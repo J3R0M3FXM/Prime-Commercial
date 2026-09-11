@@ -1,0 +1,6 @@
+{
+  "name": "Secure Telegram Shopfront",
+  "description": "A secure, Telegram-only shopfront application with server-side HMAC validation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
