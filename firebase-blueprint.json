@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Admin configuration",
+      "type": "object",
+      "properties": {
+        "accessCode": { "type": "string", "description": "Admin Access Code" }
+      },
+      "required": ["accessCode"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Product in the catalog",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Product Name" },
+        "price": { "type": "number", "description": "Price" },
+        "imageUrl": { "type": "string", "description": "Image URL" },
+        "description": { "type": "string", "description": "Description" },
+        "stock": { "type": "number", "description": "Available stock quantity" },
+        "bundleConfig": { "type": "object", "description": "Configuration for bundles/discounts" }
+      },
+      "required": ["name", "price", "stock"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Telegram user profile and PRIME mapping",
+      "type": "object",
+      "properties": {
+        "tgUserId": { "type": "string", "description": "Telegram User ID" },
+        "tgName": { "type": "string", "description": "Telegram Name" },
+        "tgUsername": { "type": "string", "description": "Telegram Handle" },
+        "phoneNumber": { "type": "string", "description": "Phone Number" },
+        "primeMemberId": { "type": "string", "description": "12-char Alphanumeric Member ID" },
+        "groups": { "type": "array", "description": "List of group IDs" },
+        "channels": { "type": "array", "description": "List of channel IDs" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tgUserId", "primeMemberId"]
+    },
+    "Fingerprint": {
+      "title": "Fingerprint",
+      "description": "Device and session fingerprint snapshot",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "enrollmentDate": { "type": "string", "format": "date-time" },
+        "lastSeen": { "type": "string", "format": "date-time" },
+        "deviceId": { "type": "string" },
+        "appId": { "type": "string" },
+        "browser": { "type": "string" },
+        "graphics": { "type": "string" },
+        "ipEnrollment": { "type": "string" },
+        "ipSession": { "type": "string" },
+        "isp": { "type": "string" },
+        "vpnDetected": { "type": "boolean" },
+        "location": { "type": "object" }
+      },
+      "required": ["userId", "deviceId"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Admin configuration"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Product catalog"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile collection"
+    },
+    "/users/{userId}/fingerprints/{fingerprintId}": {
+      "schema": "Fingerprint",
+      "description": "User specific fingerprints"
+    }
+  }
+}

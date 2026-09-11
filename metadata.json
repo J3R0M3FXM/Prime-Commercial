@@ -1,6 +1,6 @@
 {
-  "name": "Secure Telegram Shopfront",
-  "description": "A secure, Telegram-only shopfront application with server-side HMAC validation.",
-  "requestFramePermissions": [],
+  "name": "PRIME",
+  "description": "An advanced AI-powered Telegram E-Commerce Mini App.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

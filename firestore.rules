@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+      
+      match /fingerprints/{fingerprintId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+    
+    match /admins/{adminId} {
+      allow read: if false; // Admin code check should be server-side
+      allow write: if false;
+    }
+  }
+}

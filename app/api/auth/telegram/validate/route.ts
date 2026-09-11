@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { enrichFingerprintData, saveFingerprint } from '@/lib/fingerprint';
+
+function generateMemberId() {
+  return crypto.randomBytes(6).toString('hex').toUpperCase();
+}
 
 export async function POST(request: NextRequest) {
-  const { initData } = await request.json();
+  const { initData, fingerprint } = await request.json();
 
   if (!initData) {
     return NextResponse.json({ error: 'Missing initData' }, { status: 400 });
@@ -13,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
   }
 
-  // Telegram validation logic
+  // Telegram validation logic (HMAC SHA256)
   const params = new URLSearchParams(initData);
   const hash = params.get('hash');
   params.delete('hash');
@@ -30,11 +37,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // If valid, generate a cryptotoken
+  // Parse user info
+  const userStr = params.get('user');
+  if (!userStr) return NextResponse.json({ error: 'No user data' }, { status: 400 });
+  const tgUser = JSON.parse(userStr);
+  const tgUserId = tgUser.id.toString();
+
+  // Handle Firestore storage
+  const userRef = doc(db, 'users', tgUserId);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    // Create new user
+    await setDoc(userRef, {
+      tgUserId,
+      tgName: `${tgUser.first_name} ${tgUser.last_name || ''}`,
+      tgUsername: tgUser.username || '',
+      primeMemberId: generateMemberId(),
+      createdAt: new Date()
+    });
+  }
+
+  // Generate session cryptotoken
   const cryptoToken = crypto.randomBytes(32).toString('hex');
   
-  // In a real app, store this token in a secure, server-side store (e.g., Redis or DB) 
-  // with an expiry and bind it to the Telegram user ID.
+  // Store fingerprint (separate collection)
+  if (fingerprint) {
+    const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
+    const enriched = await enrichFingerprintData(ip, fingerprint.location.lat, fingerprint.location.lon);
+    
+    await saveFingerprint(tgUserId, {
+      ...fingerprint,
+      ipSession: ip,
+      ...enriched,
+      enrollmentDate: new Date(),
+      lastSeen: new Date()
+    });
+  }
 
   return NextResponse.json({ success: true, token: cryptoToken });
 }
