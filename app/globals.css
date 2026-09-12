@@ -1,9 +1,14 @@
 @import "tailwindcss";
 
-body {
-  font-family: 'Montserrat', sans-serif;
+@theme {
+  --font-sans: var(--font-montserrat);
+  --font-heading: var(--font-oswald);
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Oswald', sans-serif;
+body {
+  font-family: var(--font-sans), sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-heading), sans-serif;
 }
