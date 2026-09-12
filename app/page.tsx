@@ -176,13 +176,13 @@ export default function Shopfront() {
             <p className="text-gray-500">Try adjusting your search or filters.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             {filteredProducts.map(p => {
               const isOutOfStock = p.stock === 0;
               return (
                 <div 
                   key={p.id} 
-                  className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col cursor-pointer"
+                  className="bg-white border border-gray-100 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col cursor-pointer"
                   onClick={() => setSelectedProduct(p)}
                 >
                   <div className="relative aspect-square overflow-hidden bg-gray-50">
@@ -200,19 +200,19 @@ export default function Shopfront() {
                     )}
                   </div>
                   
-                  <div className="p-3 sm:p-4 flex flex-col flex-1">
-                    <h3 className="font-bold text-gray-900 line-clamp-2 leading-tight mb-1">{p.name}</h3>
-                    <p className="text-sm text-gray-500 mb-3">{p.category || "General"}</p>
+                  <div className="p-2 sm:p-4 flex flex-col flex-1">
+                    <h3 className="font-bold text-gray-900 line-clamp-2 leading-tight mb-1 text-[10px] sm:text-base">{p.name}</h3>
+                    <p className="text-[9px] sm:text-sm text-gray-500 mb-2">{p.category || "General"}</p>
                     
                     <div className="mt-auto flex items-center justify-between">
-                      <span className="font-heading font-bold text-lg text-gray-900">${Number(p.price).toFixed(2)}</span>
+                      <span className="font-heading font-bold text-xs sm:text-lg text-gray-900">${Number(p.price).toFixed(2)}</span>
                       {!isOutOfStock && (
                         <button 
                           onClick={(e) => {
                             e.stopPropagation(); // prevent modal opening
                             addToCart(p, 1);
                           }}
-                          className="bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-gray-800 transition-colors"
+                          className="bg-black text-white px-2 py-1 rounded text-[9px] sm:text-xs font-bold uppercase tracking-wider hover:bg-gray-800 transition-colors"
                         >
                           Add
                         </button>
