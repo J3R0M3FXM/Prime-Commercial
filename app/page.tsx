@@ -18,18 +18,35 @@ export default function Shopfront() {
     async function checkAuth() {
       try {
         let initDataRaw = "";
+        let debugInfo = "";
+        
         try {
           const lp = retrieveLaunchParams();
           initDataRaw = (lp.initDataRaw as string) || "";
         } catch (e) {
-          // Fallback to reading directly from window if the SDK fails to parse the URL
+          debugInfo += `SDK fail. `;
+          
+          // Fallback 1: window.Telegram object
           if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp?.initData) {
             initDataRaw = (window as any).Telegram.WebApp.initData;
+          } 
+          // Fallback 2: parse URL hash directly (where Telegram puts it)
+          else if (typeof window !== 'undefined' && window.location.hash) {
+            const hash = window.location.hash.substring(1); // remove #
+            const params = new URLSearchParams(hash);
+            const tgWebAppData = params.get('tgWebAppData');
+            if (tgWebAppData) {
+              initDataRaw = tgWebAppData;
+            } else {
+              debugInfo += `No tgWebAppData in hash (${hash}). `;
+            }
+          } else {
+             debugInfo += `No window.Telegram or hash. `;
           }
         }
 
         if (!initDataRaw) {
-           throw new Error("Missing initData. Are you opening this inside Telegram?");
+           throw new Error(`Missing initData. Debug: ${debugInfo}`);
         }
 
         const fingerprintData = await getClientFingerprint();
