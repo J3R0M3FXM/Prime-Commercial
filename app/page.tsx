@@ -17,7 +17,21 @@ export default function Shopfront() {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const { initDataRaw } = retrieveLaunchParams();
+        let initDataRaw = "";
+        try {
+          const lp = retrieveLaunchParams();
+          initDataRaw = (lp.initDataRaw as string) || "";
+        } catch (e) {
+          // Fallback to reading directly from window if the SDK fails to parse the URL
+          if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp?.initData) {
+            initDataRaw = (window as any).Telegram.WebApp.initData;
+          }
+        }
+
+        if (!initDataRaw) {
+           throw new Error("Missing initData. Are you opening this inside Telegram?");
+        }
+
         const fingerprintData = await getClientFingerprint();
         const locationData = await getClientLocation();
         
