@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { CartProvider } from "./components/cart-context";
 
 export const metadata: Metadata = {
-  title: "Secure Telegram Shopfront",
-  description: "A secure, Telegram-only shopfront application.",
+  title: "PRIME Shop",
+  description: "Advanced AI-powered E-Commerce.",
 };
 
 export default function RootLayout({
@@ -13,7 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <CartProvider>
+            {children}
+        </CartProvider>
+      </body>
     </html>
   );
 }

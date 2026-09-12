@@ -18,6 +18,7 @@
         "price": { "type": "number", "description": "Price" },
         "imageUrl": { "type": "string", "description": "Image URL" },
         "description": { "type": "string", "description": "Description" },
+        "category": { "type": "string", "description": "Category" },
         "stock": { "type": "number", "description": "Available stock quantity" },
         "bundleConfig": { "type": "object", "description": "Configuration for bundles/discounts" }
       },
