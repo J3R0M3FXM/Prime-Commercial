@@ -18,35 +18,37 @@ export default function Shopfront() {
     async function checkAuth() {
       try {
         let initDataRaw = "";
-        let debugInfo = "";
         
-        try {
-          const lp = retrieveLaunchParams();
-          initDataRaw = (lp.initDataRaw as string) || "";
-        } catch (e) {
-          debugInfo += `SDK fail. `;
+        // Wait for the next tick to ensure Telegram has injected the data
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Absolute fallback: read directly from the URL hash
+        if (typeof window !== 'undefined' && window.location.hash) {
+          const hashStr = window.location.hash.substring(1); // remove '#'
           
-          // Fallback 1: window.Telegram object
-          if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp?.initData) {
-            initDataRaw = (window as any).Telegram.WebApp.initData;
-          } 
-          // Fallback 2: parse URL hash directly (where Telegram puts it)
-          else if (typeof window !== 'undefined' && window.location.hash) {
-            const hash = window.location.hash.substring(1); // remove #
-            const params = new URLSearchParams(hash);
-            const tgWebAppData = params.get('tgWebAppData');
-            if (tgWebAppData) {
-              initDataRaw = tgWebAppData;
-            } else {
-              debugInfo += `No tgWebAppData in hash (${hash}). `;
-            }
+          // Telegram Mini Apps often put the data in 'tgWebAppData' inside the hash
+          const params = new URLSearchParams(hashStr);
+          const tgData = params.get('tgWebAppData');
+          
+          if (tgData) {
+            initDataRaw = tgData;
           } else {
-             debugInfo += `No window.Telegram or hash. `;
+             // Sometimes the entire hash IS the initData
+             if (hashStr.includes('user=') || hashStr.includes('hash=')) {
+               initDataRaw = hashStr;
+             }
           }
+        }
+        
+        // Final fallback: try window object
+        if (!initDataRaw && typeof window !== 'undefined' && (window as any).Telegram?.WebApp?.initData) {
+          initDataRaw = (window as any).Telegram.WebApp.initData;
         }
 
         if (!initDataRaw) {
-           throw new Error(`Missing initData. Debug: ${debugInfo}`);
+           // Output the exact hash to the screen for debugging if it still fails
+           const currentHash = typeof window !== 'undefined' ? window.location.hash : "Server-side";
+           throw new Error(`Missing initData. Hash: ${currentHash}`);
         }
 
         const fingerprintData = await getClientFingerprint();
