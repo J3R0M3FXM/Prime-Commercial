@@ -16,10 +16,18 @@ export async function getClientFingerprint() {
 }
 
 export async function getClientLocation(): Promise<{lat: number, lon: number}> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve({ lat: 0, lon: 0 });
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-      (err) => reject(err)
+      (err) => {
+        console.warn("Geolocation failed/denied", err);
+        resolve({ lat: 0, lon: 0 }); // Fail gracefully
+      },
+      { timeout: 5000 } // Prevent hanging forever
     );
   });
 }

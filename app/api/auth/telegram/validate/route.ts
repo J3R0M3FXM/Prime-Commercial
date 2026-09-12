@@ -63,16 +63,20 @@ export async function POST(request: NextRequest) {
   
   // Store fingerprint (separate collection)
   if (fingerprint) {
-    const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
-    const enriched = await enrichFingerprintData(ip, fingerprint.location.lat, fingerprint.location.lon);
-    
-    await saveFingerprint(tgUserId, {
-      ...fingerprint,
-      ipSession: ip,
-      ...enriched,
-      enrollmentDate: new Date(),
-      lastSeen: new Date()
-    });
+    try {
+      const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
+      const enriched = await enrichFingerprintData(ip, fingerprint.location.lat, fingerprint.location.lon);
+      
+      await saveFingerprint(tgUserId, {
+        ...fingerprint,
+        ipSession: ip,
+        ...enriched,
+        enrollmentDate: new Date(),
+        lastSeen: new Date()
+      });
+    } catch (err) {
+      console.error("Fingerprint tracking failed silently:", err);
+    }
   }
 
   return NextResponse.json({ success: true, token: cryptoToken });

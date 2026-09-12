@@ -12,6 +12,7 @@ export default function Shopfront() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     async function checkAuth() {
@@ -37,9 +38,13 @@ export default function Shopfront() {
           const productsRes = await fetch('/api/products');
           const pData = await productsRes.json();
           setProducts(pData);
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `Server responded with ${response.status}`);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("Auth check failed", e);
+        setErrorMsg(e.message || String(e));
       } finally {
         setChecking(false);
       }
@@ -55,13 +60,14 @@ export default function Shopfront() {
     (p.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  if (checking) return <div>Loading...</div>;
+  if (checking) return <div className="p-4 text-center mt-10">Verifying secure session...</div>;
 
   if (!authorized) {
     return (
-      <div className="p-4 text-center">
-        <h1>Access Denied</h1>
-        <p>This shopfront is exclusively for use inside the Telegram environment.</p>
+      <div className="p-4 text-center mt-10">
+        <h1 className="text-xl font-bold text-red-600 mb-2">Access Denied</h1>
+        <p className="text-sm">This shopfront is exclusively for use inside the Telegram environment.</p>
+        {errorMsg && <p className="text-xs text-gray-500 mt-4 break-all">Debug: {errorMsg}</p>}
       </div>
     );
   }
