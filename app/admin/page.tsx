@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Users, Package, Sliders, ChevronDown, Lock, Loader2, ArrowRight, Trash2, Edit2, Eye, EyeOff, Plus } from "lucide-react";
+import { Users, Package, Sliders, ChevronDown, Lock, Loader2, ArrowRight, Trash2, Edit2, Eye, EyeOff, Plus, ClipboardList } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 
 export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
@@ -10,7 +11,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [showProductForm, setShowProductForm] = useState(false);
+  const [activeModule, setActiveModule] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -115,90 +116,87 @@ export default function AdminPage() {
 
       {/* Glossy Dashboard Tiles */}
       <div className="grid grid-cols-3 gap-3 mb-8">
-        {['Customers', 'Orders', 'Products', 'Inventory', 'Settings', 'Analytics'].map((item) => (
-          <button key={item} className="h-24 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2 relative overflow-hidden">
+        {[
+          { name: 'Customers', icon: Users }, 
+          { name: 'Orders', icon: ClipboardList }, 
+          { name: 'Products', icon: Package }, 
+          { name: 'Inventory', icon: Sliders }, 
+          { name: 'Settings', icon: Lock }, 
+          { name: 'Analytics', icon: Users }
+        ].map((item) => (
+          <button key={item.name} onClick={() => setActiveModule(item.name)} className="h-24 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2 relative overflow-hidden">
              <div className="absolute inset-0 bg-gradient-to-tr from-transparent to-white/50 opacity-0 hover:opacity-100 transition-opacity"></div>
-             <span className="font-bold text-[10px] uppercase tracking-widest relative z-10">{item}</span>
+             <item.icon className="w-5 h-5 text-gray-400" />
+             <span className="font-bold text-[10px] uppercase tracking-widest relative z-10">{item.name}</span>
           </button>
         ))}
       </div>
 
-      <div className="space-y-8">
-        {/* Module 1: Customers */}
-        <section className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-            <Users className="w-5 h-5 text-gray-700" />
-            <h2 className="font-heading font-bold uppercase tracking-wide text-gray-900">Customer Management</h2>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {customers.map((c) => (
-              <div key={c.tgUserId} onClick={() => setSelectedCustomer(c)} className="p-4 cursor-pointer hover:bg-gray-50 flex justify-between items-center group">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-900 group-hover:underline">{c.tgName || 'Unknown User'}</span>
-                    <span className="text-[10px] text-gray-500 font-mono">{c.primeMemberId}</span>
+      {/* Dynamic Content Area */}
+      <AnimatePresence mode="wait">
+        {activeModule && (
+          <motion.section 
+            key={activeModule}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden"
+          >
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="font-heading font-bold uppercase tracking-wide text-gray-900">{activeModule}</h2>
+              <button onClick={() => setActiveModule(null)} className="text-xs font-bold uppercase">Close</button>
+            </div>
+            
+            <div className="p-4">
+               {activeModule === 'Customers' && (
+                  <div className="divide-y divide-gray-100">
+                      {customers.map((c) => (
+                      <div key={c.tgUserId} onClick={() => setSelectedCustomer(c)} className="p-4 cursor-pointer hover:bg-gray-50 flex justify-between items-center group">
+                          <div className="flex flex-col">
+                              <span className="text-sm font-bold text-gray-900 group-hover:underline">{c.tgName || 'Unknown User'}</span>
+                              <span className="text-[10px] text-gray-500 font-mono">{c.primeMemberId}</span>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-black transition-colors" />
+                      </div>
+                      ))}
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-black transition-colors" />
-              </div>
-            ))}
-          </div>
-        </section>
+               )}
 
-        {/* Module 2: Products/Inventory */}
-        <section className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-             <div className="flex items-center gap-3">
-                <Package className="w-5 h-5 text-gray-700" />
-                <h2 className="font-heading font-bold uppercase tracking-wide text-gray-900">Products & Inventory</h2>
-             </div>
-             <button onClick={() => setShowProductForm(!showProductForm)} className="bg-white border border-gray-200 text-black px-3 py-1.5 rounded-md font-bold uppercase text-[10px] hover:bg-gray-50 flex items-center gap-1.5">
-                <Plus className="w-3 h-3" /> Add Product
-             </button>
-          </div>
-          
-          {showProductForm && (
-            <form className="p-4 border-b border-gray-200 bg-gray-50 space-y-3" onSubmit={async (e) => {
-                e.preventDefault();
-                const form = e.target as HTMLFormElement;
-                const newProduct = {
-                  name: (form[0] as HTMLInputElement).value,
-                  price: parseFloat((form[1] as HTMLInputElement).value),
-                  stock: parseInt((form[2] as HTMLInputElement).value),
-                  description: (form[3] as HTMLTextAreaElement).value,
-                  bundleConfig: { enabled: (form[4] as HTMLInputElement).checked, discount: 15 },
-                  category: 'General'
-                };
-                await fetch('/api/admin/products', { method: 'POST', body: JSON.stringify(newProduct) });
-                form.reset();
-                setShowProductForm(false);
-                fetchData();
-              }}>
-              <input type="text" placeholder="Product Name" className="w-full p-2 border rounded text-sm" required />
-              <div className="grid grid-cols-2 gap-2">
-                <input type="number" placeholder="Price" className="p-2 border rounded text-sm" required />
-                <input type="number" placeholder="Stock" className="p-2 border rounded text-sm" required />
-              </div>
-              <textarea placeholder="Description" className="w-full p-2 border rounded text-sm" required />
-              <button type="submit" className="w-full bg-black text-white px-4 py-2 rounded text-sm font-bold">Publish Product</button>
-            </form>
-          )}
-
-          <div className="divide-y divide-gray-100">
-            {products.map(p => (
-              <div key={p.id} className="p-3 flex justify-between items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-bold text-gray-900 truncate block">{p.name}</span>
-                    <span className="text-[10px] text-gray-500 font-mono">Stock: {p.stock} | ${p.price}</span>
+               {activeModule === 'Products' && (
+                  <div>
+                     <button className="mb-4 bg-black text-white px-3 py-1.5 rounded-md font-bold uppercase text-[10px] flex items-center gap-1.5">
+                        <Plus className="w-3 h-3" /> Add Product
+                     </button>
+                     <div className="divide-y divide-gray-100">
+                      {products.map(p => (
+                        <div key={p.id} className="p-3 flex justify-between items-center">
+                            <span className="text-sm font-bold text-gray-900">{p.name}</span>
+                            <div className="flex gap-2">
+                               <button className="text-gray-400 hover:text-black"><Edit2 className="w-4 h-4" /></button>
+                               <button className="text-gray-400 hover:text-black">{p.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
+                               <button onClick={() => deleteProduct(p.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex gap-2 items-center">
-                    <button className="text-gray-400 hover:text-black"><Edit2 className="w-4 h-4" /></button>
-                    <button className="text-gray-400 hover:text-black">{p.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
-                    <button onClick={() => deleteProduct(p.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+               )}
+               
+               {activeModule === 'Inventory' && (
+                   <div className="divide-y divide-gray-100">
+                      {products.map(p => (
+                        <div key={p.id} className="p-3 flex justify-between items-center">
+                            <span className="text-sm font-bold text-gray-900">{p.name}</span>
+                            <span className="text-xs font-mono">Stock: {p.stock}</span>
+                        </div>
+                      ))}
+                   </div>
+               )}
+            </div>
+          </motion.section>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
