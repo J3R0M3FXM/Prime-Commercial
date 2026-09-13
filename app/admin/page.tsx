@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Users, Package, Sliders, ChevronDown, Lock, Loader2, ArrowRight } from "lucide-react";
+import { Users, Package, Sliders, ChevronDown, Lock, Loader2, ArrowRight, Trash2, Edit2, Eye, EyeOff, Plus } from "lucide-react";
 
 export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
@@ -23,6 +23,12 @@ export default function AdminPage() {
     } catch (e) {
       console.error("Failed to load data", e);
     }
+  };
+
+  const deleteProduct = async (id: string) => {
+    if (!confirm("Are you sure?")) return;
+    await fetch('/api/admin/products', { method: 'DELETE', body: JSON.stringify({ id }) });
+    fetchData();
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -76,64 +82,81 @@ export default function AdminPage() {
 
   if (selectedCustomer) {
     return (
-      <div className="min-h-screen bg-gray-100 p-4">
-        <button onClick={() => setSelectedCustomer(null)} className="mb-4 text-xs font-bold uppercase underline tracking-widest text-gray-600">Back to Dashboard</button>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-           <h2 className="text-2xl font-bold mb-4">{selectedCustomer.tgName || 'Unknown User'}</h2>
-           <p className="font-mono text-sm text-gray-600 mb-6">{selectedCustomer.primeMemberId}</p>
-           <pre className="text-[10px] bg-gray-50 p-4 rounded overflow-auto">{JSON.stringify(selectedCustomer, null, 2)}</pre>
+      <div className="min-h-screen bg-white p-6 font-sans">
+        <button onClick={() => setSelectedCustomer(null)} className="mb-6 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-black">
+          &larr; Back to Dashboard
+        </button>
+        <div className="max-w-2xl border border-gray-200 rounded-xl p-8 shadow-sm">
+           <h2 className="text-3xl font-heading font-black mb-1 uppercase">{selectedCustomer.tgName || 'Unknown User'}</h2>
+           <p className="font-mono text-sm text-gray-500 mb-8">{selectedCustomer.primeMemberId}</p>
+           <div className="space-y-6 text-sm">
+             <div className="grid grid-cols-2 gap-4">
+               <div><p className="text-gray-500 uppercase text-[10px] tracking-widest font-bold">Telegram ID</p><p className="font-mono">{selectedCustomer.tgUserId}</p></div>
+               <div><p className="text-gray-500 uppercase text-[10px] tracking-widest font-bold">Handle</p><p>@{selectedCustomer.tgUsername || 'none'}</p></div>
+             </div>
+             {selectedCustomer.latestFingerprint && (
+               <div className="pt-6 border-t border-gray-100">
+                 <p className="font-bold text-[10px] uppercase tracking-widest text-gray-400 mb-4">Security Snapshot</p>
+                 <pre className="text-[10px] bg-gray-50 p-4 rounded-lg overflow-auto">{JSON.stringify(selectedCustomer.latestFingerprint, null, 2)}</pre>
+               </div>
+             )}
+           </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-2 sm:p-4 font-sans pb-20">
-      <header className="mb-8 bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex justify-between items-center">
-        <h1 className="text-xl font-heading font-black tracking-widest uppercase">Prime Admin</h1>
-        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Live</span>
+    <div className="min-h-screen bg-gray-50 p-4 font-sans pb-20">
+      <header className="mb-8 flex justify-between items-end">
+        <h1 className="text-2xl font-heading font-black tracking-widest uppercase">Prime Admin</h1>
+        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Live</span>
       </header>
 
-      {/* Glossy Grid Dashboard */}
+      {/* Glossy Dashboard Tiles */}
       <div className="grid grid-cols-3 gap-3 mb-8">
         {['Customers', 'Orders', 'Products', 'Inventory', 'Settings', 'Analytics'].map((item) => (
-          <button key={item} className="h-24 bg-gradient-to-br from-white to-gray-100 border border-gray-200 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 hover:shadow-md transition-shadow">
-            <span className="font-bold text-xs uppercase tracking-widest">{item}</span>
+          <button key={item} className="h-24 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2 relative overflow-hidden">
+             <div className="absolute inset-0 bg-gradient-to-tr from-transparent to-white/50 opacity-0 hover:opacity-100 transition-opacity"></div>
+             <span className="font-bold text-[10px] uppercase tracking-widest relative z-10">{item}</span>
           </button>
         ))}
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Module 1: Customers */}
-        <section className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-          <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
+        <section className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-200 flex items-center gap-3">
             <Users className="w-5 h-5 text-gray-700" />
             <h2 className="font-heading font-bold uppercase tracking-wide text-gray-900">Customer Management</h2>
           </div>
           <div className="divide-y divide-gray-100">
             {customers.map((c) => (
-              <div key={c.tgUserId} onClick={() => setSelectedCustomer(c)} className="p-4 cursor-pointer hover:bg-gray-50 flex justify-between items-center">
+              <div key={c.tgUserId} onClick={() => setSelectedCustomer(c)} className="p-4 cursor-pointer hover:bg-gray-50 flex justify-between items-center group">
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-900">{c.tgName || 'Unknown User'}</span>
+                    <span className="text-sm font-bold text-gray-900 group-hover:underline">{c.tgName || 'Unknown User'}</span>
                     <span className="text-[10px] text-gray-500 font-mono">{c.primeMemberId}</span>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400" />
+                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-black transition-colors" />
               </div>
             ))}
           </div>
         </section>
 
         {/* Module 2: Products/Inventory */}
-        <section className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-          <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+        <section className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
              <div className="flex items-center gap-3">
                 <Package className="w-5 h-5 text-gray-700" />
                 <h2 className="font-heading font-bold uppercase tracking-wide text-gray-900">Products & Inventory</h2>
              </div>
-             <button onClick={() => setShowProductForm(!showProductForm)} className="bg-black text-white px-3 py-1.5 rounded font-bold uppercase text-[10px] hover:bg-gray-800">Add Product</button>
+             <button onClick={() => setShowProductForm(!showProductForm)} className="bg-white border border-gray-200 text-black px-3 py-1.5 rounded-md font-bold uppercase text-[10px] hover:bg-gray-50 flex items-center gap-1.5">
+                <Plus className="w-3 h-3" /> Add Product
+             </button>
           </div>
+          
           {showProductForm && (
-            <form className="p-4 border-b border-gray-200 bg-white space-y-3" onSubmit={async (e) => {
+            <form className="p-4 border-b border-gray-200 bg-gray-50 space-y-3" onSubmit={async (e) => {
                 e.preventDefault();
                 const form = e.target as HTMLFormElement;
                 const newProduct = {
@@ -144,29 +167,32 @@ export default function AdminPage() {
                   bundleConfig: { enabled: (form[4] as HTMLInputElement).checked, discount: 15 },
                   category: 'General'
                 };
-                await fetch('/api/admin/products', {
-                  method: 'POST',
-                  body: JSON.stringify(newProduct)
-                });
+                await fetch('/api/admin/products', { method: 'POST', body: JSON.stringify(newProduct) });
                 form.reset();
                 setShowProductForm(false);
                 fetchData();
               }}>
-              <input type="text" placeholder="Product Name" className="w-full p-2 border rounded" required />
-              <input type="number" placeholder="Price" className="w-full p-2 border rounded" required />
-              <input type="number" placeholder="Stock" className="w-full p-2 border rounded" required />
-              <textarea placeholder="Description" className="w-full p-2 border rounded" required />
-              <button type="submit" className="bg-black text-white px-4 py-2 rounded">Publish</button>
+              <input type="text" placeholder="Product Name" className="w-full p-2 border rounded text-sm" required />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" placeholder="Price" className="p-2 border rounded text-sm" required />
+                <input type="number" placeholder="Stock" className="p-2 border rounded text-sm" required />
+              </div>
+              <textarea placeholder="Description" className="w-full p-2 border rounded text-sm" required />
+              <button type="submit" className="w-full bg-black text-white px-4 py-2 rounded text-sm font-bold">Publish Product</button>
             </form>
           )}
+
           <div className="divide-y divide-gray-100">
             {products.map(p => (
               <div key={p.id} className="p-3 flex justify-between items-center gap-4">
-                  <span className="text-sm font-bold text-gray-900 truncate flex-1">{p.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-bold text-gray-900 truncate block">{p.name}</span>
+                    <span className="text-[10px] text-gray-500 font-mono">Stock: {p.stock} | ${p.price}</span>
+                  </div>
                   <div className="flex gap-2 items-center">
-                    <button className="bg-gray-200 px-2 py-1 rounded text-[10px] font-bold">Edit</button>
-                    <div className="w-8 h-4 bg-gray-300 rounded-full"></div>
-                    <div className="w-8 h-4 bg-gray-300 rounded-full"></div>
+                    <button className="text-gray-400 hover:text-black"><Edit2 className="w-4 h-4" /></button>
+                    <button className="text-gray-400 hover:text-black">{p.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
+                    <button onClick={() => deleteProduct(p.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                   </div>
               </div>
             ))}
@@ -176,4 +202,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
