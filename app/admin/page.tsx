@@ -90,7 +90,7 @@ export default function AdminPage() {
             <Users className="w-5 h-5 text-gray-700" />
             <h2 className="font-heading font-bold uppercase tracking-wide text-gray-900">Customer Management</h2>
           </div>
-          <div className="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
+          <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
             {customers.map((c) => (
               <details key={c.tgUserId} className="group">
                 <summary className="p-3 font-semibold cursor-pointer flex justify-between items-center hover:bg-gray-50 transition-colors list-none">
@@ -100,10 +100,39 @@ export default function AdminPage() {
                   </div>
                   <ChevronDown className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
                 </summary>
-                <div className="p-3 bg-gray-50 text-xs text-gray-700 space-y-2 border-t border-gray-100">
-                  <div className="flex justify-between"><span className="text-gray-500">Telegram ID:</span> <span className="font-mono font-medium">{c.tgUserId}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500">Handle:</span> <span className="font-medium">@{c.tgUsername || 'none'}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500">Joined:</span> <span className="font-medium">{c.createdAt ? new Date(c.createdAt.seconds * 1000).toLocaleDateString() : 'Unknown'}</span></div>
+                <div className="p-3 bg-gray-50 text-xs text-gray-700 space-y-3 border-t border-gray-100">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between"><span className="text-gray-500">Telegram ID:</span> <span className="font-mono font-medium">{c.tgUserId}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Handle:</span> <span className="font-medium">@{c.tgUsername || 'none'}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Joined:</span> <span className="font-medium">{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Unknown'}</span></div>
+                  </div>
+                  
+                  {c.latestFingerprint && (
+                    <div className="mt-3 p-3 bg-white border border-gray-200 rounded-md">
+                      <p className="font-bold text-[10px] uppercase tracking-widest text-gray-400 mb-2 border-b border-gray-100 pb-1">Security Snapshot</p>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Device/OS:</span> 
+                          <span className="font-medium text-right max-w-[150px] truncate" title={c.latestFingerprint.userAgent}>{c.latestFingerprint.platform || 'Unknown'}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500">Network (IP):</span> 
+                          <div className="flex items-center gap-2">
+                            {c.latestFingerprint.vpn && <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">VPN/PROXY</span>}
+                            <span className="font-mono">{c.latestFingerprint.ipSession || 'Hidden'}</span>
+                          </div>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Location:</span> 
+                          <span className="font-medium">{c.latestFingerprint.city ? `${c.latestFingerprint.city}, ${c.latestFingerprint.country}` : (c.latestFingerprint.location ? `${c.latestFingerprint.location.lat.toFixed(2)}, ${c.latestFingerprint.location.lon.toFixed(2)}` : 'Unknown')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Last Seen:</span> 
+                          <span className="font-medium">{c.latestFingerprint.lastSeen ? new Date(c.latestFingerprint.lastSeen).toLocaleString() : 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </details>
             ))}
@@ -153,21 +182,41 @@ export default function AdminPage() {
           </div>
           <div className="p-4 bg-white">
             <p className="text-xs text-gray-500 mb-4 uppercase tracking-wider font-bold">Add New Product</p>
-            <div className="space-y-3">
-              <input type="text" placeholder="Product Name" className="w-full p-3 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-black transition-colors" />
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.target as HTMLFormElement;
+                const newProduct = {
+                  name: (form[0] as HTMLInputElement).value,
+                  price: parseFloat((form[1] as HTMLInputElement).value),
+                  stock: parseInt((form[2] as HTMLInputElement).value),
+                  description: (form[3] as HTMLTextAreaElement).value,
+                  bundleConfig: { enabled: (form[4] as HTMLInputElement).checked, discount: 15 },
+                  category: 'General'
+                };
+                await fetch('/api/admin/products', {
+                  method: 'POST',
+                  body: JSON.stringify(newProduct)
+                });
+                form.reset();
+                fetchData();
+              }}
+              className="space-y-3"
+            >
+              <input type="text" placeholder="Product Name" className="w-full p-3 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-black transition-colors" required />
               <div className="flex gap-3">
-                <input type="number" placeholder="Price ($)" className="w-1/2 p-3 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-black transition-colors" />
-                <input type="number" placeholder="Init Stock" className="w-1/2 p-3 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-black transition-colors" />
+                <input type="number" placeholder="Price ($)" className="w-1/2 p-3 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-black transition-colors" required />
+                <input type="number" placeholder="Init Stock" className="w-1/2 p-3 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-black transition-colors" required />
               </div>
-              <textarea placeholder="Description" rows={3} className="w-full p-3 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-black transition-colors resize-none"></textarea>
+              <textarea placeholder="Description" rows={3} className="w-full p-3 bg-gray-50 border border-gray-200 rounded text-sm focus:outline-none focus:border-black transition-colors resize-none" required></textarea>
               <div className="flex items-center gap-2 p-3 border border-gray-200 rounded bg-gray-50">
                 <input type="checkbox" id="bundle" className="w-4 h-4 accent-black" />
                 <label htmlFor="bundle" className="text-sm font-bold text-gray-700 cursor-pointer">Enable 'Buy More, Save More' Bundle (15% off)</label>
               </div>
-              <button className="w-full bg-black text-white p-3 rounded font-bold uppercase tracking-widest text-sm hover:bg-gray-800 transition-colors">
+              <button type="submit" className="w-full bg-black text-white p-3 rounded font-bold uppercase tracking-widest text-sm hover:bg-gray-800 transition-colors">
                 Publish Product
               </button>
-            </div>
+            </form>
           </div>
         </section>
 
