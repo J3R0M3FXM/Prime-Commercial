@@ -1,12 +1,27 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useCart } from './cart-context';
 import { ShoppingCart, X, Plus, Minus, Trash2 } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
 
 export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const { cart, removeFromCart, updateQuantity, clearCart, cartTotal, cartCount } = useCart();
+  const { cart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, cartTotal, cartCount, syncWithServerData } = useCart();
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/products")
+        .then(res => res.json())
+        .then(data => {
+           if (data && Array.isArray(data)) {
+             syncWithServerData(data);
+           }
+        })
+        .catch(err => console.error("Failed to sync cart data", err));
+    }
+  }, [isOpen]); // Intentionally omitting syncWithServerData to prevent unnecessary re-fetches if it changes reference
 
   if (!isOpen) return null;
+
+  const selectedItems = cart.filter((item: any) => item.selected !== false);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/50 transition-opacity">
@@ -41,11 +56,17 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
             </div>
           ) : (
             cart.map((item: any) => (
-              <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+              <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100 items-center">
+                <input 
+                  type="checkbox" 
+                  checked={item.selected !== false}
+                  onChange={(e) => toggleSelection(item.id, e.target.checked)}
+                  className="w-5 h-5 cursor-pointer accent-black shrink-0"
+                />
                 <img 
                   src={item.imageUrl || "https://picsum.photos/seed/prime/100"} 
                   alt={item.name} 
-                  className="w-20 h-20 object-cover rounded bg-white border border-gray-200"
+                  className="w-16 h-16 object-cover rounded bg-white border border-gray-200"
                 />
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
@@ -64,9 +85,8 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
                   <div className="flex items-center gap-3 mt-2">
                     <div className="flex items-center border border-gray-200 rounded bg-white">
                       <button 
-                        className="px-2 py-1 text-gray-500 hover:text-black hover:bg-gray-50 disabled:opacity-50"
+                        className="px-2 py-1 text-gray-500 hover:text-black hover:bg-gray-50"
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        disabled={item.quantity <= 1}
                       >
                         <Minus className="w-3 h-3" />
                       </button>
@@ -93,7 +113,9 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
               <span className="font-heading font-normal text-2xl text-gray-950">{formatPHP(cartTotal)}</span>
             </div>
             <button 
+              disabled={selectedItems.length === 0}
               onClick={async () => {
+                if (selectedItems.length === 0) return;
                 try {
                   const storedUserId = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_customer_id") || sessionStorage.getItem("prime_admin_user_id") || "1085949511") : "1085949511";
                   const storedName = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_customer_name") || "Customer") : "Customer";
@@ -108,7 +130,7 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
                       customerName: storedName,
                       customerUsername: storedUsername,
                       primeMemberId: storedMemberId,
-                      items: cart,
+                      items: selectedItems,
                       totalAmount: cartTotal,
                       notes: "Storefront Checkout Order"
                     })
@@ -116,7 +138,7 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
                   if (res.ok) {
                     const data = await res.json();
                     alert(`Order #${data.orderNumber} placed successfully!`);
-                    clearCart();
+                    clearSelectedItems();
                     onClose();
                   } else {
                     const err = await res.json().catch(() => ({}));
@@ -127,7 +149,7 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
                   alert("Order checkout error");
                 }
               }}
-              className="w-full bg-black text-white font-bold py-4 rounded hover:bg-gray-800 transition-colors uppercase tracking-widest text-sm flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-black text-white font-bold py-4 rounded hover:bg-gray-800 transition-colors uppercase tracking-widest text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Proceed to Checkout
             </button>

@@ -6,7 +6,7 @@ import { getClientFingerprint, getClientLocation } from "./components/fingerprin
 import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import { useCart } from "./components/cart-context";
-import { ShoppingBag, Search, Filter, AlertCircle, Loader2 } from "lucide-react";
+import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 
 export default function Shopfront() {
@@ -21,7 +21,7 @@ export default function Shopfront() {
   const [errorMsg, setErrorMsg] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  const { cartCount, addToCart } = useCart();
+  const { cart, cartCount, addToCart, updateQuantity } = useCart();
 
   useEffect(() => {
     async function checkAuth() {
@@ -258,15 +258,39 @@ export default function Shopfront() {
                     <div className="mt-auto flex items-center justify-between">
                       <span className="font-heading font-normal text-xs sm:text-lg text-gray-900">{formatPHP(p.price)}</span>
                       {!isOutOfStock && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation(); // prevent modal opening
-                            addToCart(p, 1);
-                          }}
-                          className="bg-black text-white px-2 py-1 rounded text-[9px] sm:text-xs font-bold uppercase tracking-wider hover:bg-gray-800 transition-colors"
-                        >
-                          Add
-                        </button>
+                        (() => {
+                          const cartItem = cart.find((item: any) => item.id === p.id);
+                          if (cartItem) {
+                            return (
+                              <div className="flex items-center border border-gray-200 rounded bg-white shadow-sm" onClick={(e) => e.stopPropagation()}>
+                                <button 
+                                  className="p-1 sm:p-1.5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors"
+                                  onClick={() => updateQuantity(cartItem.id, cartItem.quantity - 1)}
+                                >
+                                  <Minus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                </button>
+                                <span className="text-[10px] sm:text-xs font-bold w-4 sm:w-6 text-center">{cartItem.quantity}</span>
+                                <button 
+                                  className="p-1 sm:p-1.5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors"
+                                  onClick={() => updateQuantity(cartItem.id, cartItem.quantity + 1)}
+                                >
+                                  <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addToCart(p, 1);
+                              }}
+                              className="bg-black text-white p-1 sm:p-1.5 rounded hover:bg-gray-800 transition-colors shadow-sm"
+                            >
+                              <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            </button>
+                          );
+                        })()
                       )}
                     </div>
                   </div>

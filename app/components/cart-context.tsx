@@ -25,7 +25,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         if (existing) {
             return prev.map(item => item.id === product.id ? {...item, quantity: item.quantity + quantity} : item);
         }
-        return [...prev, { ...product, quantity }];
+        return [...prev, { ...product, quantity, selected: true }];
     });
   };
 
@@ -40,12 +40,48 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     });
   };
 
+  const toggleSelection = (productId: string, selected: boolean) => {
+    setCart(prev => prev.map(item => item.id === productId ? { ...item, selected } : item));
+  };
+
+  const clearSelectedItems = () => {
+    setCart(prev => prev.filter(item => item.selected === false));
+  };
+
   const clearCart = () => {
     setCart([]);
   };
 
+  // Sync cart items with fresh server product data
+  const syncWithServerData = (serverProducts: any[]) => {
+    setCart(prev => {
+      let changed = false;
+      const updatedCart = prev.map(item => {
+        const serverProduct = serverProducts.find(p => p.id === item.id);
+        if (!serverProduct) return item; // Keep as is if not found, or maybe remove? We'll keep.
+        
+        let newQty = item.quantity;
+        // Adjust quantity if server stock is lower than requested quantity
+        if (serverProduct.stock !== undefined && newQty > serverProduct.stock) {
+          newQty = serverProduct.stock;
+        }
+
+        if (item.price !== serverProduct.price || item.name !== serverProduct.name || item.quantity !== newQty || item.imageUrl !== serverProduct.imageUrl) {
+          changed = true;
+          return { ...item, price: serverProduct.price, name: serverProduct.name, quantity: newQty, imageUrl: serverProduct.imageUrl };
+        }
+        return item;
+      }).filter(item => item.quantity > 0); // Remove if stock went to 0
+
+      if (changed || updatedCart.length !== prev.length) {
+        return updatedCart;
+      }
+      return prev;
+    });
+  };
+
   const cartTotal = useMemo(() => {
-    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return cart.filter(item => item.selected !== false).reduce((total, item) => total + (item.price * item.quantity), 0);
   }, [cart]);
 
   const cartCount = useMemo(() => {
@@ -53,7 +89,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   }, [cart]);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, cartCount }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, clearCart, cartTotal, cartCount, syncWithServerData, setCart }}>
       {children}
     </CartContext.Provider>
   );

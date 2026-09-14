@@ -1,12 +1,17 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from './cart-context';
-import { X, Check, Minus, Plus } from 'lucide-react';
+import { X, Check, Minus, Plus, ShoppingCart } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
 
 export default function ProductModal({ product, onClose }: { product: any, onClose: () => void }) {
-  const { addToCart } = useCart();
-  const [quantity, setQuantity] = useState(1);
+  const { cart, addToCart, updateQuantity } = useCart();
+  
+  const cartItem = cart.find((item: any) => item.id === product?.id);
+  const isInCart = !!cartItem;
+  
+  const [localQuantity, setLocalQuantity] = useState(1);
+  const quantity = isInCart ? cartItem.quantity : localQuantity;
 
   if (!product) return null;
 
@@ -65,22 +70,22 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
             </div>
           )}
 
-          {!isOutOfStock && (
+          {!isOutOfStock && !isInCart && (
             <div className="flex items-center gap-4 mb-2">
               <span className="font-bold text-gray-700 uppercase tracking-wide text-sm">Quantity</span>
               <div className="flex items-center border border-gray-200 rounded-lg">
                 <button 
                   className="p-3 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-50"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1}
+                  onClick={() => setLocalQuantity(Math.max(1, localQuantity - 1))}
+                  disabled={localQuantity <= 1}
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <span className="w-12 text-center font-bold text-lg">{quantity}</span>
+                <span className="w-12 text-center font-bold text-lg">{localQuantity}</span>
                 <button 
                   className="p-3 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-50"
-                  onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                  disabled={quantity >= product.stock}
+                  onClick={() => setLocalQuantity(Math.min(product.stock, localQuantity + 1))}
+                  disabled={localQuantity >= product.stock}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -90,13 +95,42 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
         </div>
 
         <div className="p-4 sm:p-6 border-t border-gray-100 bg-gray-50 shrink-0">
-          <button 
-            onClick={() => { addToCart(product, quantity); onClose(); }} 
-            disabled={isOutOfStock}
-            className="w-full bg-black text-white py-4 rounded-xl font-heading font-normal uppercase tracking-widest text-sm hover:bg-gray-800 transition-colors disabled:bg-gray-200 disabled:text-gray-400 shadow-lg disabled:shadow-none"
-          >
-            {isOutOfStock ? "Out of Stock" : `Add to Cart - ${formatPHP(finalPrice * quantity)}`}
-          </button>
+          {isOutOfStock ? (
+            <button 
+              disabled
+              className="w-full bg-gray-200 text-gray-400 py-4 rounded-xl font-heading font-normal uppercase tracking-widest text-sm"
+            >
+              Out of Stock
+            </button>
+          ) : isInCart ? (
+            <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+              <button 
+                className="p-4 sm:p-5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors"
+                onClick={() => updateQuantity(cartItem.id, cartItem.quantity - 1)}
+              >
+                <Minus className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+              <div className="flex flex-col items-center">
+                <span className="text-xl sm:text-2xl font-bold">{cartItem.quantity}</span>
+                <span className="text-[10px] sm:text-xs text-gray-500 font-bold uppercase tracking-widest">In Cart</span>
+              </div>
+              <button 
+                className="p-4 sm:p-5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-50"
+                onClick={() => updateQuantity(cartItem.id, cartItem.quantity + 1)}
+                disabled={cartItem.quantity >= product.stock}
+              >
+                <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => { addToCart(product, localQuantity); onClose(); }} 
+              className="w-full flex items-center justify-center gap-3 bg-black text-white py-4 rounded-xl font-heading font-normal uppercase tracking-widest text-sm hover:bg-gray-800 transition-colors shadow-lg"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              <span>Add to Cart - {formatPHP(finalPrice * localQuantity)}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>
