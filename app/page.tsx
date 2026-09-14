@@ -7,6 +7,7 @@ import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import { useCart } from "./components/cart-context";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2 } from "lucide-react";
+import { formatPHP } from "@/lib/currency";
 
 export default function Shopfront() {
   const router = useRouter();
@@ -246,7 +247,7 @@ export default function Shopfront() {
                     <p className="text-[9px] sm:text-sm text-gray-500 mb-2">{p.category || "General"}</p>
                     
                     <div className="mt-auto flex items-center justify-between">
-                      <span className="font-heading font-bold text-xs sm:text-lg text-gray-900">${Number(p.price).toFixed(2)}</span>
+                      <span className="font-heading font-normal text-xs sm:text-lg text-gray-900">{formatPHP(p.price)}</span>
                       {!isOutOfStock && (
                         <button 
                           onClick={(e) => {

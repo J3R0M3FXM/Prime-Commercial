@@ -1,6 +1,7 @@
 import React from 'react';
 import { useCart } from './cart-context';
 import { ShoppingCart, X, Plus, Minus, Trash2 } from 'lucide-react';
+import { formatPHP } from "@/lib/currency";
 
 export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { cart, removeFromCart, updateQuantity, clearCart, cartTotal, cartCount } = useCart();
@@ -49,8 +50,8 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-bold text-gray-900 line-clamp-1">{item.name}</h3>
-                      <p className="text-sm font-medium text-gray-600">${Number(item.price).toFixed(2)}</p>
+                      <h3 className="font-heading font-normal uppercase text-gray-900 line-clamp-1">{item.name}</h3>
+                      <p className="text-sm font-medium text-gray-600">{formatPHP(item.price)}</p>
                     </div>
                     <button 
                       onClick={() => removeFromCart(item.id)}
@@ -88,8 +89,8 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
         {cart.length > 0 && (
           <div className="p-4 border-t border-gray-100 bg-white space-y-4">
             <div className="flex justify-between items-center text-lg">
-              <span className="font-bold text-gray-600">Total:</span>
-              <span className="font-bold text-2xl font-heading">${cartTotal.toFixed(2)}</span>
+              <span className="font-heading font-normal uppercase text-gray-600">Total:</span>
+              <span className="font-heading font-normal text-2xl text-gray-950">{formatPHP(cartTotal)}</span>
             </div>
             <button 
               onClick={async () => {

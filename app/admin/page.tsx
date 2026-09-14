@@ -36,9 +36,12 @@ import {
   ChevronRight,
   Filter,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Stethoscope
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { formatPHP } from "@/lib/currency";
+import DiagnosticsModule from "@/app/components/admin/diagnostics-module";
 
 type AdminView = 
   | "dashboard" 
@@ -49,7 +52,8 @@ type AdminView =
   | "products" 
   | "inventory" 
   | "settings" 
-  | "analytics";
+  | "analytics"
+  | "diagnostics";
 
 export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
@@ -524,9 +528,9 @@ export default function AdminPage() {
               </div>
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Orders</p>
-                <p className="text-2xl font-heading font-black text-slate-900">{orders.length}</p>
+                <p className="text-2xl font-heading font-normal text-slate-900">{orders.length}</p>
                 <p className="text-[10px] text-emerald-600 font-mono mt-1">
-                  ${orders.reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0).toFixed(2)} volume
+                  {formatPHP(orders.reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0))} volume
                 </p>
               </div>
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
@@ -536,13 +540,19 @@ export default function AdminPage() {
                   {products.filter(p => (p.stock ?? 0) > 0).length} in stock
                 </p>
               </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Security & Fraud Check</p>
-                <p className="text-2xl font-heading font-black text-emerald-600 flex items-center gap-1.5">
-                  <ShieldCheck className="w-5 h-5" /> Active
+              <button 
+                onClick={() => setView("diagnostics")}
+                className="bg-white border border-slate-200 hover:border-emerald-500 rounded-xl p-4 shadow-sm text-left transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Diagnostics & Health</p>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 transition-colors" />
+                </div>
+                <p className="text-2xl font-heading font-normal text-emerald-600 flex items-center gap-1.5">
+                  <Activity className="w-5 h-5 text-emerald-600 animate-pulse" /> 9 Systems
                 </p>
-                <p className="text-[10px] text-slate-500 font-mono mt-1">Device & promo check</p>
-              </div>
+                <p className="text-[10px] text-slate-500 font-mono mt-1 group-hover:text-emerald-700">Check APIs & Infrastructure &rarr;</p>
+              </button>
             </div>
 
             {/* Glossy Module Tiles (3 per row) */}
@@ -557,7 +567,8 @@ export default function AdminPage() {
                   { id: "products", name: "Products", icon: Package, desc: "Catalog Configuration", count: products.length },
                   { id: "inventory", name: "Inventory", icon: Sliders, desc: "Stock Adjustments", count: `${products.reduce((a, p) => a + (p.stock || 0), 0)} units` },
                   { id: "settings", name: "Settings", icon: Lock, desc: "Security & Access Rules", count: "Protected" },
-                  { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Store & Order Insights", count: "Live" }
+                  { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Store & Order Insights", count: "Live" },
+                  { id: "diagnostics", name: "Diagnostics", icon: Activity, desc: "System Health & APIs", count: "9 Systems" }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -745,7 +756,7 @@ export default function AdminPage() {
                               <>
                                 <span>&bull;</span>
                                 <span className="text-emerald-700 font-semibold">
-                                  {customer.orderCount} Orders (${(customer.totalSpent || 0).toFixed(2)})
+                                  {customer.orderCount} Orders ({formatPHP(customer.totalSpent || 0)})
                                 </span>
                               </>
                             )}
@@ -1274,13 +1285,13 @@ export default function AdminPage() {
                                   {item.quantity}x {item.name}
                                 </span>
                                 <span className="font-bold text-slate-900">
-                                  ${(Number(item.price) * (Number(item.quantity) || 1)).toFixed(2)}
+                                  {formatPHP(Number(item.price) * (Number(item.quantity) || 1))}
                                 </span>
                               </div>
                             ))}
                             <div className="p-2.5 bg-slate-50 flex items-center justify-between font-bold text-slate-900">
                               <span>Total Paid</span>
-                              <span className="text-sm">${Number(ord.totalAmount).toFixed(2)}</span>
+                              <span className="text-sm">{formatPHP(ord.totalAmount)}</span>
                             </div>
                           </div>
                         </div>
@@ -1415,7 +1426,7 @@ export default function AdminPage() {
                     <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
                       <div className="text-right font-mono">
                         <p className="text-sm font-black text-slate-900">
-                          ${Number(ord.totalAmount).toFixed(2)}
+                          {formatPHP(ord.totalAmount)}
                         </p>
                         <p className="text-[10px] text-slate-500">
                           {ord.items?.length || 1} line item(s)
@@ -1522,16 +1533,16 @@ export default function AdminPage() {
                       <div key={i} className="p-3 flex items-center justify-between text-xs font-mono">
                         <div>
                           <p className="font-bold text-slate-900">{it.name}</p>
-                          <p className="text-slate-500">Qty: {it.quantity} &bull; Unit: ${Number(it.price).toFixed(2)}</p>
+                          <p className="text-slate-500">Qty: {it.quantity} &bull; Unit: {formatPHP(it.price)}</p>
                         </div>
                         <p className="font-bold text-slate-900 text-sm">
-                          ${(Number(it.price) * (Number(it.quantity) || 1)).toFixed(2)}
+                          {formatPHP(Number(it.price) * (Number(it.quantity) || 1))}
                         </p>
                       </div>
                     ))}
                     <div className="p-3 bg-slate-50 flex items-center justify-between font-mono font-black text-slate-900">
                       <span>Total Amount</span>
-                      <span className="text-base">${Number(selectedOrder.totalAmount).toFixed(2)}</span>
+                      <span className="text-base">{formatPHP(selectedOrder.totalAmount)}</span>
                     </div>
                   </div>
                 </div>
@@ -1644,7 +1655,7 @@ export default function AdminPage() {
                           )}
                         </div>
                         <p className="text-xs font-mono text-slate-500 mt-0.5">
-                          Price: <span className="font-bold text-slate-900">${Number(prod.price).toFixed(2)}</span> &bull; Stock: {prod.stock ?? 0}
+                          Price: <span className="font-bold text-slate-900">{formatPHP(prod.price)}</span> &bull; Stock: {prod.stock ?? 0}
                         </p>
                       </div>
                     </div>
@@ -1725,7 +1736,7 @@ export default function AdminPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
-                          Price ($)
+                          Price (₱)
                         </label>
                         <input
                           type="number"
@@ -1884,7 +1895,7 @@ export default function AdminPage() {
                         </span>
                       </div>
                       <p className="text-xs font-mono text-slate-500 mt-0.5">
-                        Unit Price: ${Number(item.price).toFixed(2)}
+                        Unit Price: {formatPHP(item.price)}
                       </p>
                     </div>
 
@@ -2040,8 +2051,8 @@ export default function AdminPage() {
                 </div>
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Gross Volume</p>
-                  <p className="text-2xl font-heading font-black text-emerald-600 mt-1">
-                    ${orders.reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0).toFixed(2)}
+                  <p className="text-2xl font-heading font-normal text-emerald-600 mt-1">
+                    {formatPHP(orders.reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0))}
                   </p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
@@ -2070,6 +2081,38 @@ export default function AdminPage() {
                   ))}
                 </div>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 9. DIAGNOSTICS MODULE: SYSTEM HEALTH & INTEGRATION API STATUS             */}
+        {/* ========================================================================= */}
+        {view === "diagnostics" && (
+          <motion.div
+            key="diagnostics"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <button
+                  onClick={() => setView("dashboard")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                </button>
+                <h2 className="text-base font-heading font-normal tracking-wide uppercase text-slate-900">
+                  System Diagnostics & Health
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+              <DiagnosticsModule />
             </div>
           </motion.div>
         )}

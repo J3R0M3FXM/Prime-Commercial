@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useCart } from './cart-context';
 import { X, Check, Minus, Plus } from 'lucide-react';
+import { formatPHP } from "@/lib/currency";
 
 export default function ProductModal({ product, onClose }: { product: any, onClose: () => void }) {
   const { addToCart } = useCart();
@@ -38,11 +39,11 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
         <div className="p-6 overflow-y-auto flex-1">
           <div className="flex justify-between items-start gap-4 mb-2">
-            <h2 className="text-2xl font-heading font-black uppercase text-gray-900 leading-tight">{product.name}</h2>
-            <span className="text-2xl font-heading font-bold text-gray-900 shrink-0">${Number(finalPrice).toFixed(2)}</span>
+            <h2 className="text-2xl font-heading font-normal uppercase text-gray-900 leading-tight">{product.name}</h2>
+            <span className="text-2xl font-heading font-normal text-gray-900 shrink-0">{formatPHP(finalPrice)}</span>
           </div>
           
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">
+          <p className="text-sm font-heading uppercase tracking-widest text-gray-400 mb-4">
             {product.category || "General"}
           </p>
           
@@ -92,9 +93,9 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
           <button 
             onClick={() => { addToCart(product, quantity); onClose(); }} 
             disabled={isOutOfStock}
-            className="w-full bg-black text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-gray-800 transition-colors disabled:bg-gray-200 disabled:text-gray-400 shadow-lg disabled:shadow-none"
+            className="w-full bg-black text-white py-4 rounded-xl font-heading font-normal uppercase tracking-widest text-sm hover:bg-gray-800 transition-colors disabled:bg-gray-200 disabled:text-gray-400 shadow-lg disabled:shadow-none"
           >
-            {isOutOfStock ? "Out of Stock" : `Add to Cart - $${(finalPrice * quantity).toFixed(2)}`}
+            {isOutOfStock ? "Out of Stock" : `Add to Cart - ${formatPHP(finalPrice * quantity)}`}
           </button>
         </div>
       </div>

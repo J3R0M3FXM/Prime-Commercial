@@ -1,14 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-montserrat);
-  --font-heading: var(--font-oswald);
+  --font-sans: 'Open Sauce Sans', 'Open Sauce One', sans-serif;
+  --font-heading: 'Roboto Condensed', sans-serif;
 }
 
 body {
-  font-family: var(--font-sans), sans-serif;
+  font-family: 'Open Sauce Sans', 'Open Sauce One', sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6, .font-heading {
-  font-family: var(--font-heading), sans-serif;
+  font-family: 'Roboto Condensed', sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
+
+label {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
