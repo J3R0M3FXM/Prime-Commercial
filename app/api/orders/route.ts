@@ -104,9 +104,9 @@ export async function POST(request: Request) {
             customerUsername: customerUsername || '',
             primeMemberId: primeMemberId || '',
             items: items.map((it: any) => ({
-              id: it.id,
-              name: it.name,
-              price: Number(it.price),
+              id: it.id || '',
+              name: it.name || 'Unknown Product',
+              price: Number(it.price) || 0,
               quantity: Number(it.quantity) || 1,
               imageUrl: it.imageUrl || ''
             })),
