@@ -50,7 +50,8 @@ export async function POST(request: Request) {
                 user: {
                   id: tgUserId,
                   name: `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim(),
-                  username: tgUser.username || ''
+                  username: tgUser.username || '',
+                  photoUrl: tgUser.photo_url || ''
                 }
               });
             } else {

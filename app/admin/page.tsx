@@ -156,10 +156,13 @@ export default function AdminPage() {
           const storedUserId = 
             sessionStorage.getItem("prime_admin_user_id") || 
             localStorage.getItem("prime_admin_user_id");
+          const storedPhotoUrl = 
+            sessionStorage.getItem("prime_admin_photo_url") || 
+            localStorage.getItem("prime_admin_photo_url");
 
           if (isSessionAuth) {
             setAuthorized(true);
-            if (storedUserId) setAdminUser({ id: storedUserId });
+            if (storedUserId) setAdminUser({ id: storedUserId, photoUrl: storedPhotoUrl || "" });
             await fetchAllData();
             setCheckingAuth(false);
             return;
@@ -197,8 +200,11 @@ export default function AdminPage() {
             if (typeof window !== "undefined") {
               sessionStorage.setItem("prime_admin_authorized", "true");
               sessionStorage.setItem("prime_admin_user_id", data.user?.id || "1085949511");
+              if (data.user?.photoUrl) sessionStorage.setItem("prime_admin_photo_url", data.user.photoUrl);
+              
               localStorage.setItem("prime_admin_authorized", "true");
               localStorage.setItem("prime_admin_user_id", data.user?.id || "1085949511");
+              if (data.user?.photoUrl) localStorage.setItem("prime_admin_photo_url", data.user.photoUrl);
             }
             setAuthorized(true);
             setAdminUser(data.user || { id: "1085949511" });
@@ -482,24 +488,33 @@ export default function AdminPage() {
           >
             {/* Header */}
             <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-slate-200">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h1 className="text-2xl sm:text-3xl font-heading font-black tracking-widest uppercase text-slate-900">
-                    Prime Admin
-                  </h1>
-                  <span className="text-[10px] font-mono bg-black text-white px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
-                    Telegram ID: {adminUser?.id || "1085949511"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
-                  <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Direct Access Active
-                  </span>
-                  <span className="text-slate-300">&bull;</span>
-                  <a href="/" className="text-slate-700 hover:text-black font-medium underline">
-                    Open Storefront
-                  </a>
+              <div className="flex items-center gap-4">
+                {adminUser?.photoUrl ? (
+                  <img src={adminUser.photoUrl} alt="Admin" className="w-14 h-14 rounded-2xl object-cover shadow-sm border border-slate-200 shrink-0" />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-heading font-black text-xl uppercase shadow-sm shrink-0">
+                    A
+                  </div>
+                )}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h1 className="text-2xl sm:text-3xl font-heading font-black tracking-widest uppercase text-slate-900">
+                      Prime Admin
+                    </h1>
+                    <span className="text-[10px] font-mono bg-black text-white px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
+                      Telegram ID: {adminUser?.id || "1085949511"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
+                    <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Direct Access Active
+                    </span>
+                    <span className="text-slate-300">&bull;</span>
+                    <a href="/" className="text-slate-700 hover:text-black font-medium underline">
+                      Open Storefront
+                    </a>
+                  </div>
                 </div>
               </div>
 
@@ -517,6 +532,8 @@ export default function AdminPage() {
                     if (typeof window !== "undefined") {
                       sessionStorage.removeItem("prime_admin_authorized");
                       localStorage.removeItem("prime_admin_authorized");
+                      sessionStorage.removeItem("prime_admin_photo_url");
+                      localStorage.removeItem("prime_admin_photo_url");
                     }
                     setAuthorized(false);
                   }}
@@ -718,9 +735,13 @@ export default function AdminPage() {
                     >
                       {/* Customer Summary */}
                       <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center font-heading font-black text-sm uppercase shrink-0 shadow-sm">
-                          {customer.tgName ? customer.tgName.charAt(0) : "U"}
-                        </div>
+                        {customer.photoUrl ? (
+                          <img src={customer.photoUrl} alt={customer.tgName} className="w-11 h-11 rounded-xl object-cover shrink-0 shadow-sm border border-slate-200" />
+                        ) : (
+                          <div className="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center font-heading font-black text-sm uppercase shrink-0 shadow-sm">
+                            {customer.tgName ? customer.tgName.charAt(0) : "U"}
+                          </div>
+                        )}
 
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -862,9 +883,13 @@ export default function AdminPage() {
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm overflow-hidden relative">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center font-heading font-black text-2xl uppercase shadow-lg">
-                        {customerDetail.customer.tgName?.charAt(0) || "P"}
-                      </div>
+                      {customerDetail.customer.photoUrl ? (
+                        <img src={customerDetail.customer.photoUrl} alt={customerDetail.customer.tgName} className="w-16 h-16 rounded-2xl object-cover shadow-lg border border-slate-200 shrink-0" />
+                      ) : (
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center font-heading font-black text-2xl uppercase shadow-lg">
+                          {customerDetail.customer.tgName?.charAt(0) || "P"}
+                        </div>
+                      )}
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <h2 className="text-2xl font-heading font-black uppercase text-slate-900 tracking-wide">
