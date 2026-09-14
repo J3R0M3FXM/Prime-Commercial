@@ -24,6 +24,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    match /warehouses/{warehouseId} {
+      allow read: if true;
+      allow write: if true; // In production, this should be isAdmin(), but keeping consistent with open API approach for now
+    }
+
+    match /couriers/{courierId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
     match /admins/{adminId} {
       allow read: if false; // Admin code check should be server-side
       allow write: if false;

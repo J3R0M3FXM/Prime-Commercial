@@ -37,11 +37,18 @@ import {
   Filter,
   CheckCircle2,
   AlertTriangle,
-  Stethoscope
+  Stethoscope,
+  Truck
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
 import DiagnosticsModule from "@/app/components/admin/diagnostics-module";
+import dynamic from 'next/dynamic';
+
+const LogisticsModule = dynamic(() => import('@/app/components/admin/logistics-module'), { 
+  ssr: false,
+  loading: () => <div className="p-8 text-center text-slate-500 font-mono text-sm">Loading Logistics...</div>
+});
 
 type AdminView = 
   | "dashboard" 
@@ -53,7 +60,8 @@ type AdminView =
   | "inventory" 
   | "settings" 
   | "analytics"
-  | "diagnostics";
+  | "diagnostics"
+  | "logistics";
 
 export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
@@ -568,7 +576,8 @@ export default function AdminPage() {
                   { id: "inventory", name: "Inventory", icon: Sliders, desc: "Stock Adjustments", count: `${products.reduce((a, p) => a + (p.stock || 0), 0)} units` },
                   { id: "settings", name: "Settings", icon: Lock, desc: "Security & Access Rules", count: "Protected" },
                   { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Store & Order Insights", count: "Live" },
-                  { id: "diagnostics", name: "Diagnostics", icon: Activity, desc: "System Health & APIs", count: "9 Systems" }
+                  { id: "diagnostics", name: "Diagnostics", icon: Activity, desc: "System Health & APIs", count: "9 Systems" },
+                  { id: "logistics", name: "Logistics", icon: Truck, desc: "Warehouses & Couriers", count: "Routes" }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -2113,6 +2122,38 @@ export default function AdminPage() {
 
             <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8">
               <DiagnosticsModule />
+            </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 10. LOGISTICS MODULE: WAREHOUSES & COURIERS                               */}
+        {/* ========================================================================= */}
+        {view === "logistics" && (
+          <motion.div
+            key="logistics"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <button
+                  onClick={() => setView("dashboard")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                </button>
+                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">
+                  Logistics & Operations
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+              <LogisticsModule />
             </div>
           </motion.div>
         )}
