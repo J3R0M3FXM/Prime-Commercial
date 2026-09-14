@@ -99,6 +99,13 @@ export default function Shopfront() {
             return;
           }
 
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem("prime_customer_id", authData.tgUserId || "");
+            sessionStorage.setItem("prime_customer_name", authData.tgName || "");
+            sessionStorage.setItem("prime_customer_username", authData.tgUsername || "");
+            sessionStorage.setItem("prime_member_id", authData.primeMemberId || "");
+          }
+
           setAuthorized(true);
           const productsRes = await fetch('/api/products');
           const pData = await productsRes.json();

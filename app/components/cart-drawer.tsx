@@ -95,15 +95,19 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
             <button 
               onClick={async () => {
                 try {
-                  const storedUserId = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_admin_user_id") || localStorage.getItem("prime_admin_user_id") || "1085949511") : "1085949511";
+                  const storedUserId = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_customer_id") || sessionStorage.getItem("prime_admin_user_id") || "1085949511") : "1085949511";
+                  const storedName = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_customer_name") || "Customer") : "Customer";
+                  const storedUsername = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_customer_username") || "") : "";
+                  const storedMemberId = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_member_id") || "") : "";
+                  
                   const res = await fetch("/api/orders", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       customerId: storedUserId,
-                      customerName: "𝕻𝖗𝖎𝖒𝖔 (@PrimoYelo)",
-                      customerUsername: "PrimoYelo",
-                      primeMemberId: "19054A77C8CD",
+                      customerName: storedName,
+                      customerUsername: storedUsername,
+                      primeMemberId: storedMemberId,
                       items: cart,
                       totalAmount: cartTotal,
                       notes: "Storefront Checkout Order"
@@ -115,7 +119,8 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
                     clearCart();
                     onClose();
                   } else {
-                    alert("Failed to create order. Please try again.");
+                    const err = await res.json().catch(() => ({}));
+                    alert(`Failed to create order: ${err.error || "Please try again."}`);
                   }
                 } catch (e) {
                   console.error(e);
