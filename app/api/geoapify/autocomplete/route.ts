@@ -9,15 +9,14 @@ export async function GET(request: Request) {
   }
 
   // Bias to Metro Manila (approx rect/circle) or Philippines in general.
-  // We can bias to Philippines: filter=countrycode:ph
-  // Bias to Metro Manila using proximity or boundary. Let's use filter countrycode:ph for simplicity.
+  // We use filter countrycode:ph and bias=proximity:120.9842,14.5995 (Manila Lon,Lat) to prioritize Metro Manila results.
   const apiKey = process.env.GEOAPIFY_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "GEOAPIFY_API_KEY is not configured" }, { status: 500 });
   }
 
   try {
-    const geoUrl = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(text)}&filter=countrycode:ph&format=json&apiKey=${apiKey}`;
+    const geoUrl = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(text)}&filter=countrycode:ph&bias=proximity:120.9842,14.5995&format=json&apiKey=${apiKey}`;
     const res = await fetch(geoUrl);
     const data = await res.json();
     return NextResponse.json(data);
