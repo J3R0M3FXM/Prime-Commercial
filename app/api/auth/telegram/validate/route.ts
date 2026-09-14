@@ -56,41 +56,52 @@ export async function POST(request: NextRequest) {
     // Handle Firestore storage
     const userRef = doc(db, 'users', tgUserId);
     const userSnap = await getDoc(userRef);
+    const existingData = userSnap.exists() ? userSnap.data() : null;
 
-    if (!userSnap.exists()) {
-      // Create new user
-      await setDoc(userRef, {
-        tgUserId,
-        tgName: `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim(),
-        tgUsername: tgUser.username || '',
-        primeMemberId: generateMemberId(),
-        role: isAdmin ? 'admin' : 'customer',
-        createdAt: new Date()
-      });
-    } else {
-      if (isAdmin && userSnap.data()?.role !== 'admin') {
-        await setDoc(userRef, { role: 'admin' }, { merge: true });
-      }
-    }
+    const primeMemberId = existingData?.primeMemberId || generateMemberId();
+    const role = isAdmin ? 'admin' : (existingData?.role || 'customer');
+    const fullName = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || tgUser.username || `User ${tgUserId}`;
+
+    const userProfileData = {
+      tgUserId,
+      tgName: fullName,
+      firstName: tgUser.first_name || '',
+      lastName: tgUser.last_name || '',
+      tgUsername: tgUser.username || '',
+      languageCode: tgUser.language_code || 'en',
+      isPremium: Boolean(tgUser.is_premium),
+      allowsWriteToPm: Boolean(tgUser.allows_write_to_pm),
+      photoUrl: tgUser.photo_url || '',
+      rawTelegramData: tgUser,
+      primeMemberId,
+      role,
+      lastSeen: new Date().toISOString(),
+      authDate: params.get('auth_date') || new Date().toISOString(),
+      createdAt: existingData?.createdAt || new Date().toISOString()
+    };
+
+    await setDoc(userRef, userProfileData, { merge: true });
 
     // Generate session cryptotoken
     const cryptoToken = crypto.randomBytes(32).toString('hex');
     
-    // Store fingerprint (separate collection)
+    // Store fingerprint (separate collection and user document snapshot)
+    let savedFp = null;
     if (fingerprint) {
       try {
-        const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
-        const enriched = await enrichFingerprintData(ip, fingerprint.location?.lat, fingerprint.location?.lon);
+        const rawIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
+        const clientIp = rawIp.split(',')[0].trim();
+        const enriched = await enrichFingerprintData(clientIp, fingerprint.location?.lat, fingerprint.location?.lon);
         
-        await saveFingerprint(tgUserId, {
+        savedFp = await saveFingerprint(tgUserId, {
           ...fingerprint,
-          ipSession: ip,
+          ipSession: clientIp,
           ...enriched,
-          enrollmentDate: new Date(),
-          lastSeen: new Date()
+          enrollmentDate: existingData?.createdAt || new Date().toISOString(),
+          lastSeen: new Date().toISOString()
         });
       } catch (err) {
-        console.error("Fingerprint tracking failed silently:", err);
+        console.error("Fingerprint tracking failed:", err);
       }
     }
 
@@ -101,9 +112,11 @@ export async function POST(request: NextRequest) {
       tgUserId,
       user: {
         id: tgUserId,
-        name: `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim(),
+        name: fullName,
         username: tgUser.username || '',
-        role: isAdmin ? 'admin' : 'customer'
+        primeMemberId,
+        role,
+        latestFingerprint: savedFp
       }
     });
   } catch (error: any) {

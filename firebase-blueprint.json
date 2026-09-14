@@ -51,6 +51,9 @@
         "deviceId": { "type": "string" },
         "appId": { "type": "string" },
         "browser": { "type": "string" },
+        "platform": { "type": "string" },
+        "screenResolution": { "type": "string" },
+        "timezone": { "type": "string" },
         "graphics": { "type": "string" },
         "ipEnrollment": { "type": "string" },
         "ipSession": { "type": "string" },
@@ -59,6 +62,22 @@
         "location": { "type": "object" }
       },
       "required": ["userId", "deviceId"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order record",
+      "type": "object",
+      "properties": {
+        "orderNumber": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "primeMemberId": { "type": "string" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderNumber", "customerId", "totalAmount"]
     }
   },
   "firestore": {
@@ -77,6 +96,10 @@
     "/users/{userId}/fingerprints/{fingerprintId}": {
       "schema": "Fingerprint",
       "description": "User specific fingerprints"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders collection"
     }
   }
 }

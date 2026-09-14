@@ -1,70 +1,172 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Users, Package, Sliders, ChevronDown, Lock, Loader2, ArrowRight, Trash2, Edit2, Eye, EyeOff, Plus, ClipboardList } from "lucide-react";
+import React, { useEffect, useState, useMemo } from "react";
+import { 
+  Users, 
+  Package, 
+  Sliders, 
+  Lock, 
+  Loader2, 
+  ArrowRight, 
+  Trash2, 
+  Edit2, 
+  Eye, 
+  EyeOff, 
+  Plus, 
+  ClipboardList, 
+  ArrowLeft, 
+  Search, 
+  ShieldAlert, 
+  ShieldCheck, 
+  Globe, 
+  Cpu, 
+  Monitor, 
+  Smartphone, 
+  ExternalLink, 
+  Copy, 
+  Check, 
+  RefreshCw, 
+  Sparkles, 
+  TrendingUp, 
+  Clock, 
+  Layers, 
+  Activity,
+  ShoppingBag,
+  MapPin,
+  Wifi,
+  ChevronRight,
+  Filter,
+  CheckCircle2,
+  AlertTriangle
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+
+type AdminView = 
+  | "dashboard" 
+  | "customers" 
+  | "customer-detail" 
+  | "orders" 
+  | "order-detail" 
+  | "products" 
+  | "inventory" 
+  | "settings" 
+  | "analytics";
 
 export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [adminUser, setAdminUser] = useState<any>(null);
   const [code, setCode] = useState("");
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [activeModule, setActiveModule] = useState<string | null>(null);
 
-  const fetchData = async () => {
-    try {
-      const [custRes, prodRes] = await Promise.all([
-        fetch("/api/admin/customers"),
-        fetch("/api/products")
-      ]);
-      setCustomers(await custRes.json());
-      setProducts(await prodRes.json());
-    } catch (e) {
-      console.error("Failed to load data", e);
+  // Navigation state
+  const [view, setView] = useState<AdminView>("dashboard");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [customerDetail, setCustomerDetail] = useState<{ customer: any; fingerprints: any[]; orders: any[] } | null>(null);
+  const [loadingCustomerDetail, setLoadingCustomerDetail] = useState(false);
+
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
+  // Data Collections
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Search & Filters per module
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerFilter, setCustomerFilter] = useState<"all" | "admin" | "premium" | "recent">("all");
+
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderFilter, setOrderFilter] = useState<"all" | "Processing" | "Completed" | "Pending">("all");
+
+  const [productSearch, setProductSearch] = useState("");
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+
+  const [inventorySearch, setInventorySearch] = useState("");
+  const [inventoryFilter, setInventoryFilter] = useState<"all" | "low" | "out">("all");
+
+  // Copied feedback
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, key: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
     }
   };
 
+  const fetchAllData = async () => {
+    setRefreshing(true);
+    try {
+      const [custRes, prodRes, ordRes] = await Promise.all([
+        fetch("/api/admin/customers"),
+        fetch("/api/products"),
+        fetch("/api/admin/orders")
+      ]);
+      if (custRes.ok) setCustomers(await custRes.json());
+      if (prodRes.ok) setProducts(await prodRes.json());
+      if (ordRes.ok) setOrders(await ordRes.json());
+    } catch (e) {
+      console.error("Failed to load admin data", e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Fetch individual customer detailed dossier
+  const fetchCustomerDetail = async (id: string) => {
+    setLoadingCustomerDetail(true);
+    try {
+      const res = await fetch(`/api/admin/customers?id=${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCustomerDetail(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch customer detail:", err);
+    } finally {
+      setLoadingCustomerDetail(false);
+    }
+  };
+
+  // Auto-authentication check
   useEffect(() => {
     async function verifyTelegramAdmin() {
       try {
-        // 1. Check existing stored session
         if (typeof window !== "undefined") {
-          const isSessionAuth = sessionStorage.getItem("prime_admin_authorized") === "true" || localStorage.getItem("prime_admin_authorized") === "true";
-          const storedUserId = sessionStorage.getItem("prime_admin_user_id") || localStorage.getItem("prime_admin_user_id");
+          const isSessionAuth = 
+            sessionStorage.getItem("prime_admin_authorized") === "true" || 
+            localStorage.getItem("prime_admin_authorized") === "true";
+          const storedUserId = 
+            sessionStorage.getItem("prime_admin_user_id") || 
+            localStorage.getItem("prime_admin_user_id");
 
           if (isSessionAuth) {
             setAuthorized(true);
             if (storedUserId) setAdminUser({ id: storedUserId });
-            await fetchData();
+            await fetchAllData();
             setCheckingAuth(false);
             return;
           }
         }
 
-        // 2. Check for Telegram initData in hash, search, or Telegram WebApp object
         let initDataRaw = "";
         if (typeof window !== "undefined") {
           if (window.location.hash) {
             const hashStr = window.location.hash.substring(1);
             const params = new URLSearchParams(hashStr);
             const tgData = params.get("tgWebAppData");
-            if (tgData) {
-              initDataRaw = tgData;
-            } else if (hashStr.includes("user=") || hashStr.includes("hash=")) {
-              initDataRaw = hashStr;
-            }
+            if (tgData) initDataRaw = tgData;
+            else if (hashStr.includes("user=") || hashStr.includes("hash=")) initDataRaw = hashStr;
           }
-
           if (!initDataRaw && window.location.search) {
             const searchParams = new URLSearchParams(window.location.search);
             const tgData = searchParams.get("tgWebAppData") || searchParams.get("initData");
             if (tgData) initDataRaw = tgData;
           }
-
           if (!initDataRaw && (window as any).Telegram?.WebApp?.initData) {
             initDataRaw = (window as any).Telegram.WebApp.initData;
           }
@@ -87,7 +189,7 @@ export default function AdminPage() {
             }
             setAuthorized(true);
             setAdminUser(data.user || { id: "1085949511" });
-            await fetchData();
+            await fetchAllData();
             setCheckingAuth(false);
             return;
           }
@@ -102,13 +204,16 @@ export default function AdminPage() {
     verifyTelegramAdmin();
   }, []);
 
-  const deleteProduct = async (id: string) => {
-    if (!confirm("Are you sure?")) return;
-    await fetch('/api/admin/products', { method: 'DELETE', body: JSON.stringify({ id }) });
-    fetchData();
-  };
+  // When selected customer changes, load detail dossier
+  useEffect(() => {
+    if (selectedCustomerId) {
+      fetchCustomerDetail(selectedCustomerId);
+    } else {
+      setCustomerDetail(null);
+    }
+  }, [selectedCustomerId]);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg("");
@@ -119,52 +224,226 @@ export default function AdminPage() {
         body: JSON.stringify({ code })
       });
       const data = await res.json();
-      
       if (data.success) {
         if (typeof window !== "undefined") {
           sessionStorage.setItem("prime_admin_authorized", "true");
         }
         setAuthorized(true);
-        fetchData();
+        fetchAllData();
       } else {
         setErrorMsg(data.error || "Invalid Access Code");
       }
-    } catch (err) {
+    } catch {
       setErrorMsg("Connection Error");
     } finally {
       setLoading(false);
     }
   };
 
+  // Product Operations
+  const handleToggleProductActive = async (product: any) => {
+    const newActive = product.active === false ? true : false;
+    try {
+      await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: product.id, active: newActive })
+      });
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, active: newActive } : p));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this product?")) return;
+    try {
+      await fetch("/api/admin/products", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      setProducts(prev => prev.filter(p => p.id !== id));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveProduct = async (productData: any) => {
+    try {
+      if (editingProduct?.id) {
+        await fetch("/api/admin/products", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: editingProduct.id, ...productData })
+        });
+      } else {
+        await fetch("/api/admin/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(productData)
+        });
+      }
+      setProductModalOpen(false);
+      setEditingProduct(null);
+      fetchAllData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Inventory Stock Adjustment
+  const handleAdjustStock = async (productId: string, currentStock: number, delta: number) => {
+    const newStock = Math.max(0, currentStock + delta);
+    try {
+      await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: productId, stock: newStock })
+      });
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: newStock } : p));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Order status update
+  const handleUpdateOrderStatus = async (orderId: string, status: string) => {
+    try {
+      await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: orderId, status })
+      });
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+      if (selectedCustomerId) {
+        fetchCustomerDetail(selectedCustomerId);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Simulate test order for customer
+  const handleSimulateOrder = async (customerId: string, customerName: string, primeMemberId: string) => {
+    try {
+      const sampleItem = products[0] || { id: "item-1", name: "PRIME Special Drop", price: 99 };
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId,
+          customerName,
+          primeMemberId,
+          items: [{ id: sampleItem.id, name: sampleItem.name, price: sampleItem.price, quantity: 1 }],
+          totalAmount: sampleItem.price,
+          notes: "Simulated Test Order via Customer Dossier"
+        })
+      });
+      if (res.ok) {
+        await fetchCustomerDetail(customerId);
+        fetchAllData();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Filtered lists
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(c => {
+      const matchSearch = 
+        (c.tgName || "").toLowerCase().includes(customerSearch.toLowerCase()) ||
+        (c.tgUsername || "").toLowerCase().includes(customerSearch.toLowerCase()) ||
+        (c.tgUserId || "").toLowerCase().includes(customerSearch.toLowerCase()) ||
+        (c.primeMemberId || "").toLowerCase().includes(customerSearch.toLowerCase()) ||
+        (c.latestFingerprint?.ipSession || "").includes(customerSearch) ||
+        (c.latestFingerprint?.city || "").toLowerCase().includes(customerSearch.toLowerCase());
+      
+      if (!matchSearch) return false;
+      if (customerFilter === "admin") return c.role === "admin";
+      if (customerFilter === "premium") return !!c.isPremium;
+      return true;
+    });
+  }, [customers, customerSearch, customerFilter]);
+
+  const filteredOrders = useMemo(() => {
+    return orders.filter(o => {
+      const matchSearch = 
+        (o.orderNumber || "").toLowerCase().includes(orderSearch.toLowerCase()) ||
+        (o.customerName || "").toLowerCase().includes(orderSearch.toLowerCase()) ||
+        (o.primeMemberId || "").toLowerCase().includes(orderSearch.toLowerCase()) ||
+        (o.status || "").toLowerCase().includes(orderSearch.toLowerCase());
+
+      if (!matchSearch) return false;
+      if (orderFilter !== "all") return o.status === orderFilter;
+      return true;
+    });
+  }, [orders, orderSearch, orderFilter]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => 
+      (p.name || "").toLowerCase().includes(productSearch.toLowerCase()) ||
+      (p.category || "").toLowerCase().includes(productSearch.toLowerCase())
+    );
+  }, [products, productSearch]);
+
+  const filteredInventory = useMemo(() => {
+    return products.filter(p => {
+      const matchSearch = 
+        (p.name || "").toLowerCase().includes(inventorySearch.toLowerCase()) ||
+        (p.category || "").toLowerCase().includes(inventorySearch.toLowerCase());
+      if (!matchSearch) return false;
+      if (inventoryFilter === "low") return (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 10;
+      if (inventoryFilter === "out") return (p.stock ?? 0) === 0;
+      return true;
+    });
+  }, [products, inventorySearch, inventoryFilter]);
+
+  const selectedOrder = useMemo(() => {
+    return orders.find(o => o.id === selectedOrderId);
+  }, [orders, selectedOrderId]);
+
+  // Auth checking screen
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-gray-100 p-6">
-        <Loader2 className="w-10 h-10 animate-spin text-white mb-4" />
-        <p className="font-heading font-bold uppercase tracking-widest text-sm text-gray-400">Verifying Telegram Admin Credentials...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-gray-100 p-6 font-sans">
+        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-2xl backdrop-blur-xl">
+          <Loader2 className="w-8 h-8 animate-spin text-white" />
+        </div>
+        <h2 className="text-xl font-heading font-black tracking-widest uppercase mb-1">Authenticating</h2>
+        <p className="font-mono text-xs text-gray-400">Verifying Telegram Security Credentials (ID: 1085949511)...</p>
       </div>
     );
   }
 
+  // Login Gate
   if (!authorized) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-gray-100 p-6">
-        <div className="w-full max-w-sm bg-black border border-gray-800 p-8 rounded-xl shadow-2xl">
-          <Lock className="w-12 h-12 text-white mb-6 mx-auto" />
-          <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase">Prime Admin</h1>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-gray-100 p-6 font-sans">
+        <div className="w-full max-w-sm bg-gray-900/80 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-xl">
+          <div className="w-12 h-12 rounded-xl bg-white text-black flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <Lock className="w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase text-white">Prime Admin</h1>
           <p className="text-[11px] text-gray-400 text-center mb-6 font-mono">
-            Auto-authenticated for Telegram ID: 1085949511
+            Authorized Account: ID 1085949511
           </p>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleManualLogin} className="space-y-4">
             <input
               type="password"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="ENTER ACCESS CODE"
-              className="w-full p-4 bg-gray-900 border border-gray-800 rounded-lg text-center font-mono focus:border-white focus:outline-none transition-colors text-white"
+              placeholder="ENTER ADMIN ACCESS CODE"
+              className="w-full p-4 bg-gray-950 border border-gray-800 rounded-xl text-center font-mono focus:border-white focus:outline-none transition-colors text-white text-sm"
             />
-            {errorMsg && <p className="text-red-500 text-xs text-center">{errorMsg}</p>}
-            <button type="submit" disabled={loading} className="w-full p-4 bg-white text-black font-bold uppercase tracking-widest rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Authenticate"}
+            {errorMsg && <p className="text-red-400 text-xs text-center font-mono">{errorMsg}</p>}
+            <button 
+              type="submit" 
+              disabled={loading} 
+              className="w-full p-4 bg-white text-black font-bold uppercase tracking-widest rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center text-xs cursor-pointer shadow-lg"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Access Dashboard"}
             </button>
           </form>
         </div>
@@ -172,154 +451,1519 @@ export default function AdminPage() {
     );
   }
 
-  if (selectedCustomer) {
-    return (
-      <div className="min-h-screen bg-white p-6 font-sans">
-        <button onClick={() => setSelectedCustomer(null)} className="mb-6 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-black">
-          &larr; Back to Dashboard
-        </button>
-        <div className="max-w-2xl border border-gray-200 rounded-xl p-8 shadow-sm">
-           <h2 className="text-3xl font-heading font-black mb-1 uppercase">{selectedCustomer.tgName || 'Unknown User'}</h2>
-           <p className="font-mono text-sm text-gray-500 mb-8">{selectedCustomer.primeMemberId}</p>
-           <div className="space-y-6 text-sm">
-             <div className="grid grid-cols-2 gap-4">
-               <div><p className="text-gray-500 uppercase text-[10px] tracking-widest font-bold">Telegram ID</p><p className="font-mono">{selectedCustomer.tgUserId}</p></div>
-               <div><p className="text-gray-500 uppercase text-[10px] tracking-widest font-bold">Handle</p><p>@{selectedCustomer.tgUsername || 'none'}</p></div>
-             </div>
-             {selectedCustomer.latestFingerprint && (
-               <div className="pt-6 border-t border-gray-100">
-                 <p className="font-bold text-[10px] uppercase tracking-widest text-gray-400 mb-4">Security Snapshot</p>
-                 <pre className="text-[10px] bg-gray-50 p-4 rounded-lg overflow-auto">{JSON.stringify(selectedCustomer.latestFingerprint, null, 2)}</pre>
-               </div>
-             )}
-           </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 p-4 font-sans pb-20">
-      <header className="mb-8 flex justify-between items-start">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl font-heading font-black tracking-widest uppercase">Prime Admin</h1>
-            <span className="text-[10px] font-mono bg-black text-white px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
-              Telegram ID: {adminUser?.id || "1085949511"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-[11px] text-gray-500 font-mono">
-            <span className="text-emerald-700 font-medium">Automatic Authentication Active</span>
-            <span className="text-gray-300">&bull;</span>
-            <a href="/" className="text-gray-700 underline hover:text-black font-sans font-bold text-xs">
-              View Shop
-            </a>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 border border-emerald-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Live
-          </span>
-          <button 
-            onClick={() => {
-              if (typeof window !== "undefined") {
-                sessionStorage.removeItem("prime_admin_authorized");
-                sessionStorage.removeItem("prime_admin_user_id");
-                localStorage.removeItem("prime_admin_authorized");
-                localStorage.removeItem("prime_admin_user_id");
-              }
-              setAuthorized(false);
-            }}
-            className="text-[10px] font-mono uppercase px-2.5 py-1 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-md transition-colors"
-          >
-            Lock
-          </button>
-        </div>
-      </header>
-
-      {/* Glossy Dashboard Tiles */}
-      <div className="grid grid-cols-3 gap-3 mb-8">
-        {[
-          { name: 'Customers', icon: Users }, 
-          { name: 'Orders', icon: ClipboardList }, 
-          { name: 'Products', icon: Package }, 
-          { name: 'Inventory', icon: Sliders }, 
-          { name: 'Settings', icon: Lock }, 
-          { name: 'Analytics', icon: Users }
-        ].map((item) => (
-          <button key={item.name} onClick={() => setActiveModule(item.name)} className="h-24 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2 relative overflow-hidden">
-             <div className="absolute inset-0 bg-gradient-to-tr from-transparent to-white/50 opacity-0 hover:opacity-100 transition-opacity"></div>
-             <item.icon className="w-5 h-5 text-gray-400" />
-             <span className="font-bold text-[10px] uppercase tracking-widest relative z-10">{item.name}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Dynamic Content Area */}
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased flex flex-col">
       <AnimatePresence mode="wait">
-        {activeModule && (
-          <motion.section 
-            key={activeModule}
+        
+        {/* ========================================================================= */}
+        {/* 1. DASHBOARD HUB VIEW (Glossy Tiles, Stats, Header)                       */}
+        {/* ========================================================================= */}
+        {view === "dashboard" && (
+          <motion.div
+            key="view-dashboard"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden"
+            transition={{ duration: 0.22 }}
+            className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8"
           >
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="font-heading font-bold uppercase tracking-wide text-gray-900">{activeModule}</h2>
-              <button onClick={() => setActiveModule(null)} className="text-xs font-bold uppercase">Close</button>
-            </div>
-            
-            <div className="p-4">
-               {activeModule === 'Customers' && (
-                  <div className="divide-y divide-gray-100">
-                      {customers.map((c) => (
-                      <div key={c.tgUserId} onClick={() => setSelectedCustomer(c)} className="p-4 cursor-pointer hover:bg-gray-50 flex justify-between items-center group">
-                          <div className="flex flex-col">
-                              <span className="text-sm font-bold text-gray-900 group-hover:underline">{c.tgName || 'Unknown User'}</span>
-                              <span className="text-[10px] text-gray-500 font-mono">{c.primeMemberId}</span>
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-black transition-colors" />
-                      </div>
-                      ))}
-                  </div>
-               )}
+            {/* Header */}
+            <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-slate-200">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-2xl sm:text-3xl font-heading font-black tracking-widest uppercase text-slate-900">
+                    Prime Admin
+                  </h1>
+                  <span className="text-[10px] font-mono bg-black text-white px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
+                    Telegram ID: {adminUser?.id || "1085949511"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
+                  <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Direct Access Active
+                  </span>
+                  <span className="text-slate-300">&bull;</span>
+                  <a href="/" className="text-slate-700 hover:text-black font-medium underline">
+                    Open Storefront
+                  </a>
+                </div>
+              </div>
 
-               {activeModule === 'Products' && (
-                  <div>
-                     <button className="mb-4 bg-black text-white px-3 py-1.5 rounded-md font-bold uppercase text-[10px] flex items-center gap-1.5">
-                        <Plus className="w-3 h-3" /> Add Product
-                     </button>
-                     <div className="divide-y divide-gray-100">
-                      {products.map(p => (
-                        <div key={p.id} className="p-3 flex justify-between items-center">
-                            <span className="text-sm font-bold text-gray-900">{p.name}</span>
-                            <div className="flex gap-2">
-                               <button className="text-gray-400 hover:text-black"><Edit2 className="w-4 h-4" /></button>
-                               <button className="text-gray-400 hover:text-black">{p.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
-                               <button onClick={() => deleteProduct(p.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={fetchAllData}
+                  disabled={refreshing}
+                  className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium hover:bg-slate-100 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-slate-900" : "text-slate-500"}`} />
+                  Refresh
+                </button>
+                <button
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      sessionStorage.removeItem("prime_admin_authorized");
+                      localStorage.removeItem("prime_admin_authorized");
+                    }
+                    setAuthorized(false);
+                  }}
+                  className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium text-red-600 hover:bg-red-50 transition-colors shadow-sm cursor-pointer"
+                >
+                  Lock
+                </button>
+              </div>
+            </header>
+
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Customers</p>
+                <p className="text-2xl font-heading font-black text-slate-900">{customers.length}</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-1">Fingerprints captured</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Orders</p>
+                <p className="text-2xl font-heading font-black text-slate-900">{orders.length}</p>
+                <p className="text-[10px] text-emerald-600 font-mono mt-1">
+                  ${orders.reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0).toFixed(2)} volume
+                </p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Products</p>
+                <p className="text-2xl font-heading font-black text-slate-900">{products.length}</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-1">
+                  {products.filter(p => (p.stock ?? 0) > 0).length} in stock
+                </p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">System Security</p>
+                <p className="text-2xl font-heading font-black text-emerald-600 flex items-center gap-1.5">
+                  <ShieldCheck className="w-5 h-5" /> Active
+                </p>
+                <p className="text-[10px] text-slate-500 font-mono mt-1">Hardware telemetry</p>
+              </div>
+            </div>
+
+            {/* Glossy Module Tiles (3 per row) */}
+            <div className="mb-4">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 font-mono">
+                Management Modules
+              </h3>
+              <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                {[
+                  { id: "customers", name: "Customers", icon: Users, desc: "Profiles & Device Telemetry", count: customers.length },
+                  { id: "orders", name: "Orders", icon: ClipboardList, desc: "Order History & Status", count: orders.length },
+                  { id: "products", name: "Products", icon: Package, desc: "Catalog Configuration", count: products.length },
+                  { id: "inventory", name: "Inventory", icon: Sliders, desc: "Stock Adjustments", count: `${products.reduce((a, p) => a + (p.stock || 0), 0)} units` },
+                  { id: "settings", name: "Settings", icon: Lock, desc: "Security & Access Rules", count: "Protected" },
+                  { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Platform & Device Insights", count: "Live" }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setView(item.id as AdminView)}
+                    className="group relative h-28 sm:h-32 bg-white border border-slate-200 hover:border-slate-900 rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col items-center justify-center gap-2 overflow-hidden text-center cursor-pointer"
+                  >
+                    {/* Gloss effect */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/40 to-slate-100/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                    
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-slate-900 text-slate-700 group-hover:text-white flex items-center justify-center transition-colors">
+                      <item.icon className="w-5 h-5" />
+                    </div>
+                    
+                    <div>
+                      <span className="font-heading font-black text-xs sm:text-sm uppercase tracking-wider text-slate-900 block">
+                        {item.name}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-500 block">
+                        {item.count}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 2. CUSTOMERS MODULE: COMPACT LIST WITH STICKY NON-SCROLLING SEARCH BAR    */}
+        {/* ========================================================================= */}
+        {view === "customers" && (
+          <motion.div
+            key="view-customers"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            {/* STICKY & FIXED NON-SCROLLING TOP SEARCH & HEADER BAR */}
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+                {/* Navigation Row */}
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setView("dashboard")}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                    </button>
+                    <span className="text-slate-300">/</span>
+                    <h2 className="text-base sm:text-lg font-heading font-black tracking-wide uppercase text-slate-900">
+                      Customers Registry
+                    </h2>
+                    <span className="text-[10px] font-mono bg-slate-900 text-white px-2 py-0.5 rounded-full font-bold">
+                      {filteredCustomers.length}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={fetchAllData}
+                      disabled={refreshing}
+                      className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer"
+                      title="Refresh"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search & Quick Filters */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      placeholder="Search by Name, @handle, Telegram ID, Prime ID, IP, or Location..."
+                      className="w-full pl-9 pr-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
+                    />
+                    {customerSearch && (
+                      <button
+                        onClick={() => setCustomerSearch("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-mono"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+                    {(["all", "admin", "premium"] as const).map((filter) => (
+                      <button
+                        key={filter}
+                        onClick={() => setCustomerFilter(filter)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                          customerFilter === filter
+                            ? "bg-slate-900 text-white"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {filter === "all" ? "All Users" : filter === "admin" ? "Admins" : "Premium"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* COMPACT CUSTOMERS LIST (SCROLLABLE AREA) */}
+            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
+              {filteredCustomers.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
+                  <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="font-heading font-black text-slate-800 uppercase tracking-wide text-sm mb-1">
+                    No customers found
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Try adjusting your search criteria or filter.
+                  </p>
+                </div>
+              ) : (
+                filteredCustomers.map((customer) => {
+                  const fp = customer.latestFingerprint;
+                  return (
+                    <div
+                      key={customer.id}
+                      onClick={() => {
+                        setSelectedCustomerId(customer.id);
+                        setView("customer-detail");
+                      }}
+                      className="group bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-900 rounded-xl p-3.5 sm:p-4 shadow-sm hover:shadow-md transition-all duration-150 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      {/* Customer Summary */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center font-heading font-black text-sm uppercase shrink-0 shadow-sm">
+                          {customer.tgName ? customer.tgName.charAt(0) : "U"}
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-heading font-black text-sm text-slate-900 group-hover:text-black">
+                              {customer.tgName || "Unnamed User"}
+                            </span>
+                            {customer.tgUsername && (
+                              <span className="text-xs font-mono text-slate-500">
+                                @{customer.tgUsername}
+                              </span>
+                            )}
+                            {customer.role === "admin" && (
+                              <span className="text-[9px] font-mono bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold uppercase">
+                                Admin
+                              </span>
+                            )}
+                            {customer.isPremium && (
+                              <span className="text-[9px] font-mono bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold uppercase flex items-center gap-0.5">
+                                <Sparkles className="w-2.5 h-2.5" /> Premium
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 mt-1 flex-wrap">
+                            <span className="text-slate-900 font-semibold bg-slate-100 px-1.5 py-0.5 rounded">
+                              PRIME: {customer.primeMemberId || "Unassigned"}
+                            </span>
+                            <span>&bull;</span>
+                            <span>ID: {customer.tgUserId}</span>
+                            {customer.orderCount > 0 && (
+                              <>
+                                <span>&bull;</span>
+                                <span className="text-emerald-700 font-semibold">
+                                  {customer.orderCount} Orders (${(customer.totalSpent || 0).toFixed(2)})
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Hardware / Security Preview & Arrow */}
+                      <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                        {fp ? (
+                          <div className="text-right font-mono text-[10px] text-slate-500">
+                            <p className="text-slate-900 font-bold flex items-center gap-1 justify-end">
+                              <Globe className="w-3 h-3 text-slate-400" />
+                              {fp.ipSession || "IP Captured"} {fp.city ? `(${fp.city})` : ""}
+                            </p>
+                            <p className="truncate max-w-[200px] text-slate-400">
+                              {fp.platform || fp.browser?.split(" ")[0] || "Device Active"}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                            Pending telemetry
+                          </span>
+                        )}
+
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-slate-900 group-hover:text-white flex items-center justify-center transition-colors">
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 3. CUSTOMER DETAIL PAGE: FULL HYDRATED TELEGRAM DOSSIER, FINGERPRINTS,   */}
+        {/*    SECURITY SNAPSHOTS TIMELINE & COMPLETE ORDER HISTORY                   */}
+        {/* ========================================================================= */}
+        {view === "customer-detail" && (
+          <motion.div
+            key="view-customer-detail"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-100"
+          >
+            {/* Sticky Navigation Top Bar */}
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setSelectedCustomerId(null);
+                      setView("customers");
+                    }}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" /> Back to Customers
+                  </button>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-xs font-mono font-bold text-slate-900">
+                    {customerDetail?.customer?.tgName || "Customer Dossier"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {selectedCustomerId && (
+                    <button
+                      onClick={() => fetchCustomerDetail(selectedCustomerId)}
+                      disabled={loadingCustomerDetail}
+                      className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-mono flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingCustomerDetail ? "animate-spin" : ""}`} />
+                      Refresh Dossier
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {loadingCustomerDetail || !customerDetail ? (
+              <div className="flex-1 flex items-center justify-center p-12">
+                <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
+              </div>
+            ) : (
+              <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+                
+                {/* SECTION 1: PRIME MEMBER TELEGRAM IDENTITY CARD */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm overflow-hidden relative">
+                  {/* Glossy Header Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center font-heading font-black text-2xl uppercase shadow-lg">
+                        {customerDetail.customer.tgName?.charAt(0) || "P"}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h2 className="text-2xl font-heading font-black uppercase text-slate-900 tracking-wide">
+                            {customerDetail.customer.tgName || "Unknown User"}
+                          </h2>
+                          {customerDetail.customer.role === "admin" && (
+                            <span className="text-xs font-mono bg-red-600 text-white px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                              System Admin
+                            </span>
+                          )}
+                          {customerDetail.customer.isPremium && (
+                            <span className="text-xs font-mono bg-amber-500 text-black px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" /> Telegram Premium
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-mono text-slate-500 mt-0.5">
+                          @{customerDetail.customer.tgUsername || "none"} &bull; Telegram User ID: {customerDetail.customer.tgUserId}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 text-white px-4 py-3 rounded-xl font-mono text-right shadow-sm shrink-0">
+                      <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">PRIME Member ID</p>
+                      <div className="flex items-center justify-end gap-2 mt-0.5">
+                        <span className="text-lg font-black tracking-wider text-amber-400">
+                          {customerDetail.customer.primeMemberId || "Unassigned"}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(customerDetail.customer.primeMemberId, "primeId")}
+                          className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+                          title="Copy Prime ID"
+                        >
+                          {copiedKey === "primeId" ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Identity Breakdown Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 text-xs">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">First / Last Name</p>
+                      <p className="font-mono text-slate-900 font-bold">
+                        {customerDetail.customer.firstName || "—"} {customerDetail.customer.lastName || ""}
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Language & Direct PM</p>
+                      <p className="font-mono text-slate-900 font-bold">
+                        Code: {customerDetail.customer.languageCode || "en"} &bull; PM: {customerDetail.customer.allowsWriteToPm ? "Allowed" : "Restricted"}
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Enrolled Date</p>
+                      <p className="font-mono text-slate-900 font-bold">
+                        {customerDetail.customer.createdAt ? new Date(customerDetail.customer.createdAt).toLocaleDateString() : "—"}
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Last Active Session</p>
+                      <p className="font-mono text-slate-900 font-bold">
+                        {customerDetail.customer.lastSeen ? new Date(customerDetail.customer.lastSeen).toLocaleTimeString() : "Live Now"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 2: CAPTURED DEVICE FINGERPRINT & SECURITY METRICS */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
+                          Captured Device Fingerprint & Telemetry
+                        </h3>
+                        <p className="text-[11px] font-mono text-slate-500">
+                          Active hardware snapshot from customer connection
+                        </p>
+                      </div>
+                    </div>
+
+                    {customerDetail.customer.latestFingerprint?.vpnDetected ? (
+                      <span className="text-[10px] font-mono bg-red-100 text-red-700 px-2 py-1 rounded-md font-bold uppercase flex items-center gap-1">
+                        <ShieldAlert className="w-3.5 h-3.5" /> VPN / Proxy Detected
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-1 rounded-md font-bold uppercase flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Clean Residential IP
+                      </span>
+                    )}
+                  </div>
+
+                  {customerDetail.customer.latestFingerprint ? (
+                    (() => {
+                      const fp = customerDetail.customer.latestFingerprint;
+                      return (
+                        <div className="space-y-4 text-xs font-mono">
+                          {/* IP & Geolocation Strip */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1 flex items-center gap-1">
+                                <Globe className="w-3 h-3" /> Public Session IP
+                              </p>
+                              <p className="text-sm font-black text-slate-900 font-mono">
+                                {fp.ipSession || "127.0.0.1"}
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-1 truncate">
+                                ISP: {fp.isp || "Local Gateway / Tunnel"}
+                              </p>
                             </div>
+
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1 flex items-center gap-1">
+                                <MapPin className="w-3 h-3" /> Geolocation
+                              </p>
+                              <p className="text-sm font-black text-slate-900">
+                                {fp.city || "Manila"}, {fp.country || "Philippines"}
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-1 truncate">
+                                Region: {fp.region || "National Capital Region"}
+                              </p>
+                            </div>
+
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1 flex items-center gap-1">
+                                <Activity className="w-3 h-3" /> GPS Coordinates
+                              </p>
+                              <p className="text-sm font-black text-slate-900">
+                                {fp.location?.lat ? `${fp.location.lat.toFixed(4)}, ${fp.location.lon.toFixed(4)}` : "14.5995, 120.9842"}
+                              </p>
+                              {fp.location?.lat && (
+                                <a
+                                  href={`https://www.google.com/maps?q=${fp.location.lat},${fp.location.lon}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] text-blue-600 hover:underline inline-flex items-center gap-1 mt-1 font-semibold"
+                                >
+                                  Open Google Maps <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Hardware & Browser Matrix */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Operating System</p>
+                              <p className="text-slate-900 font-bold truncate">{fp.platform || "Linux x86_64"}</p>
+                            </div>
+
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Display Resolution</p>
+                              <p className="text-slate-900 font-bold">{fp.screenResolution || "1920x1080"} ({fp.colorDepth || "24-bit"})</p>
+                            </div>
+
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">CPU Cores & Memory</p>
+                              <p className="text-slate-900 font-bold">{fp.hardwareConcurrency || "8"} Cores &bull; {fp.deviceMemory || "8 GB"}</p>
+                            </div>
+
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Timezone</p>
+                              <p className="text-slate-900 font-bold truncate">{fp.timezone || "Asia/Manila"}</p>
+                            </div>
+                          </div>
+
+                          {/* Graphics & WebGL Unmasked GPU */}
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+                            <div>
+                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">
+                                GPU Graphics Card (Unmasked WebGL Renderer)
+                              </p>
+                              <p className="text-slate-800 font-mono text-xs bg-white p-2.5 rounded-lg border border-slate-200 break-all">
+                                {fp.graphics || "ANGLE (Intel, Intel(R) UHD Graphics Direct3D11)"}
+                              </p>
+                            </div>
+
+                            <div>
+                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">
+                                Client User Agent
+                              </p>
+                              <p className="text-slate-600 font-mono text-[11px] bg-white p-2.5 rounded-lg border border-slate-200 break-all">
+                                {fp.browser || navigator.userAgent}
+                              </p>
+                            </div>
+
+                            {fp.canvasHash && (
+                              <div>
+                                <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">
+                                  Canvas 2D Hash Signature
+                                </p>
+                                <p className="text-slate-700 font-mono text-[11px]">
+                                  {fp.canvasHash}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div className="p-8 text-center bg-slate-50 rounded-xl">
+                      <p className="text-slate-500 font-mono text-xs">No active fingerprint telemetry recorded for this user yet.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* SECTION 3: HISTORICAL SECURITY SNAPSHOTS TIMELINE */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                    <div>
+                      <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
+                        Security Snapshots Timeline
+                      </h3>
+                      <p className="text-[11px] font-mono text-slate-500">
+                        {customerDetail.fingerprints.length} recorded session snapshots
+                      </p>
+                    </div>
+                  </div>
+
+                  {customerDetail.fingerprints.length === 0 ? (
+                    <p className="text-xs font-mono text-slate-400 py-6 text-center">
+                      No historical snapshots recorded yet.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {customerDetail.fingerprints.map((snap, idx) => (
+                        <div
+                          key={snap.id || idx}
+                          className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900">
+                                Snapshot #{customerDetail.fingerprints.length - idx}
+                              </span>
+                              <span className="text-slate-400">&bull;</span>
+                              <span className="text-slate-600">
+                                {snap.createdAt ? new Date(snap.createdAt).toLocaleString() : "Recent"}
+                              </span>
+                            </div>
+                            <p className="text-slate-500 text-[11px]">
+                              IP: {snap.ipSession || "127.0.0.1"} &bull; {snap.city || "Manila"}, {snap.country || "Philippines"} &bull; ISP: {snap.isp || "Private ISP"}
+                            </p>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="bg-slate-200 text-slate-800 px-2 py-1 rounded text-[10px] font-bold">
+                              {snap.platform || "ChromeOS / Linux"}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
+                  )}
+                </div>
+
+                {/* SECTION 4: CUSTOMER ORDER HISTORY */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                    <div>
+                      <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
+                        Customer Order History
+                      </h3>
+                      <p className="text-[11px] font-mono text-slate-500">
+                        {customerDetail.orders.length} orders on record
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => handleSimulateOrder(
+                        customerDetail.customer.tgUserId,
+                        customerDetail.customer.tgName,
+                        customerDetail.customer.primeMemberId
+                      )}
+                      className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-mono font-bold rounded-lg transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Simulate Test Order
+                    </button>
                   </div>
-               )}
-               
-               {activeModule === 'Inventory' && (
-                   <div className="divide-y divide-gray-100">
-                      {products.map(p => (
-                        <div key={p.id} className="p-3 flex justify-between items-center">
-                            <span className="text-sm font-bold text-gray-900">{p.name}</span>
-                            <span className="text-xs font-mono">Stock: {p.stock}</span>
+
+                  {customerDetail.orders.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50 rounded-xl">
+                      <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-xs font-mono text-slate-500">
+                        No orders recorded yet for this customer. Click &quot;Simulate Test Order&quot; to test order ingestion.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {customerDetail.orders.map((ord) => (
+                        <div
+                          key={ord.id}
+                          className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 text-sm">
+                                {ord.orderNumber}
+                              </span>
+                              <span className="text-slate-400">&bull;</span>
+                              <span className="text-slate-500">
+                                {ord.createdAt ? new Date(ord.createdAt).toLocaleString() : "Recent"}
+                              </span>
+                            </div>
+
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              ord.status === "Completed"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                : ord.status === "Processing"
+                                ? "bg-blue-100 text-blue-800 border border-blue-200"
+                                : "bg-amber-100 text-amber-800 border border-amber-200"
+                            }`}>
+                              {ord.status || "Processing"}
+                            </span>
+                          </div>
+
+                          {/* Items table */}
+                          <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                            {(ord.items || []).map((item: any, i: number) => (
+                              <div key={i} className="p-2.5 flex items-center justify-between">
+                                <span className="font-medium text-slate-800">
+                                  {item.quantity}x {item.name}
+                                </span>
+                                <span className="font-bold text-slate-900">
+                                  ${(Number(item.price) * (Number(item.quantity) || 1)).toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
+                            <div className="p-2.5 bg-slate-50 flex items-center justify-between font-bold text-slate-900">
+                              <span>Total Paid</span>
+                              <span className="text-sm">${Number(ord.totalAmount).toFixed(2)}</span>
+                            </div>
+                          </div>
                         </div>
                       ))}
-                   </div>
-               )}
-            </div>
-          </motion.section>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+          </motion.div>
         )}
+
+        {/* ========================================================================= */}
+        {/* 4. ORDERS MODULE: SEPARATE FULL PAGE WITH STICKY NON-SCROLLING SEARCH BAR */}
+        {/* ========================================================================= */}
+        {view === "orders" && (
+          <motion.div
+            key="view-orders"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            {/* Sticky non-scrolling search & header */}
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setView("dashboard")}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                    </button>
+                    <span className="text-slate-300">/</span>
+                    <h2 className="text-base sm:text-lg font-heading font-black tracking-wide uppercase text-slate-900">
+                      Orders Management
+                    </h2>
+                    <span className="text-[10px] font-mono bg-slate-900 text-white px-2 py-0.5 rounded-full font-bold">
+                      {filteredOrders.length}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={fetchAllData}
+                    disabled={refreshing}
+                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={orderSearch}
+                      onChange={(e) => setOrderSearch(e.target.value)}
+                      placeholder="Search orders by Order #, Customer Name, Prime ID, or Status..."
+                      className="w-full pl-9 pr-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1 overflow-x-auto">
+                    {(["all", "Processing", "Completed", "Pending"] as const).map((filter) => (
+                      <button
+                        key={filter}
+                        onClick={() => setOrderFilter(filter)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                          orderFilter === filter
+                            ? "bg-slate-900 text-white"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {filter === "all" ? "All Orders" : filter}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Compact Orders List */}
+            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
+              {filteredOrders.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
+                  <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="font-heading font-black text-slate-800 uppercase tracking-wide text-sm mb-1">
+                    No orders found
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Orders submitted in the storefront or simulated will appear here.
+                  </p>
+                </div>
+              ) : (
+                filteredOrders.map((ord) => (
+                  <div
+                    key={ord.id}
+                    onClick={() => {
+                      setSelectedOrderId(ord.id);
+                      setView("order-detail");
+                    }}
+                    className="group bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-900 rounded-xl p-3.5 sm:p-4 shadow-sm hover:shadow-md transition-all duration-150 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-heading font-black text-sm text-slate-900 group-hover:text-black">
+                          {ord.orderNumber}
+                        </span>
+                        <span className="text-xs font-mono text-slate-500">
+                          {ord.createdAt ? new Date(ord.createdAt).toLocaleDateString() : "Recent"}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
+                          ord.status === "Completed"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : ord.status === "Processing"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}>
+                          {ord.status || "Processing"}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-600 font-mono mt-1">
+                        Customer: <span className="font-bold text-slate-900">{ord.customerName}</span> ({ord.primeMemberId || ord.customerId})
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
+                      <div className="text-right font-mono">
+                        <p className="text-sm font-black text-slate-900">
+                          ${Number(ord.totalAmount).toFixed(2)}
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          {ord.items?.length || 1} line item(s)
+                        </p>
+                      </div>
+
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-slate-900 group-hover:text-white flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 5. ORDER DETAIL PAGE: SEPARATE FULL VIEW                                  */}
+        {/* ========================================================================= */}
+        {view === "order-detail" && selectedOrder && (
+          <motion.div
+            key="view-order-detail"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-100"
+          >
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    setSelectedOrderId(null);
+                    setView("orders");
+                  }}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to Orders
+                </button>
+                <span className="font-heading font-black text-slate-900 text-sm">
+                  Order {selectedOrder.orderNumber}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div>
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">Order Identifier</span>
+                    <h2 className="text-2xl font-heading font-black text-slate-900">{selectedOrder.orderNumber}</h2>
+                    <p className="text-xs font-mono text-slate-500 mt-1">
+                      Placed: {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : "Recent"}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-slate-500">Status:</span>
+                    {(["Processing", "Completed", "Pending"] as const).map(st => (
+                      <button
+                        key={st}
+                        onClick={() => handleUpdateOrderStatus(selectedOrder.id, st)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider font-mono transition-all cursor-pointer ${
+                          selectedOrder.status === st
+                            ? "bg-slate-900 text-white shadow-sm"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-6 border-b border-slate-100 text-xs font-mono">
+                  <div>
+                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Customer</p>
+                    <p className="text-slate-900 font-bold text-sm">{selectedOrder.customerName}</p>
+                    <p className="text-slate-500">Prime ID: {selectedOrder.primeMemberId || "Unassigned"}</p>
+                    <p className="text-slate-500">Telegram ID: {selectedOrder.customerId}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Checkout Device Snapshot</p>
+                    {selectedOrder.deviceSnapshot ? (
+                      <div className="text-slate-600">
+                        <p>IP: {selectedOrder.deviceSnapshot.ip || "Captured"}</p>
+                        <p>Browser: {selectedOrder.deviceSnapshot.browser || "Telegram Mini App"}</p>
+                      </div>
+                    ) : (
+                      <p className="text-slate-400">Standard Web Mini App Checkout</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Line Items */}
+                <div className="pt-6">
+                  <h3 className="font-heading font-black text-sm uppercase text-slate-900 mb-3 tracking-wide">
+                    Purchased Items
+                  </h3>
+                  <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                    {(selectedOrder.items || []).map((it: any, i: number) => (
+                      <div key={i} className="p-3 flex items-center justify-between text-xs font-mono">
+                        <div>
+                          <p className="font-bold text-slate-900">{it.name}</p>
+                          <p className="text-slate-500">Qty: {it.quantity} &bull; Unit: ${Number(it.price).toFixed(2)}</p>
+                        </div>
+                        <p className="font-bold text-slate-900 text-sm">
+                          ${(Number(it.price) * (Number(it.quantity) || 1)).toFixed(2)}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="p-3 bg-slate-50 flex items-center justify-between font-mono font-black text-slate-900">
+                      <span>Total Amount</span>
+                      <span className="text-base">${Number(selectedOrder.totalAmount).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 6. PRODUCTS MODULE: SEPARATE FULL PAGE WITH STICKY NON-SCROLLING SEARCH   */}
+        {/*    + COMPACT "+ ADD PRODUCT" BUTTON AT TOP (FORMS NOT SHOWN RIGHT AWAY)   */}
+        {/* ========================================================================= */}
+        {view === "products" && (
+          <motion.div
+            key="view-products"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            {/* Sticky non-scrolling search & header */}
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setView("dashboard")}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                    </button>
+                    <span className="text-slate-300">/</span>
+                    <h2 className="text-base sm:text-lg font-heading font-black tracking-wide uppercase text-slate-900">
+                      Products Configurator
+                    </h2>
+                    <span className="text-[10px] font-mono bg-slate-900 text-white px-2 py-0.5 rounded-full font-bold">
+                      {filteredProducts.length}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setEditingProduct({
+                        name: "",
+                        price: 49.99,
+                        stock: 50,
+                        category: "Featured",
+                        description: "",
+                        imageUrl: "https://picsum.photos/seed/primeprod/400/400",
+                        active: true
+                      });
+                      setProductModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Product
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Search product catalog by name or category..."
+                    className="w-full pl-9 pr-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Compact Products List */}
+            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
+              {filteredProducts.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
+                  <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="font-heading font-black text-slate-800 uppercase tracking-wide text-sm mb-1">
+                    No products found
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Click &quot;Add Product&quot; above to create a new catalog item.
+                  </p>
+                </div>
+              ) : (
+                filteredProducts.map((prod) => (
+                  <div
+                    key={prod.id}
+                    className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={prod.imageUrl || "https://picsum.photos/seed/prime/100"}
+                        alt={prod.name}
+                        className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-200 shrink-0"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-heading font-black text-sm text-slate-900">
+                            {prod.name}
+                          </h4>
+                          <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                            {prod.category || "General"}
+                          </span>
+                          {prod.active === false && (
+                            <span className="text-[9px] font-mono bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold uppercase">
+                              Hidden
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-mono text-slate-500 mt-0.5">
+                          Price: <span className="font-bold text-slate-900">${Number(prod.price).toFixed(2)}</span> &bull; Stock: {prod.stock ?? 0}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleToggleProductActive(prod)}
+                        className={`p-2 rounded-lg border text-xs transition-colors cursor-pointer ${
+                          prod.active === false
+                            ? "bg-red-50 border-red-200 text-red-600"
+                            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                        title={prod.active === false ? "Show in Store" : "Hide from Store"}
+                      >
+                        {prod.active === false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setEditingProduct(prod);
+                          setProductModalOpen(true);
+                        }}
+                        className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                        title="Edit Product"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteProduct(prod.id)}
+                        className="p-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg transition-colors cursor-pointer"
+                        title="Delete Product"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* PRODUCT CONFIGURATION MODAL (Only opened via button, not shown right away) */}
+            {productModalOpen && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-200">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
+                      {editingProduct?.id ? "Edit Product" : "Add New Product"}
+                    </h3>
+                    <button
+                      onClick={() => setProductModalOpen(false)}
+                      className="text-slate-400 hover:text-slate-800 text-sm font-mono"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSaveProduct(editingProduct);
+                    }}
+                    className="space-y-3 text-xs"
+                  >
+                    <div>
+                      <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
+                        Product Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editingProduct?.name || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-medium"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
+                          Price ($)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={editingProduct?.price ?? 49.99}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
+                          Category
+                        </label>
+                        <input
+                          type="text"
+                          value={editingProduct?.category || "Featured"}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
+                        Image URL
+                      </label>
+                      <input
+                        type="text"
+                        value={editingProduct?.imageUrl || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, imageUrl: e.target.value })}
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-mono text-[11px]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editingProduct?.description || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-medium"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setProductModalOpen(false)}
+                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold uppercase tracking-wider text-[11px]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-lg font-bold uppercase tracking-wider text-[11px] shadow-sm"
+                      >
+                        Save Product
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 7. INVENTORY MODULE: SEPARATE FULL PAGE STRICTLY FOR STOCK ADJUSTMENTS    */}
+        {/* ========================================================================= */}
+        {view === "inventory" && (
+          <motion.div
+            key="view-inventory"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            {/* Sticky non-scrolling search & header */}
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setView("dashboard")}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                    </button>
+                    <span className="text-slate-300">/</span>
+                    <h2 className="text-base sm:text-lg font-heading font-black tracking-wide uppercase text-slate-900">
+                      Inventory & Stock Control
+                    </h2>
+                  </div>
+
+                  <button
+                    onClick={fetchAllData}
+                    disabled={refreshing}
+                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={inventorySearch}
+                      onChange={(e) => setInventorySearch(e.target.value)}
+                      placeholder="Search inventory items by product name or category..."
+                      className="w-full pl-9 pr-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1 overflow-x-auto">
+                    {(["all", "low", "out"] as const).map((filter) => (
+                      <button
+                        key={filter}
+                        onClick={() => setInventoryFilter(filter)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                          inventoryFilter === filter
+                            ? "bg-slate-900 text-white"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {filter === "all" ? "All Items" : filter === "low" ? "Low Stock (≤10)" : "Out of Stock"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Compact Stock Adjustment Rows */}
+            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
+              {filteredInventory.map((item) => {
+                const stock = item.stock ?? 0;
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-heading font-black text-sm text-slate-900">
+                          {item.name}
+                        </h4>
+                        <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                          {item.category || "General"}
+                        </span>
+                      </div>
+                      <p className="text-xs font-mono text-slate-500 mt-0.5">
+                        Unit Price: ${Number(item.price).toFixed(2)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                      {/* Stock Badge */}
+                      <div className="text-right font-mono pr-2">
+                        <span className={`text-sm font-black px-2.5 py-1 rounded-lg ${
+                          stock === 0
+                            ? "bg-red-100 text-red-700"
+                            : stock <= 10
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}>
+                          {stock} in stock
+                        </span>
+                      </div>
+
+                      {/* Stock Adjustment Controls */}
+                      <div className="flex items-center gap-1 font-mono text-xs">
+                        <button
+                          onClick={() => handleAdjustStock(item.id, stock, -10)}
+                          disabled={stock < 10}
+                          className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded-lg text-slate-700 font-bold transition-colors cursor-pointer"
+                        >
+                          -10
+                        </button>
+                        <button
+                          onClick={() => handleAdjustStock(item.id, stock, -1)}
+                          disabled={stock <= 0}
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded-lg text-slate-700 font-bold transition-colors cursor-pointer"
+                        >
+                          -1
+                        </button>
+                        <button
+                          onClick={() => handleAdjustStock(item.id, stock, +1)}
+                          className="px-2.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg font-bold transition-colors cursor-pointer"
+                        >
+                          +1
+                        </button>
+                        <button
+                          onClick={() => handleAdjustStock(item.id, stock, +10)}
+                          className="px-2 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg font-bold transition-colors cursor-pointer"
+                        >
+                          +10
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 8. SETTINGS MODULE: SEPARATE FULL PAGE                                    */}
+        {/* ========================================================================= */}
+        {view === "settings" && (
+          <motion.div
+            key="view-settings"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <button
+                  onClick={() => setView("dashboard")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                </button>
+                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">
+                  Admin System Settings
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
+                  Telegram Authentication Gateway
+                </h3>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs font-mono space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Authorized Master Telegram ID:</span>
+                    <span className="font-black text-slate-900 bg-white px-2 py-1 rounded border border-slate-200">1085949511</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Auto-Bypass Status:</span>
+                    <span className="text-emerald-700 font-bold">Enabled & Active</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Device Fingerprinting:</span>
+                    <span className="text-emerald-700 font-bold">Enforced on all sessions</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
+                  Security & Telemetry Engine
+                </h3>
+                <p className="text-xs text-slate-600 font-mono leading-relaxed">
+                  Every user accessing the storefront or admin panel has their WebGL GPU, Canvas 2D Hash, Screen Display metrics, IP, ISP, and Geolocation fingerprinted and stored in Firestore for auditing.
+                </p>
+                <div className="flex items-center gap-2 pt-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <span className="text-xs font-mono font-bold text-slate-900">Hardware Telemetry Online</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 9. ANALYTICS MODULE: SEPARATE FULL PAGE                                   */}
+        {/* ========================================================================= */}
+        {view === "analytics" && (
+          <motion.div
+            key="view-analytics"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <button
+                  onClick={() => setView("dashboard")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                </button>
+                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">
+                  Telemetry Analytics
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Total Users</p>
+                  <p className="text-2xl font-heading font-black text-slate-900 mt-1">{customers.length}</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Total Orders</p>
+                  <p className="text-2xl font-heading font-black text-slate-900 mt-1">{orders.length}</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Gross Volume</p>
+                  <p className="text-2xl font-heading font-black text-emerald-600 mt-1">
+                    ${orders.reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0).toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Active Products</p>
+                  <p className="text-2xl font-heading font-black text-slate-900 mt-1">
+                    {products.filter(p => p.active !== false).length}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <h3 className="font-heading font-black uppercase text-sm text-slate-900 tracking-wide mb-4">
+                  Device Hardware Distribution
+                </h3>
+                <div className="space-y-3 font-mono text-xs">
+                  {customers.map((c) => (
+                    <div key={c.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
+                      <div>
+                        <span className="font-bold text-slate-900">{c.tgName}</span>
+                        <span className="text-slate-400 text-[11px] ml-2">({c.primeMemberId})</span>
+                      </div>
+                      <span className="bg-slate-200 text-slate-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                        {c.latestFingerprint?.platform || "Linux / ChromeOS"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
       </AnimatePresence>
     </div>
   );

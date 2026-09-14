@@ -91,7 +91,38 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
               <span className="font-bold text-gray-600">Total:</span>
               <span className="font-bold text-2xl font-heading">${cartTotal.toFixed(2)}</span>
             </div>
-            <button className="w-full bg-black text-white font-bold py-4 rounded hover:bg-gray-800 transition-colors uppercase tracking-widest text-sm flex items-center justify-center gap-2">
+            <button 
+              onClick={async () => {
+                try {
+                  const storedUserId = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_admin_user_id") || localStorage.getItem("prime_admin_user_id") || "1085949511") : "1085949511";
+                  const res = await fetch("/api/orders", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      customerId: storedUserId,
+                      customerName: "𝕻𝖗𝖎𝖒𝖔 (@PrimoYelo)",
+                      customerUsername: "PrimoYelo",
+                      primeMemberId: "19054A77C8CD",
+                      items: cart,
+                      totalAmount: cartTotal,
+                      notes: "Storefront Checkout Order"
+                    })
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    alert(`Order #${data.orderNumber} placed successfully!`);
+                    clearCart();
+                    onClose();
+                  } else {
+                    alert("Failed to create order. Please try again.");
+                  }
+                } catch (e) {
+                  console.error(e);
+                  alert("Order checkout error");
+                }
+              }}
+              className="w-full bg-black text-white font-bold py-4 rounded hover:bg-gray-800 transition-colors uppercase tracking-widest text-sm flex items-center justify-center gap-2 cursor-pointer"
+            >
               Proceed to Checkout
             </button>
           </div>

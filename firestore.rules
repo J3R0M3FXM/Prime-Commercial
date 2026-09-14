@@ -18,6 +18,10 @@ service cloud.firestore {
         allow read, write: if true; // Allow API route to save fingerprints
       }
     }
+
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
     
     match /admins/{adminId} {
       allow read: if false; // Admin code check should be server-side
