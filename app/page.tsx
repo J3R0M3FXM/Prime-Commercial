@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getClientFingerprint, getClientLocation } from "./components/fingerprint-collector";
 import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
@@ -8,8 +9,10 @@ import { useCart } from "./components/cart-context";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2 } from "lucide-react";
 
 export default function Shopfront() {
+  const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [routingToAdmin, setRoutingToAdmin] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -27,22 +30,30 @@ export default function Shopfront() {
         // Wait for the next tick to ensure Telegram has injected the data
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        // Absolute fallback: read directly from the URL hash
-        if (typeof window !== 'undefined' && window.location.hash) {
-          const hashStr = window.location.hash.substring(1);
-          const params = new URLSearchParams(hashStr);
-          const tgData = params.get('tgWebAppData');
-          
-          if (tgData) {
-            initDataRaw = tgData;
-          } else {
-             if (hashStr.includes('user=') || hashStr.includes('hash=')) {
-               initDataRaw = hashStr;
-             }
+        // 1. Read directly from URL hash or query params
+        if (typeof window !== 'undefined') {
+          if (window.location.hash) {
+            const hashStr = window.location.hash.substring(1);
+            const params = new URLSearchParams(hashStr);
+            const tgData = params.get('tgWebAppData');
+            
+            if (tgData) {
+              initDataRaw = tgData;
+            } else if (hashStr.includes('user=') || hashStr.includes('hash=')) {
+              initDataRaw = hashStr;
+            }
+          }
+
+          if (!initDataRaw && window.location.search) {
+            const searchParams = new URLSearchParams(window.location.search);
+            const tgData = searchParams.get('tgWebAppData') || searchParams.get('initData');
+            if (tgData) {
+              initDataRaw = tgData;
+            }
           }
         }
         
-        // Final fallback: try window object
+        // 2. Fallback to Telegram WebApp object
         if (!initDataRaw && typeof window !== 'undefined' && (window as any).Telegram?.WebApp?.initData) {
           initDataRaw = (window as any).Telegram.WebApp.initData;
         }
@@ -68,6 +79,25 @@ export default function Shopfront() {
         });
 
         if (response.ok) {
+          const authData = await response.json();
+
+          // If connection is from authorized Telegram Admin (ID: 1085949511)
+          if (authData.isAdmin) {
+            setRoutingToAdmin(true);
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem("prime_admin_authorized", "true");
+              sessionStorage.setItem("prime_admin_user_id", authData.tgUserId || "1085949511");
+              localStorage.setItem("prime_admin_authorized", "true");
+              localStorage.setItem("prime_admin_user_id", authData.tgUserId || "1085949511");
+              if (authData.token) {
+                sessionStorage.setItem("prime_admin_token", authData.token);
+              }
+              const hash = window.location.hash;
+              router.replace(`/admin${hash ? hash : ''}`);
+            }
+            return;
+          }
+
           setAuthorized(true);
           const productsRes = await fetch('/api/products');
           const pData = await productsRes.json();
@@ -85,7 +115,7 @@ export default function Shopfront() {
     }
 
     checkAuth();
-  }, []);
+  }, [router]);
 
   const categories = ["All", ...Array.from(new Set(products.map(p => p.category || "General")))];
 
@@ -93,6 +123,17 @@ export default function Shopfront() {
     (selectedCategory === "All" || (p.category || "General") === selectedCategory) &&
     (p.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  if (routingToAdmin) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-6 text-center font-sans">
+        <Loader2 className="w-10 h-10 animate-spin mb-4 text-white" />
+        <h1 className="text-xl font-heading font-black uppercase tracking-widest mb-1">Telegram Admin Verified</h1>
+        <p className="text-xs font-mono text-gray-400">Telegram ID: 1085949511</p>
+        <p className="text-xs text-gray-400 mt-2">Routing directly to Admin Panel...</p>
+      </div>
+    );
+  }
 
   if (checking) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-900">
