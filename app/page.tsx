@@ -168,41 +168,39 @@ export default function Shopfront() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col relative pb-20">
       
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm px-4 py-3 flex items-center justify-between">
-        <h1 className="text-2xl font-heading font-black tracking-widest uppercase">PRIME</h1>
-        <button 
-          onClick={() => setIsCartOpen(true)}
-          className="relative p-2 text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
-        >
-          <ShoppingBag className="w-6 h-6" />
-          {cartCount > 0 && (
-            <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
-              {cartCount}
-            </span>
-          )}
-        </button>
-      </header>
+      {/* Sticky Header & Search */}
+      <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <h1 className="text-2xl font-heading font-black tracking-widest uppercase">PRIME</h1>
+          <button 
+            onClick={() => setIsCartOpen(true)}
+            className="relative p-2 text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <ShoppingBag className="w-6 h-6" />
+            {cartCount > 0 && (
+              <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
+                {cartCount}
+              </span>
+            )}
+          </button>
+        </div>
 
-      {/* Main Content */}
-      <main className="flex-1 p-4 max-w-5xl mx-auto w-full">
-        
         {/* Search & Filter Controls */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <div className="px-4 pb-3 flex flex-row gap-2 max-w-5xl mx-auto w-full">
+          <div className="relative flex-[5]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input 
               type="text" 
-              placeholder="Search products..." 
-              className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+              placeholder="SEARCH PRODUCTS..." 
+              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all font-heading font-normal uppercase text-sm"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
             />
           </div>
-          <div className="relative sm:w-48">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <div className="relative flex-[3]">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <select 
-              className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent appearance-none cursor-pointer" 
+              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-black appearance-none cursor-pointer font-heading font-normal uppercase text-sm" 
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
             >
@@ -210,6 +208,10 @@ export default function Shopfront() {
             </select>
           </div>
         </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 p-4 max-w-5xl mx-auto w-full">
         
         {/* Product Grid */}
         {products.length === 0 ? (

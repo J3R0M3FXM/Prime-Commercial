@@ -5,6 +5,8 @@ import "@fontsource/open-sauce-sans/400.css";
 import "@fontsource/open-sauce-sans/500.css";
 import "@fontsource/open-sauce-sans/600.css";
 import "@fontsource/open-sauce-sans/700.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
 import "./globals.css";
 import { CartProvider } from "./components/cart-context";
 import SystemFooter from "./components/system-footer";

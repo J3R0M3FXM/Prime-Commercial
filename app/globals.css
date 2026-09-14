@@ -3,6 +3,7 @@
 @theme {
   --font-sans: 'Open Sauce Sans', 'Open Sauce One', sans-serif;
   --font-heading: 'Roboto Condensed', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 }
 
 body {
