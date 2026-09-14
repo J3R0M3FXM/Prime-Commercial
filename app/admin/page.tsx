@@ -757,11 +757,11 @@ export default function AdminPage() {
                       <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                         {fp ? (
                           <div className="text-right font-mono text-[10px] text-slate-500">
-                            <p className="text-slate-900 font-bold flex items-center gap-1 justify-end">
-                              <Globe className="w-3 h-3 text-slate-400" />
-                              {fp.city || "Manila"}, {fp.country || "Philippines"}
+                            <p className="text-slate-900 font-bold flex items-center gap-1 justify-end truncate max-w-[260px]">
+                              <Globe className="w-3 h-3 text-slate-400 shrink-0" />
+                              {fp.location?.address || `${fp.city || "Manila"}, ${fp.country || "Philippines"}`}
                             </p>
-                            <p className="truncate max-w-[200px] text-slate-400">
+                            <p className="truncate max-w-[260px] text-slate-400">
                               {fp.platform || "Standard Device"} &bull; {fp.locationSource || "Active"}
                             </p>
                           </div>
@@ -1077,8 +1077,8 @@ export default function AdminPage() {
                                     )}
                                   </div>
 
-                                  <p className="text-[11px] text-slate-500 mt-0.5">
-                                    {snap.city || "Manila"}, {snap.country || "Philippines"} &bull; IP: {snap.ipSession || "127.0.0.1"} &bull; {snap.platform || "Standard Device"}
+                                  <p className="text-[11px] text-slate-500 mt-0.5 truncate max-w-xl">
+                                    {snap.location?.address || `${snap.city || "Manila"}, ${snap.country || "Philippines"}`} &bull; IP: {snap.ipSession || "127.0.0.1"}
                                   </p>
                                 </div>
                               </div>
