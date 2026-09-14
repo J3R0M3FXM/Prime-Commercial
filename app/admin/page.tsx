@@ -62,6 +62,7 @@ export default function AdminPage() {
   // Navigation state
   const [view, setView] = useState<AdminView>("dashboard");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [customerDetail, setCustomerDetail] = useState<{ customer: any; fingerprints: any[]; orders: any[] } | null>(null);
   const [loadingCustomerDetail, setLoadingCustomerDetail] = useState(false);
 
@@ -519,7 +520,7 @@ export default function AdminPage() {
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Customers</p>
                 <p className="text-2xl font-heading font-black text-slate-900">{customers.length}</p>
-                <p className="text-[10px] text-slate-500 font-mono mt-1">Fingerprints captured</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-1">Registered accounts</p>
               </div>
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Orders</p>
@@ -536,11 +537,11 @@ export default function AdminPage() {
                 </p>
               </div>
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">System Security</p>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Security & Fraud Check</p>
                 <p className="text-2xl font-heading font-black text-emerald-600 flex items-center gap-1.5">
                   <ShieldCheck className="w-5 h-5" /> Active
                 </p>
-                <p className="text-[10px] text-slate-500 font-mono mt-1">Hardware telemetry</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-1">Device & promo check</p>
               </div>
             </div>
 
@@ -551,12 +552,12 @@ export default function AdminPage() {
               </h3>
               <div className="grid grid-cols-3 gap-3 sm:gap-4">
                 {[
-                  { id: "customers", name: "Customers", icon: Users, desc: "Profiles & Device Telemetry", count: customers.length },
+                  { id: "customers", name: "Customers", icon: Users, desc: "Profiles & Device Info", count: customers.length },
                   { id: "orders", name: "Orders", icon: ClipboardList, desc: "Order History & Status", count: orders.length },
                   { id: "products", name: "Products", icon: Package, desc: "Catalog Configuration", count: products.length },
                   { id: "inventory", name: "Inventory", icon: Sliders, desc: "Stock Adjustments", count: `${products.reduce((a, p) => a + (p.stock || 0), 0)} units` },
                   { id: "settings", name: "Settings", icon: Lock, desc: "Security & Access Rules", count: "Protected" },
-                  { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Platform & Device Insights", count: "Live" }
+                  { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Store & Order Insights", count: "Live" }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -690,6 +691,7 @@ export default function AdminPage() {
                       key={customer.id}
                       onClick={() => {
                         setSelectedCustomerId(customer.id);
+                        setSelectedSessionId(null);
                         setView("customer-detail");
                       }}
                       className="group bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-900 rounded-xl p-3.5 sm:p-4 shadow-sm hover:shadow-md transition-all duration-150 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
@@ -720,6 +722,11 @@ export default function AdminPage() {
                                 <Sparkles className="w-2.5 h-2.5" /> Premium
                               </span>
                             )}
+                            {customer.isPromoFraudRisk && (
+                              <span className="text-[9px] font-mono bg-red-600 text-white px-1.5 py-0.5 rounded font-bold uppercase flex items-center gap-1 shadow-sm">
+                                ⚠️ Shared Device ({customer.sharedAccountCount + 1} Accounts)
+                              </span>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 mt-1 flex-wrap">
@@ -728,6 +735,12 @@ export default function AdminPage() {
                             </span>
                             <span>&bull;</span>
                             <span>ID: {customer.tgUserId}</span>
+                            {customer.deviceId && (
+                              <>
+                                <span>&bull;</span>
+                                <span className="text-slate-600 font-medium">Device: {customer.deviceId}</span>
+                              </>
+                            )}
                             {customer.orderCount > 0 && (
                               <>
                                 <span>&bull;</span>
@@ -740,21 +753,21 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Hardware / Security Preview & Arrow */}
+                      {/* Device & Location Preview & Arrow */}
                       <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                         {fp ? (
                           <div className="text-right font-mono text-[10px] text-slate-500">
                             <p className="text-slate-900 font-bold flex items-center gap-1 justify-end">
                               <Globe className="w-3 h-3 text-slate-400" />
-                              {fp.ipSession || "IP Captured"} {fp.city ? `(${fp.city})` : ""}
+                              {fp.city || "Manila"}, {fp.country || "Philippines"}
                             </p>
                             <p className="truncate max-w-[200px] text-slate-400">
-                              {fp.platform || fp.browser?.split(" ")[0] || "Device Active"}
+                              {fp.platform || "Standard Device"} &bull; {fp.locationSource || "Active"}
                             </p>
                           </div>
                         ) : (
                           <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded">
-                            Pending telemetry
+                            No session data
                           </span>
                         )}
 
@@ -790,6 +803,7 @@ export default function AdminPage() {
                   <button
                     onClick={() => {
                       setSelectedCustomerId(null);
+                      setSelectedSessionId(null);
                       setView("customers");
                     }}
                     className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -798,7 +812,7 @@ export default function AdminPage() {
                   </button>
                   <span className="text-slate-300">/</span>
                   <span className="text-xs font-mono font-bold text-slate-900">
-                    {customerDetail?.customer?.tgName || "Customer Dossier"}
+                    {customerDetail?.customer?.tgName || "Customer Profile"}
                   </span>
                 </div>
 
@@ -810,7 +824,7 @@ export default function AdminPage() {
                       className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-mono flex items-center gap-1.5 cursor-pointer shadow-sm"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${loadingCustomerDetail ? "animate-spin" : ""}`} />
-                      Refresh Dossier
+                      Refresh Profile
                     </button>
                   )}
                 </div>
@@ -824,9 +838,8 @@ export default function AdminPage() {
             ) : (
               <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
                 
-                {/* SECTION 1: PRIME MEMBER TELEGRAM IDENTITY CARD */}
+                {/* SECTION 1: CUSTOMER IDENTITY CARD */}
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm overflow-hidden relative">
-                  {/* Glossy Header Bar */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center font-heading font-black text-2xl uppercase shadow-lg">
@@ -863,7 +876,7 @@ export default function AdminPage() {
                         <button
                           onClick={() => copyToClipboard(customerDetail.customer.primeMemberId, "primeId")}
                           className="text-slate-400 hover:text-white transition-colors cursor-pointer"
-                          title="Copy Prime ID"
+                          title="Copy Member ID"
                         >
                           {copiedKey === "primeId" ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                         </button>
@@ -881,21 +894,21 @@ export default function AdminPage() {
                     </div>
 
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Language & Direct PM</p>
+                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Language & Direct Message</p>
                       <p className="font-mono text-slate-900 font-bold">
-                        Code: {customerDetail.customer.languageCode || "en"} &bull; PM: {customerDetail.customer.allowsWriteToPm ? "Allowed" : "Restricted"}
+                        Code: {customerDetail.customer.languageCode || "en"} &bull; Message: {customerDetail.customer.allowsWriteToPm ? "Allowed" : "Restricted"}
                       </p>
                     </div>
 
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Enrolled Date</p>
+                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Account Created</p>
                       <p className="font-mono text-slate-900 font-bold">
                         {customerDetail.customer.createdAt ? new Date(customerDetail.customer.createdAt).toLocaleDateString() : "—"}
                       </p>
                     </div>
 
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Last Active Session</p>
+                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Last Active</p>
                       <p className="font-mono text-slate-900 font-bold">
                         {customerDetail.customer.lastSeen ? new Date(customerDetail.customer.lastSeen).toLocaleTimeString() : "Live Now"}
                       </p>
@@ -903,195 +916,292 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* SECTION 2: CAPTURED DEVICE FINGERPRINT & SECURITY METRICS */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+                {/* SECTION 2: DEVICE ID & PROMO FRAUD DETECTION */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                        <ShieldCheck className="w-4 h-4" />
+                      <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center">
+                        <Smartphone className="w-4 h-4" />
                       </div>
                       <div>
                         <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
-                          Captured Device Fingerprint & Telemetry
+                          Device Check & Promo Fraud Detection
                         </h3>
                         <p className="text-[11px] font-mono text-slate-500">
-                          Active hardware snapshot from customer connection
+                          Identifies physical devices to check if multiple accounts are claiming promos
                         </p>
                       </div>
                     </div>
 
-                    {customerDetail.customer.latestFingerprint?.vpnDetected ? (
-                      <span className="text-[10px] font-mono bg-red-100 text-red-700 px-2 py-1 rounded-md font-bold uppercase flex items-center gap-1">
-                        <ShieldAlert className="w-3.5 h-3.5" /> VPN / Proxy Detected
+                    {customerDetail.customer.isPromoFraudRisk ? (
+                      <span className="text-xs font-mono bg-red-100 text-red-700 px-2.5 py-1 rounded-md font-bold uppercase flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-600" /> Multiple Accounts Detected
                       </span>
                     ) : (
-                      <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-1 rounded-md font-bold uppercase flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Clean Residential IP
+                      <span className="text-xs font-mono bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md font-bold uppercase flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Single Account (Clean)
                       </span>
                     )}
                   </div>
 
-                  {customerDetail.customer.latestFingerprint ? (
-                    (() => {
-                      const fp = customerDetail.customer.latestFingerprint;
-                      return (
-                        <div className="space-y-4 text-xs font-mono">
-                          {/* IP & Geolocation Strip */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1 flex items-center gap-1">
-                                <Globe className="w-3 h-3" /> Public Session IP
-                              </p>
-                              <p className="text-sm font-black text-slate-900 font-mono">
-                                {fp.ipSession || "127.0.0.1"}
-                              </p>
-                              <p className="text-[11px] text-slate-500 mt-1 truncate">
-                                ISP: {fp.isp || "Local Gateway / Tunnel"}
-                              </p>
-                            </div>
+                  {/* Device Identifiers Strip */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Device ID</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-900 font-mono text-xs truncate">
+                          {customerDetail.customer.deviceId || "DEV_STANDARD"}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(customerDetail.customer.deviceId || "DEV_STANDARD", "devId")}
+                          className="text-slate-400 hover:text-slate-900 transition-colors"
+                          title="Copy Device ID"
+                        >
+                          {copiedKey === "devId" ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
 
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1 flex items-center gap-1">
-                                <MapPin className="w-3 h-3" /> Geolocation
-                              </p>
-                              <p className="text-sm font-black text-slate-900">
-                                {fp.city || "Manila"}, {fp.country || "Philippines"}
-                              </p>
-                              <p className="text-[11px] text-slate-500 mt-1 truncate">
-                                Region: {fp.region || "National Capital Region"}
-                              </p>
-                            </div>
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">App ID</p>
+                      <span className="font-bold text-slate-900 font-mono text-xs truncate block">
+                        {customerDetail.customer.appId || "PRIME_SHOP_APP"}
+                      </span>
+                    </div>
 
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1 flex items-center gap-1">
-                                <Activity className="w-3 h-3" /> GPS Coordinates
-                              </p>
-                              <p className="text-sm font-black text-slate-900">
-                                {fp.location?.lat ? `${fp.location.lat.toFixed(4)}, ${fp.location.lon.toFixed(4)}` : "14.5995, 120.9842"}
-                              </p>
-                              {fp.location?.lat && (
-                                <a
-                                  href={`https://www.google.com/maps?q=${fp.location.lat},${fp.location.lon}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-[11px] text-blue-600 hover:underline inline-flex items-center gap-1 mt-1 font-semibold"
-                                >
-                                  Open Google Maps <ExternalLink className="w-3 h-3" />
-                                </a>
-                              )}
-                            </div>
-                          </div>
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                      <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Hardware Code</p>
+                      <span className="font-bold text-slate-900 font-mono text-xs truncate block">
+                        {customerDetail.customer.hardwareId || "HW_RECOGNIZED"}
+                      </span>
+                    </div>
+                  </div>
 
-                          {/* Hardware & Browser Matrix */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Operating System</p>
-                              <p className="text-slate-900 font-bold truncate">{fp.platform || "Linux x86_64"}</p>
-                            </div>
-
-                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Display Resolution</p>
-                              <p className="text-slate-900 font-bold">{fp.screenResolution || "1920x1080"} ({fp.colorDepth || "24-bit"})</p>
-                            </div>
-
-                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">CPU Cores & Memory</p>
-                              <p className="text-slate-900 font-bold">{fp.hardwareConcurrency || "8"} Cores &bull; {fp.deviceMemory || "8 GB"}</p>
-                            </div>
-
-                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Timezone</p>
-                              <p className="text-slate-900 font-bold truncate">{fp.timezone || "Asia/Manila"}</p>
-                            </div>
-                          </div>
-
-                          {/* Graphics & WebGL Unmasked GPU */}
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
-                            <div>
-                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">
-                                GPU Graphics Card (Unmasked WebGL Renderer)
-                              </p>
-                              <p className="text-slate-800 font-mono text-xs bg-white p-2.5 rounded-lg border border-slate-200 break-all">
-                                {fp.graphics || "ANGLE (Intel, Intel(R) UHD Graphics Direct3D11)"}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">
-                                Client User Agent
-                              </p>
-                              <p className="text-slate-600 font-mono text-[11px] bg-white p-2.5 rounded-lg border border-slate-200 break-all">
-                                {fp.browser || navigator.userAgent}
-                              </p>
-                            </div>
-
-                            {fp.canvasHash && (
-                              <div>
-                                <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">
-                                  Canvas 2D Hash Signature
-                                </p>
-                                <p className="text-slate-700 font-mono text-[11px]">
-                                  {fp.canvasHash}
-                                </p>
-                              </div>
-                            )}
-                          </div>
+                  {/* Promo Fraud Status Alert Box */}
+                  {customerDetail.customer.isPromoFraudRisk && customerDetail.customer.sharedAccounts?.length > 0 ? (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
+                      <div className="flex items-start gap-2.5">
+                        <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-bold text-red-900 uppercase tracking-wide">
+                            Promo Fraud Warning: Same Device Used by Multiple Accounts
+                          </p>
+                          <p className="text-xs text-red-700 mt-0.5">
+                            This device has been used to access {customerDetail.customer.sharedAccounts.length + 1} different Telegram accounts. Please review to prevent duplicate promo code redemption:
+                          </p>
                         </div>
-                      );
-                    })()
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        {customerDetail.customer.sharedAccounts.map((acc: any) => (
+                          <div key={acc.id} className="bg-white border border-red-200 rounded-lg p-2.5 text-xs font-mono flex items-center justify-between">
+                            <div>
+                              <p className="font-bold text-slate-900">{acc.name || `User ${acc.id}`}</p>
+                              <p className="text-[11px] text-slate-500">
+                                {acc.username ? `@${acc.username}` : `ID: ${acc.id}`} &bull; PRIME: {acc.memberId || "None"}
+                              </p>
+                            </div>
+                            <span className="text-[10px] bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold">
+                              Linked
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ) : (
-                    <div className="p-8 text-center bg-slate-50 rounded-xl">
-                      <p className="text-slate-500 font-mono text-xs">No active fingerprint telemetry recorded for this user yet.</p>
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center gap-2.5 text-xs">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <p className="text-emerald-800 font-medium">
+                        Unique Device Verified: No other accounts have accessed the store from this device ID.
+                      </p>
                     </div>
                   )}
                 </div>
 
-                {/* SECTION 3: HISTORICAL SECURITY SNAPSHOTS TIMELINE */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                {/* SECTION 3: SAVED SESSIONS (COMPACT LIST + CLICK FOR FULL SESSION DETAILS) */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                     <div>
                       <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
-                        Security Snapshots Timeline
+                        Saved Sessions ({customerDetail.fingerprints.length})
                       </h3>
                       <p className="text-[11px] font-mono text-slate-500">
-                        {customerDetail.fingerprints.length} recorded session snapshots
+                        Compact session history. Click any session below to view its complete details.
                       </p>
                     </div>
                   </div>
 
                   {customerDetail.fingerprints.length === 0 ? (
-                    <p className="text-xs font-mono text-slate-400 py-6 text-center">
-                      No historical snapshots recorded yet.
-                    </p>
+                    <div className="p-8 text-center bg-slate-50 rounded-xl">
+                      <p className="text-xs font-mono text-slate-400">No login sessions recorded yet for this customer.</p>
+                    </div>
                   ) : (
                     <div className="space-y-3">
-                      {customerDetail.fingerprints.map((snap, idx) => (
-                        <div
-                          key={snap.id || idx}
-                          className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900">
-                                Snapshot #{customerDetail.fingerprints.length - idx}
-                              </span>
-                              <span className="text-slate-400">&bull;</span>
-                              <span className="text-slate-600">
-                                {snap.createdAt ? new Date(snap.createdAt).toLocaleString() : "Recent"}
-                              </span>
-                            </div>
-                            <p className="text-slate-500 text-[11px]">
-                              IP: {snap.ipSession || "127.0.0.1"} &bull; {snap.city || "Manila"}, {snap.country || "Philippines"} &bull; ISP: {snap.isp || "Private ISP"}
-                            </p>
-                          </div>
+                      {customerDetail.fingerprints.map((snap, idx) => {
+                        const isExpanded = selectedSessionId === snap.id;
+                        const sessionNumber = customerDetail.fingerprints.length - idx;
+                        const isGps = snap.location?.lat && snap.location?.lat !== 0;
 
-                          <div className="text-right shrink-0">
-                            <span className="bg-slate-200 text-slate-800 px-2 py-1 rounded text-[10px] font-bold">
-                              {snap.platform || "ChromeOS / Linux"}
-                            </span>
+                        return (
+                          <div
+                            key={snap.id || idx}
+                            className={`border rounded-xl transition-all duration-150 overflow-hidden ${
+                              isExpanded ? "border-slate-900 bg-white shadow-md ring-1 ring-slate-900/10" : "border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300"
+                            }`}
+                          >
+                            {/* COMPACT SESSION ROW (CLICKABLE) */}
+                            <div
+                              onClick={() => setSelectedSessionId(isExpanded ? null : snap.id)}
+                              className="p-3.5 sm:p-4 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono select-none"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                                  isExpanded ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-700"
+                                }`}>
+                                  #{sessionNumber}
+                                </div>
+
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-slate-900">
+                                      {snap.createdAt ? new Date(snap.createdAt).toLocaleString() : "Recent Session"}
+                                    </span>
+                                    {isGps ? (
+                                      <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                        <MapPin className="w-2.5 h-2.5" /> GPS Location
+                                      </span>
+                                    ) : (
+                                      <span className="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded font-bold">
+                                        Internet Location
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <p className="text-[11px] text-slate-500 mt-0.5">
+                                    {snap.city || "Manila"}, {snap.country || "Philippines"} &bull; IP: {snap.ipSession || "127.0.0.1"} &bull; {snap.platform || "Standard Device"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                                  isExpanded ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                                }`}>
+                                  {isExpanded ? "Hide Details ▲" : "View Details ▼"}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* EXPANDED FULL SESSION DETAILS (POPULATES ONLY ON CLICK) */}
+                            {isExpanded && (
+                              <div className="p-4 sm:p-5 border-t border-slate-200 bg-white space-y-4 text-xs font-mono animate-in fade-in duration-200">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                  <p className="font-bold text-slate-900 uppercase tracking-wide text-xs">
+                                    Full Session Details (Session #{sessionNumber})
+                                  </p>
+                                  <span className="text-slate-400 text-[11px]">
+                                    Recorded at: {snap.createdAt ? new Date(snap.createdAt).toLocaleString() : "Live"}
+                                  </span>
+                                </div>
+
+                                {/* Physical Location & GPS Coordinates */}
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
+                                      <MapPin className="w-3.5 h-3.5 text-slate-600" /> Physical Location & Coordinates
+                                    </span>
+                                    {snap.location?.lat && (
+                                      <a
+                                        href={`https://www.google.com/maps?q=${snap.location.lat},${snap.location.lon}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 font-bold"
+                                      >
+                                        Open in Google Maps <ExternalLink className="w-3 h-3" />
+                                      </a>
+                                    )}
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                    <div>
+                                      <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Address / Street</p>
+                                      <p className="text-slate-900 font-bold mt-0.5">
+                                        {snap.location?.address || `${snap.city || "Current Area"}, ${snap.region || ""}, ${snap.country || ""}`}
+                                      </p>
+                                    </div>
+
+                                    <div>
+                                      <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Coordinates & Accuracy</p>
+                                      <p className="text-slate-900 font-bold mt-0.5">
+                                        {snap.location?.lat ? `${snap.location.lat.toFixed(5)}, ${snap.location.lon.toFixed(5)}` : "Approximate"} 
+                                        {snap.location?.accuracy ? ` (within ±${snap.location.accuracy}m)` : ""}
+                                      </p>
+                                      <p className="text-[10px] text-slate-500 mt-0.5">
+                                        Source: {snap.locationSource || (isGps ? "Calibrated GPS" : "Internet Address")}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Device & Hardware System Details */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Operating System</p>
+                                    <p className="text-slate-900 font-bold truncate">{snap.platform || "Standard System"}</p>
+                                  </div>
+
+                                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Screen Size</p>
+                                    <p className="text-slate-900 font-bold">{snap.screenResolution || "Standard Display"}</p>
+                                  </div>
+
+                                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Processor & Memory</p>
+                                    <p className="text-slate-900 font-bold">{snap.hardwareConcurrency || "4"} Cores &bull; {snap.deviceMemory || "Standard RAM"}</p>
+                                  </div>
+
+                                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Timezone</p>
+                                    <p className="text-slate-900 font-bold truncate">{snap.timezone || "UTC"}</p>
+                                  </div>
+                                </div>
+
+                                {/* Internet Provider & Connection Security */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">IP Address</p>
+                                    <p className="text-slate-900 font-bold">{snap.ipSession || "127.0.0.1"}</p>
+                                  </div>
+
+                                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Internet Provider</p>
+                                    <p className="text-slate-900 font-bold truncate">{snap.isp || "Standard Internet Provider"}</p>
+                                  </div>
+
+                                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Security Check</p>
+                                    <p className="font-bold truncate">
+                                      {snap.vpnDetected ? (
+                                        <span className="text-red-600">⚠️ VPN or Proxy Detected</span>
+                                      ) : (
+                                        <span className="text-emerald-700">✓ Standard Home / Mobile Internet</span>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Browser Version */}
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                  <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Web Browser</p>
+                                  <p className="text-slate-700 text-[11px] break-all">
+                                    {snap.browser || "Standard Browser"}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

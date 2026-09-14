@@ -91,7 +91,12 @@ export async function POST(request: NextRequest) {
       try {
         const rawIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
         const clientIp = rawIp.split(',')[0].trim();
-        const enriched = await enrichFingerprintData(clientIp, fingerprint.location?.lat, fingerprint.location?.lon);
+        const enriched = await enrichFingerprintData(
+          clientIp, 
+          fingerprint.location?.lat, 
+          fingerprint.location?.lon,
+          fingerprint.location?.accuracy
+        );
         
         savedFp = await saveFingerprint(tgUserId, {
           ...fingerprint,
@@ -100,8 +105,15 @@ export async function POST(request: NextRequest) {
           enrollmentDate: existingData?.createdAt || new Date().toISOString(),
           lastSeen: new Date().toISOString()
         });
+
+        // Also update primary device identifiers on user doc for rapid fraud lookup
+        await setDoc(userRef, {
+          deviceId: fingerprint.deviceId || existingData?.deviceId || "",
+          hardwareId: fingerprint.hardwareId || existingData?.hardwareId || "",
+          appId: fingerprint.appId || existingData?.appId || "PRIME_SHOP_APP"
+        }, { merge: true });
       } catch (err) {
-        console.error("Fingerprint tracking failed:", err);
+        console.error("Device tracking failed:", err);
       }
     }
 

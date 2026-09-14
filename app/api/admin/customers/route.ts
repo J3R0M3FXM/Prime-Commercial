@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('id');
 
-    // 1. Single Customer Deep Dossier
+    // 1. Single Customer Profile
     if (customerId) {
       const userRef = doc(db, 'users', customerId);
       const userSnap = await getDoc(userRef);
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
       const userData = cleanTimestamps(userSnap.data());
 
-      // Fetch all historical fingerprint snapshots
+      // Fetch all recorded sessions for this customer
       let fingerprints: any[] = [];
       try {
         const fpCol = collection(db, 'users', customerId, 'fingerprints');
@@ -51,7 +51,38 @@ export async function GET(request: Request) {
           return tB - tA;
         });
       } catch (err) {
-        console.warn(`Failed to fetch fingerprints for customer ${customerId}:`, err);
+        console.warn(`Failed to fetch sessions for customer ${customerId}:`, err);
+      }
+
+      const currentDeviceId = userData.deviceId || userData.latestFingerprint?.deviceId || fingerprints[0]?.deviceId || "";
+      const currentHardwareId = userData.hardwareId || userData.latestFingerprint?.hardwareId || fingerprints[0]?.hardwareId || "";
+
+      // Promo Fraud Detection: Check if other accounts share this Device ID or Hardware Signature
+      let sharedAccounts: any[] = [];
+      try {
+        const allUsersSnap = await getDocs(collection(db, 'users'));
+        allUsersSnap.docs.forEach(uDoc => {
+          if (uDoc.id !== customerId) {
+            const uData = uDoc.data();
+            const uDevId = uData.deviceId || uData.latestFingerprint?.deviceId || "";
+            const uHwId = uData.hardwareId || uData.latestFingerprint?.hardwareId || "";
+            
+            const isMatch = (currentDeviceId && uDevId && currentDeviceId === uDevId) ||
+                            (currentHardwareId && uHwId && currentHardwareId === uHwId);
+            
+            if (isMatch) {
+              sharedAccounts.push({
+                id: uDoc.id,
+                name: uData.tgName || `User ${uDoc.id}`,
+                username: uData.tgUsername || "",
+                memberId: uData.primeMemberId || "",
+                lastSeen: uData.lastSeen || uData.createdAt || ""
+              });
+            }
+          }
+        });
+      } catch (err) {
+        console.warn("Fraud check error:", err);
       }
 
       // Fetch order history for this customer
@@ -79,7 +110,12 @@ export async function GET(request: Request) {
         customer: {
           id: userSnap.id,
           ...userData,
-          latestFingerprint: userData.latestFingerprint || (fingerprints.length > 0 ? fingerprints[0] : null)
+          deviceId: currentDeviceId,
+          hardwareId: currentHardwareId,
+          appId: userData.appId || fingerprints[0]?.appId || "PRIME_SHOP_APP",
+          latestFingerprint: userData.latestFingerprint || (fingerprints.length > 0 ? fingerprints[0] : null),
+          sharedAccounts,
+          isPromoFraudRisk: sharedAccounts.length > 0
         },
         fingerprints,
         orders
@@ -99,6 +135,26 @@ export async function GET(request: Request) {
     } catch {
       allOrders = [];
     }
+
+    // Pre-build device sharing map for fraud detection
+    const deviceToUsersMap = new Map<string, string[]>();
+    const hardwareToUsersMap = new Map<string, string[]>();
+
+    userSnap.docs.forEach(doc => {
+      const data = doc.data();
+      const devId = data.deviceId || data.latestFingerprint?.deviceId;
+      const hwId = data.hardwareId || data.latestFingerprint?.hardwareId;
+      if (devId) {
+        const arr = deviceToUsersMap.get(devId) || [];
+        arr.push(doc.id);
+        deviceToUsersMap.set(devId, arr);
+      }
+      if (hwId) {
+        const arr = hardwareToUsersMap.get(hwId) || [];
+        arr.push(doc.id);
+        hardwareToUsersMap.set(hwId, arr);
+      }
+    });
     
     const users = await Promise.all(userSnap.docs.map(async (userDoc) => {
       const userData = cleanTimestamps(userDoc.data());
@@ -120,8 +176,15 @@ export async function GET(request: Request) {
           latestFingerprint = fps[0];
         }
       } catch (err) {
-        console.warn(`Fingerprint lookup for ${userDoc.id}:`, err);
+        console.warn(`Session lookup for ${userDoc.id}:`, err);
       }
+
+      // Check device sharing for promo fraud detection
+      const userDevId = userData.deviceId || latestFingerprint?.deviceId;
+      const userHwId = userData.hardwareId || latestFingerprint?.hardwareId;
+      const devMatches = userDevId ? (deviceToUsersMap.get(userDevId) || []).filter(id => id !== userDoc.id) : [];
+      const hwMatches = userHwId ? (hardwareToUsersMap.get(userHwId) || []).filter(id => id !== userDoc.id) : [];
+      const totalSharedOthers = Array.from(new Set([...devMatches, ...hwMatches])).length;
 
       // Customer orders count & sum
       const customerOrders = allOrders.filter((ord: any) => 
@@ -134,10 +197,15 @@ export async function GET(request: Request) {
       return { 
         id: userDoc.id, 
         ...userData,
+        deviceId: userDevId || "",
+        hardwareId: userHwId || "",
+        appId: userData.appId || latestFingerprint?.appId || "PRIME_SHOP_APP",
         latestFingerprint,
         snapshotCount: Math.max(snapshotCount, latestFingerprint ? 1 : 0),
         orderCount: customerOrders.length,
-        totalSpent
+        totalSpent,
+        isPromoFraudRisk: totalSharedOthers > 0,
+        sharedAccountCount: totalSharedOthers
       };
     }));
     
