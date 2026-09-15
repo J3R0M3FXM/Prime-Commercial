@@ -34,6 +34,11 @@ service cloud.firestore {
       allow write: if true;
     }
     
+    match /charges/{chargeId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
     match /admins/{adminId} {
       allow read: if false; // Admin code check should be server-side
       allow write: if false;

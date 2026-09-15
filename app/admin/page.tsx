@@ -38,7 +38,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Stethoscope,
-  Truck
+  Truck,
+  Receipt
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
@@ -49,6 +50,8 @@ const LogisticsModule = dynamic(() => import('@/app/components/admin/logistics-m
   ssr: false,
   loading: () => <div className="p-8 text-center text-slate-500 font-mono text-sm">Loading Logistics...</div>
 });
+
+const ChargesModule = dynamic(() => import('@/app/components/admin/charges-module'), { ssr: false });
 
 type AdminView = 
   | "dashboard" 
@@ -61,7 +64,8 @@ type AdminView =
   | "settings" 
   | "analytics"
   | "diagnostics"
-  | "logistics";
+  | "logistics"
+  | "charges";
 
 export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
@@ -594,7 +598,8 @@ export default function AdminPage() {
                   { id: "settings", name: "Settings", icon: Lock, desc: "Security & Access Rules", count: "Protected" },
                   { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Store & Order Insights", count: "Live" },
                   { id: "diagnostics", name: "Diagnostics", icon: Activity, desc: "System Health & APIs", count: "9 Systems" },
-                  { id: "logistics", name: "Logistics", icon: Truck, desc: "Warehouses & Couriers", count: "Routes" }
+                  { id: "logistics", name: "Logistics", icon: Truck, desc: "Warehouses & Couriers", count: "Routes" },
+                  { id: "charges", name: "Charges", icon: Receipt, desc: "Global Additional Fees", count: "Config" }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -2183,6 +2188,37 @@ export default function AdminPage() {
           </motion.div>
         )}
 
+        {/* ========================================================================= */}
+        {/* 11. CHARGES MODULE: GLOBAL ADDITIONAL FEES                                */}
+        {/* ========================================================================= */}
+        {view === "charges" && (
+          <motion.div
+            key="charges"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <button
+                  onClick={() => setView("dashboard")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                </button>
+                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">
+                  Global Additional Charges
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+              <ChargesModule />
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
