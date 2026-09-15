@@ -19,6 +19,23 @@ function cleanTimestamps(obj: any): any {
   return copy;
 }
 
+/**
+ * Recursively strips `undefined` fields or normalizes them so Firestore never
+ * throws "Unsupported field value: undefined" error.
+ */
+function cleanForFirestore<T>(data: T): T {
+  if (data === undefined) return null as any;
+  if (data === null || typeof data !== 'object') return data;
+  if (Array.isArray(data)) return data.map(item => cleanForFirestore(item)) as any;
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      result[key] = cleanForFirestore(value);
+    }
+  }
+  return result as T;
+}
+
 function getOrderNumber(): string {
   const d = new Date();
   // Adjust to Philippine Time (UTC + 8)
@@ -117,13 +134,18 @@ export async function POST(request: Request) {
 
           // 4. Create the order with accurate financial snapshotting
           const itemsSubtotal = Number(subTotal) || items.reduce((sum: number, it: any) => sum + (Number(it.price) * (Number(it.quantity) || 1)), 0);
-          const sanitizedCharges = Array.isArray(appliedCharges) ? appliedCharges.map((ch: any) => ({
-            id: String(ch.id || ''),
-            name: String(ch.name || 'Charge'),
-            amount: Number(ch.amount) || 0,
-            rate: ch.rate !== undefined ? Number(ch.rate) : undefined,
-            type: ch.type === 'percentage' ? 'percentage' : 'fixed'
-          })) : [];
+          const sanitizedCharges = Array.isArray(appliedCharges) ? appliedCharges.map((ch: any) => {
+            const entry: Record<string, any> = {
+              id: String(ch.id || ''),
+              name: String(ch.name || 'Charge'),
+              amount: Number(ch.amount) || 0,
+              type: ch.type === 'percentage' ? 'percentage' : 'fixed'
+            };
+            if (ch.rate !== undefined && ch.rate !== null && Number.isFinite(Number(ch.rate))) {
+              entry.rate = Number(ch.rate);
+            }
+            return entry;
+          }) : [];
           const chargesTotal = sanitizedCharges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
           const safeDeliveryFee = Number(deliveryFee) || 0;
           const calculatedTotal = totalAmount !== undefined 
@@ -162,7 +184,9 @@ export async function POST(request: Request) {
             updatedAt: new Date().toISOString()
           };
 
-          transaction.set(orderDocRef, finalOrderData);
+          const safeOrderData = cleanForFirestore(finalOrderData);
+          transaction.set(orderDocRef, safeOrderData);
+          finalOrderData = safeOrderData;
         });
         
         orderCreated = true;

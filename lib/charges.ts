@@ -100,6 +100,50 @@ export function normalizeCharge(raw: any, fallbackId = ''): ChargeConfig {
 }
 
 /**
+ * Extracts exact localized hour, minute, day of week, and date string
+ * in the specified timezone (default 'Asia/Manila', UTC+8) without timezone distortion.
+ */
+export function getTargetTimeParts(targetDate: Date, timeZone = 'Asia/Manila') {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour12: false,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: 'numeric',
+      minute: 'numeric',
+      weekday: 'short',
+    });
+
+    const parts = formatter.formatToParts(targetDate);
+    const map: Record<string, string> = {};
+    for (const p of parts) {
+      map[p.type] = p.value;
+    }
+
+    const weekdayMap: Record<string, number> = {
+      Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+    };
+
+    const hour = parseInt(map.hour || '0', 10);
+    const minute = parseInt(map.minute || '0', 10);
+    const dayOfWeek = weekdayMap[map.weekday || 'Sun'] ?? 0;
+    const dateStr = `${map.year}-${map.month}-${map.day}`;
+
+    return { hour, minute, dayOfWeek, dateStr };
+  } catch (e) {
+    // Graceful fallback to targetDate local methods if timeZone is unsupported
+    const hour = targetDate.getHours();
+    const minute = targetDate.getMinutes();
+    const dayOfWeek = targetDate.getDay();
+    const dateStr = targetDate.toISOString().split('T')[0];
+    return { hour, minute, dayOfWeek, dateStr };
+  }
+}
+
+/**
  * Determines whether a charge is currently applicable to an order.
  * Follows the user's specification:
  * 1. If isActive === false -> never applies.
@@ -107,12 +151,12 @@ export function normalizeCharge(raw: any, fallbackId = ''): ChargeConfig {
  * 3. If isDefault === false -> applies ONLY if it satisfies configured schedule conditions:
  *    - Date / Day of week
  *    - Time (e.g. from scheduled time onwards)
- *    - Overnight (10 PM - 6 AM / 22:00 - 05:59)
+ *    - Overnight (10:00 PM to 6:00 AM / 22:00 - 05:59:59 PHT)
  *    - Recurring
  */
 export function isChargeApplicable(
   chargeRaw: any,
-  options?: { date?: Date; timezoneOffsetHours?: number }
+  options?: { date?: Date; timezone?: string }
 ): boolean {
   const charge = normalizeCharge(chargeRaw);
 
@@ -128,17 +172,10 @@ export function isChargeApplicable(
 
   // 3. For scheduled charges (isDefault === false), evaluate current date & time
   const targetDate = options?.date || new Date();
+  const timeZone = options?.timezone || 'Asia/Manila';
   
-  // Philippine Standard Time (UTC+8) is the store reference
-  // Compute local hours and minutes in target timezone (default UTC+8)
-  const tzOffset = options?.timezoneOffsetHours ?? 8;
-  const utcMs = targetDate.getTime() + targetDate.getTimezoneOffset() * 60000;
-  const phtDate = new Date(utcMs + tzOffset * 3600000);
-
-  const currentHour = phtDate.getHours();
-  const currentMin = phtDate.getMinutes();
-  const currentDayOfWeek = phtDate.getDay(); // 0 = Sun, 6 = Sat
-  const currentDateStr = phtDate.toISOString().split('T')[0]; // YYYY-MM-DD
+  const { hour: currentHour, minute: currentMin, dayOfWeek: currentDayOfWeek, dateStr: currentDateStr } = 
+    getTargetTimeParts(targetDate, timeZone);
 
   const schedules = charge.schedules || {};
   const isOvernight = Boolean(schedules.isOvernight || schedules.overnight);
@@ -153,7 +190,7 @@ export function isChargeApplicable(
     return false;
   }
 
-  // Condition A: Overnight (10 PM to 6 AM / 22:00 - 05:59)
+  // Condition A: Overnight (10:00 PM to 6:00 AM PHT -> hour 22, 23, 0, 1, 2, 3, 4, 5)
   if (isOvernight) {
     const isLateNight = currentHour >= 22 || currentHour < 6;
     if (!isLateNight) {
@@ -208,7 +245,7 @@ export function computeChargeAmount(chargeRaw: any, subtotal: number): number {
 export function calculateChargesBreakdown(
   chargesRaw: any[],
   subtotal: number,
-  options?: { date?: Date; timezoneOffsetHours?: number }
+  options?: { date?: Date; timezone?: string }
 ): {
   totalChargesAmount: number;
   computedCharges: ComputedCharge[];
