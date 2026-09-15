@@ -12,6 +12,7 @@ import { formatPHP } from "@/lib/currency";
 export default function Shopfront() {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [checking, setChecking] = useState(true);
   const [routingToAdmin, setRoutingToAdmin] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
@@ -84,6 +85,15 @@ export default function Shopfront() {
 
           // If connection is from authorized Telegram Admin (ID: 1085949511)
           if (authData.isAdmin) {
+            if (typeof window !== 'undefined' && (localStorage.getItem("skip_admin_redirect") === "true" || sessionStorage.getItem("skip_admin_redirect") === "true")) {
+              setAuthorized(true);
+              setIsAdmin(true);
+              const productsRes = await fetch('/api/products');
+              const pData = await productsRes.json();
+              setProducts(pData);
+              return;
+            }
+
             setRoutingToAdmin(true);
             if (typeof window !== 'undefined') {
               sessionStorage.setItem("prime_admin_authorized", "true");
@@ -173,6 +183,26 @@ export default function Shopfront() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col relative pb-20">
+      {isAdmin && (
+        <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-[11px] font-mono shrink-0">
+          <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            Admin mode active
+          </span>
+          <button
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("skip_admin_redirect");
+                sessionStorage.removeItem("skip_admin_redirect");
+              }
+              router.push("/admin");
+            }}
+            className="bg-white hover:bg-slate-100 text-black px-2 py-1 rounded font-bold uppercase text-[9px] tracking-wider transition-all cursor-pointer font-sans"
+          >
+            Back to Admin Panel
+          </button>
+        </div>
+      )}
       
       {/* Sticky Header & Search */}
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">

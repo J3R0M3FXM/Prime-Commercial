@@ -640,9 +640,18 @@ export default function AdminPage() {
                       Direct Access Active
                     </span>
                     <span className="text-slate-300">&bull;</span>
-                    <a href="/" className="text-slate-700 hover:text-black font-medium underline">
+                    <button 
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          localStorage.setItem("skip_admin_redirect", "true");
+                          sessionStorage.setItem("skip_admin_redirect", "true");
+                          window.location.href = "/";
+                        }
+                      }}
+                      className="text-slate-700 hover:text-black font-medium underline cursor-pointer bg-transparent border-none p-0 align-baseline font-mono text-xs"
+                    >
                       Open Storefront
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>
