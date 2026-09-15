@@ -35,6 +35,15 @@ export interface ComputedCharge {
 /**
  * Normalizes a raw Firestore charge document into a strongly-typed ChargeConfig
  */
+
+function toTitleCase(str: string): string {
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export function normalizeCharge(raw: any, fallbackId = ''): ChargeConfig {
   if (!raw || typeof raw !== 'object') {
     return {
@@ -78,7 +87,7 @@ export function normalizeCharge(raw: any, fallbackId = ''): ChargeConfig {
 
   return {
     id: String(raw.id || fallbackId),
-    name: String(raw.name || 'Additional Charge').trim(),
+    name: toTitleCase(String(raw.name || 'Additional Charge').trim()),
     type: raw.type === 'percentage' ? 'percentage' : 'fixed',
     amount: Number.isFinite(amount) ? Math.max(0, amount) : 0,
     isDefault,

@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo } from '
 
 const CartContext = createContext<any>(null);
 
-export const CartProvider = ({ children }: { children: React.ReactNode }) => {
+export default function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<any[]>([]);
 
   useEffect(() => {

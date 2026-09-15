@@ -1061,7 +1061,7 @@ export default function CheckoutModal({
               </div>
 
               {/* Comprehensive Charges Breakdown */}
-              <div className="border border-gray-200 rounded-xl p-4 bg-white space-y-2.5">
+              <div className="border border-gray-200 rounded-xl p-4 bg-white space-y-1.5">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 font-heading border-b border-gray-100 pb-2">
                   Financial Breakdown
                 </h4>
@@ -1075,7 +1075,7 @@ export default function CheckoutModal({
                 {/* Active Admin Charges */}
                 {computedCharges.map((charge) => (
                   <div key={charge.id} className="flex justify-between items-center text-xs font-mono">
-                    <span className="text-gray-600 uppercase flex items-center gap-1">
+                    <span className="text-gray-600 flex items-center gap-1">
                       {charge.name}:
                       {charge.type === "percentage" && (
                         <span className="text-[10px] text-gray-400">({charge.rate || (charge as any).amount}%)</span>
@@ -1165,8 +1165,27 @@ export default function CheckoutModal({
                   <span className="font-medium text-gray-900">{completedOrder.receiverName}</span>
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400 uppercase text-[10px]">Total Amount</span>
+                <div className="pt-2 mt-2 border-t border-gray-200 space-y-1">
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span>Items Subtotal</span>
+                    <span>{formatPHP(completedOrder.subTotal || 0)}</span>
+                  </div>
+                  
+                  {Array.isArray(completedOrder.appliedCharges) && completedOrder.appliedCharges.map((charge: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center text-gray-600">
+                      <span>{charge.name}</span>
+                      <span>{formatPHP(charge.computedAmount || charge.amount || 0)}</span>
+                    </div>
+                  ))}
+
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span>Delivery Fee</span>
+                    <span>{formatPHP(completedOrder.deliveryFee || 0)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2 mt-2 border-t border-gray-200">
+                  <span className="text-gray-900 font-bold uppercase text-[10px]">Total Order Value</span>
                   <span className="font-bold text-gray-900">{formatPHP(completedOrder.totalAmount || 0)}</span>
                 </div>
 
