@@ -21,6 +21,11 @@ export default function ChargesModule() {
   const [scheduleTemporal, setScheduleTemporal] = useState(false);
   const [scheduleOvernight, setScheduleOvernight] = useState(false);
   const [scheduleRecurring, setScheduleRecurring] = useState(false);
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
+
+  const toggleDay = (day: number) => {
+    setDaysOfWeek(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
 
   const fetchCharges = async () => {
     setLoading(true);
@@ -47,6 +52,7 @@ export default function ChargesModule() {
     setScheduleTemporal(false);
     setScheduleOvernight(false);
     setScheduleRecurring(false);
+    setDaysOfWeek([]);
     setEditingCharge(null);
   };
 
@@ -59,6 +65,7 @@ export default function ChargesModule() {
     setScheduleTemporal(charge.schedules?.temporal || false);
     setScheduleOvernight(charge.schedules?.overnight || false);
     setScheduleRecurring(charge.schedules?.recurring || false);
+    setDaysOfWeek(charge.schedules?.daysOfWeek || []);
     setShowModal(true);
   };
 
@@ -88,7 +95,8 @@ export default function ChargesModule() {
         schedules: {
           temporal: scheduleTemporal,
           overnight: scheduleOvernight,
-          recurring: scheduleRecurring
+          recurring: scheduleRecurring,
+          daysOfWeek
         }
       };
 
@@ -283,6 +291,19 @@ export default function ChargesModule() {
                 <h4 className="font-heading font-black text-sm uppercase tracking-wider text-slate-800 mb-4 flex items-center gap-2">
                   <Settings className="w-4 h-4" /> Schedules
                 </h4>
+
+                {(scheduleTemporal || scheduleRecurring) && (
+                  <div className="mb-4">
+                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Apply on Days</label>
+                    <div className="flex gap-1">
+                      {['S','M','T','W','T','F','S'].map((day, i) => (
+                        <button type="button" key={i} onClick={() => toggleDay(i)} className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${daysOfWeek.includes(i) ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 <div className="space-y-3">
                   <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">

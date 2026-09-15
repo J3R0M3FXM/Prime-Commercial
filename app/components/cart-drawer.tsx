@@ -25,8 +25,23 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
         .then(res => res.json())
         .then(data => {
           if (data && Array.isArray(data)) {
-            // Apply only if the charge is marked as Active
-            setActiveCharges(data.filter(c => c.isActive === true));
+            const now = new Date();
+            const dayOfWeek = now.getDay(); // 0-6 (Sun-Sat)
+
+            const isApplicable = (charge: any) => {
+              if (charge.isActive !== true) return false;
+              
+              // If it's a schedule-based charge, check days
+              if (charge.schedules?.temporal || charge.schedules?.recurring) {
+                const { daysOfWeek } = charge.schedules;
+                if (daysOfWeek && daysOfWeek.length > 0 && !daysOfWeek.includes(dayOfWeek)) {
+                  return false;
+                }
+              }
+              return true;
+            };
+
+            setActiveCharges(data.filter(c => isApplicable(c)));
           }
         })
         .catch(err => console.error("Failed to fetch charges", err))
