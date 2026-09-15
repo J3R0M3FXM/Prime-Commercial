@@ -4,7 +4,7 @@ import React, { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { Navigation, Loader2, MapPin } from "lucide-react";
+import { Navigation, Loader2, MapPin, Plus, Minus } from "lucide-react";
 
 // Fix Leaflet's default icon path issues in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -41,6 +41,101 @@ function MapRecenter({ center }: { center: [number, number] }) {
   return null;
 }
 
+function MapControls({
+  onUseMyLocation,
+  isLocating,
+  onLocationChange,
+  safeLat,
+  safeLon
+}: {
+  onUseMyLocation?: () => void;
+  isLocating?: boolean;
+  onLocationChange: (lat: number, lon: number) => void;
+  safeLat: number;
+  safeLon: number;
+}) {
+  const map = useMap();
+
+  const handleDropPinAtCenter = () => {
+    const center = map.getCenter();
+    onLocationChange(center.lat, center.lng);
+  };
+
+  return (
+    <>
+      {/* Zoom Controls on the LEFT */}
+      <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 pointer-events-auto">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            map.zoomIn();
+          }}
+          className="w-8 h-8 bg-white/95 hover:bg-white active:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center cursor-pointer transition-all active:scale-95"
+          title="Zoom In"
+          aria-label="Zoom In"
+        >
+          <Plus className="w-4 h-4 text-gray-700" />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            map.zoomOut();
+          }}
+          className="w-8 h-8 bg-white/95 hover:bg-white active:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center cursor-pointer transition-all active:scale-95"
+          title="Zoom Out"
+          aria-label="Zoom Out"
+        >
+          <Minus className="w-4 h-4 text-gray-700" />
+        </button>
+      </div>
+
+      {/* Action Controls on the RIGHT (Same size w-8 h-8, aligned with zoom buttons) */}
+      <div className="absolute top-2.5 right-2.5 z-10 flex flex-col gap-1.5 pointer-events-auto">
+        {onUseMyLocation && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUseMyLocation();
+            }}
+            disabled={isLocating}
+            className="w-8 h-8 bg-white/95 hover:bg-white active:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+            title="Use My Current Location"
+            aria-label="Use My Current Location"
+          >
+            {isLocating ? (
+              <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+            ) : (
+              <Navigation className="w-4 h-4 text-gray-700" />
+            )}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDropPinAtCenter();
+          }}
+          className="w-8 h-8 bg-white/95 hover:bg-white active:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center cursor-pointer transition-all active:scale-95"
+          title="Drop Pin at Map Center"
+          aria-label="Drop Pin at Map Center"
+        >
+          <MapPin className="w-4 h-4 text-red-500" />
+        </button>
+      </div>
+
+      {/* Coordinate status tag at bottom-right */}
+      <div className="absolute bottom-2 right-2 z-10 pointer-events-none">
+        <span className="bg-white/90 backdrop-blur-xs text-[10px] font-mono text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 shadow-xs">
+          {safeLat.toFixed(4)}, {safeLon.toFixed(4)}
+        </span>
+      </div>
+    </>
+  );
+}
+
 export default function AddressPickerMap({
   lat,
   lon,
@@ -53,11 +148,12 @@ export default function AddressPickerMap({
   const position: [number, number] = [safeLat, safeLon];
 
   return (
-    <div className="w-full h-64 md:h-72 rounded-xl overflow-hidden border border-gray-300 relative shadow-inner bg-gray-100">
+    <div className="w-full h-44 sm:h-48 md:h-52 rounded-xl overflow-hidden border border-gray-300 relative shadow-inner bg-gray-100 isolate z-0">
       <MapContainer
         center={position}
         zoom={15}
         scrollWheelZoom={true}
+        zoomControl={false}
         style={{ height: "100%", width: "100%" }}
         className="z-0"
       >
@@ -80,48 +176,15 @@ export default function AddressPickerMap({
             }
           }}
         />
+
+        <MapControls
+          onUseMyLocation={onUseMyLocation}
+          isLocating={isLocating}
+          onLocationChange={onLocationChange}
+          safeLat={safeLat}
+          safeLon={safeLon}
+        />
       </MapContainer>
-
-      {/* Floating Action Overlay */}
-      <div className="absolute top-3 right-3 z-[400] flex flex-col gap-2">
-        {onUseMyLocation && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onUseMyLocation();
-            }}
-            disabled={isLocating}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-black/90 hover:bg-black text-white text-xs font-mono uppercase tracking-wider rounded-lg shadow-md backdrop-blur-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-          >
-            {isLocating ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                <span>Locating...</span>
-              </>
-            ) : (
-              <>
-                <Navigation className="w-3.5 h-3.5 text-amber-400" />
-                <span>Use My Location</span>
-              </>
-            )}
-          </button>
-        )}
-      </div>
-
-      {/* Helper Footer Badge */}
-      <div className="absolute bottom-2 left-2 right-2 z-[400] pointer-events-none">
-        <div className="bg-white/95 backdrop-blur-sm py-1.5 px-3 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between text-[11px] font-mono text-gray-700">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3 h-3 text-red-500 shrink-0" />
-            <span className="font-semibold uppercase tracking-tight">Drop a Pin:</span>
-            <span className="text-gray-500 hidden sm:inline">Click map or drag marker to adjust delivery spot</span>
-          </div>
-          <span className="text-gray-500 font-mono text-[10px]">
-            {safeLat.toFixed(4)}, {safeLon.toFixed(4)}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

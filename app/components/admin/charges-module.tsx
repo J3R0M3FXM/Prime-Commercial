@@ -121,7 +121,7 @@ export default function ChargesModule() {
     
     setIsSaving(true);
     try {
-      const payload = {
+      const formData = {
         name: name.trim(),
         type,
         amount: Number(amount) || 0,
@@ -140,12 +140,12 @@ export default function ChargesModule() {
       };
 
       const method = editingCharge ? "PUT" : "POST";
-      if (editingCharge) (payload as any).id = editingCharge.id;
+      if (editingCharge) (formData as any).id = editingCharge.id;
 
       await fetch("/api/admin/charges", {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(formData)
       });
       
       await fetchCharges();

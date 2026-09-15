@@ -111,7 +111,7 @@ export default function LogisticsModule() {
     
     setIsSavingCourier(true);
     try {
-      const payload = {
+      const formData = {
         name: courierName,
         logo: courierLogo,
         type: courierType,
@@ -124,12 +124,12 @@ export default function LogisticsModule() {
       };
 
       const method = editingCourier ? "PUT" : "POST";
-      if (editingCourier) (payload as any).id = editingCourier.id;
+      if (editingCourier) (formData as any).id = editingCourier.id;
 
       await fetch("/api/admin/couriers", {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(formData)
       });
       
       await fetchCouriers();
@@ -243,7 +243,7 @@ export default function LogisticsModule() {
     if (!whName || !whAddress || !whLat || !whLon) return;
     setIsSavingWh(true);
     try {
-      const payload = {
+      const formData = {
         name: whName,
         address: whAddress,
         lat: whLat,
@@ -252,12 +252,12 @@ export default function LogisticsModule() {
       };
 
       const method = editingWarehouse ? "PUT" : "POST";
-      if (editingWarehouse) (payload as any).id = editingWarehouse.id;
+      if (editingWarehouse) (formData as any).id = editingWarehouse.id;
 
       await fetch("/api/admin/warehouses", {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(formData)
       });
       
       await fetchWarehouses();

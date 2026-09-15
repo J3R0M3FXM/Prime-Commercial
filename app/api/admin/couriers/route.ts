@@ -19,14 +19,14 @@ export async function POST(request: Request) {
     const data = await request.json();
     const newDocRef = doc(collection(db, 'couriers'));
 
-    const payload = {
+    const requestData = {
       ...data,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    await setDoc(newDocRef, payload);
-    return NextResponse.json({ id: newDocRef.id, ...payload });
+    await setDoc(newDocRef, requestData);
+    return NextResponse.json({ id: newDocRef.id, ...requestData });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -37,13 +37,13 @@ export async function PUT(request: Request) {
     const { id, ...data } = await request.json();
     if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
 
-    const payload = {
+    const requestData = {
       ...data,
       updatedAt: new Date().toISOString(),
     };
     
-    await setDoc(doc(db, 'couriers', id), payload, { merge: true });
-    return NextResponse.json({ success: true, id, ...payload });
+    await setDoc(doc(db, 'couriers', id), requestData, { merge: true });
+    return NextResponse.json({ success: true, id, ...requestData });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

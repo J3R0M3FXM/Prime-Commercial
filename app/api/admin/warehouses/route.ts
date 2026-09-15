@@ -33,15 +33,15 @@ export async function POST(request: Request) {
       await batch.commit();
     }
 
-    const payload = {
+    const requestData = {
       ...data,
       isDefault,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    await setDoc(newDocRef, payload);
-    return NextResponse.json({ id: newDocRef.id, ...payload });
+    await setDoc(newDocRef, requestData);
+    return NextResponse.json({ id: newDocRef.id, ...requestData });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -66,14 +66,14 @@ export async function PUT(request: Request) {
       await batch.commit();
     }
 
-    const payload = {
+    const requestData = {
       ...data,
       isDefault,
       updatedAt: new Date().toISOString(),
     };
     
-    await setDoc(doc(db, 'warehouses', id), payload, { merge: true });
-    return NextResponse.json({ success: true, id, ...payload });
+    await setDoc(doc(db, 'warehouses', id), requestData, { merge: true });
+    return NextResponse.json({ success: true, id, ...requestData });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

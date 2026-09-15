@@ -584,10 +584,10 @@ export default function AdminPage() {
               </button>
             </div>
 
-            {/* Glossy Module Tiles (3 per row) */}
+            {/* Glossy Tiles (3 per row) */}
             <div className="mb-4">
               <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 font-mono">
-                Management Modules
+                Management Sections
               </h3>
               <div className="grid grid-cols-3 gap-3 sm:gap-4">
                 {[
@@ -629,7 +629,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 2. CUSTOMERS MODULE: COMPACT LIST WITH STICKY NON-SCROLLING SEARCH BAR    */}
+        {/* 2. CUSTOMERS SECTION: COMPACT LIST WITH STICKY NON-SCROLLING SEARCH BAR    */}
         {/* ========================================================================= */}
         {view === "customers" && (
           <motion.div
@@ -830,7 +830,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 3. CUSTOMER DETAIL PAGE: FULL HYDRATED TELEGRAM DOSSIER, FINGERPRINTS,   */}
+        {/* 3. CUSTOMER DETAIL PAGE: FULL TELEGRAM DOSSIER, FINGERPRINTS,   */}
         {/*    SECURITY SNAPSHOTS TIMELINE & COMPLETE ORDER HISTORY                   */}
         {/* ========================================================================= */}
         {view === "customer-detail" && (
@@ -1345,7 +1345,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 4. ORDERS MODULE: SEPARATE FULL PAGE WITH STICKY NON-SCROLLING SEARCH BAR */}
+        {/* 4. ORDERS SECTION: SEPARATE FULL PAGE WITH STICKY NON-SCROLLING SEARCH BAR */}
         {/* ========================================================================= */}
         {view === "orders" && (
           <motion.div
@@ -1550,7 +1550,7 @@ export default function AdminPage() {
                   </div>
 
                   <div>
-                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Checkout Device Snapshot</p>
+                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Checkout Device Info</p>
                     {selectedOrder.deviceSnapshot ? (
                       <div className="text-slate-600">
                         <p>IP: {selectedOrder.deviceSnapshot.ip || "Captured"}</p>
@@ -1580,7 +1580,7 @@ export default function AdminPage() {
                       </div>
                     ))}
 
-                    {/* Snapshot Financial Consolidation Breakdown */}
+                    {/* Order Financial Breakdown */}
                     <div className="p-3 bg-slate-50/70 border-t border-slate-100 space-y-1.5 text-xs font-mono">
                       <div className="flex justify-between items-center text-slate-600">
                         <span className="uppercase">Items Subtotal:</span>
@@ -1589,7 +1589,7 @@ export default function AdminPage() {
                         </span>
                       </div>
 
-                      {/* Snapshotted Charges */}
+                      {/* Applied Charges */}
                       {Array.isArray(selectedOrder.appliedCharges) && selectedOrder.appliedCharges.map((ch: any, ci: number) => (
                         <div key={ci} className="flex justify-between items-center text-slate-600">
                           <span className="uppercase flex items-center gap-1">
@@ -1600,7 +1600,7 @@ export default function AdminPage() {
                         </div>
                       ))}
 
-                      {/* Snapshotted Delivery Fee */}
+                      {/* Delivery Fee */}
                       {Number(selectedOrder.deliveryFee) > 0 && (
                         <div className="flex justify-between items-center text-slate-600">
                           <span className="uppercase flex items-center gap-1">
@@ -1627,7 +1627,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 6. PRODUCTS MODULE: SEPARATE FULL PAGE WITH STICKY NON-SCROLLING SEARCH   */}
+        {/* 6. PRODUCTS SECTION: SEPARATE FULL PAGE WITH STICKY NON-SCROLLING SEARCH   */}
         {/*    + COMPACT "+ ADD PRODUCT" BUTTON AT TOP (FORMS NOT SHOWN RIGHT AWAY)   */}
         {/* ========================================================================= */}
         {view === "products" && (
@@ -1883,7 +1883,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 7. INVENTORY MODULE: SEPARATE FULL PAGE STRICTLY FOR STOCK ADJUSTMENTS    */}
+        {/* 7. INVENTORY SECTION: SEPARATE FULL PAGE STRICTLY FOR STOCK ADJUSTMENTS    */}
         {/* ========================================================================= */}
         {view === "inventory" && (
           <motion.div
@@ -2026,7 +2026,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 8. SETTINGS MODULE: SEPARATE FULL PAGE                                    */}
+        {/* 8. SETTINGS SECTION: SEPARATE FULL PAGE                                    */}
         {/* ========================================================================= */}
         {view === "settings" && (
           <motion.div
@@ -2089,7 +2089,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 9. ANALYTICS MODULE: SEPARATE FULL PAGE                                   */}
+        {/* 9. ANALYTICS SECTION: SEPARATE FULL PAGE                                   */}
         {/* ========================================================================= */}
         {view === "analytics" && (
           <motion.div
@@ -2161,7 +2161,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 9. DIAGNOSTICS MODULE: SYSTEM HEALTH & INTEGRATION API STATUS             */}
+        {/* 9. DIAGNOSTICS SECTION: SYSTEM HEALTH & INTEGRATION API STATUS             */}
         {/* ========================================================================= */}
         {view === "diagnostics" && (
           <motion.div
@@ -2193,7 +2193,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 10. LOGISTICS MODULE: WAREHOUSES & COURIERS                               */}
+        {/* 10. LOGISTICS SECTION: WAREHOUSES & COURIERS                               */}
         {/* ========================================================================= */}
         {view === "logistics" && (
           <motion.div
@@ -2225,7 +2225,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 11. CHARGES MODULE: GLOBAL ADDITIONAL FEES                                */}
+        {/* 11. CHARGES SECTION: GLOBAL ADDITIONAL FEES                                */}
         {/* ========================================================================= */}
         {view === "charges" && (
           <motion.div

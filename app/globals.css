@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Open Sauce Sans', 'Open Sauce One', -apple-system, BlinkMacSystemFont, 'SF Pro Condensed', sans-serif;
+  --font-sans: 'Arial Narrow', Arial, sans-serif;
   --font-heading: 'Roboto Condensed', sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
+  --font-mono: 'Arial Narrow', Arial, sans-serif;
 }
 
-/* Base Body & Layout Font: Open Sauce Sans / SF Pro Condensed */
+/* Base Body & Layout Font: Arial Narrow */
 html, body {
-  font-family: 'Open Sauce Sans', 'Open Sauce One', -apple-system, BlinkMacSystemFont, 'SF Pro Condensed', sans-serif;
+  font-family: 'Arial Narrow', Arial, sans-serif;
 }
 
 /* Headings, Section Titles, and Labels: Strictly Roboto Condensed Regular (Weight 400) */
@@ -18,9 +18,9 @@ h1, h2, h3, h4, h5, h6, .font-heading, label {
   letter-spacing: 0.03em;
 }
 
-/* Monospace, Codes, Numbers, Order Details, Customer ID, and Technical Labels: IBM Plex Mono */
+/* Monospace, Codes, Numbers, Order Details, Customer ID, and Technical Labels: Replaced with Arial Narrow */
 .font-mono, code, pre, kbd, samp {
-  font-family: 'IBM Plex Mono', monospace !important;
+  font-family: 'Arial Narrow', Arial, sans-serif !important;
 }
 
 /* Universal Form Controls font inheritance */
@@ -28,8 +28,8 @@ button, input, select, textarea, optgroup {
   font-family: inherit;
 }
 
-/* Explicit form controls with font-mono class strictly use IBM Plex Mono */
+/* Explicit form controls with font-mono class strictly use Arial Narrow */
 input.font-mono, textarea.font-mono, button.font-mono {
-  font-family: 'IBM Plex Mono', monospace !important;
+  font-family: 'Arial Narrow', Arial, sans-serif !important;
 }
 

@@ -31,7 +31,7 @@ import { getClientFingerprint, getClientLocation } from "./fingerprint-collector
 const AddressPickerMap = dynamic(() => import("./address-picker-map"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-64 md:h-72 rounded-xl bg-gray-100 flex flex-col items-center justify-center text-gray-400 font-mono text-xs gap-2 border border-gray-200">
+    <div className="w-full h-44 sm:h-48 md:h-52 rounded-xl bg-gray-100 flex flex-col items-center justify-center text-gray-400 font-mono text-xs gap-2 border border-gray-200">
       <Loader2 className="w-5 h-5 animate-spin text-gray-500" />
       <span>Loading Interactive Map...</span>
     </div>
@@ -63,7 +63,7 @@ export default function CheckoutModal({
   // Step state: 1 = Contact & Receiver, 2 = Address & Map, 3 = Courier & Delivery Fee, 4 = Review & Place Order, 5 = Confirmation
   const [currentStep, setCurrentStep] = useState<number>(1);
 
-  // Telegram Hydrated Identity State
+  // Telegram Identity State
   const [tgCustomer, setTgCustomer] = useState<{
     id: string;
     name: string;
@@ -77,7 +77,7 @@ export default function CheckoutModal({
     primeMemberId: "",
     contactNumber: "",
   });
-  const [isHydratingCustomer, setIsHydratingCustomer] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
   // Step 1: Receiver Details
   const [receiverName, setReceiverName] = useState("");
@@ -150,7 +150,7 @@ export default function CheckoutModal({
 
       // Synchronize directly with Firestore customer record to guarantee primeMemberId hydration
       if (resolvedId) {
-        setIsHydratingCustomer(true);
+        setIsLoadingProfile(true);
         fetch(`/api/admin/customers?id=${encodeURIComponent(resolvedId)}`)
           .then(res => res.json())
           .then(data => {
@@ -195,7 +195,7 @@ export default function CheckoutModal({
             console.warn("Could not sync customer record:", err);
           })
           .finally(() => {
-            setIsHydratingCustomer(false);
+            setIsLoadingProfile(false);
           });
       }
 
@@ -453,7 +453,7 @@ export default function CheckoutModal({
       const fpData = await getClientFingerprint();
       const locData = await getClientLocation();
 
-      const orderPayload = {
+      const orderData = {
         items: selectedItems.map((it) => ({
           id: it.id,
           name: it.name,
@@ -504,7 +504,7 @@ export default function CheckoutModal({
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderPayload),
+        body: JSON.stringify(orderData),
       });
 
       if (!res.ok) {
@@ -547,12 +547,11 @@ export default function CheckoutModal({
               </button>
             )}
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold tracking-widest text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                  STEP {Math.min(currentStep, 4)} OF 4
-                </span>
-                <span className="text-xs text-gray-400 font-mono">CHECKOUT</span>
-              </div>
+              {currentStep < 5 && (
+                <div className="text-xs text-gray-500 font-mono">
+                  {Math.min(currentStep, 4)}/4
+                </div>
+              )}
               <h2 className="text-lg font-heading font-bold text-gray-900 tracking-wide uppercase mt-0.5">
                 {currentStep === 1 && "Identity & Receiver Info"}
                 {currentStep === 2 && "Delivery Address & Pin"}
@@ -583,137 +582,83 @@ export default function CheckoutModal({
         )}
 
         {/* Modal Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
 
           {/* ================= STEP 1: IDENTITY & RECEIVER ================= */}
           {currentStep === 1 && (
-            <div className="space-y-6">
-              {/* Telegram Hydrated Identity Card */}
-              <div className="p-4 rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white space-y-3">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center font-bold text-xs">
-                      TG
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 font-heading">
-                        Telegram Account Information
-                      </h4>
-                      <p className="text-[11px] text-gray-500 font-mono">Hydrated Session Profile</p>
-                    </div>
-                  </div>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    <ShieldCheck className="w-3 h-3" />
-                    Verified
-                  </span>
+            <div className="space-y-3">
+              {receiverError && (
+                <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs font-mono text-red-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                  <span>{receiverError}</span>
                 </div>
+              )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-                  <div className="bg-white p-2.5 rounded-lg border border-gray-100">
-                    <span className="text-gray-400 uppercase text-[10px] block">Customer Name</span>
-                    <span className="text-gray-900 font-medium truncate block">{tgCustomer.name || "Customer"}</span>
-                  </div>
-
-                  <div className="bg-white p-2.5 rounded-lg border border-gray-100">
-                    <span className="text-gray-400 uppercase text-[10px] block">Telegram Handle</span>
-                    <span className="text-gray-900 font-medium block">
-                      {tgCustomer.username ? `@${tgCustomer.username}` : "Not provided"}
-                    </span>
-                  </div>
-
-                  <div className="bg-white p-2.5 rounded-lg border border-gray-100">
-                    <span className="text-gray-400 uppercase text-[10px] block">PRIME Member ID</span>
-                    <span className="text-amber-700 font-bold block font-mono">
-                      {tgCustomer.primeMemberId || (isHydratingCustomer ? "Hydrating..." : "Unassigned")}
-                    </span>
-                  </div>
-
-                  <div className="bg-white p-2.5 rounded-lg border border-gray-100">
-                    <span className="text-gray-400 uppercase text-[10px] block">Hydrated Contact</span>
-                    <span className="text-gray-900 font-medium block">
-                      {tgCustomer.contactNumber ? formatPhoneNumber(tgCustomer.contactNumber) : "Optional / Not Linked"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Quick copy helper */}
-                <div className="pt-1 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (tgCustomer.name) setReceiverName(tgCustomer.name.toUpperCase());
-                      if (tgCustomer.contactNumber) setReceiverPhone(formatPhoneNumber(tgCustomer.contactNumber));
-                    }}
-                    className="text-[11px] font-mono text-black hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Sparkles className="w-3 h-3 text-amber-500" />
-                    Auto-fill receiver fields with my info
-                  </button>
-                </div>
-              </div>
-
-              {/* Receiver's Information Form */}
-              <div className="space-y-4 pt-1">
-                <div className="border-b border-gray-100 pb-2">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 font-heading">
-                    Receiver's Details <span className="text-red-500">*</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 font-mono">
-                    Person authorized to accept the delivery package
-                  </p>
-                </div>
-
-                {receiverError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-mono text-red-700 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
-                    <span>{receiverError}</span>
-                  </div>
-                )}
-
-                {/* Receiver Name */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 font-heading">
-                    Receiver's Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                      <User className="w-4 h-4" />
-                    </div>
+              <div className="p-3.5 sm:p-4 rounded-xl border border-gray-200 bg-gray-50/70">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                  {/* Telegram Name (Left) */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
+                      Telegram Name <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
                       value={receiverName}
-                      onChange={(e) => setReceiverName(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setReceiverName(val);
+                        setTgCustomer(prev => ({ ...prev, name: val }));
+                      }}
                       placeholder="JUAN DELA CRUZ"
-                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm font-mono uppercase tracking-wide text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-black transition-all"
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
                       required
                     />
                   </div>
-                  <span className="text-[11px] text-gray-400 font-mono block">
-                    Auto-formatted to UPPERCASE in IBM Plex Mono.
-                  </span>
-                </div>
 
-                {/* Receiver Phone */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 font-heading">
-                    Receiver's Phone Number <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                      <Phone className="w-4 h-4" />
-                    </div>
+                  {/* Telegram Handle (Right) */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
+                      Telegram Handle
+                    </label>
+                    <input
+                      type="text"
+                      value={tgCustomer.username ? (tgCustomer.username.startsWith('@') ? tgCustomer.username : `@${tgCustomer.username}`) : ''}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/^@/, '');
+                        setTgCustomer(prev => ({ ...prev, username: val }));
+                      }}
+                      placeholder="@username"
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+
+                  {/* PRIME Member ID (Left) */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
+                      PRIME Member ID
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={tgCustomer.primeMemberId || (isLoadingProfile ? "Loading..." : "PRM-MEMBER")}
+                      className="w-full px-3 py-2 bg-gray-100/90 border border-gray-300 rounded-lg text-xs font-mono font-bold text-amber-800 cursor-default select-none focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Phone Number (Right) */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="tel"
                       value={receiverPhone}
                       onChange={(e) => setReceiverPhone(formatPhoneNumber(e.target.value))}
                       placeholder="0919 1234 8765"
-                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm font-mono tracking-wider text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-black transition-all"
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
                       required
                     />
                   </div>
-                  <span className="text-[11px] text-gray-400 font-mono block">
-                    Auto-formatted to <strong className="text-gray-600">0919 1234 8765</strong> format automatically.
-                  </span>
                 </div>
               </div>
             </div>
@@ -721,10 +666,10 @@ export default function CheckoutModal({
 
           {/* ================= STEP 2: ADDRESS & MAP ================= */}
           {currentStep === 2 && (
-            <div className="space-y-5">
-              <div className="border-b border-gray-100 pb-2">
+            <div className="space-y-3.5">
+              <div className="border-b border-gray-100 pb-1.5">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 font-heading">
-                  Delivery Destination & Interactive Pin <span className="text-red-500">*</span>
+                  Delivery Destination & Location <span className="text-red-500">*</span>
                 </h3>
                 <p className="text-xs text-gray-500 font-mono">
                   Search address or pinpoint your exact gate/drop-off point on the map
@@ -732,19 +677,19 @@ export default function CheckoutModal({
               </div>
 
               {addressError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-mono text-red-700 flex items-center gap-2">
+                <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs font-mono text-red-700 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
                   <span>{addressError}</span>
                 </div>
               )}
 
               {/* Address Search with Geoapify Autocomplete */}
-              <div className="space-y-1.5 relative">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 font-heading">
+              <div className="space-y-1 relative z-50">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
                   Search Street Address / Landmark <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                     <Search className="w-4 h-4" />
                   </div>
                   <input
@@ -752,7 +697,7 @@ export default function CheckoutModal({
                     value={addressSearch}
                     onChange={(e) => handleAddressSearch(e.target.value)}
                     placeholder="Type address, street, building, or landmark in the Philippines..."
-                    className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-300 rounded-xl text-xs sm:text-sm font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-black transition-all"
+                    className="w-full pl-9 pr-9 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black transition-all"
                   />
                   {isSearchingAddress && (
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -763,13 +708,13 @@ export default function CheckoutModal({
 
                 {/* Autocomplete Suggestions Dropdown */}
                 {addressSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-gray-100">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-[100] max-h-56 overflow-y-auto divide-y divide-gray-100">
                     {addressSuggestions.map((item, idx) => (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => handleSelectSuggestion(item)}
-                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors flex items-start gap-2.5 cursor-pointer"
+                        className="w-full text-left px-3.5 py-2 hover:bg-gray-50 transition-colors flex items-start gap-2.5 cursor-pointer"
                       >
                         <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">
@@ -787,16 +732,7 @@ export default function CheckoutModal({
               </div>
 
               {/* Rectangular Map Container with Zoom, Drag, Use My Location, & Drop Pin */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-gray-700 font-heading">
-                    Pinpoint Exact Location on Map
-                  </span>
-                  <span className="text-[11px] font-mono text-gray-500">
-                    Zoom, drag & drop pin
-                  </span>
-                </div>
-
+              <div className="space-y-1 relative z-0">
                 <AddressPickerMap
                   lat={coords.lat}
                   lon={coords.lon}
@@ -808,8 +744,8 @@ export default function CheckoutModal({
 
               {/* Selected Formatted Address Confirmation Badge */}
               {selectedAddress && (
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-start gap-2.5">
-                  <MapPin className="w-4 h-4 text-black mt-0.5 shrink-0" />
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-200 flex items-start gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-black mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block font-heading">
                       Selected Delivery Location
@@ -822,12 +758,12 @@ export default function CheckoutModal({
               )}
 
               {/* Additional Information: Unit No, Floor No, Apartment No, Company Name */}
-              <div className="space-y-1.5 pt-1">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 font-heading">
+              <div className="space-y-1 pt-0.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
                   Unit No., Floor No., Apartment, Company Name, Landmarks
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                     <Building className="w-4 h-4" />
                   </div>
                   <input
@@ -835,12 +771,9 @@ export default function CheckoutModal({
                     value={unitDetails}
                     onChange={(e) => setUnitDetails(e.target.value)}
                     placeholder="e.g. Unit 402, 4th Floor, Tower B / Near 7-Eleven gate"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-xs sm:text-sm font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-black transition-all"
+                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black transition-all"
                   />
                 </div>
-                <span className="text-[11px] text-gray-400 font-mono block">
-                  Helps rider locate your exact doorstep or reception quickly.
-                </span>
               </div>
             </div>
           )}
