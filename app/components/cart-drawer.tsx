@@ -29,15 +29,29 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
             const dayOfWeek = now.getDay(); // 0-6 (Sun-Sat)
 
             const isApplicable = (charge: any) => {
-              if (charge.isActive !== true) return false;
+              if (charge.isDefault === true) return true;
               
-              // If it's a schedule-based charge, check days
-              if (charge.schedules?.temporal || charge.schedules?.recurring) {
-                const { daysOfWeek } = charge.schedules;
-                if (daysOfWeek && daysOfWeek.length > 0 && !daysOfWeek.includes(dayOfWeek)) {
-                  return false;
-                }
+              const now = new Date();
+              const dayOfWeek = now.getDay(); // 0-6
+              const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+              
+              const { date, days, time, isOvernight, isRecurring } = charge.schedules || {};
+              
+              // If not recurring, it might be a date-specific charge
+              if (!isRecurring && date && date !== now.toISOString().split('T')[0]) return false;
+              
+              // Days check (if defined)
+              if (days && days.length > 0 && !days.includes(dayOfWeek)) return false;
+              
+              // Time check (if defined)
+              if (time && time !== currentTime) return false;
+              
+              // Overnight check
+              if (isOvernight) {
+                  const hour = now.getHours();
+                  if (!(hour >= 22 || hour < 6)) return false;
               }
+              
               return true;
             };
 
@@ -55,32 +69,37 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
   
   // Calculate Grand Total
   const { totalChargesAmount, grandTotal, chargesBreakdown } = useMemo(() => {
-    if (selectedItems.length === 0 || !Number.isFinite(cartTotal)) return { totalChargesAmount: 0, grandTotal: 0, chargesBreakdown: [] };
-    
-    let breakdown: { id: string, name: string, computedAmount: number }[] = [];
-    let fixedTotal = 0;
-    let percentTotal = 0;
+    try {
+      if (selectedItems.length === 0 || !Number.isFinite(cartTotal)) return { totalChargesAmount: 0, grandTotal: 0, chargesBreakdown: [] };
+      
+      let breakdown: { id: string, name: string, computedAmount: number }[] = [];
+      let fixedTotal = 0;
+      let percentTotal = 0;
 
-    activeCharges.forEach(charge => {
-      if (!charge) return; // Defensive check
-      let computed = 0;
-      const amount = Number(charge.amount) || 0;
-      if (charge.type === 'percentage') {
-        computed = (Number(cartTotal) || 0) * (amount / 100);
-        percentTotal += computed;
-      } else {
-        computed = amount;
-        fixedTotal += computed;
-      }
-      breakdown.push({ id: charge.id || Math.random().toString(), name: charge.name || 'Unknown Charge', computedAmount: computed });
-    });
+      activeCharges.forEach(charge => {
+        if (!charge) return; // Defensive check
+        let computed = 0;
+        const amount = Number(charge.amount) || 0;
+        if (charge.type === 'percentage') {
+          computed = (Number(cartTotal) || 0) * (amount / 100);
+          percentTotal += computed;
+        } else {
+          computed = amount;
+          fixedTotal += computed;
+        }
+        breakdown.push({ id: charge.id || Math.random().toString(), name: charge.name || 'Unknown Charge', computedAmount: computed });
+      });
 
-    const totalCharges = fixedTotal + percentTotal;
-    return {
-      totalChargesAmount: totalCharges,
-      grandTotal: cartTotal + totalCharges,
-      chargesBreakdown: breakdown
-    };
+      const totalCharges = fixedTotal + percentTotal;
+      return {
+        totalChargesAmount: totalCharges,
+        grandTotal: cartTotal + totalCharges,
+        chargesBreakdown: breakdown
+      };
+    } catch (e) {
+      console.error("Cart calculation error:", e);
+      return { totalChargesAmount: 0, grandTotal: cartTotal, chargesBreakdown: [] };
+    }
   }, [cartTotal, activeCharges, selectedItems.length]);
 
   return (

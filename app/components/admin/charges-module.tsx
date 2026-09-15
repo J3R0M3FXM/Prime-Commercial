@@ -15,16 +15,17 @@ export default function ChargesModule() {
   const [name, setName] = useState('');
   const [type, setType] = useState<'fixed' | 'percentage'>('fixed');
   const [amount, setAmount] = useState<number>(0);
-  const [isActive, setIsActive] = useState(true);
+  const [isDefault, setIsDefault] = useState(true); // Default Add to Bill
   
   // Schedules State
-  const [scheduleTemporal, setScheduleTemporal] = useState(false);
-  const [scheduleOvernight, setScheduleOvernight] = useState(false);
-  const [scheduleRecurring, setScheduleRecurring] = useState(false);
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
+  const [scheduleDate, setScheduleDate] = useState(''); // Date
+  const [scheduleDay, setScheduleDay] = useState<number[]>([]); // Days 0-6
+  const [scheduleTime, setScheduleTime] = useState(''); // Time
+  const [isOvernight, setIsOvernight] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
 
   const toggleDay = (day: number) => {
-    setDaysOfWeek(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+    setScheduleDay(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   };
 
   const fetchCharges = async () => {
@@ -48,11 +49,12 @@ export default function ChargesModule() {
     setName('');
     setType('fixed');
     setAmount(0);
-    setIsActive(true);
-    setScheduleTemporal(false);
-    setScheduleOvernight(false);
-    setScheduleRecurring(false);
-    setDaysOfWeek([]);
+    setIsDefault(true);
+    setScheduleDate('');
+    setScheduleDay([]);
+    setScheduleTime('');
+    setIsOvernight(false);
+    setIsRecurring(false);
     setEditingCharge(null);
   };
 
@@ -61,11 +63,12 @@ export default function ChargesModule() {
     setName(charge.name);
     setType(charge.type || 'fixed');
     setAmount(charge.amount || 0);
-    setIsActive(charge.isActive ?? true);
-    setScheduleTemporal(charge.schedules?.temporal || false);
-    setScheduleOvernight(charge.schedules?.overnight || false);
-    setScheduleRecurring(charge.schedules?.recurring || false);
-    setDaysOfWeek(charge.schedules?.daysOfWeek || []);
+    setIsDefault(charge.isDefault ?? true);
+    setScheduleDate(charge.schedules?.date || '');
+    setScheduleDay(charge.schedules?.days || []);
+    setScheduleTime(charge.schedules?.time || '');
+    setIsOvernight(charge.schedules?.isOvernight || false);
+    setIsRecurring(charge.schedules?.isRecurring || false);
     setShowModal(true);
   };
 
@@ -91,12 +94,13 @@ export default function ChargesModule() {
         name: name.trim(),
         type,
         amount: Number(amount) || 0,
-        isActive,
+        isDefault,
         schedules: {
-          temporal: scheduleTemporal,
-          overnight: scheduleOvernight,
-          recurring: scheduleRecurring,
-          daysOfWeek
+          date: scheduleDate,
+          days: scheduleDay,
+          time: scheduleTime,
+          isOvernight,
+          isRecurring
         }
       };
 
@@ -271,14 +275,14 @@ export default function ChargesModule() {
                 <div className="pt-2">
                   <label className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
                     <div>
-                      <span className="block text-sm font-bold text-slate-900">Active Status</span>
-                      <span className="block text-xs text-slate-500">Enable this charge to be available for calculations</span>
+                      <span className="block text-sm font-bold text-slate-900">Default to Bill</span>
+                      <span className="block text-xs text-slate-500">Automatically apply this charge to all orders</span>
                     </div>
                     <div className="relative inline-flex items-center h-6 rounded-full w-11 shrink-0">
                       <input
                         type="checkbox"
-                        checked={isActive}
-                        onChange={e => setIsActive(e.target.checked)}
+                        checked={isDefault}
+                        onChange={e => setIsDefault(e.target.checked)}
                         className="sr-only peer"
                       />
                       <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
@@ -287,56 +291,46 @@ export default function ChargesModule() {
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-slate-100">
-                <h4 className="font-heading font-black text-sm uppercase tracking-wider text-slate-800 mb-4 flex items-center gap-2">
-                  <Settings className="w-4 h-4" /> Schedules
-                </h4>
+              {!isDefault && (
+                <div className="pt-6 border-t border-slate-100">
+                  <h4 className="font-heading font-black text-sm uppercase tracking-wider text-slate-800 mb-4 flex items-center gap-2">
+                    <Settings className="w-4 h-4" /> Schedule Configuration
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Date</label>
+                        <input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Time</label>
+                        <input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm" />
+                      </div>
+                    </div>
 
-                {(scheduleTemporal || scheduleRecurring) && (
-                  <div className="mb-4">
-                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Apply on Days</label>
-                    <div className="flex gap-1">
-                      {['S','M','T','W','T','F','S'].map((day, i) => (
-                        <button type="button" key={i} onClick={() => toggleDay(i)} className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${daysOfWeek.includes(i) ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                          {day}
-                        </button>
-                      ))}
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Apply on Days</label>
+                      <div className="flex gap-1">
+                        {['S','M','T','W','T','F','S'].map((day, i) => (
+                          <button type="button" key={i} onClick={() => toggleDay(i)} className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${scheduleDay.includes(i) ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                            {day}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <input type="checkbox" checked={isOvernight} onChange={e => setIsOvernight(e.target.checked)} /> Overnight
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <input type="checkbox" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)} /> Recurring
+                      </label>
                     </div>
                   </div>
-                )}
-                
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={scheduleTemporal}
-                      onChange={e => setScheduleTemporal(e.target.checked)}
-                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
-                    />
-                    <span className="text-sm font-medium text-slate-700">Temporal</span>
-                  </label>
-                  
-                  <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={scheduleOvernight}
-                      onChange={e => setScheduleOvernight(e.target.checked)}
-                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
-                    />
-                    <span className="text-sm font-medium text-slate-700">Overnight</span>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={scheduleRecurring}
-                      onChange={e => setScheduleRecurring(e.target.checked)}
-                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
-                    />
-                    <span className="text-sm font-medium text-slate-700">Recurring</span>
-                  </label>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
