@@ -67,6 +67,131 @@ type AdminView =
   | "logistics"
   | "charges";
 
+const ImageUploadField = ({
+  label,
+  value,
+  onChange,
+  className = ""
+}: {
+  label: string;
+  value: string;
+  onChange: (base64: string) => void;
+  className?: string;
+}) => {
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File) => {
+    if (file && file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          onChange(e.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  return (
+    <div className={`space-y-1 ${className}`}>
+      <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
+        {label}
+      </label>
+      
+      {value ? (
+        <div className="relative border border-slate-200 rounded-xl p-2 bg-slate-50 flex items-center gap-3">
+          <img
+            src={value}
+            alt="Preview"
+            className="w-16 h-16 object-cover rounded-lg border border-slate-200 bg-white"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = "https://picsum.photos/seed/prime/100";
+            }}
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider font-mono">Image Selected</p>
+            <p className="text-[9px] text-slate-400 font-mono truncate max-w-[200px]">Base64 Data String</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-[9px] font-bold uppercase tracking-wider font-mono cursor-pointer"
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <div
+          onDragEnter={handleDrag}
+          onDragOver={handleDrag}
+          onDragLeave={handleDrag}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all ${
+            dragActive
+              ? "border-slate-900 bg-slate-50"
+              : "border-slate-200 hover:border-slate-400 hover:bg-slate-50/50"
+          }`}
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleChange}
+            accept="image/*"
+            className="hidden"
+          />
+          <svg
+            className="w-6 h-6 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
+          </svg>
+          <div className="text-center">
+            <span className="font-bold text-slate-900 text-[10px] uppercase tracking-wider">
+              Upload File
+            </span>
+            <p className="text-[9px] text-slate-400 mt-0.5">Drag & drop or click to browse</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -1775,8 +1900,8 @@ export default function AdminPage() {
             {/* PRODUCT CONFIGURATION MODAL (Only opened via button, not shown right away) */}
             {productModalOpen && (
               <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-200">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] flex flex-col p-6 shadow-2xl border border-slate-200">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
                     <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
                       {editingProduct?.id ? "Edit Product" : "Add New Product"}
                     </h3>
@@ -1791,9 +1916,21 @@ export default function AdminPage() {
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
-                      handleSaveProduct(editingProduct);
+                      const finalProduct = { ...editingProduct };
+                      if (finalProduct.variants && finalProduct.variants.length > 0) {
+                        finalProduct.stock = finalProduct.variants.reduce((acc: number, v: any) => acc + (v.stock || 0), 0);
+                        const prices = finalProduct.variants.map((v: any) => v.price || 0);
+                        finalProduct.price = Math.min(...prices);
+                      } else {
+                        finalProduct.stock = finalProduct.stock ?? 10;
+                        finalProduct.price = finalProduct.price ?? 49.99;
+                      }
+                      finalProduct.rating = finalProduct.rating ?? 4.5;
+                      finalProduct.lowStockThreshold = finalProduct.lowStockThreshold ?? 10;
+
+                      handleSaveProduct(finalProduct);
                     }}
-                    className="space-y-3 text-xs"
+                    className="space-y-4 text-xs overflow-y-auto flex-1 pr-1 mt-3"
                   >
                     <div>
                       <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
@@ -1836,17 +1973,57 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
-                        Image URL
-                      </label>
-                      <input
-                        type="text"
-                        value={editingProduct?.imageUrl || ""}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, imageUrl: e.target.value })}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-mono text-[11px]"
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
+                          Low Stock Threshold
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={editingProduct?.lowStockThreshold ?? 10}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, lowStockThreshold: parseInt(e.target.value) || 0 })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
+                          Product Rating (1-5)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="1"
+                          max="5"
+                          required
+                          value={editingProduct?.rating ?? 4.5}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, rating: parseFloat(e.target.value) || 4.5 })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-mono"
+                        />
+                      </div>
                     </div>
+
+                    {(!editingProduct?.variants || editingProduct.variants.length === 0) && (
+                      <div>
+                        <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
+                          Stock (No Variants Mode)
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={editingProduct?.stock ?? 10}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, stock: parseInt(e.target.value) || 0 })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-mono"
+                        />
+                      </div>
+                    )}
+
+                    <ImageUploadField
+                      label="Product Image"
+                      value={editingProduct?.imageUrl || ""}
+                      onChange={(base64) => setEditingProduct({ ...editingProduct, imageUrl: base64 })}
+                    />
 
                     <div>
                       <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
@@ -1860,7 +2037,157 @@ export default function AdminPage() {
                       />
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                    {/* Variants Management */}
+                    <div className="pt-4 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-heading font-black uppercase text-xs tracking-wider text-slate-700">
+                          Product Variants
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newVar = {
+                              id: Math.random().toString(36).substring(2, 9),
+                              name: "",
+                              imageUrl: "",
+                              rating: 4.5,
+                              stock: 10,
+                              price: editingProduct?.price || 49.99,
+                              tag: "NONE"
+                            };
+                            const current = editingProduct?.variants || [];
+                            setEditingProduct({ ...editingProduct, variants: [...current, newVar] });
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-md text-[10px] font-bold uppercase tracking-wider font-mono cursor-pointer"
+                        >
+                          + Add Variant
+                        </button>
+                      </div>
+
+                      {(!editingProduct?.variants || editingProduct.variants.length === 0) ? (
+                        <p className="text-[11px] text-slate-400 italic">No variants configured. Product will sell in single-variant mode.</p>
+                      ) : (
+                        <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
+                          {editingProduct.variants.map((v: any, index: number) => (
+                            <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50 space-y-2 relative" key={v.id || index}>
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-500 uppercase text-[9px] tracking-widest font-mono">
+                                  Variant #{index + 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = (editingProduct?.variants || []).filter((_: any, idx: number) => idx !== index);
+                                    setEditingProduct({ ...editingProduct, variants: updated });
+                                  }}
+                                  className="text-red-500 hover:text-red-700 text-[9px] font-bold uppercase tracking-wider font-mono cursor-pointer"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="col-span-2">
+                                  <ImageUploadField
+                                    label="Variant Image (Optional)"
+                                    value={v.imageUrl || ""}
+                                    onChange={(base64) => {
+                                      const updated = [...(editingProduct?.variants || [])];
+                                      updated[index] = { ...updated[index], imageUrl: base64 };
+                                      setEditingProduct({ ...editingProduct, variants: updated });
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Variant Name</label>
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. Size M, Red"
+                                    value={v.name || ""}
+                                    onChange={(e) => {
+                                      const updated = [...(editingProduct?.variants || [])];
+                                      updated[index] = { ...updated[index], name: e.target.value };
+                                      setEditingProduct({ ...editingProduct, variants: updated });
+                                    }}
+                                    className="w-full p-1.5 bg-white border border-slate-200 rounded-md text-[11px] focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-4 gap-1.5">
+                                <div>
+                                  <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Price (₱)</label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    required
+                                    value={v.price ?? ""}
+                                    onChange={(e) => {
+                                      const updated = [...(editingProduct?.variants || [])];
+                                      updated[index] = { ...updated[index], price: parseFloat(e.target.value) || 0 };
+                                      setEditingProduct({ ...editingProduct, variants: updated });
+                                    }}
+                                    className="w-full p-1.5 bg-white border border-slate-200 rounded-md text-[11px] focus:outline-none font-mono"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Stock</label>
+                                  <input
+                                    type="number"
+                                    required
+                                    value={v.stock ?? ""}
+                                    onChange={(e) => {
+                                      const updated = [...(editingProduct?.variants || [])];
+                                      updated[index] = { ...updated[index], stock: parseInt(e.target.value) || 0 };
+                                      setEditingProduct({ ...editingProduct, variants: updated });
+                                    }}
+                                    className="w-full p-1.5 bg-white border border-slate-200 rounded-md text-[11px] focus:outline-none font-mono"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Rating</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    min="1"
+                                    max="5"
+                                    value={v.rating ?? 4.5}
+                                    onChange={(e) => {
+                                      const updated = [...(editingProduct?.variants || [])];
+                                      updated[index] = { ...updated[index], rating: parseFloat(e.target.value) || 4.5 };
+                                      setEditingProduct({ ...editingProduct, variants: updated });
+                                    }}
+                                    className="w-full p-1.5 bg-white border border-slate-200 rounded-md text-[11px] focus:outline-none font-mono"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Tag</label>
+                                  <select
+                                    value={v.tag || "NONE"}
+                                    onChange={(e) => {
+                                      const updated = [...(editingProduct?.variants || [])];
+                                      updated[index] = { ...updated[index], tag: e.target.value };
+                                      setEditingProduct({ ...editingProduct, variants: updated });
+                                    }}
+                                    className="w-full p-1.5 bg-white border border-slate-200 rounded-md text-[11px] focus:outline-none"
+                                  >
+                                    <option value="NONE">NONE</option>
+                                    <option value="NEW">NEW</option>
+                                    <option value="LOW STOCKS">LOW STOCKS</option>
+                                    <option value="UNAVAILABLE">UNAVAILABLE</option>
+                                    <option value="BEST SELLER">BEST SELLER</option>
+                                    <option value="SALE">SALE</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 shrink-0">
                       <button
                         type="button"
                         onClick={() => setProductModalOpen(false)}

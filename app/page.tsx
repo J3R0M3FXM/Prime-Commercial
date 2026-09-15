@@ -233,72 +233,66 @@ export default function Shopfront() {
             <p className="text-gray-500">Try adjusting your search or filters.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6">
             {filteredProducts.map(p => {
-              const isOutOfStock = p.stock === 0;
+              const variants = p.variants && p.variants.length > 0 ? p.variants : [];
+              const isOutOfStock = variants.length > 0 
+                ? variants.every((v: any) => (v.stock ?? 0) <= 0)
+                : (p.stock ?? 0) <= 0;
+
+              // Price range logic
+              let priceDisplay = formatPHP(p.price || 0);
+              if (variants.length > 0) {
+                const prices = variants.map((v: any) => Number(v.price) || 0);
+                const minPrice = Math.min(...prices);
+                const maxPrice = Math.max(...prices);
+                if (minPrice === maxPrice) {
+                  priceDisplay = formatPHP(minPrice);
+                } else {
+                  priceDisplay = `${formatPHP(minPrice)} - ${formatPHP(maxPrice)}`;
+                }
+              }
+
+              // Ratings logic
+              const rating = p.rating || "4.5";
+
               return (
                 <div 
                   key={p.id} 
-                  className="bg-white border border-gray-100 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col cursor-pointer"
+                  className="bg-white border border-gray-200/60 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col cursor-pointer"
                   onClick={() => setSelectedProduct(p)}
                 >
-                  <div className="relative aspect-square overflow-hidden bg-gray-50">
+                  <div className="relative aspect-square overflow-hidden bg-gray-50 border-b border-gray-100">
                     <img 
                       src={p.imageUrl || "https://picsum.photos/seed/prime/400"} 
                       alt={p.name} 
                       className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
                     />
                     {isOutOfStock && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="bg-black/80 backdrop-blur-sm text-white px-3 py-1.5 font-bold uppercase tracking-widest text-xs rounded">
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                        <span className="bg-black/80 backdrop-blur-sm text-white px-3 py-1.5 font-bold uppercase tracking-widest text-[10px] sm:text-xs rounded-lg">
                           Sold Out
                         </span>
                       </div>
                     )}
                   </div>
                   
-                  <div className="p-2 sm:p-4 flex flex-col flex-1">
-                    <h3 className="font-bold text-gray-900 line-clamp-2 leading-tight mb-1 text-[10px] sm:text-base">{p.name}</h3>
-                    <p className="text-[9px] sm:text-sm text-gray-500 mb-2">{p.category || "General"}</p>
+                  <div className="p-3 sm:p-5 flex flex-col flex-1">
+                    <p className="text-[10px] sm:text-xs font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">
+                      {p.category || "General"}
+                    </p>
+                    <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-tight mb-2 text-sm sm:text-lg">
+                      {p.name}
+                    </h3>
                     
-                    <div className="mt-auto flex items-center justify-between">
-                      <span className="font-heading font-normal text-xs sm:text-lg text-gray-900">{formatPHP(p.price)}</span>
-                      {!isOutOfStock && (
-                        (() => {
-                          const safeCart = Array.isArray(cart) ? cart : [];
-                          const cartItem = safeCart.find((item: any) => item && item.id === p.id);
-                          if (cartItem) {
-                            return (
-                              <div className="flex items-center border border-gray-200 rounded bg-white shadow-sm" onClick={(e) => e.stopPropagation()}>
-                                <button 
-                                  className="p-1 sm:p-1.5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors"
-                                  onClick={() => updateQuantity(cartItem.id, cartItem.quantity - 1)}
-                                >
-                                  <Minus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                                </button>
-                                <span className="text-[10px] sm:text-xs font-bold w-4 sm:w-6 text-center">{cartItem.quantity}</span>
-                                <button 
-                                  className="p-1 sm:p-1.5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors"
-                                  onClick={() => updateQuantity(cartItem.id, cartItem.quantity + 1)}
-                                >
-                                  <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                                </button>
-                              </div>
-                            );
-                          }
-                          return (
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                addToCart(p, 1);
-                              }}
-                              className="bg-black text-white p-1 sm:p-1.5 rounded hover:bg-gray-800 transition-colors shadow-sm"
-                            >
-                              <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                            </button>
-                          );
-                        })()
-                      )}
+                    <div className="mt-auto pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-t border-gray-50">
+                      <div className="flex items-center gap-1 text-amber-500 font-mono text-xs sm:text-sm">
+                        <span>★</span>
+                        <span className="text-gray-700 font-bold">{Number(rating).toFixed(1)}</span>
+                      </div>
+                      <span className="font-mono font-bold text-xs sm:text-base text-gray-900">
+                        {priceDisplay}
+                      </span>
                     </div>
                   </div>
                 </div>
