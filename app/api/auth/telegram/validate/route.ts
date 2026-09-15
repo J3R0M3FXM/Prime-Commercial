@@ -122,6 +122,9 @@ export async function POST(request: NextRequest) {
       token: cryptoToken,
       isAdmin,
       tgUserId,
+      tgName: fullName,
+      tgUsername: tgUser.username || '',
+      primeMemberId,
       user: {
         id: tgUserId,
         name: fullName,

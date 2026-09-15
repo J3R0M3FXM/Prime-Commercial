@@ -100,10 +100,20 @@ export default function Shopfront() {
           }
 
           if (typeof window !== 'undefined') {
-            sessionStorage.setItem("prime_customer_id", authData.tgUserId || "");
-            sessionStorage.setItem("prime_customer_name", authData.tgName || "");
-            sessionStorage.setItem("prime_customer_username", authData.tgUsername || "");
-            sessionStorage.setItem("prime_member_id", authData.primeMemberId || "");
+            const customerId = authData.tgUserId || authData.user?.id || "";
+            const customerName = authData.tgName || authData.user?.name || "";
+            const customerUsername = authData.tgUsername || authData.user?.username || "";
+            const memberId = authData.primeMemberId || authData.user?.primeMemberId || "";
+
+            sessionStorage.setItem("prime_customer_id", customerId);
+            sessionStorage.setItem("prime_customer_name", customerName);
+            sessionStorage.setItem("prime_customer_username", customerUsername);
+            sessionStorage.setItem("prime_member_id", memberId);
+
+            localStorage.setItem("prime_customer_id", customerId);
+            localStorage.setItem("prime_customer_name", customerName);
+            localStorage.setItem("prime_customer_username", customerUsername);
+            localStorage.setItem("prime_member_id", memberId);
           }
 
           setAuthorized(true);

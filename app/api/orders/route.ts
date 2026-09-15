@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, runTransaction } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, runTransaction } from 'firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,6 +61,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cart items are required' }, { status: 400 });
     }
 
+    let finalMemberId = primeMemberId || '';
+    if (!finalMemberId && customerId) {
+      try {
+        const uSnap = await getDoc(doc(db, 'users', customerId));
+        if (uSnap.exists()) {
+          finalMemberId = uSnap.data().primeMemberId || '';
+        }
+      } catch (e) {
+        console.warn("Could not query user for memberId:", e);
+      }
+    }
+
     const MAX_RETRIES = 5;
     let orderCreated = false;
     let finalOrderData: any = null;
@@ -108,11 +120,11 @@ export async function POST(request: Request) {
           
           finalOrderData = {
             orderNumber,
-            customerId: customerId || '1085949511',
-            tgUserId: customerId || '1085949511',
+            customerId: customerId || '',
+            tgUserId: customerId || '',
             customerName: customerName || 'Customer',
             customerUsername: customerUsername || '',
-            primeMemberId: primeMemberId || '',
+            primeMemberId: finalMemberId || '',
             items: items.map((it: any) => ({
               id: it.id || '',
               name: it.name || 'Unknown Product',

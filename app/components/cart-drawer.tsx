@@ -243,17 +243,17 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     setCheckoutStatus({ type: null, message: '' });
 
     try {
-      let storedUserId = "1085949511";
+      let storedUserId = "";
       let storedName = "Customer";
       let storedUsername = "";
       let storedMemberId = "";
 
       if (typeof window !== 'undefined') {
         try {
-          storedUserId = sessionStorage.getItem("prime_customer_id") || sessionStorage.getItem("prime_admin_user_id") || "1085949511";
-          storedName = sessionStorage.getItem("prime_customer_name") || "Customer";
-          storedUsername = sessionStorage.getItem("prime_customer_username") || "";
-          storedMemberId = sessionStorage.getItem("prime_member_id") || "";
+          storedUserId = sessionStorage.getItem("prime_customer_id") || localStorage.getItem("prime_customer_id") || "";
+          storedName = sessionStorage.getItem("prime_customer_name") || localStorage.getItem("prime_customer_name") || "Customer";
+          storedUsername = sessionStorage.getItem("prime_customer_username") || localStorage.getItem("prime_customer_username") || "";
+          storedMemberId = sessionStorage.getItem("prime_member_id") || localStorage.getItem("prime_member_id") || "";
         } catch (e) {}
       }
       

@@ -70,12 +70,13 @@ export default function CheckoutModal({
     primeMemberId: string;
     contactNumber: string;
   }>({
-    id: "1085949511",
-    name: "PRIME Customer",
+    id: "",
+    name: "",
     username: "",
-    primeMemberId: "PRIME-MEMBER",
+    primeMemberId: "",
     contactNumber: "",
   });
+  const [isHydratingCustomer, setIsHydratingCustomer] = useState(false);
 
   // Step 1: Receiver Details
   const [receiverName, setReceiverName] = useState("");
@@ -118,12 +119,6 @@ export default function CheckoutModal({
     if (!isOpen) return;
 
     if (typeof window !== "undefined") {
-      const storedId = sessionStorage.getItem("prime_customer_id") || "1085949511";
-      const storedName = sessionStorage.getItem("prime_customer_name") || "PRIME Customer";
-      const storedUsername = sessionStorage.getItem("prime_customer_username") || "";
-      const storedMemberId = sessionStorage.getItem("prime_member_id") || "PRIME-88219";
-      const storedPhone = sessionStorage.getItem("prime_customer_phone") || "";
-
       let tgUser: any = null;
       try {
         tgUser = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -131,11 +126,17 @@ export default function CheckoutModal({
         // ignore
       }
 
+      const storedId = sessionStorage.getItem("prime_customer_id") || localStorage.getItem("prime_customer_id") || "";
+      const storedName = sessionStorage.getItem("prime_customer_name") || localStorage.getItem("prime_customer_name") || "";
+      const storedUsername = sessionStorage.getItem("prime_customer_username") || localStorage.getItem("prime_customer_username") || "";
+      const storedMemberId = sessionStorage.getItem("prime_member_id") || localStorage.getItem("prime_member_id") || "";
+      const storedPhone = sessionStorage.getItem("prime_customer_phone") || localStorage.getItem("prime_customer_phone") || "";
+
+      const resolvedId = tgUser?.id ? tgUser.id.toString() : storedId;
       const resolvedName = tgUser?.first_name 
         ? `${tgUser.first_name} ${tgUser.last_name || ""}`.trim() 
-        : storedName;
+        : (storedName || "Customer");
       const resolvedUsername = tgUser?.username || storedUsername;
-      const resolvedId = tgUser?.id?.toString() || storedId;
       const resolvedPhone = tgUser?.phone_number || storedPhone;
 
       setTgCustomer({
@@ -146,8 +147,59 @@ export default function CheckoutModal({
         contactNumber: resolvedPhone,
       });
 
+      // Synchronize directly with Firestore customer record to guarantee primeMemberId hydration
+      if (resolvedId) {
+        setIsHydratingCustomer(true);
+        fetch(`/api/admin/customers?id=${encodeURIComponent(resolvedId)}`)
+          .then(res => res.json())
+          .then(data => {
+            const customer = data?.customer;
+            if (customer) {
+              const realMemberId = customer.primeMemberId || "";
+              const realName = customer.tgName || resolvedName;
+              const realUsername = customer.tgUsername || resolvedUsername;
+
+              if (realMemberId) {
+                try {
+                  sessionStorage.setItem("prime_member_id", realMemberId);
+                  localStorage.setItem("prime_member_id", realMemberId);
+                } catch (e) {}
+              }
+              if (realName) {
+                try {
+                  sessionStorage.setItem("prime_customer_name", realName);
+                  localStorage.setItem("prime_customer_name", realName);
+                } catch (e) {}
+              }
+              if (realUsername) {
+                try {
+                  sessionStorage.setItem("prime_customer_username", realUsername);
+                  localStorage.setItem("prime_customer_username", realUsername);
+                } catch (e) {}
+              }
+
+              setTgCustomer(prev => ({
+                ...prev,
+                name: realName,
+                username: realUsername,
+                primeMemberId: realMemberId || prev.primeMemberId,
+              }));
+
+              if (!receiverName && realName) {
+                setReceiverName(realName.toUpperCase());
+              }
+            }
+          })
+          .catch(err => {
+            console.warn("Could not sync customer record:", err);
+          })
+          .finally(() => {
+            setIsHydratingCustomer(false);
+          });
+      }
+
       // Pre-fill receiver if empty
-      if (!receiverName && resolvedName && resolvedName !== "PRIME Customer") {
+      if (!receiverName && resolvedName && resolvedName !== "Customer") {
         setReceiverName(resolvedName.toUpperCase());
       }
       if (!receiverPhone && resolvedPhone) {
@@ -581,7 +633,9 @@ export default function CheckoutModal({
 
                   <div className="bg-white p-2.5 rounded-lg border border-gray-100">
                     <span className="text-gray-400 uppercase text-[10px] block">PRIME Member ID</span>
-                    <span className="text-amber-700 font-bold block">{tgCustomer.primeMemberId}</span>
+                    <span className="text-amber-700 font-bold block font-mono">
+                      {tgCustomer.primeMemberId || (isHydratingCustomer ? "Hydrating..." : "Unassigned")}
+                    </span>
                   </div>
 
                   <div className="bg-white p-2.5 rounded-lg border border-gray-100">
