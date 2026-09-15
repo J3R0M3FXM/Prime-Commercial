@@ -54,6 +54,12 @@ export function formatPhoneNumber(val: string): string {
   return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
 }
 
+// Convert courier name to Title Case nicely (e.g. LALAMOVE -> Lalamove)
+export function formatCourierName(name: string): string {
+  if (!name) return "";
+  return name.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
 export default function CheckoutModal({
   isOpen,
   onClose,
@@ -62,6 +68,19 @@ export default function CheckoutModal({
 }: CheckoutModalProps) {
   // Step state: 1 = Contact & Receiver, 2 = Address & Map, 3 = Courier & Delivery Fee, 4 = Review & Place Order, 5 = Confirmation
   const [currentStep, setCurrentStep] = useState<number>(1);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+    if (overlayRef.current) {
+      overlayRef.current.scrollTop = 0;
+    }
+  }, [currentStep]);
 
   // Telegram Identity State
   const [tgCustomer, setTgCustomer] = useState<{
@@ -528,7 +547,7 @@ export default function CheckoutModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+    <div ref={overlayRef} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
       <div 
         className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[92vh] my-auto animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
@@ -582,7 +601,7 @@ export default function CheckoutModal({
         )}
 
         {/* Modal Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
 
           {/* ================= STEP 1: IDENTITY & RECEIVER ================= */}
           {currentStep === 1 && (
@@ -870,8 +889,8 @@ export default function CheckoutModal({
                             )}
 
                             <div>
-                              <h4 className="text-sm font-heading font-bold text-gray-900 uppercase">
-                                {courier.name}
+                              <h4 className="text-sm font-heading font-bold text-gray-900">
+                                {formatCourierName(courier.name)}
                               </h4>
                               <p className="text-[11px] text-gray-500 font-mono">
                                 {courier.type || "Express Delivery"}
@@ -1062,13 +1081,13 @@ export default function CheckoutModal({
 
               {/* Comprehensive Charges Breakdown */}
               <div className="border border-gray-200 rounded-xl p-4 bg-white space-y-1.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 font-heading border-b border-gray-100 pb-2">
-                  Financial Breakdown
+                <h4 className="text-xs font-bold tracking-wider text-gray-900 font-heading border-b border-gray-100 pb-2">
+                  Breakdown of charges
                 </h4>
 
                 {/* Subtotal */}
                 <div className="flex justify-between items-center text-xs font-mono">
-                  <span className="text-gray-500 uppercase">Items Subtotal:</span>
+                  <span className="text-gray-600 font-medium">Items Subtotal:</span>
                   <span className="font-semibold text-gray-900">{formatPHP(itemsSubtotal)}</span>
                 </div>
 
@@ -1088,8 +1107,8 @@ export default function CheckoutModal({
                 {/* Courier Delivery Fee */}
                 <div className="flex justify-between items-start text-xs font-mono pt-1 border-t border-gray-100">
                   <div>
-                    <span className="text-gray-700 uppercase font-medium block">
-                      Delivery Fee ({selectedCourier?.name || "Courier"}):
+                    <span className="text-gray-700 font-medium block">
+                      Delivery Fee ({selectedCourier?.name ? formatCourierName(selectedCourier.name) : "Courier"}):
                     </span>
                     {deliveryPaymentMethod === "upon_delivery" && (
                       <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 inline-block mt-0.5">
@@ -1160,12 +1179,27 @@ export default function CheckoutModal({
                   <span className="font-bold text-sm text-black">{completedOrder.id || completedOrder.orderNumber}</span>
                 </div>
 
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                   <span className="text-gray-400 uppercase text-[10px]">Receiver</span>
                   <span className="font-medium text-gray-900">{completedOrder.receiverName}</span>
                 </div>
 
-                <div className="pt-2 mt-2 border-t border-gray-200 space-y-1">
+                {/* Items Purchased Group */}
+                <div className="space-y-1 pb-1">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">Items Purchased</span>
+                  {((completedOrder.items && completedOrder.items.length > 0) ? completedOrder.items : selectedItems).map((item: any, idx: number) => (
+                    <div key={item.id || idx} className="flex justify-between items-center text-gray-600">
+                      <span className="truncate max-w-[240px]">
+                        {item.name} <span className="text-gray-400">x{item.quantity}</span>
+                      </span>
+                      <span>{formatPHP((Number(item.price) || 0) * (Number(item.quantity) || 1))}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Breakdown of charges */}
+                <div className="pt-2 border-t border-gray-200 space-y-1">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">Breakdown of charges</span>
                   <div className="flex justify-between items-center text-gray-600">
                     <span>Items Subtotal</span>
                     <span>{formatPHP(completedOrder.subTotal || 0)}</span>
@@ -1179,7 +1213,7 @@ export default function CheckoutModal({
                   ))}
 
                   <div className="flex justify-between items-center text-gray-600">
-                    <span>Delivery Fee</span>
+                    <span>Delivery Fee ({completedOrder.courier?.name ? formatCourierName(completedOrder.courier.name) : "Courier"})</span>
                     <span>{formatPHP(completedOrder.deliveryFee || 0)}</span>
                   </div>
                 </div>
