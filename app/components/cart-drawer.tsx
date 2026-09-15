@@ -1,13 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useCart } from './cart-context';
 import { ShoppingCart, X, Plus, Minus, Trash2 } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
 
 export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { cart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, cartTotal, cartCount, syncWithServerData } = useCart();
+  const [activeCharges, setActiveCharges] = useState<any[]>([]);
+  const [loadingCharges, setLoadingCharges] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
+      // Sync Products
       fetch("/api/products")
         .then(res => res.json())
         .then(data => {
@@ -16,12 +19,52 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
            }
         })
         .catch(err => console.error("Failed to sync cart data", err));
+              // Fetch Active Charges
+      setLoadingCharges(true);
+      fetch("/api/admin/charges")
+        .then(res => res.json())
+        .then(data => {
+          if (data && Array.isArray(data)) {
+            // Apply only if the charge is marked as Active
+            setActiveCharges(data.filter(c => c.isActive === true));
+          }
+        })
+        .catch(err => console.error("Failed to fetch charges", err))
+        .finally(() => setLoadingCharges(false));
     }
-  }, [isOpen]); // Intentionally omitting syncWithServerData to prevent unnecessary re-fetches if it changes reference
+  }, [isOpen]); 
 
   if (!isOpen) return null;
 
   const selectedItems = cart.filter((item: any) => item.selected !== false);
+  
+  // Calculate Grand Total
+  const { totalChargesAmount, grandTotal, chargesBreakdown } = useMemo(() => {
+    if (selectedItems.length === 0) return { totalChargesAmount: 0, grandTotal: 0, chargesBreakdown: [] };
+    
+    let breakdown: { id: string, name: string, computedAmount: number }[] = [];
+    let fixedTotal = 0;
+    let percentTotal = 0;
+
+    activeCharges.forEach(charge => {
+      let computed = 0;
+      if (charge.type === 'percentage') {
+        computed = cartTotal * (charge.amount / 100);
+        percentTotal += computed;
+      } else {
+        computed = charge.amount;
+        fixedTotal += computed;
+      }
+      breakdown.push({ id: charge.id, name: charge.name, computedAmount: computed });
+    });
+
+    const totalCharges = fixedTotal + percentTotal;
+    return {
+      totalChargesAmount: totalCharges,
+      grandTotal: cartTotal + totalCharges,
+      chargesBreakdown: breakdown
+    };
+  }, [cartTotal, activeCharges, selectedItems.length]);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/50 transition-opacity">
@@ -108,10 +151,26 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
         {/* Footer */}
         {cart.length > 0 && (
           <div className="p-4 border-t border-gray-100 bg-white space-y-4">
-            <div className="flex justify-between items-center text-lg">
-              <span className="font-heading font-normal uppercase text-gray-600">Total:</span>
-              <span className="font-heading font-normal text-2xl text-gray-950">{formatPHP(cartTotal)}</span>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500 uppercase tracking-wider">Subtotal:</span>
+                <span className="font-medium text-gray-900">{formatPHP(cartTotal)}</span>
+              </div>
+              
+              {chargesBreakdown.map(charge => (
+                <div key={charge.id} className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500 uppercase tracking-wider">{charge.name}:</span>
+                  <span className="font-medium text-gray-900">{formatPHP(charge.computedAmount)}</span>
+                </div>
+              ))}
+              
+              <div className="flex justify-between items-center text-lg pt-3 border-t border-gray-100 mt-2">
+                <span className="font-heading font-bold uppercase tracking-wide text-gray-900">Total:</span>
+                <span className="font-heading font-bold text-2xl text-black">{formatPHP(grandTotal)}</span>
+              </div>
             </div>
+
             <button 
               disabled={selectedItems.length === 0}
               onClick={async () => {
@@ -131,7 +190,9 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
                       customerUsername: storedUsername,
                       primeMemberId: storedMemberId,
                       items: selectedItems,
-                      totalAmount: cartTotal,
+                      subTotal: cartTotal,
+                      appliedCharges: chargesBreakdown,
+                      totalAmount: grandTotal,
                       notes: "Storefront Checkout Order"
                     })
                   });

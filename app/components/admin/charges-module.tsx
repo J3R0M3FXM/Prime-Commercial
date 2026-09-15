@@ -15,7 +15,7 @@ export default function ChargesModule() {
   const [name, setName] = useState('');
   const [type, setType] = useState<'fixed' | 'percentage'>('fixed');
   const [amount, setAmount] = useState<number>(0);
-  const [defaultAddToBill, setDefaultAddToBill] = useState(true);
+  const [isActive, setIsActive] = useState(true);
   
   // Schedules State
   const [scheduleTemporal, setScheduleTemporal] = useState(false);
@@ -43,7 +43,7 @@ export default function ChargesModule() {
     setName('');
     setType('fixed');
     setAmount(0);
-    setDefaultAddToBill(true);
+    setIsActive(true);
     setScheduleTemporal(false);
     setScheduleOvernight(false);
     setScheduleRecurring(false);
@@ -55,7 +55,7 @@ export default function ChargesModule() {
     setName(charge.name);
     setType(charge.type || 'fixed');
     setAmount(charge.amount || 0);
-    setDefaultAddToBill(charge.defaultAddToBill ?? true);
+    setIsActive(charge.isActive ?? true);
     setScheduleTemporal(charge.schedules?.temporal || false);
     setScheduleOvernight(charge.schedules?.overnight || false);
     setScheduleRecurring(charge.schedules?.recurring || false);
@@ -84,7 +84,7 @@ export default function ChargesModule() {
         name: name.trim(),
         type,
         amount: Number(amount) || 0,
-        defaultAddToBill,
+        isActive,
         schedules: {
           temporal: scheduleTemporal,
           overnight: scheduleOvernight,
@@ -172,9 +172,9 @@ export default function ChargesModule() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-400">Default to Bill:</span>
-                  <span className={`font-bold ${charge.defaultAddToBill ? 'text-emerald-600' : 'text-slate-400'}`}>
-                    {charge.defaultAddToBill ? 'YES' : 'NO'}
+                  <span className="text-slate-400">Status:</span>
+                  <span className={`font-bold ${charge.isActive ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {charge.isActive ? 'ACTIVE' : 'INACTIVE'}
                   </span>
                 </div>
                 
@@ -263,14 +263,14 @@ export default function ChargesModule() {
                 <div className="pt-2">
                   <label className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
                     <div>
-                      <span className="block text-sm font-bold text-slate-900">Default Add to Bill</span>
-                      <span className="block text-xs text-slate-500">Automatically apply this charge to all new orders</span>
+                      <span className="block text-sm font-bold text-slate-900">Active Status</span>
+                      <span className="block text-xs text-slate-500">Enable this charge to be available for calculations</span>
                     </div>
                     <div className="relative inline-flex items-center h-6 rounded-full w-11 shrink-0">
                       <input
                         type="checkbox"
-                        checked={defaultAddToBill}
-                        onChange={e => setDefaultAddToBill(e.target.checked)}
+                        checked={isActive}
+                        onChange={e => setIsActive(e.target.checked)}
                         className="sr-only peer"
                       />
                       <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>

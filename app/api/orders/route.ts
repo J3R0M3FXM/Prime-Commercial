@@ -42,6 +42,8 @@ export async function POST(request: Request) {
       customerName, 
       customerUsername, 
       primeMemberId, 
+      subTotal,
+      appliedCharges,
       totalAmount, 
       deviceSnapshot,
       notes 
@@ -110,6 +112,8 @@ export async function POST(request: Request) {
               quantity: Number(it.quantity) || 1,
               imageUrl: it.imageUrl || ''
             })),
+            subTotal: subTotal || calculatedTotal,
+            appliedCharges: appliedCharges || [],
             totalAmount: calculatedTotal,
             status: 'Processing',
             notes: notes || 'Submitted via Telegram Mini App Storefront',
