@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, Component, ErrorInfo, ReactNode } 
 import { useCart } from './cart-context';
 import { ShoppingCart, X, Plus, Minus, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
+import CheckoutModal from './checkout-modal';
 
 // Defensive Error Boundary to ensure Cart never crashes the host page
 interface ErrorBoundaryProps {
@@ -77,6 +78,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const [loadingCharges, setLoadingCharges] = useState(false);
   const [checkoutStatus, setCheckoutStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -407,35 +409,38 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         {safeCart.length > 0 && (
           <div className="p-4 border-t border-gray-100 bg-white space-y-4">
             
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500 uppercase tracking-wider">Subtotal:</span>
-                <span className="font-medium text-gray-900">{formatPHP(cartTotal || 0)}</span>
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center text-base">
+                <span className="font-heading font-bold uppercase tracking-wider text-gray-700">Subtotal:</span>
+                <span className="font-heading font-bold text-xl text-black">{formatPHP(cartTotal || 0)}</span>
               </div>
-              
-              {chargesBreakdown && chargesBreakdown.map((charge) => (
-                <div key={charge.id} className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500 uppercase tracking-wider">{charge.name}:</span>
-                  <span className="font-medium text-gray-900">{formatPHP(charge.computedAmount)}</span>
-                </div>
-              ))}
-              
-              <div className="flex justify-between items-center text-lg pt-3 border-t border-gray-100 mt-2">
-                <span className="font-heading font-bold uppercase tracking-wide text-gray-900">Total:</span>
-                <span className="font-heading font-bold text-2xl text-black">{formatPHP(grandTotal || 0)}</span>
-              </div>
+              <p className="text-[11px] text-gray-500 font-mono">
+                Delivery fees & applicable charges are calculated during checkout.
+              </p>
             </div>
 
             <button 
-              disabled={selectedItems.length === 0 || isSubmitting}
-              onClick={handleCheckout}
+              disabled={selectedItems.length === 0}
+              onClick={() => setIsCheckoutOpen(true)}
               className="w-full bg-black text-white font-bold py-4 rounded hover:bg-gray-800 transition-colors uppercase tracking-widest text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Processing..." : "Proceed to Checkout"}
+              Proceed to Checkout ({selectedItems.length})
             </button>
           </div>
         )}
       </div>
+
+      {/* Multi-Step Checkout Modal */}
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        selectedItems={selectedItems}
+        onOrderSuccess={() => {
+          if (typeof clearSelectedItems === 'function') {
+            clearSelectedItems();
+          }
+        }}
+      />
     </div>
   );
 }

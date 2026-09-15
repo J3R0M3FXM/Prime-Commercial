@@ -1579,7 +1579,43 @@ export default function AdminPage() {
                         </p>
                       </div>
                     ))}
-                    <div className="p-3 bg-slate-50 flex items-center justify-between font-mono font-black text-slate-900">
+
+                    {/* Snapshot Financial Consolidation Breakdown */}
+                    <div className="p-3 bg-slate-50/70 border-t border-slate-100 space-y-1.5 text-xs font-mono">
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span className="uppercase">Items Subtotal:</span>
+                        <span className="font-bold text-slate-900">
+                          {formatPHP(selectedOrder.subTotal || selectedOrder.items?.reduce((s: number, it: any) => s + (Number(it.price) * (Number(it.quantity) || 1)), 0) || 0)}
+                        </span>
+                      </div>
+
+                      {/* Snapshotted Charges */}
+                      {Array.isArray(selectedOrder.appliedCharges) && selectedOrder.appliedCharges.map((ch: any, ci: number) => (
+                        <div key={ci} className="flex justify-between items-center text-slate-600">
+                          <span className="uppercase flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                            {ch.name || "Fee"}:
+                          </span>
+                          <span className="font-semibold text-slate-800">{formatPHP(ch.amount || 0)}</span>
+                        </div>
+                      ))}
+
+                      {/* Snapshotted Delivery Fee */}
+                      {Number(selectedOrder.deliveryFee) > 0 && (
+                        <div className="flex justify-between items-center text-slate-600">
+                          <span className="uppercase flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                            Delivery ({selectedOrder.courier?.name || "Courier"}):
+                            <span className="text-[10px] text-slate-400">
+                              ({selectedOrder.deliveryFeePaymentMethod === "upon_delivery" ? "Paid upon delivery" : "Paid at checkout"})
+                            </span>
+                          </span>
+                          <span className="font-semibold text-slate-800">{formatPHP(selectedOrder.deliveryFee)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-slate-100 flex items-center justify-between font-mono font-black text-slate-900 border-t border-slate-200">
                       <span>Total Amount</span>
                       <span className="text-base">{formatPHP(selectedOrder.totalAmount)}</span>
                     </div>
