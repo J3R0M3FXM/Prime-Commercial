@@ -55,13 +55,14 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
   
   // Calculate Grand Total
   const { totalChargesAmount, grandTotal, chargesBreakdown } = useMemo(() => {
-    if (selectedItems.length === 0 || typeof cartTotal !== 'number') return { totalChargesAmount: 0, grandTotal: 0, chargesBreakdown: [] };
+    if (selectedItems.length === 0 || !Number.isFinite(cartTotal)) return { totalChargesAmount: 0, grandTotal: 0, chargesBreakdown: [] };
     
     let breakdown: { id: string, name: string, computedAmount: number }[] = [];
     let fixedTotal = 0;
     let percentTotal = 0;
 
     activeCharges.forEach(charge => {
+      if (!charge) return; // Defensive check
       let computed = 0;
       const amount = Number(charge.amount) || 0;
       if (charge.type === 'percentage') {
@@ -71,7 +72,7 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
         computed = amount;
         fixedTotal += computed;
       }
-      breakdown.push({ id: charge.id, name: charge.name, computedAmount: computed });
+      breakdown.push({ id: charge.id || Math.random().toString(), name: charge.name || 'Unknown Charge', computedAmount: computed });
     });
 
     const totalCharges = fixedTotal + percentTotal;
