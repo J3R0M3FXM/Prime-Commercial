@@ -55,7 +55,7 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
   
   // Calculate Grand Total
   const { totalChargesAmount, grandTotal, chargesBreakdown } = useMemo(() => {
-    if (selectedItems.length === 0) return { totalChargesAmount: 0, grandTotal: 0, chargesBreakdown: [] };
+    if (selectedItems.length === 0 || typeof cartTotal !== 'number') return { totalChargesAmount: 0, grandTotal: 0, chargesBreakdown: [] };
     
     let breakdown: { id: string, name: string, computedAmount: number }[] = [];
     let fixedTotal = 0;
