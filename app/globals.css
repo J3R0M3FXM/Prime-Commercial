@@ -33,3 +33,12 @@ input.font-mono, textarea.font-mono, button.font-mono {
   font-family: 'Arial Narrow', Arial, sans-serif !important;
 }
 
+
+/* Hide scrollbar globally */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -316,7 +316,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
         {/* Footer */}
         {safeCart.length > 0 && (
-          <div className="p-4 border-t border-gray-100 bg-white space-y-4">
+          <div className="p-4 pb-12 border-t border-gray-100 bg-white space-y-4">
             
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-base">

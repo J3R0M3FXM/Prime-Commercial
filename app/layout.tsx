@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "@fontsource/roboto-condensed/400.css";
 import "./globals.css";
 import { CartProvider } from "./components/cart-context";
-import SystemFooter from "./components/system-footer";
 import Script from "next/script";
+import SystemFooter from "./components/system-footer";
 
 export const metadata: Metadata = {
   title: "PRIME Shop",

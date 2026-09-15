@@ -167,11 +167,6 @@ export default function Shopfront() {
         <AlertCircle className="w-16 h-16 text-red-500 mb-6" />
         <h1 className="text-2xl font-heading font-bold text-gray-900 mb-2 uppercase tracking-wide">Access Denied</h1>
         <p className="text-gray-600 mb-6 max-w-sm">This shopfront is exclusively secured for use within the Telegram environment.</p>
-        {errorMsg && (
-          <div className="bg-red-50 text-red-800 p-4 rounded-lg w-full max-w-sm text-left border border-red-100">
-            <p className="text-xs font-mono break-all font-medium">Debug: {errorMsg}</p>
-          </div>
-        )}
       </div>
     );
   }

@@ -45,13 +45,13 @@ interface CheckoutModalProps {
   onOrderSuccess: (orderData: any) => void;
 }
 
-// Auto-format phone to 0919 1234 8765
+// Auto-format phone to 0919 123 4567
 export function formatPhoneNumber(val: string): string {
   const digits = val.replace(/\D/g, "").slice(0, 11);
   if (!digits) return "";
   if (digits.length <= 4) return digits;
-  if (digits.length <= 8) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
-  return `${digits.slice(0, 4)} ${digits.slice(4, 8)} ${digits.slice(8)}`;
+  if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
+  return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
 }
 
 export default function CheckoutModal({
@@ -417,7 +417,7 @@ export default function CheckoutModal({
       return;
     }
     if (cleanPhoneDigits.length < 11) {
-      setReceiverError("Please enter a valid 11-digit phone number (e.g. 0919 1234 8765).");
+      setReceiverError("Please enter a valid 11-digit phone number (e.g. 0919 123 4567).");
       return;
     }
     setCurrentStep(2);
@@ -586,32 +586,30 @@ export default function CheckoutModal({
 
           {/* ================= STEP 1: IDENTITY & RECEIVER ================= */}
           {currentStep === 1 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {receiverError && (
-                <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs font-mono text-red-700 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                <div className="text-xs font-mono text-red-600 flex items-center gap-1.5 py-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>{receiverError}</span>
                 </div>
               )}
 
+              {/* Telegram Identity (Read-Only) */}
               <div className="p-3.5 sm:p-4 rounded-xl border border-gray-200 bg-gray-50/70">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 font-heading mb-3">
+                  Telegram Identity
+                </h4>
                 <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                   {/* Telegram Name (Left) */}
                   <div className="space-y-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
-                      Telegram Name <span className="text-red-500">*</span>
+                      Telegram Name
                     </label>
                     <input
                       type="text"
-                      value={receiverName}
-                      onChange={(e) => {
-                        const val = e.target.value.toUpperCase();
-                        setReceiverName(val);
-                        setTgCustomer(prev => ({ ...prev, name: val }));
-                      }}
-                      placeholder="JUAN DELA CRUZ"
-                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
-                      required
+                      readOnly
+                      value={tgCustomer.name || "Loading..."}
+                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs font-mono text-gray-700 cursor-default focus:outline-none"
                     />
                   </div>
 
@@ -622,13 +620,9 @@ export default function CheckoutModal({
                     </label>
                     <input
                       type="text"
-                      value={tgCustomer.username ? (tgCustomer.username.startsWith('@') ? tgCustomer.username : `@${tgCustomer.username}`) : ''}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/^@/, '');
-                        setTgCustomer(prev => ({ ...prev, username: val }));
-                      }}
-                      placeholder="@username"
-                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+                      readOnly
+                      value={tgCustomer.username ? (tgCustomer.username.startsWith('@') ? tgCustomer.username : `@${tgCustomer.username}`) : "Not provided"}
+                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs font-mono text-gray-700 cursor-default focus:outline-none"
                     />
                   </div>
 
@@ -640,21 +634,57 @@ export default function CheckoutModal({
                     <input
                       type="text"
                       readOnly
-                      value={tgCustomer.primeMemberId || (isLoadingProfile ? "Loading..." : "PRM-MEMBER")}
-                      className="w-full px-3 py-2 bg-gray-100/90 border border-gray-300 rounded-lg text-xs font-mono font-bold text-amber-800 cursor-default select-none focus:outline-none"
+                      value={tgCustomer.primeMemberId || (isLoadingProfile ? "Loading..." : "No ID")}
+                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs font-mono font-bold text-amber-800 cursor-default focus:outline-none"
                     />
                   </div>
 
-                  {/* Phone Number (Right) */}
+                  {/* Linked Phone Number (Right) */}
                   <div className="space-y-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
-                      Phone Number <span className="text-red-500">*</span>
+                      Linked Phone No.
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={tgCustomer.contactNumber ? formatPhoneNumber(tgCustomer.contactNumber) : "No Phone No. Linked"}
+                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs font-mono text-gray-700 cursor-default focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Receiver Information (Editable) */}
+              <div className="p-3.5 sm:p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 font-heading mb-3">
+                  Receiver Information
+                </h4>
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                  {/* Receiver Name (Left) */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
+                      Receiver's Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={receiverName}
+                      onChange={(e) => setReceiverName(e.target.value.toUpperCase())}
+                      placeholder="JUAN DELA CRUZ"
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+                      required
+                    />
+                  </div>
+
+                  {/* Receiver Phone (Right) */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
+                      Receiver's Phone <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="tel"
                       value={receiverPhone}
                       onChange={(e) => setReceiverPhone(formatPhoneNumber(e.target.value))}
-                      placeholder="0919 1234 8765"
+                      placeholder="0919 123 4567"
                       className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
                       required
                     />
@@ -669,7 +699,7 @@ export default function CheckoutModal({
             <div className="space-y-3.5">
               <div className="border-b border-gray-100 pb-1.5">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 font-heading">
-                  Delivery Destination & Location <span className="text-red-500">*</span>
+                  Delivery Destination & Location
                 </h3>
                 <p className="text-xs text-gray-500 font-mono">
                   Search address or pinpoint your exact gate/drop-off point on the map
@@ -677,8 +707,8 @@ export default function CheckoutModal({
               </div>
 
               {addressError && (
-                <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs font-mono text-red-700 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                <div className="text-xs font-mono text-red-600 flex items-center gap-1.5 py-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>{addressError}</span>
                 </div>
               )}
@@ -686,7 +716,7 @@ export default function CheckoutModal({
               {/* Address Search with Geoapify Autocomplete */}
               <div className="space-y-1 relative z-50">
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
-                  Search Street Address / Landmark <span className="text-red-500">*</span>
+                  Search Street Address / Landmark
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -791,8 +821,8 @@ export default function CheckoutModal({
               </div>
 
               {courierFetchError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-mono text-red-700 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                <div className="text-xs font-mono text-red-600 flex items-center gap-1.5 py-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>{courierFetchError}</span>
                 </div>
               )}
@@ -968,8 +998,8 @@ export default function CheckoutModal({
               </div>
 
               {submitError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-mono text-red-700 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                <div className="text-xs font-mono text-red-600 flex items-center gap-1.5 py-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>{submitError}</span>
                 </div>
               )}
