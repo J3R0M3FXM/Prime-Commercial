@@ -63,11 +63,12 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
 
     activeCharges.forEach(charge => {
       let computed = 0;
+      const amount = Number(charge.amount) || 0;
       if (charge.type === 'percentage') {
-        computed = cartTotal * (charge.amount / 100);
+        computed = (Number(cartTotal) || 0) * (amount / 100);
         percentTotal += computed;
       } else {
-        computed = charge.amount;
+        computed = amount;
         fixedTotal += computed;
       }
       breakdown.push({ id: charge.id, name: charge.name, computedAmount: computed });
