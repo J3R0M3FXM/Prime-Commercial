@@ -4,23 +4,39 @@
  */
 
 export function formatPHP(amount: number | string | null | undefined): string {
-  const numeric = typeof amount === "number" ? amount : Number(amount);
-  if (isNaN(numeric)) {
+  try {
+    const numeric = typeof amount === "number" ? amount : Number(amount);
+    if (isNaN(numeric) || !isFinite(numeric)) {
+      return "₱0.00";
+    }
+    try {
+      return `₱${numeric.toLocaleString("en-PH", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    } catch {
+      return `₱${numeric.toFixed(2)}`;
+    }
+  } catch {
     return "₱0.00";
   }
-  return `₱${numeric.toLocaleString("en-PH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 }
 
 export function formatNumber(val: number | string | null | undefined, decimals = 2): string {
-  const numeric = typeof val === "number" ? val : Number(val);
-  if (isNaN(numeric)) {
+  try {
+    const numeric = typeof val === "number" ? val : Number(val);
+    if (isNaN(numeric) || !isFinite(numeric)) {
+      return "0.00";
+    }
+    try {
+      return numeric.toLocaleString("en-PH", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+    } catch {
+      return numeric.toFixed(decimals);
+    }
+  } catch {
     return "0.00";
   }
-  return numeric.toLocaleString("en-PH", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
 }

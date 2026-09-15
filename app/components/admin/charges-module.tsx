@@ -184,20 +184,48 @@ export default function ChargesModule() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-400">Status:</span>
-                  <span className={`font-bold ${charge.isActive ? 'text-emerald-600' : 'text-slate-400'}`}>
-                    {charge.isActive ? 'ACTIVE' : 'INACTIVE'}
+                  <span className="text-slate-400">Application:</span>
+                  <span className={`font-bold uppercase text-[11px] px-2 py-0.5 rounded ${
+                    (charge.isDefault ?? charge.isActive) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {(charge.isDefault ?? (!charge.schedules?.overnight && !charge.schedules?.isOvernight && !charge.schedules?.days?.length && !charge.schedules?.date)) ? 'Default to Bill' : 'Scheduled Rule'}
                   </span>
                 </div>
                 
                 <div className="pt-2">
-                  <span className="text-slate-400 text-[10px] uppercase tracking-wider block mb-2">Active Schedules</span>
-                  <div className="flex flex-wrap gap-2">
-                    {charge.schedules?.temporal && <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold text-[9px] uppercase tracking-wider">Temporal</span>}
-                    {charge.schedules?.overnight && <span className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold text-[9px] uppercase tracking-wider">Overnight</span>}
-                    {charge.schedules?.recurring && <span className="bg-orange-50 text-orange-600 px-2 py-1 rounded font-bold text-[9px] uppercase tracking-wider">Recurring</span>}
-                    {!charge.schedules?.temporal && !charge.schedules?.overnight && !charge.schedules?.recurring && (
-                       <span className="text-slate-400 text-[10px] italic">None specified</span>
+                  <span className="text-slate-400 text-[10px] uppercase tracking-wider block mb-2">Schedule Details</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Boolean(charge.schedules?.isOvernight || charge.schedules?.overnight) && (
+                      <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider">
+                        Overnight (10pm-6am)
+                      </span>
+                    )}
+                    {Boolean(charge.schedules?.isRecurring || charge.schedules?.recurring) && (
+                      <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider">
+                        Recurring
+                      </span>
+                    )}
+                    {charge.schedules?.date && (
+                      <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider">
+                        Date: {charge.schedules.date}
+                      </span>
+                    )}
+                    {charge.schedules?.time && (
+                      <span className="bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider">
+                        Time: {charge.schedules.time}
+                      </span>
+                    )}
+                    {Array.isArray(charge.schedules?.days) && charge.schedules.days.length > 0 && (
+                      <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider">
+                        Days: {charge.schedules.days.map((d: number) => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}
+                      </span>
+                    )}
+                    {!(charge.schedules?.isOvernight || charge.schedules?.overnight) &&
+                     !(charge.schedules?.isRecurring || charge.schedules?.recurring) &&
+                     !charge.schedules?.date &&
+                     !charge.schedules?.time &&
+                     (!charge.schedules?.days || charge.schedules.days.length === 0) && (
+                      <span className="text-slate-400 text-[10px] italic">Always active</span>
                     )}
                   </div>
                 </div>

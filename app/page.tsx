@@ -125,11 +125,12 @@ export default function Shopfront() {
     checkAuth();
   }, [router]);
 
-  const categories = ["All", ...Array.from(new Set(products.map(p => p.category || "General")))];
+  const safeProducts = Array.isArray(products) ? products : [];
+  const categories = ["All", ...Array.from(new Set(safeProducts.map(p => p?.category || "General")))];
 
-  const filteredProducts = products.filter(p => 
-    (selectedCategory === "All" || (p.category || "General") === selectedCategory) &&
-    (p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredProducts = safeProducts.filter(p => 
+    p && (selectedCategory === "All" || (p?.category || "General") === selectedCategory) &&
+    ((p?.name || "").toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (routingToAdmin) {
@@ -259,7 +260,8 @@ export default function Shopfront() {
                       <span className="font-heading font-normal text-xs sm:text-lg text-gray-900">{formatPHP(p.price)}</span>
                       {!isOutOfStock && (
                         (() => {
-                          const cartItem = cart.find((item: any) => item.id === p.id);
+                          const safeCart = Array.isArray(cart) ? cart : [];
+                          const cartItem = safeCart.find((item: any) => item && item.id === p.id);
                           if (cartItem) {
                             return (
                               <div className="flex items-center border border-gray-200 rounded bg-white shadow-sm" onClick={(e) => e.stopPropagation()}>

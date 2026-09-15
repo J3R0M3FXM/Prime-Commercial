@@ -1,25 +1,98 @@
-import React, { useEffect, useState, useMemo } from 'react';
+"use client";
+
+import React, { useEffect, useState, useMemo, Component, ErrorInfo, ReactNode } from 'react';
 import { useCart } from './cart-context';
-import { ShoppingCart, X, Plus, Minus, Trash2 } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
 
-export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+// Defensive Error Boundary to ensure Cart never crashes the host page
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  onClose: () => void;
+}
+interface ErrorBoundaryState {
+  hasError: boolean;
+  errorMessage: string;
+}
+
+class CartErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, errorMessage: '' };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, errorMessage: error?.message || 'An unexpected error occurred.' };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("CartDrawer Caught Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-6 items-center justify-center text-center">
+            <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+              <AlertCircle className="w-7 h-7" />
+            </div>
+            <h3 className="font-heading font-black uppercase tracking-wider text-gray-900 text-lg mb-2">Cart Recovered</h3>
+            <p className="text-gray-500 text-sm mb-6 max-w-xs leading-relaxed">
+              We encountered a temporary calculation hiccup with cart data.
+            </p>
+            <div className="flex flex-col gap-3 w-full max-w-xs">
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.removeItem('prime-cart');
+                  } catch (e) {}
+                  window.location.reload();
+                }}
+                className="w-full bg-black text-white font-bold py-3 rounded-lg text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-800"
+              >
+                <RefreshCw className="w-4 h-4" /> Reset Cart & Reload
+              </button>
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false });
+                  this.props.onClose();
+                }}
+                className="w-full bg-gray-100 text-gray-700 font-bold py-3 rounded-lg text-xs uppercase tracking-widest hover:bg-gray-200"
+              >
+                Close Drawer
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { cart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, cartTotal, cartCount, syncWithServerData } = useCart();
   const [activeCharges, setActiveCharges] = useState<any[]>([]);
   const [loadingCharges, setLoadingCharges] = useState(false);
+  const [checkoutStatus, setCheckoutStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
+      setCheckoutStatus({ type: null, message: '' });
+
       // Sync Products
       fetch("/api/products")
         .then(res => res.json())
         .then(data => {
-           if (data && Array.isArray(data)) {
+           if (data && Array.isArray(data) && typeof syncWithServerData === 'function') {
              syncWithServerData(data);
            }
         })
-        .catch(err => console.error("Failed to sync cart data", err));
-              // Fetch Active Charges
+        .catch(err => console.warn("Failed to sync cart data", err));
+
+      // Fetch Active Charges
       setLoadingCharges(true);
       fetch("/api/admin/charges")
         .then(res => res.json())
@@ -27,80 +100,206 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
           if (data && Array.isArray(data)) {
             const now = new Date();
             const dayOfWeek = now.getDay(); // 0-6 (Sun-Sat)
+            const currentHour = now.getHours();
+            const currentMin = now.getMinutes();
 
             const isApplicable = (charge: any) => {
-              if (charge.isDefault === true) return true;
-              
-              const now = new Date();
-              const dayOfWeek = now.getDay(); // 0-6
-              const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-              
-              const { date, days, time, isOvernight, isRecurring } = charge.schedules || {};
-              
-              // If not recurring, it might be a date-specific charge
-              if (!isRecurring && date && date !== now.toISOString().split('T')[0]) return false;
-              
-              // Days check (if defined)
-              if (days && days.length > 0 && !days.includes(dayOfWeek)) return false;
-              
-              // Time check (if defined)
-              if (time && time !== currentTime) return false;
-              
-              // Overnight check
-              if (isOvernight) {
-                  const hour = now.getHours();
-                  if (!(hour >= 22 || hour < 6)) return false;
+              if (!charge || typeof charge !== 'object') return false;
+
+              // Check for default / legacy active flag
+              const isDefault = charge.isDefault === true || charge.defaultAddToBill === true;
+              const hasNoSchedule = !charge.schedules || (
+                !charge.schedules.date &&
+                !charge.schedules.time &&
+                (!charge.schedules.days || charge.schedules.days.length === 0) &&
+                (!charge.schedules.daysOfWeek || charge.schedules.daysOfWeek.length === 0) &&
+                !charge.schedules.isOvernight &&
+                !charge.schedules.overnight &&
+                !charge.schedules.isRecurring &&
+                !charge.schedules.recurring
+              );
+
+              // If marked default or legacy active with no schedules, always apply
+              if (isDefault || (charge.isActive === true && hasNoSchedule)) {
+                return true;
+              }
+
+              // Explicitly inactive
+              if (charge.isActive === false && !isDefault) {
+                return false;
               }
               
-              return true;
+              try {
+                const schedules = charge.schedules || {};
+                const date = schedules.date;
+                const days = Array.isArray(schedules.days) ? schedules.days : (Array.isArray(schedules.daysOfWeek) ? schedules.daysOfWeek : []);
+                const time = typeof schedules.time === 'string' ? schedules.time : '';
+                const isOvernight = Boolean(schedules.isOvernight || schedules.overnight);
+                const isRecurring = Boolean(schedules.isRecurring || schedules.recurring);
+                
+                // Specific date restriction (non-recurring)
+                if (!isRecurring && date) {
+                  const todayStr = now.toISOString().split('T')[0];
+                  if (date !== todayStr) return false;
+                }
+                
+                // Days of week check (0-6)
+                if (days.length > 0 && !days.includes(dayOfWeek)) {
+                  return false;
+                }
+                
+                // Time check (HH:mm)
+                if (time && time.includes(':')) {
+                  const [cHour, cMin] = time.split(':').map(Number);
+                  if (Number.isFinite(cHour) && Number.isFinite(cMin)) {
+                    if (currentHour !== cHour || currentMin !== cMin) {
+                      return false;
+                    }
+                  }
+                }
+                
+                // Overnight check: 10 PM to 6 AM (22:00 - 05:59)
+                if (isOvernight) {
+                  if (!(currentHour >= 22 || currentHour < 6)) {
+                    return false;
+                  }
+                }
+                
+                return true;
+              } catch (e) {
+                console.warn("Error evaluating charge applicability:", charge?.name, e);
+                return false;
+              }
             };
 
-            setActiveCharges(data.filter(c => isApplicable(c)));
+            const filtered = data.filter(c => isApplicable(c));
+            setActiveCharges(filtered);
           }
         })
-        .catch(err => console.error("Failed to fetch charges", err))
+        .catch(err => console.warn("Failed to fetch charges", err))
         .finally(() => setLoadingCharges(false));
     }
   }, [isOpen]); 
 
-  if (!isOpen) return null;
-
-  const selectedItems = cart.filter((item: any) => item.selected !== false);
+  const safeCart = Array.isArray(cart) ? cart : [];
+  const selectedItems = useMemo(() => {
+    return safeCart.filter((item: any) => item && typeof item === 'object' && item.selected !== false);
+  }, [safeCart]);
   
-  // Calculate Grand Total
+  // Calculate Grand Total & Charges Breakdown
   const { totalChargesAmount, grandTotal, chargesBreakdown } = useMemo(() => {
+    const validCartTotal = Number.isFinite(cartTotal) ? Math.max(0, cartTotal) : 0;
+    
+    if (selectedItems.length === 0 || validCartTotal === 0) {
+      return { totalChargesAmount: 0, grandTotal: validCartTotal, chargesBreakdown: [] };
+    }
+    
     try {
-      if (selectedItems.length === 0 || !Number.isFinite(cartTotal)) return { totalChargesAmount: 0, grandTotal: 0, chargesBreakdown: [] };
-      
-      let breakdown: { id: string, name: string, computedAmount: number }[] = [];
+      let breakdown: { id: string; name: string; computedAmount: number }[] = [];
       let fixedTotal = 0;
       let percentTotal = 0;
 
-      activeCharges.forEach(charge => {
-        if (!charge) return; // Defensive check
-        let computed = 0;
-        const amount = Number(charge.amount) || 0;
-        if (charge.type === 'percentage') {
-          computed = (Number(cartTotal) || 0) * (amount / 100);
-          percentTotal += computed;
-        } else {
-          computed = amount;
-          fixedTotal += computed;
-        }
-        breakdown.push({ id: charge.id || Math.random().toString(), name: charge.name || 'Unknown Charge', computedAmount: computed });
-      });
+      if (Array.isArray(activeCharges)) {
+        activeCharges.forEach(charge => {
+          if (!charge || typeof charge !== 'object') return;
+          const amount = Number(charge.amount) || 0;
+          let computed = 0;
+
+          if (charge.type === 'percentage') {
+            computed = validCartTotal * (amount / 100);
+            percentTotal += computed;
+          } else {
+            computed = amount;
+            fixedTotal += computed;
+          }
+
+          breakdown.push({
+            id: String(charge.id || Math.random()),
+            name: String(charge.name || 'Charge'),
+            computedAmount: computed
+          });
+        });
+      }
 
       const totalCharges = fixedTotal + percentTotal;
       return {
         totalChargesAmount: totalCharges,
-        grandTotal: cartTotal + totalCharges,
+        grandTotal: validCartTotal + totalCharges,
         chargesBreakdown: breakdown
       };
     } catch (e) {
-      console.error("Cart calculation error:", e);
-      return { totalChargesAmount: 0, grandTotal: cartTotal, chargesBreakdown: [] };
+      console.warn("Charges calculation error fallback", e);
+      return { totalChargesAmount: 0, grandTotal: validCartTotal, chargesBreakdown: [] };
     }
   }, [cartTotal, activeCharges, selectedItems.length]);
+
+  if (!isOpen) return null;
+
+  const handleCheckout = async () => {
+    if (selectedItems.length === 0 || isSubmitting) return;
+    setIsSubmitting(true);
+    setCheckoutStatus({ type: null, message: '' });
+
+    try {
+      let storedUserId = "1085949511";
+      let storedName = "Customer";
+      let storedUsername = "";
+      let storedMemberId = "";
+
+      if (typeof window !== 'undefined') {
+        try {
+          storedUserId = sessionStorage.getItem("prime_customer_id") || sessionStorage.getItem("prime_admin_user_id") || "1085949511";
+          storedName = sessionStorage.getItem("prime_customer_name") || "Customer";
+          storedUsername = sessionStorage.getItem("prime_customer_username") || "";
+          storedMemberId = sessionStorage.getItem("prime_member_id") || "";
+        } catch (e) {}
+      }
+      
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: storedUserId,
+          customerName: storedName,
+          customerUsername: storedUsername,
+          primeMemberId: storedMemberId,
+          items: selectedItems,
+          subTotal: cartTotal || 0,
+          appliedCharges: chargesBreakdown || [],
+          totalAmount: grandTotal || 0,
+          notes: "Storefront Checkout Order"
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCheckoutStatus({
+          type: 'success',
+          message: `Order #${data.orderNumber || 'COMPLETED'} placed successfully!`
+        });
+        if (typeof clearSelectedItems === 'function') {
+          clearSelectedItems();
+        }
+        setTimeout(() => {
+          onClose();
+        }, 2000);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setCheckoutStatus({
+          type: 'error',
+          message: err.error || "Failed to create order. Please try again."
+        });
+      }
+    } catch (e: any) {
+      console.error("Order checkout error", e);
+      setCheckoutStatus({
+        type: 'error',
+        message: e?.message || "Order checkout encountered an error. Please retry."
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/50 transition-opacity">
@@ -112,7 +311,7 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
             <ShoppingCart className="w-5 h-5 text-gray-900" />
             <h2 className="text-xl font-heading font-bold uppercase tracking-wide">Your Cart</h2>
             <span className="bg-black text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2">
-              {cartCount}
+              {cartCount || 0}
             </span>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -120,9 +319,23 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
           </button>
         </div>
 
+        {/* Status Notification Banner (Replaces window.alert for sandboxed iframes) */}
+        {checkoutStatus.type && (
+          <div className={`p-4 mx-4 mt-3 rounded-lg flex items-center gap-3 text-xs font-bold uppercase tracking-wider ${
+            checkoutStatus.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
+            {checkoutStatus.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
+            ) : (
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
+            )}
+            <span>{checkoutStatus.message}</span>
+          </div>
+        )}
+
         {/* Cart Items */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {cart.length === 0 ? (
+          {safeCart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
               <ShoppingCart className="w-16 h-16 opacity-20" />
               <p className="font-medium text-lg">Your cart is empty</p>
@@ -134,67 +347,73 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
               </button>
             </div>
           ) : (
-            cart.map((item: any) => (
-              <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100 items-center">
-                <input 
-                  type="checkbox" 
-                  checked={item.selected !== false}
-                  onChange={(e) => toggleSelection(item.id, e.target.checked)}
-                  className="w-5 h-5 cursor-pointer accent-black shrink-0"
-                />
-                <img 
-                  src={item.imageUrl || "https://picsum.photos/seed/prime/100"} 
-                  alt={item.name} 
-                  className="w-16 h-16 object-cover rounded bg-white border border-gray-200"
-                />
-                <div className="flex-1 flex flex-col justify-between">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-heading font-normal uppercase text-gray-900 line-clamp-1">{item.name}</h3>
-                      <p className="text-sm font-medium text-gray-600">{formatPHP(item.price)}</p>
+            safeCart.map((item: any) => {
+              if (!item || !item.id) return null;
+              return (
+                <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100 items-center">
+                  <input 
+                    type="checkbox" 
+                    checked={item.selected !== false}
+                    onChange={(e) => toggleSelection && toggleSelection(item.id, e.target.checked)}
+                    className="w-5 h-5 cursor-pointer accent-black shrink-0"
+                  />
+                  <img 
+                    src={item.imageUrl || "https://picsum.photos/seed/prime/100"} 
+                    alt={item.name || "Item"} 
+                    className="w-16 h-16 object-cover rounded bg-white border border-gray-200"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = "https://picsum.photos/seed/prime/100";
+                    }}
+                  />
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-heading font-normal uppercase text-gray-900 line-clamp-1">{item.name || "Product"}</h3>
+                        <p className="text-sm font-medium text-gray-600">{formatPHP(item.price || 0)}</p>
+                      </div>
+                      <button 
+                        onClick={() => removeFromCart && removeFromCart(item.id)}
+                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button 
-                      onClick={() => removeFromCart(item.id)}
-                      className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 mt-2">
-                    <div className="flex items-center border border-gray-200 rounded bg-white">
-                      <button 
-                        className="px-2 py-1 text-gray-500 hover:text-black hover:bg-gray-50"
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="text-sm font-bold w-8 text-center">{item.quantity}</span>
-                      <button 
-                        className="px-2 py-1 text-gray-500 hover:text-black hover:bg-gray-50"
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
+                    
+                    <div className="flex items-center gap-3 mt-2">
+                      <div className="flex items-center border border-gray-200 rounded bg-white">
+                        <button 
+                          className="px-2 py-1 text-gray-500 hover:text-black hover:bg-gray-50"
+                          onClick={() => updateQuantity && updateQuantity(item.id, (item.quantity || 1) - 1)}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-sm font-bold w-8 text-center">{item.quantity || 1}</span>
+                        <button 
+                          className="px-2 py-1 text-gray-500 hover:text-black hover:bg-gray-50"
+                          onClick={() => updateQuantity && updateQuantity(item.id, (item.quantity || 1) + 1)}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
         {/* Footer */}
-        {cart.length > 0 && (
+        {safeCart.length > 0 && (
           <div className="p-4 border-t border-gray-100 bg-white space-y-4">
             
             <div className="space-y-2">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-500 uppercase tracking-wider">Subtotal:</span>
-                <span className="font-medium text-gray-900">{formatPHP(cartTotal)}</span>
+                <span className="font-medium text-gray-900">{formatPHP(cartTotal || 0)}</span>
               </div>
               
-              {chargesBreakdown.map(charge => (
+              {chargesBreakdown && chargesBreakdown.map((charge) => (
                 <div key={charge.id} className="flex justify-between items-center text-sm">
                   <span className="text-gray-500 uppercase tracking-wider">{charge.name}:</span>
                   <span className="font-medium text-gray-900">{formatPHP(charge.computedAmount)}</span>
@@ -203,56 +422,29 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
               
               <div className="flex justify-between items-center text-lg pt-3 border-t border-gray-100 mt-2">
                 <span className="font-heading font-bold uppercase tracking-wide text-gray-900">Total:</span>
-                <span className="font-heading font-bold text-2xl text-black">{formatPHP(grandTotal)}</span>
+                <span className="font-heading font-bold text-2xl text-black">{formatPHP(grandTotal || 0)}</span>
               </div>
             </div>
 
             <button 
-              disabled={selectedItems.length === 0}
-              onClick={async () => {
-                if (selectedItems.length === 0) return;
-                try {
-                  const storedUserId = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_customer_id") || sessionStorage.getItem("prime_admin_user_id") || "1085949511") : "1085949511";
-                  const storedName = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_customer_name") || "Customer") : "Customer";
-                  const storedUsername = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_customer_username") || "") : "";
-                  const storedMemberId = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_member_id") || "") : "";
-                  
-                  const res = await fetch("/api/orders", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      customerId: storedUserId,
-                      customerName: storedName,
-                      customerUsername: storedUsername,
-                      primeMemberId: storedMemberId,
-                      items: selectedItems,
-                      subTotal: cartTotal,
-                      appliedCharges: chargesBreakdown,
-                      totalAmount: grandTotal,
-                      notes: "Storefront Checkout Order"
-                    })
-                  });
-                  if (res.ok) {
-                    const data = await res.json();
-                    alert(`Order #${data.orderNumber} placed successfully!`);
-                    clearSelectedItems();
-                    onClose();
-                  } else {
-                    const err = await res.json().catch(() => ({}));
-                    alert(`Failed to create order: ${err.error || "Please try again."}`);
-                  }
-                } catch (e) {
-                  console.error(e);
-                  alert("Order checkout error");
-                }
-              }}
+              disabled={selectedItems.length === 0 || isSubmitting}
+              onClick={handleCheckout}
               className="w-full bg-black text-white font-bold py-4 rounded hover:bg-gray-800 transition-colors uppercase tracking-widest text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Proceed to Checkout
+              {isSubmitting ? "Processing..." : "Proceed to Checkout"}
             </button>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+export default function CartDrawer(props: { isOpen: boolean; onClose: () => void }) {
+  if (!props.isOpen) return null;
+  return (
+    <CartErrorBoundary onClose={props.onClose}>
+      <CartDrawerContent {...props} />
+    </CartErrorBoundary>
   );
 }

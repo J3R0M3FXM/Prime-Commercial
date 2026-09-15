@@ -8,44 +8,62 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     try {
-      const savedCart = localStorage.getItem('prime-cart');
-      if (savedCart) setCart(JSON.parse(savedCart));
+      if (typeof window !== 'undefined') {
+        const savedCart = localStorage.getItem('prime-cart');
+        if (savedCart) {
+          const parsed = JSON.parse(savedCart);
+          if (Array.isArray(parsed)) {
+            // Sanitize items
+            const clean = parsed.filter(item => item && typeof item === 'object' && item.id);
+            setCart(clean);
+          }
+        }
+      }
     } catch (e) {
-      console.error("Failed to load cart from local storage", e);
+      console.warn("Notice: Local storage unavailable or failed to parse cart", e);
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('prime-cart', JSON.stringify(cart));
+    try {
+      if (typeof window !== 'undefined' && Array.isArray(cart)) {
+        localStorage.setItem('prime-cart', JSON.stringify(cart));
+      }
+    } catch (e) {
+      // Quietly ignore storage quota or sandbox restrictions
+    }
   }, [cart]);
 
   const addToCart = (product: any, quantity: number) => {
+    if (!product || !product.id) return;
     setCart(prev => {
-        const existing = prev.find(item => item.id === product.id);
-        if (existing) {
-            return prev.map(item => item.id === product.id ? {...item, quantity: item.quantity + quantity} : item);
-        }
-        return [...prev, { ...product, quantity, selected: true }];
+      const safePrev = Array.isArray(prev) ? prev : [];
+      const existing = safePrev.find(item => item && item.id === product.id);
+      if (existing) {
+        return safePrev.map(item => item && item.id === product.id ? { ...item, quantity: (Number(item.quantity) || 1) + quantity } : item);
+      }
+      return [...safePrev, { ...product, quantity: Number(quantity) || 1, selected: true }];
     });
   };
 
   const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.id !== productId));
+    setCart(prev => (Array.isArray(prev) ? prev.filter(item => item && item.id !== productId) : []));
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
     setCart(prev => {
-      if (quantity <= 0) return prev.filter(item => item.id !== productId);
-      return prev.map(item => item.id === productId ? { ...item, quantity } : item);
+      if (!Array.isArray(prev)) return [];
+      if (quantity <= 0) return prev.filter(item => item && item.id !== productId);
+      return prev.map(item => item && item.id === productId ? { ...item, quantity: Number(quantity) || 1 } : item);
     });
   };
 
   const toggleSelection = (productId: string, selected: boolean) => {
-    setCart(prev => prev.map(item => item.id === productId ? { ...item, selected } : item));
+    setCart(prev => (Array.isArray(prev) ? prev.map(item => item && item.id === productId ? { ...item, selected } : item) : []));
   };
 
   const clearSelectedItems = () => {
-    setCart(prev => prev.filter(item => item.selected === false));
+    setCart(prev => (Array.isArray(prev) ? prev.filter(item => item && item.selected === false) : []));
   };
 
   const clearCart = () => {
@@ -54,14 +72,16 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Sync cart items with fresh server product data
   const syncWithServerData = (serverProducts: any[]) => {
+    if (!Array.isArray(serverProducts)) return;
     setCart(prev => {
+      if (!Array.isArray(prev)) return [];
       let changed = false;
       const updatedCart = prev.map(item => {
-        const serverProduct = serverProducts.find(p => p.id === item.id);
-        if (!serverProduct) return item; // Keep as is if not found, or maybe remove? We'll keep.
+        if (!item || !item.id) return item;
+        const serverProduct = serverProducts.find(p => p && p.id === item.id);
+        if (!serverProduct) return item;
         
-        let newQty = item.quantity;
-        // Adjust quantity if server stock is lower than requested quantity
+        let newQty = Number(item.quantity) || 1;
         if (serverProduct.stock !== undefined && newQty > serverProduct.stock) {
           newQty = serverProduct.stock;
         }
@@ -71,7 +91,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           return { ...item, price: serverProduct.price, name: serverProduct.name, quantity: newQty, imageUrl: serverProduct.imageUrl };
         }
         return item;
-      }).filter(item => item.quantity > 0); // Remove if stock went to 0
+      }).filter(item => item && item.quantity > 0);
 
       if (changed || updatedCart.length !== prev.length) {
         return updatedCart;
@@ -81,11 +101,17 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const cartTotal = useMemo(() => {
-    return cart.filter(item => item.selected !== false).reduce((total, item) => total + (item.price * item.quantity), 0);
+    if (!Array.isArray(cart)) return 0;
+    return cart
+      .filter(item => item && item.selected !== false)
+      .reduce((total, item) => total + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
   }, [cart]);
 
   const cartCount = useMemo(() => {
-    return cart.reduce((count, item) => count + item.quantity, 0);
+    if (!Array.isArray(cart)) return 0;
+    return cart
+      .filter(Boolean)
+      .reduce((count, item) => count + (Number(item.quantity) || 0), 0);
   }, [cart]);
 
   return (
