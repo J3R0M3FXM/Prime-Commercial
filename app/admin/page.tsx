@@ -597,7 +597,7 @@ export default function AdminPage() {
                   { id: "inventory", name: "Inventory", icon: Sliders, desc: "Stock Adjustments", count: `${products.reduce((a, p) => a + (p.stock || 0), 0)} units` },
                   { id: "settings", name: "Settings", icon: Lock, desc: "Security & Access Rules", count: "Protected" },
                   { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Store & Order Insights", count: "Live" },
-                  { id: "diagnostics", name: "Diagnostics", icon: Activity, desc: "System Health & APIs", count: "9 Systems" },
+                  { id: "diagnostics", name: "Diagnostics", icon: Activity, desc: "Health, APIs & Font Audit", count: "9 Systems + DOM" },
                   { id: "logistics", name: "Logistics", icon: Truck, desc: "Warehouses & Couriers", count: "Routes" },
                   { id: "charges", name: "Charges", icon: Receipt, desc: "Global Additional Fees", count: "Config" }
                 ].map((item) => (
