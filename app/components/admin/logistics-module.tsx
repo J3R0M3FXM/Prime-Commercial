@@ -60,6 +60,98 @@ export default function LogisticsModule() {
   const [couriers, setCouriers] = useState<any[]>([]);
   const [loadingCouriers, setLoadingCouriers] = useState(true);
 
+  // Courier Config Modal State
+  const [showCourierModal, setShowCourierModal] = useState(false);
+  const [editingCourier, setEditingCourier] = useState<any>(null);
+  
+  // Courier Form State
+  const [courierName, setCourierName] = useState("");
+  const [courierLogo, setCourierLogo] = useState<string>("");
+  const [courierType, setCourierType] = useState("Standard");
+  const [baseFare, setBaseFare] = useState<number>(0);
+  const [firstMile, setFirstMile] = useState<number>(0);
+  const [firstMileFee, setFirstMileFee] = useState<number>(0);
+  const [exceedingKmFee, setExceedingKmFee] = useState<number>(0);
+  const [surcharge, setSurcharge] = useState<number>(0);
+  const [nightDifferential, setNightDifferential] = useState<number>(0);
+  const [isSavingCourier, setIsSavingCourier] = useState(false);
+  
+  const courierFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCourierLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCourierLogo(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const resetCourierForm = () => {
+    setCourierName("");
+    setCourierLogo("");
+    setCourierType("Standard");
+    setBaseFare(0);
+    setFirstMile(0);
+    setFirstMileFee(0);
+    setExceedingKmFee(0);
+    setSurcharge(0);
+    setNightDifferential(0);
+    setEditingCourier(null);
+    if (courierFileInputRef.current) courierFileInputRef.current.value = "";
+  };
+
+  const saveCourier = async () => {
+    if (!courierName || !courierLogo) {
+      alert("Name and Logo are required.");
+      return;
+    }
+    
+    setIsSavingCourier(true);
+    try {
+      const payload = {
+        name: courierName,
+        logo: courierLogo,
+        type: courierType,
+        baseFare: Number(baseFare) || 0,
+        firstMile: Number(firstMile) || 0,
+        firstMileFee: Number(firstMileFee) || 0,
+        exceedingKmFee: Number(exceedingKmFee) || 0,
+        surcharge: Number(surcharge) || 0,
+        nightDifferential: Number(nightDifferential) || 0,
+      };
+
+      const method = editingCourier ? "PUT" : "POST";
+      if (editingCourier) (payload as any).id = editingCourier.id;
+
+      await fetch("/api/admin/couriers", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      await fetchCouriers();
+      setShowCourierModal(false);
+      resetCourierForm();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingCourier(false);
+    }
+  };
+
+  const deleteCourier = async (id: string) => {
+    if (!confirm("Delete this courier?")) return;
+    try {
+      await fetch(`/api/admin/couriers?id=${id}`, { method: "DELETE" });
+      fetchCouriers();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchWarehouses();
     fetchCouriers();
@@ -300,26 +392,109 @@ export default function LogisticsModule() {
               <p className="text-xs font-mono text-slate-500 mt-1">Configure logistics partners and delivery fee calculators.</p>
             </div>
             <button
-              onClick={() => alert("Courier configuration will be implemented in the next phase.")}
+              onClick={() => {
+                resetCourierForm();
+                setShowCourierModal(true);
+              }}
               className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" /> Add Courier
             </button>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
-            <Truck className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <h4 className="text-slate-900 font-bold mb-2">Configuration Pending</h4>
-            <p className="text-slate-500 text-sm max-w-sm mx-auto">
-              You can add unlimited courier services that will handle the deliveries. The full configurator and delivery fee calculator will be available in the next implementation phase.
-            </p>
-          </div>
+          {loadingCouriers ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
+            </div>
+          ) : couriers.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+              <Truck className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <h4 className="text-slate-900 font-bold mb-2">No Couriers Configured</h4>
+              <p className="text-slate-500 text-sm max-w-sm mx-auto">
+                Add courier services to enable the dynamic delivery fee calculator engine.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {couriers.map((courier) => (
+                <div key={courier.id} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm relative group overflow-hidden">
+                  <div className="flex items-center gap-4 mb-4">
+                    {courier.logo ? (
+                      <img src={courier.logo} alt={courier.name} className="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                        <Truck className="w-5 h-5 text-slate-400" />
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-heading font-black text-base text-slate-900 uppercase">
+                        {courier.name}
+                      </h4>
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                        {courier.type}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1.5 text-xs font-mono text-slate-600 mb-6">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Base Fare:</span>
+                      <span className="font-bold text-slate-900">₱{courier.baseFare}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">First Mile:</span>
+                      <span className="font-bold text-slate-900">{courier.firstMile} km @ ₱{courier.firstMileFee}/km</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Excess /km:</span>
+                      <span className="font-bold text-slate-900">₱{courier.exceedingKmFee}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Surcharge:</span>
+                      <span className="font-bold text-slate-900">₱{courier.surcharge}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Night Diff:</span>
+                      <span className="font-bold text-slate-900">₱{courier.nightDifferential}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
+                    <button
+                      onClick={() => {
+                        setEditingCourier(courier);
+                        setCourierName(courier.name);
+                        setCourierLogo(courier.logo || "");
+                        setCourierType(courier.type);
+                        setBaseFare(courier.baseFare);
+                        setFirstMile(courier.firstMile);
+                        setFirstMileFee(courier.firstMileFee);
+                        setExceedingKmFee(courier.exceedingKmFee);
+                        setSurcharge(courier.surcharge);
+                        setNightDifferential(courier.nightDifferential);
+                        setShowCourierModal(true);
+                      }}
+                      className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md"
+                    >
+                      Edit Config
+                    </button>
+                    <button
+                      onClick={() => deleteCourier(courier.id)}
+                      className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Warehouse Modal */}
       {showWarehouseModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
             <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
@@ -447,6 +622,150 @@ export default function LogisticsModule() {
               >
                 {isSavingWh ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Save Warehouse
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Courier Modal */}
+      {showCourierModal && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
+                {editingCourier ? "Edit Courier Config" : "New Courier Config"}
+              </h3>
+              <button onClick={() => setShowCourierModal(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              
+              <div className="flex items-start gap-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Courier Logo</label>
+                  <div 
+                    className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center cursor-pointer hover:bg-slate-50 overflow-hidden relative"
+                    onClick={() => courierFileInputRef.current?.click()}
+                  >
+                    {courierLogo ? (
+                      <img src={courierLogo} alt="Logo" className="w-full h-full object-contain p-2" />
+                    ) : (
+                      <div className="text-center">
+                        <Plus className="w-6 h-6 text-slate-300 mx-auto" />
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block mt-1">Upload</span>
+                      </div>
+                    )}
+                  </div>
+                  <input type="file" accept="image/*" ref={courierFileInputRef} onChange={handleCourierLogoUpload} className="hidden" />
+                </div>
+                
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Courier Name</label>
+                    <input
+                      type="text"
+                      value={courierName}
+                      onChange={e => setCourierName(e.target.value)}
+                      placeholder="e.g. Lalamove, Grab"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Service Type</label>
+                    <select
+                      value={courierType}
+                      onChange={e => setCourierType(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    >
+                      <option value="Standard">Standard</option>
+                      <option value="Express">Express</option>
+                      <option value="Priority">Priority</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-slate-100">
+                <h4 className="font-heading font-black text-sm uppercase tracking-wider text-slate-800 mb-4 flex items-center gap-2">
+                  <Settings className="w-4 h-4" /> Delivery Fee Engine
+                </h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Base Fare (₱)</label>
+                    <input
+                      type="number"
+                      value={baseFare}
+                      onChange={e => setBaseFare(e.target.valueAsNumber || 0)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">First Mile Inc. (KM)</label>
+                    <input
+                      type="number"
+                      value={firstMile}
+                      onChange={e => setFirstMile(e.target.valueAsNumber || 0)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">First Mile Fee (₱ / KM)</label>
+                    <input
+                      type="number"
+                      value={firstMileFee}
+                      onChange={e => setFirstMileFee(e.target.valueAsNumber || 0)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Exceeding Fee (₱ / KM)</label>
+                    <input
+                      type="number"
+                      value={exceedingKmFee}
+                      onChange={e => setExceedingKmFee(e.target.valueAsNumber || 0)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Surcharge (₱)</label>
+                    <input
+                      type="number"
+                      value={surcharge}
+                      onChange={e => setSurcharge(e.target.valueAsNumber || 0)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Night Diff. (₱)</label>
+                    <input
+                      type="number"
+                      value={nightDifferential}
+                      onChange={e => setNightDifferential(e.target.valueAsNumber || 0)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
+              <button
+                onClick={() => setShowCourierModal(false)}
+                className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveCourier}
+                disabled={isSavingCourier || !courierName || !courierLogo}
+                className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSavingCourier ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Save Configuration
               </button>
             </div>
           </div>
