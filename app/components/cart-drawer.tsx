@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, Component, ErrorInfo, ReactNode } 
 import { useCart } from './cart-context';
 import { ShoppingCart, X, Plus, Minus, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
+import { calculateChargesBreakdown } from "@/lib/charges";
 import CheckoutModal from './checkout-modal';
 
 // Defensive Error Boundary to ensure Cart never crashes the host page
@@ -94,88 +95,16 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         })
         .catch(err => console.warn("Failed to sync cart data", err));
 
-      // Fetch Active Charges
+      // Fetch Active Charges Fresh with No Cache
       setLoadingCharges(true);
-      fetch("/api/admin/charges")
+      fetch(`/api/admin/charges?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache" }
+      })
         .then(res => res.json())
         .then(data => {
-          if (data && Array.isArray(data)) {
-            const now = new Date();
-            const dayOfWeek = now.getDay(); // 0-6 (Sun-Sat)
-            const currentHour = now.getHours();
-            const currentMin = now.getMinutes();
-
-            const isApplicable = (charge: any) => {
-              if (!charge || typeof charge !== 'object') return false;
-
-              // Check for default / legacy active flag
-              const isDefault = charge.isDefault === true || charge.defaultAddToBill === true;
-              const hasNoSchedule = !charge.schedules || (
-                !charge.schedules.date &&
-                !charge.schedules.time &&
-                (!charge.schedules.days || charge.schedules.days.length === 0) &&
-                (!charge.schedules.daysOfWeek || charge.schedules.daysOfWeek.length === 0) &&
-                !charge.schedules.isOvernight &&
-                !charge.schedules.overnight &&
-                !charge.schedules.isRecurring &&
-                !charge.schedules.recurring
-              );
-
-              // If marked default or legacy active with no schedules, always apply
-              if (isDefault || (charge.isActive === true && hasNoSchedule)) {
-                return true;
-              }
-
-              // Explicitly inactive
-              if (charge.isActive === false && !isDefault) {
-                return false;
-              }
-              
-              try {
-                const schedules = charge.schedules || {};
-                const date = schedules.date;
-                const days = Array.isArray(schedules.days) ? schedules.days : (Array.isArray(schedules.daysOfWeek) ? schedules.daysOfWeek : []);
-                const time = typeof schedules.time === 'string' ? schedules.time : '';
-                const isOvernight = Boolean(schedules.isOvernight || schedules.overnight);
-                const isRecurring = Boolean(schedules.isRecurring || schedules.recurring);
-                
-                // Specific date restriction (non-recurring)
-                if (!isRecurring && date) {
-                  const todayStr = now.toISOString().split('T')[0];
-                  if (date !== todayStr) return false;
-                }
-                
-                // Days of week check (0-6)
-                if (days.length > 0 && !days.includes(dayOfWeek)) {
-                  return false;
-                }
-                
-                // Time check (HH:mm)
-                if (time && time.includes(':')) {
-                  const [cHour, cMin] = time.split(':').map(Number);
-                  if (Number.isFinite(cHour) && Number.isFinite(cMin)) {
-                    if (currentHour !== cHour || currentMin !== cMin) {
-                      return false;
-                    }
-                  }
-                }
-                
-                // Overnight check: 10 PM to 6 AM (22:00 - 05:59)
-                if (isOvernight) {
-                  if (!(currentHour >= 22 || currentHour < 6)) {
-                    return false;
-                  }
-                }
-                
-                return true;
-              } catch (e) {
-                console.warn("Error evaluating charge applicability:", charge?.name, e);
-                return false;
-              }
-            };
-
-            const filtered = data.filter(c => isApplicable(c));
-            setActiveCharges(filtered);
+          if (Array.isArray(data)) {
+            setActiveCharges(data);
           }
         })
         .catch(err => console.warn("Failed to fetch charges", err))
@@ -188,7 +117,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     return safeCart.filter((item: any) => item && typeof item === 'object' && item.selected !== false);
   }, [safeCart]);
   
-  // Calculate Grand Total & Charges Breakdown
+  // Calculate Grand Total & Charges Breakdown via lib/charges.ts
   const { totalChargesAmount, grandTotal, chargesBreakdown } = useMemo(() => {
     const validCartTotal = Number.isFinite(cartTotal) ? Math.max(0, cartTotal) : 0;
     
@@ -197,37 +126,17 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     }
     
     try {
-      let breakdown: { id: string; name: string; computedAmount: number }[] = [];
-      let fixedTotal = 0;
-      let percentTotal = 0;
-
-      if (Array.isArray(activeCharges)) {
-        activeCharges.forEach(charge => {
-          if (!charge || typeof charge !== 'object') return;
-          const amount = Number(charge.amount) || 0;
-          let computed = 0;
-
-          if (charge.type === 'percentage') {
-            computed = validCartTotal * (amount / 100);
-            percentTotal += computed;
-          } else {
-            computed = amount;
-            fixedTotal += computed;
-          }
-
-          breakdown.push({
-            id: String(charge.id || Math.random()),
-            name: String(charge.name || 'Charge'),
-            computedAmount: computed
-          });
-        });
-      }
-
-      const totalCharges = fixedTotal + percentTotal;
+      const { totalChargesAmount: computedTotal, computedCharges } = calculateChargesBreakdown(activeCharges, validCartTotal);
       return {
-        totalChargesAmount: totalCharges,
-        grandTotal: validCartTotal + totalCharges,
-        chargesBreakdown: breakdown
+        totalChargesAmount: computedTotal,
+        grandTotal: validCartTotal + computedTotal,
+        chargesBreakdown: computedCharges.map(c => ({
+          id: c.id,
+          name: c.name,
+          computedAmount: c.computedAmount,
+          rate: c.rate,
+          type: c.type
+        }))
       };
     } catch (e) {
       console.warn("Charges calculation error fallback", e);

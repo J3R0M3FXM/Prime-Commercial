@@ -24,6 +24,7 @@ import {
   ShoppingBag
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
+import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
 import { getClientFingerprint, getClientLocation } from "./fingerprint-collector";
 
 // Dynamic map import to ensure zero SSR conflicts
@@ -208,17 +209,20 @@ export default function CheckoutModal({
     }
   }, [isOpen]);
 
-  // Fetch admin configured charges
+  // Fetch admin configured charges with fresh no-cache fetch
   useEffect(() => {
     if (!isOpen) return;
     const fetchCharges = async () => {
       try {
         setIsLoadingCharges(true);
-        const res = await fetch("/api/admin/charges");
+        const res = await fetch(`/api/admin/charges?_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Pragma": "no-cache" }
+        });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
-            setActiveCharges(data.filter((c: any) => c && c.isActive));
+            setActiveCharges(data);
           }
         }
       } catch (e) {
@@ -373,25 +377,10 @@ export default function CheckoutModal({
     return selectedItems.reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
   }, [selectedItems]);
 
-  // Compute active charges
-  const computedCharges = useMemo(() => {
-    return activeCharges.map((charge) => {
-      let amount = 0;
-      if (charge.type === "percentage") {
-        amount = Math.round(((itemsSubtotal * Number(charge.amount || 0)) / 100) * 100) / 100;
-      } else {
-        amount = Number(charge.amount || 0);
-      }
-      return {
-        ...charge,
-        computedAmount: amount,
-      };
-    });
+  // Compute active charges dynamically via lib/charges.ts engine
+  const { totalChargesAmount, computedCharges } = useMemo(() => {
+    return calculateChargesBreakdown(activeCharges, itemsSubtotal);
   }, [activeCharges, itemsSubtotal]);
-
-  const totalChargesAmount = useMemo(() => {
-    return computedCharges.reduce((sum, c) => sum + (Number(c.computedAmount) || 0), 0);
-  }, [computedCharges]);
 
   const courierDeliveryFee = useMemo(() => {
     return selectedCourier?.calculatedFee || 0;
@@ -481,6 +470,7 @@ export default function CheckoutModal({
           id: c.id,
           name: c.name,
           amount: c.computedAmount,
+          rate: c.rate,
           type: c.type,
         })),
         deliveryFee: courierDeliveryFee,
@@ -1125,7 +1115,7 @@ export default function CheckoutModal({
                     <span className="text-gray-600 uppercase flex items-center gap-1">
                       {charge.name}:
                       {charge.type === "percentage" && (
-                        <span className="text-[10px] text-gray-400">({charge.amount}%)</span>
+                        <span className="text-[10px] text-gray-400">({charge.rate || (charge as any).amount}%)</span>
                       )}
                     </span>
                     <span className="font-semibold text-gray-900">{formatPHP(charge.computedAmount)}</span>

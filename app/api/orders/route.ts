@@ -115,8 +115,20 @@ export async function POST(request: Request) {
             transaction.update(update.ref, { stock: update.newStock, updatedAt: new Date().toISOString() });
           });
 
-          // 4. Create the order
-          const calculatedTotal = totalAmount || items.reduce((sum: number, it: any) => sum + (Number(it.price) * (Number(it.quantity) || 1)), 0);
+          // 4. Create the order with accurate financial snapshotting
+          const itemsSubtotal = Number(subTotal) || items.reduce((sum: number, it: any) => sum + (Number(it.price) * (Number(it.quantity) || 1)), 0);
+          const sanitizedCharges = Array.isArray(appliedCharges) ? appliedCharges.map((ch: any) => ({
+            id: String(ch.id || ''),
+            name: String(ch.name || 'Charge'),
+            amount: Number(ch.amount) || 0,
+            rate: ch.rate !== undefined ? Number(ch.rate) : undefined,
+            type: ch.type === 'percentage' ? 'percentage' : 'fixed'
+          })) : [];
+          const chargesTotal = sanitizedCharges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+          const safeDeliveryFee = Number(deliveryFee) || 0;
+          const calculatedTotal = totalAmount !== undefined 
+            ? Number(totalAmount) 
+            : (itemsSubtotal + chargesTotal + (deliveryFeePaymentMethod === 'upon_checkout' ? safeDeliveryFee : 0));
           
           finalOrderData = {
             orderNumber,
@@ -132,9 +144,9 @@ export async function POST(request: Request) {
               quantity: Number(it.quantity) || 1,
               imageUrl: it.imageUrl || ''
             })),
-            subTotal: subTotal || calculatedTotal,
-            appliedCharges: appliedCharges || [],
-            deliveryFee: Number(deliveryFee) || 0,
+            subTotal: itemsSubtotal,
+            appliedCharges: sanitizedCharges,
+            deliveryFee: safeDeliveryFee,
             deliveryFeePaymentMethod: deliveryFeePaymentMethod || 'upon_checkout',
             receiverName: receiverName || '',
             receiverPhone: receiverPhone || '',
