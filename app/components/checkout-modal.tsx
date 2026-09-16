@@ -623,7 +623,7 @@ export default function CheckoutModal({
                 {currentStep === 2 && "Delivery Address & Pin"}
                 {currentStep === 3 && "Courier & Delivery Option"}
                 {currentStep === 4 && "Order Breakdown & Confirm"}
-                {currentStep === 5 && "Order Confirmed!"}
+                {currentStep === 5 && "Order Submitted - Awaiting Payment"}
               </h2>
             </div>
           </div>
@@ -1295,9 +1295,9 @@ export default function CheckoutModal({
                                 {method.name}
                               </p>
                               <p className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">
-                                {method.paymentType === "qr_code" && "QR Code"}
-                                {method.paymentType === "api" && "API Online"}
-                                {method.paymentType === "crypto" && "Crypto"}
+                                {((method.paymentType || method.type || "").toLowerCase() === "qr_code" || (method.paymentType || method.type || "").toLowerCase() === "qr" || (method.paymentType || method.type || "").toLowerCase().includes("qr")) ? "QR Code" : 
+                                 ((method.paymentType || method.type || "").toLowerCase() === "api" || (method.paymentType || method.type || "").toLowerCase() === "webhook") ? "API Online" : 
+                                 ((method.paymentType || method.type || "").toLowerCase() === "crypto") ? "Crypto" : "Other"}
                               </p>
                             </div>
                           </button>
@@ -1306,101 +1306,109 @@ export default function CheckoutModal({
                     </div>
 
                     {/* Expandable Selected Method Details */}
-                    {selectedPaymentMethod && (
-                      <div className="p-4 rounded-xl border border-gray-200 bg-white space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
-                        <div className="border-b border-gray-100 pb-2 flex items-center justify-between">
-                          <h5 className="text-xs font-heading font-black uppercase text-gray-900">
-                            Instructions for {selectedPaymentMethod.name}
-                          </h5>
-                          <span className="text-[10px] font-mono text-gray-400 uppercase">
-                            {selectedPaymentMethod.paymentType === "qr_code" && "Static QR"}
-                            {selectedPaymentMethod.paymentType === "crypto" && "Wallet Deposit"}
-                            {selectedPaymentMethod.paymentType === "api" && "Integrated Webhook"}
-                          </span>
-                        </div>
+                    {(() => {
+                      if (!selectedPaymentMethod) return null;
+                      const pType = (selectedPaymentMethod.paymentType || selectedPaymentMethod.type || "").toLowerCase();
+                      const isQr = pType === "qr_code" || pType === "qr" || pType.includes("qr");
+                      const isCrypto = pType === "crypto";
+                      const isApi = pType === "api" || pType === "webhook";
+                      const qrImg = selectedPaymentMethod.qrCodeImage || selectedPaymentMethod.qrCode || selectedPaymentMethod.qrImage || selectedPaymentMethod.qr_code_image || "";
 
-                        {/* QR Code Block */}
-                        {selectedPaymentMethod.paymentType === "qr_code" && (
-                          <div className="flex flex-col items-center justify-center gap-3">
-                            {selectedPaymentMethod.qrCodeImage ? (
-                              <div className="p-2 border border-gray-200 rounded-lg bg-white">
-                                <img
-                                  src={selectedPaymentMethod.qrCodeImage}
-                                  alt="Static QR Code"
-                                  className="w-48 h-48 object-contain"
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-48 h-48 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 font-mono text-xs">
-                                No static QR code uploaded
-                              </div>
-                            )}
-
-                            {selectedPaymentMethod.qrCodeImage && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const link = document.createElement("a");
-                                  link.href = selectedPaymentMethod.qrCodeImage;
-                                  link.download = `PRIME_QR_${selectedPaymentMethod.name.replace(/\s+/g, '_')}.png`;
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                }}
-                                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-heading font-bold text-xs uppercase tracking-wider rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                                <span>Download QR Code</span>
-                              </button>
-                            )}
+                      return (
+                        <div className="p-4 rounded-xl border border-gray-200 bg-white space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
+                          <div className="border-b border-gray-100 pb-2 flex items-center justify-between">
+                            <h5 className="text-xs font-heading font-black uppercase text-gray-900">
+                              Instructions for {selectedPaymentMethod.name}
+                            </h5>
+                            <span className="text-[10px] font-mono text-gray-400 uppercase">
+                              {isQr && "Static QR"}
+                              {isCrypto && "Wallet Deposit"}
+                              {isApi && "Integrated Webhook"}
+                            </span>
                           </div>
-                        )}
 
-                        {/* Crypto Block */}
-                        {selectedPaymentMethod.paymentType === "crypto" && (
-                          <div className="space-y-2">
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 font-heading">
-                              Wallet Deposit Address
-                            </label>
-                            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 p-2.5 rounded-lg">
-                              <span className="font-mono text-xs text-gray-700 break-all select-all flex-1">
-                                {selectedPaymentMethod.walletAddress || "No wallet address specified"}
-                              </span>
-                              {selectedPaymentMethod.walletAddress && (
+                          {/* QR Code Block */}
+                          {isQr && (
+                            <div className="flex flex-col items-center justify-center gap-3">
+                              {qrImg ? (
+                                <div className="p-2 border border-gray-200 rounded-lg bg-white">
+                                  <img
+                                    src={qrImg}
+                                    alt="Static QR Code"
+                                    className="w-48 h-48 object-contain"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-48 h-48 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 font-mono text-xs">
+                                  No static QR code uploaded
+                                </div>
+                              )}
+
+                              {qrImg && (
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    navigator.clipboard.writeText(selectedPaymentMethod.walletAddress || "");
-                                    setCopiedText(true);
-                                    setTimeout(() => setCopiedText(false), 2000);
+                                    const link = document.createElement("a");
+                                    link.href = qrImg;
+                                    link.download = `PRIME_QR_${selectedPaymentMethod.name.replace(/\s+/g, '_')}.png`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
                                   }}
-                                  className="p-2 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 rounded-md transition-colors cursor-pointer shrink-0"
-                                  title="Copy address"
+                                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-heading font-bold text-xs uppercase tracking-wider rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
                                 >
-                                  {copiedText ? (
-                                    <span className="text-[10px] font-bold text-emerald-600 uppercase">Copied!</span>
-                                  ) : (
-                                    <Copy className="w-3.5 h-3.5" />
-                                  )}
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Download QR Code</span>
                                 </button>
                               )}
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {/* API Block */}
-                        {selectedPaymentMethod.paymentType === "api" && (
-                          <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-lg space-y-1">
-                            <p className="text-xs text-blue-900 font-medium">
-                              Online checkout API is active.
-                            </p>
-                            <p className="text-[11px] text-blue-700 font-mono">
-                              Public Key: {selectedPaymentMethod.publicKey ? `${selectedPaymentMethod.publicKey.slice(0, 8)}...` : "None"}
-                            </p>
-                          </div>
-                        )}
+                          {/* Crypto Block */}
+                          {isCrypto && (
+                            <div className="space-y-2">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 font-heading">
+                                Wallet Deposit Address
+                              </label>
+                              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 p-2.5 rounded-lg">
+                                <span className="font-mono text-xs text-gray-700 break-all select-all flex-1">
+                                  {selectedPaymentMethod.walletAddress || "No wallet address specified"}
+                                </span>
+                                {selectedPaymentMethod.walletAddress && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(selectedPaymentMethod.walletAddress || "");
+                                      setCopiedText(true);
+                                      setTimeout(() => setCopiedText(false), 2000);
+                                    }}
+                                    className="p-2 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 rounded-md transition-colors cursor-pointer shrink-0"
+                                    title="Copy address"
+                                  >
+                                    {copiedText ? (
+                                      <span className="text-[10px] font-bold text-emerald-600 uppercase">Copied!</span>
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
 
-                        {/* Upload Proof of Payment Container */}
+                          {/* API Block */}
+                          {isApi && (
+                            <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-lg space-y-1">
+                              <p className="text-xs text-blue-900 font-medium">
+                                Online checkout API is active.
+                              </p>
+                              <p className="text-[11px] text-blue-700 font-mono">
+                                Public Key: {selectedPaymentMethod.publicKey ? `${selectedPaymentMethod.publicKey.slice(0, 8)}...` : "None"}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Upload Proof of Payment Container */}
                         {!proofSubmitSuccess ? (
                           <div className="border-t border-gray-100 pt-4 space-y-3">
                             <div className="space-y-1">
@@ -1516,22 +1524,13 @@ export default function CheckoutModal({
                             </p>
                           </div>
                         )}
-                      </div>
-                    )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
 
-              {/* Continue / Close Shopping */}
-              <div className="pt-4 border-t border-gray-100 flex justify-center">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-8 py-3.5 bg-black hover:bg-gray-800 text-white font-bold font-heading uppercase tracking-widest text-xs rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer"
-                >
-                  Continue Shopping
-                </button>
-              </div>
             </div>
           )}
 
