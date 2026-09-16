@@ -287,6 +287,39 @@ export default function AdminPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [zoomedProofImage, setZoomedProofImage] = useState<string | null>(null);
 
+  // Custom non-blocking dialogs for sandbox iframes
+  const [customConfirm, setCustomConfirm] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: () => {}
+  });
+
+  const [customAlert, setCustomAlert] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    type: "error" | "success" | "info";
+  }>({
+    open: false,
+    title: "",
+    message: "",
+    type: "info"
+  });
+
+  const showAlert = (message: string, title = "Notification", type: "error" | "success" | "info" = "info") => {
+    setCustomAlert({ open: true, title, message, type });
+  };
+
+  const showConfirm = (message: string, onConfirm: () => void, title = "Confirm Action") => {
+    setCustomConfirm({ open: true, title, message, onConfirm });
+  };
+
   const copyToClipboard = (text: string, key: string) => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(text);
@@ -459,27 +492,33 @@ export default function AdminPage() {
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, active: newActive } : p));
     } catch (e: any) {
       console.error(e);
-      alert(`Failed to update product status: ${e.message || String(e)}`);
+      showAlert(`Failed to update product status: ${e.message || String(e)}`, "Error", "error");
     }
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
-    try {
-      const res = await fetch("/api/admin/products", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id })
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP error ${res.status}`);
-      }
-      setProducts(prev => prev.filter(p => p.id !== id));
-    } catch (e: any) {
-      console.error(e);
-      alert(`Failed to delete product: ${e.message || String(e)}`);
-    }
+    showConfirm(
+      "Are you sure you want to permanently delete this product? This action cannot be undone.",
+      async () => {
+        try {
+          const res = await fetch("/api/admin/products", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id })
+          });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP error ${res.status}`);
+          }
+          setProducts(prev => prev.filter(p => p.id !== id));
+          showAlert("Product deleted successfully.", "Success", "success");
+        } catch (e: any) {
+          console.error(e);
+          showAlert(`Failed to delete product: ${e.message || String(e)}`, "Error", "error");
+        }
+      },
+      "Delete Product"
+    );
   };
 
   const handleSaveProduct = async (productData: any) => {
@@ -505,9 +544,10 @@ export default function AdminPage() {
       setProductModalOpen(false);
       setEditingProduct(null);
       fetchAllData();
+      showAlert("Product saved successfully.", "Success", "success");
     } catch (e: any) {
       console.error(e);
-      alert(`Failed to save product: ${e.message || String(e)}`);
+      showAlert(`Failed to save product: ${e.message || String(e)}`, "Error", "error");
     }
   };
 
@@ -527,7 +567,7 @@ export default function AdminPage() {
       setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: newStock } : p));
     } catch (e: any) {
       console.error(e);
-      alert(`Failed to adjust stock: ${e.message || String(e)}`);
+      showAlert(`Failed to adjust stock: ${e.message || String(e)}`, "Error", "error");
     }
   };
 
@@ -2940,6 +2980,63 @@ export default function AdminPage() {
             >
               Got It
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {customConfirm.open && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+            <h3 className="font-heading font-normal text-base text-slate-900 uppercase tracking-wide mb-2">
+              {customConfirm.title}
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed font-sans mb-6">
+              {customConfirm.message}
+            </p>
+            <div className="flex justify-end gap-2 text-xs font-mono">
+              <button
+                onClick={() => setCustomConfirm(prev => ({ ...prev, open: false }))}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setCustomConfirm(prev => ({ ...prev, open: false }));
+                  customConfirm.onConfirm();
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors cursor-pointer font-bold"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {customAlert.open && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+            <h3 className={`font-heading font-normal text-base uppercase tracking-wide mb-2 ${
+              customAlert.type === "error" ? "text-red-600" : customAlert.type === "success" ? "text-emerald-600" : "text-slate-900"
+            }`}>
+              {customAlert.title}
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed font-sans mb-6">
+              {customAlert.message}
+            </p>
+            <div className="flex justify-end text-xs font-mono">
+              <button
+                onClick={() => setCustomAlert(prev => ({ ...prev, open: false }))}
+                className={`px-5 py-2 text-white rounded-lg transition-colors cursor-pointer font-bold ${
+                  customAlert.type === "error" ? "bg-red-600 hover:bg-red-700" : customAlert.type === "success" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-slate-900 hover:bg-black"
+                }`}
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}
