@@ -127,7 +127,7 @@ export interface LocationResult {
  * Uses high accuracy mode, no cache, and proper timeout.
  * Checks Telegram LocationManager if available, with HTML5 Geolocation fallback.
  */
-export async function getClientLocation(): Promise<LocationResult> {
+export async function getClientLocation(timeoutMs = 2500): Promise<LocationResult> {
   if (typeof window === "undefined") {
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
@@ -137,7 +137,7 @@ export async function getClientLocation(): Promise<LocationResult> {
   if (tgLocationManager && typeof tgLocationManager.getLocation === "function") {
     try {
       const tgLoc = await new Promise<any>((resolve) => {
-        const timeout = setTimeout(() => resolve(null), 5000);
+        const timeout = setTimeout(() => resolve(null), Math.min(timeoutMs, 2000));
         tgLocationManager.init(() => {
           tgLocationManager.getLocation((data: any) => {
             clearTimeout(timeout);
@@ -158,31 +158,47 @@ export async function getClientLocation(): Promise<LocationResult> {
     }
   }
 
-  // 2. High-accuracy HTML5 Geolocation API
+  // 2. High-accuracy HTML5 Geolocation API with bounded timer
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
       resolve({ lat: 0, lon: 0, source: "Unavailable" });
       return;
     }
 
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve({ lat: 0, lon: 0, source: "Approximate Location" });
+      }
+    }, timeoutMs);
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        resolve({
-          lat: pos.coords.latitude,
-          lon: pos.coords.longitude,
-          accuracy: Math.round(pos.coords.accuracy),
-          altitude: pos.coords.altitude ? Math.round(pos.coords.altitude) : null,
-          source: "Precise GPS"
-        });
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve({
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            accuracy: Math.round(pos.coords.accuracy),
+            altitude: pos.coords.altitude ? Math.round(pos.coords.altitude) : null,
+            source: "Precise GPS"
+          });
+        }
       },
       (err) => {
-        console.warn("GPS position request denied or timed out:", err.message);
-        resolve({ lat: 0, lon: 0, source: "Approximate Location" });
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          console.warn("GPS position request denied or timed out:", err.message);
+          resolve({ lat: 0, lon: 0, source: "Approximate Location" });
+        }
       },
       {
-        enableHighAccuracy: true, // Forces real hardware GPS satellite/sensor
-        timeout: 10000,           // Sufficient time for GPS lock
-        maximumAge: 0             // Strictly fresh reading, no stale cached coords
+        enableHighAccuracy: false, // Don't force blocking satellite sensor during fast submit
+        timeout: timeoutMs,
+        maximumAge: 60000
       }
     );
   });

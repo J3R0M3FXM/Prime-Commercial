@@ -517,11 +517,13 @@ export default function CheckoutModal({
       setSubmitError("");
 
       const fpData = await getClientFingerprint();
-      const locData = await getClientLocation();
+      const locData = await getClientLocation(1500);
 
       const orderData = {
         items: selectedItems.map((it) => ({
           id: it.id,
+          productId: it.productId || (typeof it.id === 'string' && it.id.includes('_') ? it.id.split('_')[0] : it.id),
+          variantId: it.variantId || (typeof it.id === 'string' && it.id.includes('_') ? it.id.split('_')[1] : 'default'),
           name: it.name,
           price: Number(it.price) || 0,
           quantity: Number(it.quantity) || 1,
@@ -1586,24 +1588,31 @@ export default function CheckoutModal({
             )}
 
             {currentStep === 4 && (
-              <button
-                type="button"
-                onClick={handleSubmitOrder}
-                disabled={isSubmittingOrder}
-                className="px-8 py-3.5 bg-black hover:bg-gray-800 text-white font-heading font-bold uppercase tracking-widest text-xs rounded-xl flex items-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmittingOrder ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Submitting Order...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Confirm & Place Order</span>
-                    <Check className="w-4 h-4" />
-                  </>
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                {submitError && (
+                  <span className="text-xs font-mono text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg max-w-xs truncate">
+                    {submitError}
+                  </span>
                 )}
-              </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitOrder}
+                  disabled={isSubmittingOrder}
+                  className="px-8 py-3.5 bg-black hover:bg-gray-800 text-white font-heading font-bold uppercase tracking-widest text-xs rounded-xl flex items-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingOrder ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Submitting Order...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Confirm & Place Order</span>
+                      <Check className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
             )}
           </div>
         )}

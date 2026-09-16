@@ -107,29 +107,104 @@ export async function POST(request: Request) {
           }
 
           // 2. Pull real-time stock levels and prepare updates
-          const productRefs = items.map((it: any) => doc(db, 'products', it.id));
-          const productDocs = await Promise.all(productRefs.map((ref: any) => transaction.get(ref)));
-          
-          const stockUpdates = [];
-          for (let i = 0; i < productDocs.length; i++) {
-            const pDoc = productDocs[i];
-            if (!pDoc.exists()) {
-              throw new Error(`Product "${items[i].name}" not found`);
+          // Extract base product ID and variant ID correctly for both simple and variant items
+          const resolvePid = (it: any): string => {
+            if (it.productId) return String(it.productId);
+            const raw = String(it.id || '');
+            return raw.includes('_') ? raw.split('_')[0] : raw;
+          };
+
+          const resolveVid = (it: any): string | null => {
+            if (it.variantId && it.variantId !== 'default') return String(it.variantId);
+            const raw = String(it.id || '');
+            return raw.includes('_') ? raw.split('_')[1] : null;
+          };
+
+          // 2a. Gather all unique candidate product IDs
+          const candidateProductIds = Array.from(new Set([
+            ...items.map((it: any) => resolvePid(it)),
+            ...items.map((it: any) => String(it.id || ''))
+          ].filter(Boolean)));
+
+          const productDocs = await Promise.all(
+            candidateProductIds.map(pid => transaction.get(doc(db, 'products', pid)))
+          );
+
+          const productDocMap = new Map<string, { ref: any; data: any; exists: boolean }>();
+          candidateProductIds.forEach((pid, idx) => {
+            const pDoc = productDocs[idx];
+            productDocMap.set(pid, {
+              ref: pDoc.ref,
+              data: pDoc.exists() ? pDoc.data() : null,
+              exists: pDoc.exists()
+            });
+          });
+
+          // 2b. Validate stock per item and group updates by product document
+          const stockUpdatesByDocId = new Map<string, {
+            ref: any;
+            newStock: number;
+            variants?: any[];
+          }>();
+
+          for (let i = 0; i < items.length; i++) {
+            const it = items[i];
+            const pid = resolvePid(it);
+            const rawId = String(it.id || '');
+
+            let pEntry = productDocMap.get(pid);
+            if (!pEntry?.exists && rawId && productDocMap.get(rawId)?.exists) {
+              pEntry = productDocMap.get(rawId);
             }
-            const data = pDoc.data();
-            const currentStock = typeof data.stock === 'number' ? data.stock : 0;
-            const requestedQuantity = Number(items[i].quantity) || 1;
-            
-            if (currentStock < requestedQuantity) {
-              throw new Error(`Insufficient stock for "${items[i].name}". Available: ${currentStock}`);
+
+            if (!pEntry || !pEntry.exists) {
+              throw new Error(`Product "${it.name || 'Item'}" not found`);
             }
-            
-            stockUpdates.push({ ref: pDoc.ref, newStock: currentStock - requestedQuantity });
+
+            const pData = pEntry.data;
+            const docId = pEntry.ref.id;
+            const requestedQty = Number(it.quantity) || 1;
+
+            const currentRecord = stockUpdatesByDocId.get(docId) || {
+              ref: pEntry.ref,
+              newStock: typeof pData.stock === 'number' ? pData.stock : 0,
+              variants: Array.isArray(pData.variants) ? JSON.parse(JSON.stringify(pData.variants)) : undefined
+            };
+
+            // Deduct variant stock if item has variant specified
+            const variantId = resolveVid(it);
+            if (currentRecord.variants && variantId) {
+              const vIdx = currentRecord.variants.findIndex((v: any) => String(v.id) === String(variantId));
+              if (vIdx >= 0) {
+                const vStock = typeof currentRecord.variants[vIdx].stock === 'number'
+                  ? currentRecord.variants[vIdx].stock
+                  : currentRecord.newStock;
+                if (vStock < requestedQty) {
+                  throw new Error(`Insufficient stock for "${it.name}". Available: ${vStock}`);
+                }
+                currentRecord.variants[vIdx].stock = Math.max(0, vStock - requestedQty);
+              }
+            }
+
+            // Deduct overall product stock
+            if (currentRecord.newStock < requestedQty) {
+              throw new Error(`Insufficient stock for "${it.name}". Available: ${currentRecord.newStock}`);
+            }
+
+            currentRecord.newStock = Math.max(0, currentRecord.newStock - requestedQty);
+            stockUpdatesByDocId.set(docId, currentRecord);
           }
 
-          // 3. Update stock levels
-          stockUpdates.forEach(update => {
-            transaction.update(update.ref, { stock: update.newStock, updatedAt: new Date().toISOString() });
+          // 3. Update stock levels in Firestore
+          stockUpdatesByDocId.forEach((update) => {
+            const updatePayload: any = {
+              stock: update.newStock,
+              updatedAt: new Date().toISOString()
+            };
+            if (update.variants) {
+              updatePayload.variants = update.variants;
+            }
+            transaction.update(update.ref, updatePayload);
           });
 
           // 4. Create the order with accurate financial snapshotting
