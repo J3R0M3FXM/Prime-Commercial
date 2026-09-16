@@ -207,6 +207,53 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // PWA install state
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isPWAInstalled, setIsPWAInstalled] = useState(false);
+  const [isIOSDevice, setIsIOSDevice] = useState(false);
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isStandalone = 
+        window.matchMedia("(display-mode: standalone)").matches || 
+        (window.navigator as any).standalone === true;
+      setIsPWAInstalled(isStandalone);
+
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      setIsIOSDevice(/iphone|ipad|ipod/.test(userAgent));
+
+      const handleBeforeInstall = (e: any) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+      };
+
+      const handleAppInstalled = () => {
+        setIsPWAInstalled(true);
+        setDeferredPrompt(null);
+      };
+
+      window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+      window.addEventListener("appinstalled", handleAppInstalled);
+
+      return () => {
+        window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+        window.removeEventListener("appinstalled", handleAppInstalled);
+      };
+    }
+  }, []);
+
+  const handleInstallPWA = async () => {
+    if (deferredPrompt) {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") {
+        setIsPWAInstalled(true);
+        setDeferredPrompt(null);
+      }
+    }
+  };
+
   // Navigation state
   const [view, setView] = useState<AdminView>("dashboard");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -579,12 +626,15 @@ export default function AdminPage() {
   // Auth checking screen
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-gray-100 p-6 font-sans">
-        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-2xl backdrop-blur-xl">
-          <Loader2 className="w-8 h-8 animate-spin text-white" />
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center sm:py-6 font-sans antialiased">
+        <div className="w-full max-w-[430px] h-screen sm:h-[880px] sm:rounded-[40px] bg-gray-950 text-gray-100 flex flex-col items-center justify-center p-6 overflow-hidden relative shadow-2xl border-0 sm:border-[10px] border-slate-900">
+          <div className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-slate-900 rounded-b-2xl z-50"></div>
+          <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-2xl backdrop-blur-xl">
+            <Loader2 className="w-8 h-8 animate-spin text-white" />
+          </div>
+          <h2 className="text-xl font-heading font-black tracking-widest uppercase mb-1">Authenticating</h2>
+          <p className="font-mono text-xs text-gray-400">Verifying Telegram Security Credentials (ID: 1085949511)...</p>
         </div>
-        <h2 className="text-xl font-heading font-black tracking-widest uppercase mb-1">Authenticating</h2>
-        <p className="font-mono text-xs text-gray-400">Verifying Telegram Security Credentials (ID: 1085949511)...</p>
       </div>
     );
   }
@@ -592,40 +642,51 @@ export default function AdminPage() {
   // Login Gate
   if (!authorized) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-gray-100 p-6 font-sans">
-        <div className="w-full max-w-sm bg-gray-900/80 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-xl">
-          <div className="w-12 h-12 rounded-xl bg-white text-black flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <Lock className="w-6 h-6" />
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center sm:py-6 font-sans antialiased">
+        <div className="w-full max-w-[430px] h-screen sm:h-[880px] sm:rounded-[40px] bg-gray-950 text-gray-100 flex flex-col items-center justify-center p-6 overflow-hidden relative shadow-2xl border-0 sm:border-[10px] border-slate-900">
+          <div className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-slate-900 rounded-b-2xl z-50"></div>
+          <div className="w-full max-w-sm bg-gray-900/80 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-xl">
+            <div className="w-12 h-12 rounded-xl bg-white text-black flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <Lock className="w-6 h-6" />
+            </div>
+            <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase text-white">Prime Admin</h1>
+            <p className="text-[11px] text-gray-400 text-center mb-6 font-mono">
+              Authorized Account: ID 1085949511
+            </p>
+            <form onSubmit={handleManualLogin} className="space-y-4">
+              <input
+                type="password"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="ENTER ADMIN ACCESS CODE"
+                className="w-full p-4 bg-gray-950 border border-gray-800 rounded-xl text-center font-mono focus:border-white focus:outline-none transition-colors text-white text-sm"
+              />
+              {errorMsg && <p className="text-red-400 text-xs text-center font-mono">{errorMsg}</p>}
+              <button 
+                type="submit" 
+                disabled={loading} 
+                className="w-full p-4 bg-white text-black font-bold uppercase tracking-widest rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center text-xs cursor-pointer shadow-lg"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Access Dashboard"}
+              </button>
+            </form>
           </div>
-          <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase text-white">Prime Admin</h1>
-          <p className="text-[11px] text-gray-400 text-center mb-6 font-mono">
-            Authorized Account: ID 1085949511
-          </p>
-          <form onSubmit={handleManualLogin} className="space-y-4">
-            <input
-              type="password"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="ENTER ADMIN ACCESS CODE"
-              className="w-full p-4 bg-gray-950 border border-gray-800 rounded-xl text-center font-mono focus:border-white focus:outline-none transition-colors text-white text-sm"
-            />
-            {errorMsg && <p className="text-red-400 text-xs text-center font-mono">{errorMsg}</p>}
-            <button 
-              type="submit" 
-              disabled={loading} 
-              className="w-full p-4 bg-white text-black font-bold uppercase tracking-widest rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center text-xs cursor-pointer shadow-lg"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Access Dashboard"}
-            </button>
-          </form>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased flex flex-col">
-      <AnimatePresence mode="wait">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center sm:py-6 font-sans antialiased">
+      {/* Mobile Device Mockup Wrap */}
+      <div className="w-full max-w-[430px] h-screen sm:h-[880px] sm:rounded-[40px] bg-slate-50 text-slate-900 flex flex-col overflow-hidden relative shadow-2xl border-0 sm:border-[10px] border-slate-900">
+        
+        {/* Device Notch */}
+        <div className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-slate-900 rounded-b-2xl z-50"></div>
+        
+        {/* Scrollable Container Inside Phone Mockup */}
+        <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden pt-0 sm:pt-4">
+          <AnimatePresence mode="wait">
         
         {/* ========================================================================= */}
         {/* 1. DASHBOARD HUB VIEW (Glossy Tiles, Stats, Header)                       */}
@@ -705,6 +766,39 @@ export default function AdminPage() {
                 </button>
               </div>
             </header>
+
+            {/* PWA Installation Card Banner */}
+            {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (
+              <div className="mb-6 bg-gradient-to-r from-slate-900 to-indigo-950 border border-indigo-500/20 rounded-2xl p-4 shadow-md text-white relative overflow-hidden">
+                <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-24 h-24 bg-white/5 rounded-full blur-xl"></div>
+                <div className="flex items-center justify-between gap-4 relative z-10">
+                  <div className="flex-1">
+                    <h3 className="font-heading font-black text-xs uppercase tracking-widest text-indigo-400 mb-1 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Install Prime PWA
+                    </h3>
+                    <p className="text-[11px] text-slate-300 font-sans leading-relaxed">
+                      Add to your home screen for rapid offline launching, portrait-lock, and secure fast access.
+                    </p>
+                  </div>
+                  {deferredPrompt && (
+                    <button
+                      onClick={handleInstallPWA}
+                      className="px-4 py-2 bg-white text-slate-950 hover:bg-slate-100 rounded-xl text-[10px] font-heading font-black uppercase tracking-widest cursor-pointer transition-colors shrink-0 shadow-md"
+                    >
+                      Install App
+                    </button>
+                  )}
+                  {isIOSDevice && (
+                    <button
+                      onClick={() => setShowIOSGuide(true)}
+                      className="px-4 py-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl text-[10px] font-heading font-black uppercase tracking-widest cursor-pointer transition-colors shrink-0 shadow-md"
+                    >
+                      Install iOS
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Quick Metrics Bar */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
@@ -2801,6 +2895,36 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* iOS Installation Guide */}
+      {showIOSGuide && (
+        <div 
+          onClick={() => setShowIOSGuide(false)}
+          className="absolute inset-0 bg-black/85 z-50 flex items-center justify-center p-4 backdrop-blur-xs cursor-pointer animate-in fade-in"
+        >
+          <div 
+            className="bg-slate-900 border border-slate-800 text-white rounded-2xl p-6 shadow-2xl max-w-xs w-full cursor-default text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center mx-auto mb-4 text-white shadow-lg">
+              <ExternalLink className="w-6 h-6" />
+            </div>
+            <h3 className="text-xs font-heading font-black uppercase tracking-widest text-white mb-2">Install on iOS Device</h3>
+            <p className="text-[10px] text-slate-300 leading-relaxed mb-5 font-mono">
+              To install this PWA on your iPhone or iPad, tap the <span className="font-semibold text-indigo-400">Share</span> button in Safari and select <span className="font-semibold text-indigo-400">&ldquo;Add to Home Screen&rdquo;</span>.
+            </p>
+            <button
+              onClick={() => setShowIOSGuide(false)}
+              className="w-full py-2.5 bg-white hover:bg-gray-100 text-slate-950 rounded-xl text-[10px] font-heading font-black uppercase tracking-widest cursor-pointer transition-colors shadow-md"
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      )}
+
+        </div>
+      </div>
     </div>
   );
 }
