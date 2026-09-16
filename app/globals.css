@@ -42,3 +42,68 @@ input.font-mono, textarea.font-mono, button.font-mono {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Print Media Styles for Order Invoices & Thermal Receipts */
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Reset outer phone mockup container constraints on print */
+  .min-h-screen,
+  div[class*="max-w-[430px]"],
+  div[class*="border-slate-900"],
+  div[class*="rounded-[40px]"] {
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  .no-print,
+  .screen-only,
+  nav,
+  aside,
+  header.screen-header,
+  button:not(.allow-print) {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* Force background colors and borders to print properly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    margin: 8mm;
+    size: auto;
+  }
+
+  .print-break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}

@@ -50,12 +50,15 @@ import {
   Square,
   CheckCircle,
   ArrowDownToLine,
-  Boxes
+  Boxes,
+  Printer,
+  FileText
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
 import DiagnosticsModule from "@/app/components/admin/diagnostics-module";
 import ModifyOrderModal from "@/app/components/admin/modify-order-modal";
+import OrderPrintView from "@/app/components/admin/order-print-view";
 import dynamic from 'next/dynamic';
 
 const LogisticsModule = dynamic(() => import('@/app/components/admin/logistics-module'), { 
@@ -305,6 +308,21 @@ export default function AdminPage() {
   // Bulk Order Selection & Actions
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [isBulkUpdating, setIsBulkUpdating] = useState<boolean>(false);
+
+  // Print Order configuration states
+  const [printPaperFormat, setPrintPaperFormat] = useState<"standard" | "thermal">("standard");
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+
+  const handleTriggerPrint = (format?: "standard" | "thermal") => {
+    if (format) {
+      setPrintPaperFormat(format);
+    }
+    setTimeout(() => {
+      if (typeof window !== "undefined") {
+        window.print();
+      }
+    }, 50);
+  };
 
   // Silent Real-Time Background Sync states & refs
   const [silentSyncEnabled, setSilentSyncEnabled] = useState(true);
@@ -2433,33 +2451,87 @@ export default function AdminPage() {
         {/* ========================================================================= */}
         {/* 5. ORDER DETAIL PAGE: SEPARATE FULL VIEW                                  */}
         {/* ========================================================================= */}
-        {view === "order-detail" && selectedOrder && (
-          <motion.div
-            key="view-order-detail"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.22 }}
-            className="flex-1 flex flex-col min-h-screen bg-slate-100"
-          >
-            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+        {view === "order-detail" && selectedOrder && (() => {
+          const deliveryAddressText = [
+            selectedOrder.deliveryAddress?.street,
+            selectedOrder.deliveryAddress?.barangay,
+            selectedOrder.deliveryAddress?.city,
+            selectedOrder.deliveryAddress?.province,
+            selectedOrder.deliveryAddress?.zipCode
+          ].filter(Boolean).join(", ") || (typeof selectedOrder.deliveryAddress === "string" ? selectedOrder.deliveryAddress : "") || selectedOrder.address || "";
+
+          const gpsStreetAddressText = selectedOrder.deviceSnapshot?.location?.streetAddress 
+            || selectedOrder.deviceSnapshot?.location?.display_name 
+            || (selectedOrder.deviceSnapshot?.location?.latitude ? `${selectedOrder.deviceSnapshot.location.latitude}, ${selectedOrder.deviceSnapshot.location.longitude}` : "") 
+            || "Not captured";
+
+          return (
+            <motion.div
+              key="view-order-detail"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22 }}
+              className="flex-1 flex flex-col min-h-screen bg-slate-100"
+            >
+            {/* Screen-Only Sticky Navigation & Quick Actions Bar */}
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm screen-only">
+              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
                 <button
                   onClick={() => {
                     setSelectedOrderId(null);
                     setView("orders");
                   }}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 font-mono"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Back to Orders
                 </button>
-                <span className="font-heading font-black text-slate-900 text-sm">
-                  Order {selectedOrder.orderNumber}
-                </span>
+
+                <div className="flex items-center gap-2">
+                  {/* Paper Format Selector */}
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-[10px] font-mono border border-slate-200/80">
+                    <button
+                      type="button"
+                      onClick={() => setPrintPaperFormat("standard")}
+                      className={`px-2 py-1 rounded-md transition-all cursor-pointer font-bold ${
+                        printPaperFormat === "standard"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                      title="Standard A4 / Letter Invoice Format"
+                    >
+                      A4 Standard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrintPaperFormat("thermal")}
+                      className={`px-2 py-1 rounded-md transition-all cursor-pointer font-bold ${
+                        printPaperFormat === "thermal"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                      title="80mm Thermal Receipt Format"
+                    >
+                      80mm Thermal
+                    </button>
+                  </div>
+
+                  {/* Print Trigger Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleTriggerPrint()}
+                    className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold uppercase tracking-wider font-mono flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95 shrink-0"
+                    title="Print Order (Browser Native Print)"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print Order</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            {/* Screen-Only Order Management Container */}
+            <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 screen-only">
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
                   <div>
@@ -2491,6 +2563,16 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setIsPrintModalOpen(true)}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold uppercase tracking-wider font-mono transition-all flex items-center gap-1.5 cursor-pointer border border-slate-200 shadow-xs"
+                      title="Preview format and print order"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Print Slip</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => {
@@ -2623,208 +2705,297 @@ export default function AdminPage() {
                   })()}
                 </div>
 
-                {/* Compact & Dense 2-Column Fields View */}
-                <div className="py-5 border-b border-slate-100">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 font-mono text-xs">
-                    
-                    {/* Telegram Name */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                        Telegram Name
-                      </span>
-                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
-                        {selectedOrder.customerName || "Customer"}
-                      </span>
+                {/* Structured Customer & Fulfillment Details Sections */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 py-4 border-b border-slate-100">
+                  
+                  {/* Column 1: Customer Profile & Identity */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 px-0.5">
+                      <Users className="w-3.5 h-3.5 text-slate-600" />
+                      <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900">
+                        Customer & Account Identity
+                      </h3>
                     </div>
 
-                    {/* Telegram Handle */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                        Telegram Handle
-                      </span>
-                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
-                        {selectedOrder.customerUsername 
-                          ? (selectedOrder.customerUsername.startsWith('@') ? selectedOrder.customerUsername : `@${selectedOrder.customerUsername}`) 
-                          : "None"}
-                      </span>
-                    </div>
-
-                    {/* Telegram ID */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                        Telegram ID
-                      </span>
-                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
-                        {selectedOrder.customerId || selectedOrder.tgUserId || "None"}
-                      </span>
-                    </div>
-
-                    {/* PRIME Member ID */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                        PRIME Member ID
-                      </span>
-                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
-                        {selectedOrder.primeMemberId || "Unassigned"}
-                      </span>
-                    </div>
-
-                    {/* IP Address */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                        IP Address
-                      </span>
-                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
-                        {selectedOrder.ip || selectedOrder.deviceSnapshot?.ip || "N/A"}
-                      </span>
-                    </div>
-
-                    {/* GPS street-level address */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          GPS street-level address
+                    <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50/40 overflow-hidden font-mono text-xs">
+                      {/* Telegram Name */}
+                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
+                          Telegram Name
                         </span>
-                        {selectedOrder.deviceSnapshot?.location?.source && (
-                          <span className="text-[9px] text-slate-500 bg-slate-200/60 px-1 rounded">
-                            {selectedOrder.deviceSnapshot.location.source}
-                          </span>
-                        )}
+                        <span className="font-bold text-slate-900 text-right truncate">
+                          {selectedOrder.customerName || "Customer"}
+                        </span>
                       </div>
-                      <span className="text-slate-900 font-bold text-xs leading-snug break-words">
-                        {gpsStreetAddressText}
-                      </span>
+
+                      {/* Telegram Handle */}
+                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
+                          Telegram Handle
+                        </span>
+                        <span className="font-bold text-slate-900 text-right truncate">
+                          {selectedOrder.customerUsername 
+                            ? (selectedOrder.customerUsername.startsWith('@') ? selectedOrder.customerUsername : `@${selectedOrder.customerUsername}`) 
+                            : "None"}
+                        </span>
+                      </div>
+
+                      {/* Telegram ID */}
+                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
+                          Telegram ID
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-900">
+                            {selectedOrder.customerId || selectedOrder.tgUserId || "None"}
+                          </span>
+                          {(selectedOrder.customerId || selectedOrder.tgUserId) && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(String(selectedOrder.customerId || selectedOrder.tgUserId), "customerId")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                              title="Copy Telegram ID"
+                            >
+                              {copiedKey === "customerId" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* PRIME Member ID */}
+                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
+                          Prime Member ID
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-900">
+                            {selectedOrder.primeMemberId || "Unassigned"}
+                          </span>
+                          {selectedOrder.primeMemberId && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(selectedOrder.primeMemberId, "primeMemberId")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                              title="Copy PRIME Member ID"
+                            >
+                              {copiedKey === "primeMemberId" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* IP Address */}
+                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
+                          IP Address
+                        </span>
+                        <span className="font-bold text-slate-900 text-right truncate">
+                          {selectedOrder.ip || selectedOrder.deviceSnapshot?.ip || "N/A"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Column 2: Fulfillment & Delivery Logistics */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 px-0.5">
+                      <Truck className="w-3.5 h-3.5 text-slate-600" />
+                      <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900">
+                        Recipient & Delivery Logistics
+                      </h3>
                     </div>
 
-                    {/* Receiver's Name (with tiny copy button) */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50/40 overflow-hidden font-mono text-xs">
+                      {/* Receiver's Name */}
+                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
                           Receiver's Name
                         </span>
-                        {selectedOrder.receiverName && (
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(selectedOrder.receiverName, "receiverName")}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
-                            title="Copy Receiver's Name"
-                          >
-                            {copiedKey === "receiverName" ? (
-                              <>
-                                <Check className="w-2.5 h-2.5 text-emerald-600" />
-                                <span className="text-emerald-700 font-bold">Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-2.5 h-2.5 text-slate-400" />
-                                <span>Copy</span>
-                              </>
-                            )}
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="font-bold text-slate-900 truncate">
+                            {selectedOrder.receiverName || "None"}
+                          </span>
+                          {selectedOrder.receiverName && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(selectedOrder.receiverName, "receiverName")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer shrink-0"
+                              title="Copy Receiver's Name"
+                            >
+                              {copiedKey === "receiverName" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
-                        {selectedOrder.receiverName || "None"}
-                      </span>
-                    </div>
 
-                    {/* Receiver's Phone (with tiny copy button) */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      {/* Receiver's Phone */}
+                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
                           Receiver's Phone
                         </span>
-                        {selectedOrder.receiverPhone && (
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(selectedOrder.receiverPhone, "receiverPhone")}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
-                            title="Copy Receiver's Phone"
-                          >
-                            {copiedKey === "receiverPhone" ? (
-                              <>
-                                <Check className="w-2.5 h-2.5 text-emerald-600" />
-                                <span className="text-emerald-700 font-bold">Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-2.5 h-2.5 text-slate-400" />
-                                <span>Copy</span>
-                              </>
-                            )}
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-900">
+                            {selectedOrder.receiverPhone || "None"}
+                          </span>
+                          {selectedOrder.receiverPhone && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(selectedOrder.receiverPhone, "receiverPhone")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer shrink-0"
+                              title="Copy Receiver's Phone"
+                            >
+                              {copiedKey === "receiverPhone" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
-                        {selectedOrder.receiverPhone || "None"}
-                      </span>
-                    </div>
 
-                    {/* Delivery Address (with tiny copy button) */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          Delivery Address
-                        </span>
-                        {deliveryAddressText && (
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(deliveryAddressText, "deliveryAddress")}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
-                            title="Copy Delivery Address"
-                          >
-                            {copiedKey === "deliveryAddress" ? (
-                              <>
-                                <Check className="w-2.5 h-2.5 text-emerald-600" />
-                                <span className="text-emerald-700 font-bold">Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-2.5 h-2.5 text-slate-400" />
-                                <span>Copy</span>
-                              </>
-                            )}
-                          </button>
-                        )}
+                      {/* Delivery Address */}
+                      <div className="px-3.5 py-2.5 space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                            Delivery Address
+                          </span>
+                          {deliveryAddressText && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(deliveryAddressText, "deliveryAddress")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                              title="Copy Delivery Address"
+                            >
+                              {copiedKey === "deliveryAddress" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-slate-900 font-bold leading-relaxed break-words">
+                          {deliveryAddressText || "None"}
+                        </p>
                       </div>
-                      <span className="text-slate-900 font-bold text-xs leading-snug break-words">
-                        {deliveryAddressText || "None"}
-                      </span>
-                    </div>
 
-                    {/* Notes (with tiny copy button) */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          Notes
-                        </span>
-                        {selectedOrder.notes && (
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(selectedOrder.notes, "notes")}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
-                            title="Copy Notes"
-                          >
-                            {copiedKey === "notes" ? (
-                              <>
-                                <Check className="w-2.5 h-2.5 text-emerald-600" />
-                                <span className="text-emerald-700 font-bold">Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-2.5 h-2.5 text-slate-400" />
-                                <span>Copy</span>
-                              </>
+                      {/* GPS Street-Level Address */}
+                      <div className="px-3.5 py-2.5 space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                              GPS Street-Level Address
+                            </span>
+                            {selectedOrder.deviceSnapshot?.location?.source && (
+                              <span className="text-[9px] font-bold text-slate-600 bg-slate-200/80 px-1.5 py-0.2 rounded">
+                                {selectedOrder.deviceSnapshot.location.source}
+                              </span>
                             )}
-                          </button>
-                        )}
+                          </div>
+                          {gpsStreetAddressText && gpsStreetAddressText !== "Not captured" && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(gpsStreetAddressText, "gpsAddress")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                              title="Copy GPS Street Address"
+                            >
+                              {copiedKey === "gpsAddress" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-slate-900 font-bold leading-relaxed break-words">
+                          {gpsStreetAddressText}
+                        </p>
                       </div>
-                      <span className="text-slate-900 font-bold text-xs leading-snug break-words">
-                        {selectedOrder.notes || "None"}
-                      </span>
-                    </div>
 
+                      {/* Delivery Notes */}
+                      <div className="px-3.5 py-2.5 space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                            Delivery Notes & Instructions
+                          </span>
+                          {selectedOrder.notes && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(selectedOrder.notes, "notes")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                              title="Copy Notes"
+                            >
+                              {copiedKey === "notes" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-slate-800 font-medium leading-relaxed break-words">
+                          {selectedOrder.notes || "No special instructions provided."}
+                        </p>
+                      </div>
+
+                    </div>
                   </div>
+
                 </div>
 
                 {/* Line Items */}
@@ -3077,8 +3248,17 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
+
+            {/* Native Printable Document (Hidden on screen, actively rendered when window.print() triggers) */}
+            <OrderPrintView
+              order={selectedOrder}
+              deliveryAddressText={deliveryAddressText}
+              gpsStreetAddressText={gpsStreetAddressText}
+              format={printPaperFormat}
+            />
           </motion.div>
-        )}
+        );
+      })()}
 
         {/* ========================================================================= */}
         {/* 6. PRODUCTS SECTION: SEPARATE FULL PAGE WITH STICKY NON-SCROLLING SEARCH   */}
@@ -4066,6 +4246,108 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* Print Preview & Configuration Modal */}
+      {isPrintModalOpen && selectedOrder && (() => {
+        const modalDeliveryAddressText = [
+          selectedOrder.deliveryAddress?.street,
+          selectedOrder.deliveryAddress?.barangay,
+          selectedOrder.deliveryAddress?.city,
+          selectedOrder.deliveryAddress?.province,
+          selectedOrder.deliveryAddress?.zipCode
+        ].filter(Boolean).join(", ") || (typeof selectedOrder.deliveryAddress === "string" ? selectedOrder.deliveryAddress : "") || selectedOrder.address || "";
+
+        const modalGpsStreetAddressText = selectedOrder.deviceSnapshot?.location?.streetAddress 
+          || selectedOrder.deviceSnapshot?.location?.display_name 
+          || (selectedOrder.deviceSnapshot?.location?.latitude ? `${selectedOrder.deviceSnapshot.location.latitude}, ${selectedOrder.deviceSnapshot.location.longitude}` : "") 
+          || "Not captured";
+
+        return (
+          <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs screen-only">
+            <div className="bg-slate-50 rounded-2xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <Printer className="w-5 h-5 text-slate-800" />
+                  <h3 className="font-heading font-normal text-base text-slate-900 uppercase tracking-wide">
+                    Print Order Document
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center bg-slate-200 p-0.5 rounded-lg text-xs font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setPrintPaperFormat("standard")}
+                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer font-bold ${
+                        printPaperFormat === "standard"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Standard A4
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrintPaperFormat("thermal")}
+                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer font-bold ${
+                        printPaperFormat === "thermal"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      80mm Thermal
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPrintModalOpen(false)}
+                    className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Live Preview Area */}
+              <div className="flex-1 overflow-y-auto py-4 px-2 my-2 bg-slate-200/50 rounded-xl border border-slate-200 flex justify-center">
+                <OrderPrintView
+                  order={selectedOrder}
+                  deliveryAddressText={modalDeliveryAddressText}
+                  gpsStreetAddressText={modalGpsStreetAddressText}
+                  format={printPaperFormat}
+                  isModalPreview={true}
+                />
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200 text-xs font-mono">
+                <p className="text-[11px] text-slate-500 hidden sm:block">
+                  Formatted for {printPaperFormat === "thermal" ? "80mm POS thermal roll" : "standard A4 / Letter paper"}
+                </p>
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsPrintModalOpen(false)}
+                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-colors cursor-pointer font-bold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPrintModalOpen(false);
+                      handleTriggerPrint();
+                    }}
+                    className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-lg transition-colors cursor-pointer font-bold flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Print Document</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modify Order Modal */}
       {isModifyModalOpen && modifyingOrder && (
