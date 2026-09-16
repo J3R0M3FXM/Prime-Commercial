@@ -289,8 +289,15 @@ export default function Shopfront() {
               return (
                 <div 
                   key={p.id} 
-                  className="bg-white border border-gray-200/60 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col cursor-pointer"
+                  className="bg-white border border-gray-200/60 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all group flex flex-col cursor-pointer active:scale-[0.98]"
                   onClick={() => setSelectedProduct(p)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      setSelectedProduct(p);
+                    }
+                  }}
                 >
                   <div className="relative aspect-square overflow-hidden bg-gray-50 border-b border-gray-100">
                     <img 
@@ -307,22 +314,38 @@ export default function Shopfront() {
                     )}
                   </div>
                   
-                  <div className="p-3 sm:p-5 flex flex-col flex-1">
-                    <p className="text-[10px] sm:text-xs font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">
-                      {p.category || "General"}
-                    </p>
-                    <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-tight mb-2 text-sm sm:text-lg">
-                      {p.name}
-                    </h3>
+                  <div className="p-3 sm:p-5 flex flex-col flex-1 justify-between">
+                    <div>
+                      <p className="text-[10px] sm:text-xs font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">
+                        {p.category || "General"}
+                      </p>
+                      <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-tight mb-2 text-sm sm:text-lg">
+                        {p.name}
+                      </h3>
+                    </div>
                     
-                    <div className="mt-auto pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-t border-gray-50">
-                      <div className="flex items-center gap-1 text-amber-500 font-mono text-xs sm:text-sm">
-                        <span>★</span>
-                        <span className="text-gray-700 font-bold">{Number(rating).toFixed(1)}</span>
+                    <div className="mt-4">
+                      <div className="pt-2 flex flex-row items-center justify-between gap-1 border-t border-gray-100 mb-3">
+                        <div className="flex items-center gap-1 text-amber-500 font-mono text-xs sm:text-sm">
+                          <span>★</span>
+                          <span className="text-gray-700 font-bold">{Number(rating).toFixed(1)}</span>
+                        </div>
+                        <span className="font-mono font-bold text-xs sm:text-base text-gray-900">
+                          {priceDisplay}
+                        </span>
                       </div>
-                      <span className="font-mono font-bold text-xs sm:text-base text-gray-900">
-                        {priceDisplay}
-                      </span>
+
+                      {/* Explicit Interactive Button Fallback */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProduct(p);
+                        }}
+                        className="w-full bg-black text-white py-2 text-[10px] sm:text-xs font-heading font-normal uppercase tracking-widest rounded-lg hover:bg-neutral-800 active:bg-neutral-900 transition-colors cursor-pointer text-center"
+                      >
+                        {isOutOfStock ? "SOLD OUT" : "VIEW OPTIONS"}
+                      </button>
                     </div>
                   </div>
                 </div>
