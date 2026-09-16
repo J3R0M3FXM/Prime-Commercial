@@ -447,51 +447,67 @@ export default function AdminPage() {
   const handleToggleProductActive = async (product: any) => {
     const newActive = product.active === false ? true : false;
     try {
-      await fetch("/api/admin/products", {
+      const res = await fetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: product.id, active: newActive })
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, active: newActive } : p));
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert(`Failed to update product status: ${e.message || String(e)}`);
     }
   };
 
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
     try {
-      await fetch("/api/admin/products", {
+      const res = await fetch("/api/admin/products", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id })
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
       setProducts(prev => prev.filter(p => p.id !== id));
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert(`Failed to delete product: ${e.message || String(e)}`);
     }
   };
 
   const handleSaveProduct = async (productData: any) => {
     try {
+      let res;
       if (editingProduct?.id) {
-        await fetch("/api/admin/products", {
+        res = await fetch("/api/admin/products", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: editingProduct.id, ...productData })
         });
       } else {
-        await fetch("/api/admin/products", {
+        res = await fetch("/api/admin/products", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(productData)
         });
       }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
       setProductModalOpen(false);
       setEditingProduct(null);
       fetchAllData();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert(`Failed to save product: ${e.message || String(e)}`);
     }
   };
 
@@ -499,14 +515,19 @@ export default function AdminPage() {
   const handleAdjustStock = async (productId: string, currentStock: number, delta: number) => {
     const newStock = Math.max(0, currentStock + delta);
     try {
-      await fetch("/api/admin/products", {
+      const res = await fetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: productId, stock: newStock })
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
       setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: newStock } : p));
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert(`Failed to adjust stock: ${e.message || String(e)}`);
     }
   };
 
