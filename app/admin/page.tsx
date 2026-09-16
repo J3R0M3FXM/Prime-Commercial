@@ -2707,19 +2707,16 @@ export default function AdminPage() {
                 </div>
 
                 {/* Structured Customer, Fingerprint & Fulfillment Details Sections */}
-                <div className="space-y-4 py-4 border-b border-slate-100">
+                <div className="py-5 space-y-6 border-b border-slate-200">
                   
                   {/* 1. CUSTOMER & ACCOUNT IDENTITY */}
-                  <div className="border border-slate-200 rounded-xl p-4 sm:p-5 bg-slate-50/50 space-y-3.5 shadow-xs">
-                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200/80">
-                      <Users className="w-3.5 h-3.5 text-slate-700" />
-                      <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900">
-                        CUSTOMER &amp; ACCOUNT IDENTITY
-                      </h3>
-                    </div>
+                  <div className="space-y-3">
+                    <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 pb-1.5 border-b border-slate-200">
+                      CUSTOMER &amp; ACCOUNT IDENTITY
+                    </h3>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
-                      {/* Row 1, Col 1: TELEGRAM NAME */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3.5">
+                      {/* TELEGRAM NAME */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
@@ -2751,7 +2748,7 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Row 1, Col 2: TELEGRAM HANDLE */}
+                      {/* TELEGRAM HANDLE */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
@@ -2785,7 +2782,7 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Row 2, Col 1: TELEGRAM UID */}
+                      {/* TELEGRAM UID */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
@@ -2817,7 +2814,7 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Row 2, Col 2: PRIME MID */}
+                      {/* PRIME MID */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
@@ -2852,16 +2849,13 @@ export default function AdminPage() {
                   </div>
 
                   {/* 2. TRANSACTION & DEVICE FINGERPRINT */}
-                  <div className="border border-slate-200 rounded-xl p-4 sm:p-5 bg-slate-50/50 space-y-3.5 shadow-xs">
-                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200/80">
-                      <Fingerprint className="w-3.5 h-3.5 text-slate-700" />
-                      <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900">
-                        TRANSACTION &amp; DEVICE FINGERPRINT
-                      </h3>
-                    </div>
+                  <div className="space-y-3">
+                    <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 pb-1.5 border-b border-slate-200">
+                      TRANSACTION &amp; DEVICE FINGERPRINT
+                    </h3>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
-                      {/* Row 1, Col 1: IP ADDRESS */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3.5">
+                      {/* IP ADDRESS */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
@@ -2893,7 +2887,7 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Row 1, Col 2: COORDINATES */}
+                      {/* COORDINATES */}
                       {(() => {
                         const coords = (selectedOrder.deviceSnapshot?.location?.latitude && selectedOrder.deviceSnapshot?.location?.longitude)
                           ? `${selectedOrder.deviceSnapshot.location.latitude}, ${selectedOrder.deviceSnapshot.location.longitude}`
@@ -2933,7 +2927,7 @@ export default function AdminPage() {
                         );
                       })()}
 
-                      {/* Row 2, Col 1: DEVICE IDENTIFIER */}
+                      {/* DEVICE IDENTIFIER */}
                       {(() => {
                         const devId = selectedOrder.deviceSnapshot?.deviceFingerprint 
                           || selectedOrder.deviceSnapshot?.device_id 
@@ -2977,7 +2971,7 @@ export default function AdminPage() {
                         );
                       })()}
 
-                      {/* Row 2, Col 2: SESSION TOKEN */}
+                      {/* SESSION TOKEN */}
                       {(() => {
                         const sessToken = selectedOrder.sessionToken 
                           || selectedOrder.deviceSnapshot?.sessionId 
@@ -3020,8 +3014,8 @@ export default function AdminPage() {
                         );
                       })()}
 
-                      {/* Row 3, Full Width: PRECISE GPS ADDRESS */}
-                      <div className="col-span-1 sm:col-span-2 space-y-1 pt-2 border-t border-slate-200/60">
+                      {/* PRECISE GPS ADDRESS */}
+                      <div className="col-span-1 sm:col-span-2 space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
                             PRECISE GPS ADDRESS
@@ -3055,16 +3049,13 @@ export default function AdminPage() {
                   </div>
 
                   {/* 3. RECIPIENT & DELIVERY INFORMATION */}
-                  <div className="border border-slate-200 rounded-xl p-4 sm:p-5 bg-slate-50/50 space-y-3.5 shadow-xs">
-                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200/80">
-                      <Truck className="w-3.5 h-3.5 text-slate-700" />
-                      <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900">
-                        RECIPIENT &amp; DELIVERY INFORMATION
-                      </h3>
-                    </div>
+                  <div className="space-y-3">
+                    <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 pb-1.5 border-b border-slate-200">
+                      RECIPIENT &amp; DELIVERY INFORMATION
+                    </h3>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
-                      {/* Row 1, Col 1: RECEIVER'S NAME */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3.5">
+                      {/* RECEIVER'S NAME */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
@@ -3096,7 +3087,7 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Row 1, Col 2: RECEIVER'S PHONE */}
+                      {/* RECEIVER'S PHONE */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
@@ -3128,8 +3119,8 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Row 2, Full Width: DELIVERY ADDRESS */}
-                      <div className="col-span-1 sm:col-span-2 space-y-1 pt-2 border-t border-slate-200/60">
+                      {/* DELIVERY ADDRESS */}
+                      <div className="col-span-1 sm:col-span-2 space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
                             DELIVERY ADDRESS
@@ -3160,8 +3151,8 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Row 3, Full Width: DELIVERY NOTES */}
-                      <div className="col-span-1 sm:col-span-2 space-y-1 pt-2 border-t border-slate-200/60">
+                      {/* DELIVERY NOTES */}
+                      <div className="col-span-1 sm:col-span-2 space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
                             DELIVERY NOTES

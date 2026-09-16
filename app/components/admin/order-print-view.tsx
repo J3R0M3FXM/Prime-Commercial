@@ -265,13 +265,13 @@ export default function OrderPrintView({
       </div>
 
       {/* 3-Section Layout: Identity, Fingerprint, Recipient */}
-      <div className="space-y-4 mb-6 print-break-inside-avoid">
+      <div className="space-y-5 mb-6 print-break-inside-avoid">
         {/* 1. CUSTOMER & ACCOUNT IDENTITY */}
-        <div className="border border-slate-300 rounded-lg p-3.5 bg-slate-50/70">
-          <h2 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 mb-2.5 pb-1 border-b border-slate-200">
+        <div className="space-y-2.5">
+          <h2 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 pb-1 border-b border-slate-300">
             CUSTOMER &amp; ACCOUNT IDENTITY
           </h2>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-2.5">
             <div>
               <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
                 TELEGRAM NAME
@@ -310,11 +310,11 @@ export default function OrderPrintView({
         </div>
 
         {/* 2. TRANSACTION & DEVICE FINGERPRINT */}
-        <div className="border border-slate-300 rounded-lg p-3.5 bg-slate-50/70">
-          <h2 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 mb-2.5 pb-1 border-b border-slate-200">
+        <div className="space-y-2.5">
+          <h2 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 pb-1 border-b border-slate-300">
             TRANSACTION &amp; DEVICE FINGERPRINT
           </h2>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-2.5">
             <div>
               <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
                 IP ADDRESS
@@ -359,7 +359,7 @@ export default function OrderPrintView({
                   || "Not captured"}
               </span>
             </div>
-            <div className="col-span-2 pt-1 border-t border-slate-200">
+            <div className="col-span-2">
               <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
                 PRECISE GPS ADDRESS
               </span>
@@ -371,11 +371,11 @@ export default function OrderPrintView({
         </div>
 
         {/* 3. RECIPIENT & DELIVERY INFORMATION */}
-        <div className="border border-slate-300 rounded-lg p-3.5 bg-slate-50/70">
-          <h2 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 mb-2.5 pb-1 border-b border-slate-200">
+        <div className="space-y-2.5">
+          <h2 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 pb-1 border-b border-slate-300">
             RECIPIENT &amp; DELIVERY INFORMATION
           </h2>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-2.5">
             <div>
               <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
                 RECEIVER'S NAME
@@ -392,7 +392,7 @@ export default function OrderPrintView({
                 {order.receiverPhone || "None"}
               </span>
             </div>
-            <div className="col-span-2 pt-1 border-t border-slate-200">
+            <div className="col-span-2">
               <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
                 DELIVERY ADDRESS
               </span>
@@ -400,7 +400,7 @@ export default function OrderPrintView({
                 {deliveryAddressText || "None"}
               </span>
             </div>
-            <div className="col-span-2 pt-1 border-t border-slate-200">
+            <div className="col-span-2">
               <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
                 DELIVERY NOTES
               </span>
