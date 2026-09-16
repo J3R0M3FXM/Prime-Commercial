@@ -331,10 +331,11 @@ export default function AdminPage() {
   const fetchAllData = async () => {
     setRefreshing(true);
     try {
+      const t = Date.now();
       const [custRes, prodRes, ordRes] = await Promise.all([
-        fetch("/api/admin/customers"),
-        fetch("/api/products"),
-        fetch("/api/admin/orders")
+        fetch(`/api/admin/customers?_t=${t}`, { cache: "no-store" }),
+        fetch(`/api/products?_t=${t}`, { cache: "no-store" }),
+        fetch(`/api/admin/orders?_t=${t}`, { cache: "no-store" })
       ]);
       if (custRes.ok) setCustomers(await custRes.json());
       if (prodRes.ok) setProducts(await prodRes.json());

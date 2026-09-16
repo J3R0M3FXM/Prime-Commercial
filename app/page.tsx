@@ -88,7 +88,7 @@ export default function Shopfront() {
             if (typeof window !== 'undefined' && (localStorage.getItem("skip_admin_redirect") === "true" || sessionStorage.getItem("skip_admin_redirect") === "true")) {
               setAuthorized(true);
               setIsAdmin(true);
-              const productsRes = await fetch('/api/products');
+              const productsRes = await fetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
               const pData = await productsRes.json();
               setProducts(pData);
               return;
@@ -127,7 +127,7 @@ export default function Shopfront() {
           }
 
           setAuthorized(true);
-          const productsRes = await fetch('/api/products');
+          const productsRes = await fetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
           const pData = await productsRes.json();
           setProducts(pData);
         } else {
