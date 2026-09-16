@@ -44,7 +44,13 @@ import {
   Zap,
   Bell,
   Volume2,
-  VolumeX
+  VolumeX,
+  Download,
+  CheckSquare,
+  Square,
+  CheckCircle,
+  ArrowDownToLine,
+  Boxes
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
@@ -295,6 +301,10 @@ export default function AdminPage() {
   // Modify Order state
   const [modifyingOrder, setModifyingOrder] = useState<any | null>(null);
   const [isModifyModalOpen, setIsModifyModalOpen] = useState<boolean>(false);
+
+  // Bulk Order Selection & Actions
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [isBulkUpdating, setIsBulkUpdating] = useState<boolean>(false);
 
   // Silent Real-Time Background Sync states & refs
   const [silentSyncEnabled, setSilentSyncEnabled] = useState(true);
@@ -845,6 +855,115 @@ export default function AdminPage() {
     });
   };
 
+  // Bulk status update handler
+  const handleBulkUpdateOrderStatus = async (newStatus: "Processing" | "Completed" | "Pending") => {
+    if (selectedOrderIds.length === 0) return;
+    setIsBulkUpdating(true);
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: selectedOrderIds,
+          status: newStatus
+        })
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to update orders: ${res.statusText}`);
+      }
+      setOrders(prev => prev.map(o => selectedOrderIds.includes(o.id) ? { ...o, status: newStatus } : o));
+      const count = selectedOrderIds.length;
+      setSelectedOrderIds([]);
+      setLiveToast({
+        id: `bulk-${Date.now()}`,
+        title: "Bulk Status Updated",
+        message: `Updated ${count} order(s) to "${newStatus}".`,
+        type: "info"
+      });
+      showAlert(`Successfully updated ${count} orders to "${newStatus}".`, "Bulk Update Successful", "success");
+    } catch (err: any) {
+      console.error(err);
+      showAlert(`Bulk update failed: ${err.message || String(err)}`, "Update Error", "error");
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  // Export current filtered orders to CSV
+  const handleExportOrdersCSV = (ordersToExport: any[]) => {
+    if (!ordersToExport || ordersToExport.length === 0) {
+      showAlert("There are no orders matching the current filter to export.", "No Orders to Export", "info");
+      return;
+    }
+
+    const headers = [
+      "Order Number",
+      "Date Placed",
+      "Status",
+      "Payment Status",
+      "Customer Name",
+      "Customer Username",
+      "Prime Member ID",
+      "Total Amount (PHP)",
+      "Subtotal (PHP)",
+      "Delivery Fee (PHP)",
+      "Delivery Free?",
+      "Items Count",
+      "Items Breakdown",
+      "Applied Charges Breakdown",
+      "GPS Address / Delivery Address",
+      "Has Payment Proof"
+    ];
+
+    const rows = ordersToExport.map(ord => {
+      const itemsList = (ord.items || [])
+        .map((it: any) => `${it.name} (Qty: ${it.quantity || 1}, ₱${it.price}${it.isFree ? ' [FREE]' : ''})`)
+        .join("; ");
+      const chargesList = (ord.appliedCharges || [])
+        .map((ch: any) => `${ch.name} (₱${ch.amount}${ch.isFree ? ' [FREE]' : ''})`)
+        .join("; ");
+      const dateStr = ord.createdAt ? new Date(ord.createdAt).toISOString() : "";
+      const address = ord.gpsStreetAddress || ord.deviceSnapshot?.location?.address || "N/A";
+      const hasProof = ord.paymentProofImage ? "YES" : "NO";
+
+      return [
+        `"${String(ord.orderNumber || ord.id || '').replace(/"/g, '""')}"`,
+        `"${dateStr.replace(/"/g, '""')}"`,
+        `"${String(ord.status || 'Processing').replace(/"/g, '""')}"`,
+        `"${String(ord.paymentStatus || 'Pending').replace(/"/g, '""')}"`,
+        `"${String(ord.customerName || '').replace(/"/g, '""')}"`,
+        `"${String(ord.customerUsername || '').replace(/"/g, '""')}"`,
+        `"${String(ord.primeMemberId || ord.customerId || '').replace(/"/g, '""')}"`,
+        Number(ord.totalAmount || 0).toFixed(2),
+        Number(ord.subTotal || 0).toFixed(2),
+        Number(ord.deliveryFee || 0).toFixed(2),
+        ord.isDeliveryFeeFree ? "YES" : "NO",
+        ord.items?.length || 0,
+        `"${itemsList.replace(/"/g, '""')}"`,
+        `"${chargesList.replace(/"/g, '""')}"`,
+        `"${String(address).replace(/"/g, '""')}"`,
+        `"${hasProof}"`
+      ].join(",");
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    link.setAttribute("download", `Prime_Orders_Export_${timestamp}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setLiveToast({
+      id: `csv-${Date.now()}`,
+      title: "Export Completed",
+      message: `Exported ${ordersToExport.length} orders to CSV successfully.`,
+      type: "info"
+    });
+  };
+
   // Filtered lists
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => {
@@ -890,11 +1009,20 @@ export default function AdminPage() {
         (p.name || "").toLowerCase().includes(inventorySearch.toLowerCase()) ||
         (p.category || "").toLowerCase().includes(inventorySearch.toLowerCase());
       if (!matchSearch) return false;
-      if (inventoryFilter === "low") return (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 10;
+      if (inventoryFilter === "low") return (p.stock ?? 0) > 0 && (p.stock ?? 0) <= (p.lowStockThreshold ?? 10);
       if (inventoryFilter === "out") return (p.stock ?? 0) === 0;
       return true;
     });
   }, [products, inventorySearch, inventoryFilter]);
+
+  // Products with stock <= their defined lowStockThreshold
+  const lowStockProducts = useMemo(() => {
+    return products.filter(p => {
+      const threshold = p.lowStockThreshold !== undefined ? Number(p.lowStockThreshold) : 10;
+      const stock = Number(p.stock) || 0;
+      return stock <= threshold;
+    });
+  }, [products]);
 
   const selectedOrder = useMemo(() => {
     return orders.find(o => o.id === selectedOrderId);
@@ -1148,6 +1276,70 @@ export default function AdminPage() {
                       Install iOS
                     </button>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Low-Stock Notification Banner */}
+            {lowStockProducts.length > 0 && (
+              <div className="mb-6 bg-amber-50 border border-amber-200/90 rounded-2xl p-4 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-200/60">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-800 flex items-center justify-center shrink-0">
+                      <AlertTriangle className="w-5 h-5 text-amber-700" />
+                    </div>
+                    <div>
+                      <h4 className="font-heading font-black text-xs sm:text-sm uppercase tracking-wider text-amber-950 flex items-center gap-2">
+                        <span>Low Stock Notification</span>
+                        <span className="px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900 text-[10px] font-mono font-bold">
+                          {lowStockProducts.length} {lowStockProducts.length === 1 ? "Product" : "Products"} Affected
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-amber-800 font-sans mt-0.5">
+                        The items below have fallen below their defined low stock threshold. Replenish inventory to prevent sales interruption.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setInventoryFilter("low");
+                      setView("inventory");
+                    }}
+                    className="px-3.5 py-1.5 bg-amber-900 hover:bg-amber-950 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 self-start sm:self-center shrink-0 cursor-pointer shadow-xs"
+                  >
+                    <Boxes className="w-3.5 h-3.5" />
+                    <span>Manage Inventory &rarr;</span>
+                  </button>
+                </div>
+
+                {/* Horizontal scrollable pills of affected products */}
+                <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 text-xs font-mono">
+                  {lowStockProducts.map((p: any) => {
+                    const threshold = p.lowStockThreshold !== undefined ? Number(p.lowStockThreshold) : 10;
+                    const stock = Number(p.stock) || 0;
+                    const isOut = stock === 0;
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => {
+                          setInventorySearch(p.name || "");
+                          setView("inventory");
+                        }}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer shrink-0 shadow-2xs ${
+                          isOut
+                            ? "bg-red-50 border-red-200 hover:border-red-300 text-red-950"
+                            : "bg-white border-amber-200 hover:border-amber-400 text-amber-950"
+                        }`}
+                        title={`Click to manage ${p.name}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${isOut ? "bg-red-600 animate-pulse" : "bg-amber-500"}`} />
+                        <span className="font-bold truncate max-w-[140px] sm:max-w-[200px]">{p.name}</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isOut ? "bg-red-200/80 text-red-900" : "bg-amber-100 text-amber-900"}`}>
+                          {isOut ? "OUT OF STOCK" : `${stock} left (≤${threshold})`}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1992,12 +2184,24 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {/* Export CSV button */}
+                    <button
+                      type="button"
+                      onClick={() => handleExportOrdersCSV(filteredOrders)}
+                      className="px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-400 hover:bg-slate-50 text-slate-800 rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                      title="Export currently displayed orders to CSV spreadsheet"
+                    >
+                      <Download className="w-3.5 h-3.5 text-slate-700" />
+                      <span className="hidden sm:inline">Export CSV</span>
+                      <span className="sm:hidden">CSV</span>
+                    </button>
+
                     <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200/80 rounded-lg text-emerald-800 text-[11px] font-mono">
                       <span className="relative flex h-2 w-2">
                         <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isSilentSyncing ? "bg-emerald-500 opacity-75" : "bg-emerald-400 opacity-50"}`}></span>
                         <span className={`relative inline-flex rounded-full h-2 w-2 ${isSilentSyncing ? "bg-emerald-600" : "bg-emerald-500"}`}></span>
                       </span>
-                      <span className="font-bold">
+                      <span className="font-bold hidden md:inline">
                         {isSilentSyncing ? "Detecting..." : "Auto-Detect Active"}
                       </span>
                     </div>
@@ -2041,6 +2245,71 @@ export default function AdminPage() {
                     ))}
                   </div>
                 </div>
+
+                {/* Bulk Action Toolbar Bar */}
+                <div className="mt-2.5 pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0) {
+                          setSelectedOrderIds([]);
+                        } else {
+                          setSelectedOrderIds(filteredOrders.map(o => o.id));
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer text-[11px]"
+                    >
+                      {selectedOrderIds.length > 0 && selectedOrderIds.length === filteredOrders.length ? (
+                        <CheckSquare className="w-3.5 h-3.5 text-slate-900" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5 text-slate-500" />
+                      )}
+                      <span>
+                        {selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0
+                          ? "Deselect All"
+                          : `Select All (${filteredOrders.length})`}
+                      </span>
+                    </button>
+
+                    {selectedOrderIds.length > 0 && (
+                      <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                        {selectedOrderIds.length} selected
+                      </span>
+                    )}
+                  </div>
+
+                  {selectedOrderIds.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                        Set Status:
+                      </span>
+                      {(["Processing", "Completed", "Pending"] as const).map(st => (
+                        <button
+                          key={st}
+                          disabled={isBulkUpdating}
+                          onClick={() => handleBulkUpdateOrderStatus(st)}
+                          className={`px-2.5 py-1 rounded text-[11px] font-bold uppercase transition-all cursor-pointer shadow-2xs border ${
+                            st === "Completed"
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
+                              : st === "Processing"
+                              ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-700"
+                              : "bg-amber-600 hover:bg-amber-700 text-white border-amber-700"
+                          } ${isBulkUpdating ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          {st}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderIds([])}
+                        className="px-2 py-1 text-slate-500 hover:text-slate-800 text-[11px] underline cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2057,77 +2326,105 @@ export default function AdminPage() {
                   </p>
                 </div>
               ) : (
-                filteredOrders.map((ord) => (
-                  <div
-                    key={ord.id}
-                    onClick={() => {
-                      setSelectedOrderId(ord.id);
-                      setView("order-detail");
-                    }}
-                    className="group bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-900 rounded-xl p-3.5 sm:p-4 shadow-sm hover:shadow-md transition-all duration-150 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-heading font-black text-sm text-slate-900 group-hover:text-black">
-                          {ord.orderNumber}
-                        </span>
-                        <span className="text-xs font-mono text-slate-500">
-                          {ord.createdAt ? new Date(ord.createdAt).toLocaleDateString() : "Recent"}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
-                          ord.status === "Completed"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : ord.status === "Processing"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-amber-100 text-amber-800"
-                        }`}>
-                          {ord.status || "Processing"}
-                        </span>
-                        {ord.paymentProofImage ? (
-                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-1">
-                            <Receipt className="w-2.5 h-2.5" /> Proof Uploaded
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[9px] font-mono text-slate-400 bg-slate-100 border border-slate-200">
-                            No Proof Yet
-                          </span>
-                        )}
+                filteredOrders.map((ord) => {
+                  const isSelected = selectedOrderIds.includes(ord.id);
+                  return (
+                    <div
+                      key={ord.id}
+                      onClick={() => {
+                        setSelectedOrderId(ord.id);
+                        setView("order-detail");
+                      }}
+                      className={`group border rounded-xl p-3.5 sm:p-4 shadow-sm hover:shadow-md transition-all duration-150 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isSelected 
+                          ? "bg-indigo-50/50 border-indigo-400 hover:border-indigo-600" 
+                          : "bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-900"
+                      }`}
+                    >
+                      <div className="flex items-start sm:items-center gap-3">
+                        {/* Order selection checkbox */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedOrderIds(prev =>
+                              prev.includes(ord.id) ? prev.filter(id => id !== ord.id) : [...prev, ord.id]
+                            );
+                          }}
+                          className="mt-0.5 sm:mt-0 p-1 rounded hover:bg-slate-200/80 text-slate-600 cursor-pointer shrink-0 transition-colors"
+                          title={isSelected ? "Deselect this order" : "Select this order"}
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-indigo-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400 hover:text-slate-600" />
+                          )}
+                        </button>
+
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-heading font-black text-sm text-slate-900 group-hover:text-black">
+                              {ord.orderNumber}
+                            </span>
+                            <span className="text-xs font-mono text-slate-500">
+                              {ord.createdAt ? new Date(ord.createdAt).toLocaleDateString() : "Recent"}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
+                              ord.status === "Completed"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : ord.status === "Processing"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}>
+                              {ord.status || "Processing"}
+                            </span>
+                            {ord.paymentProofImage ? (
+                              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-1">
+                                <Receipt className="w-2.5 h-2.5" /> Proof Uploaded
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[9px] font-mono text-slate-400 bg-slate-100 border border-slate-200">
+                                No Proof Yet
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-slate-600 font-mono mt-1">
+                            Customer: <span className="font-bold text-slate-900">{ord.customerName}</span> ({ord.primeMemberId || ord.customerId})
+                          </p>
+                        </div>
                       </div>
 
-                      <p className="text-xs text-slate-600 font-mono mt-1">
-                        Customer: <span className="font-bold text-slate-900">{ord.customerName}</span> ({ord.primeMemberId || ord.customerId})
-                      </p>
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                        <div className="text-right font-mono">
+                          <p className="text-sm font-black text-slate-900">
+                            {formatPHP(ord.totalAmount)}
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            {ord.items?.length || 1} line item(s)
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setModifyingOrder(ord);
+                            setIsModifyModalOpen(true);
+                          }}
+                          className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-amber-50 hover:border-amber-300 text-slate-600 hover:text-amber-800 transition-colors shadow-2xs cursor-pointer"
+                          title="Modify Order Items & Pricing"
+                        >
+                          <Sliders className="w-3.5 h-3.5" />
+                        </button>
+
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-slate-900 group-hover:text-white flex items-center justify-center transition-colors">
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
+                      </div>
                     </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-                      <div className="text-right font-mono">
-                        <p className="text-sm font-black text-slate-900">
-                          {formatPHP(ord.totalAmount)}
-                        </p>
-                        <p className="text-[10px] text-slate-500">
-                          {ord.items?.length || 1} line item(s)
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setModifyingOrder(ord);
-                          setIsModifyModalOpen(true);
-                        }}
-                        className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-amber-50 hover:border-amber-300 text-slate-600 hover:text-amber-800 transition-colors shadow-2xs cursor-pointer"
-                        title="Modify Order Items & Pricing"
-                      >
-                        <Sliders className="w-3.5 h-3.5" />
-                      </button>
-
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-slate-900 group-hover:text-white flex items-center justify-center transition-colors">
-                        <ChevronRight className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </motion.div>
@@ -2221,6 +2518,109 @@ export default function AdminPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Visual Step-Based Order Progress Timeline */}
+                <div className="py-5 px-3 sm:px-4 bg-slate-50/80 rounded-xl border border-slate-200/80 my-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-mono uppercase tracking-widest font-bold text-slate-400">
+                      Order Lifecycle Progress
+                    </span>
+                    <span className="text-[11px] font-mono font-bold text-slate-700">
+                      Current Stage: <span className="uppercase text-slate-900 font-black">{selectedOrder.status || "Pending"}</span>
+                    </span>
+                  </div>
+
+                  {(() => {
+                    const currentStatus = selectedOrder.status || "Pending";
+                    const steps = [
+                      {
+                        key: "Pending",
+                        label: "Order Pending",
+                        description: "Placed & awaiting review",
+                        icon: Clock,
+                      },
+                      {
+                        key: "Processing",
+                        label: "Processing",
+                        description: "Payment & items verified",
+                        icon: Sliders,
+                      },
+                      {
+                        key: "Completed",
+                        label: "Completed",
+                        description: "Fulfilled & delivered",
+                        icon: CheckCircle2,
+                      }
+                    ];
+
+                    const stepIndexMap: Record<string, number> = {
+                      Pending: 0,
+                      Processing: 1,
+                      Completed: 2
+                    };
+
+                    const activeIndex = stepIndexMap[currentStatus] ?? 0;
+
+                    return (
+                      <div className="relative">
+                        <div className="grid grid-cols-3 gap-2 relative z-10">
+                          {steps.map((step, idx) => {
+                            const isPast = idx < activeIndex;
+                            const isCurrent = idx === activeIndex;
+                            const isFuture = idx > activeIndex;
+                            const StepIcon = step.icon;
+
+                            return (
+                              <button
+                                key={step.key}
+                                type="button"
+                                onClick={() => handleUpdateOrderStatus(selectedOrder.id, step.key)}
+                                className={`text-left p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                                  isCurrent
+                                    ? "bg-white border-slate-900 shadow-sm ring-1 ring-slate-900"
+                                    : isPast
+                                    ? "bg-emerald-50/60 border-emerald-200 hover:bg-emerald-50 text-emerald-950"
+                                    : "bg-white/60 border-slate-200 hover:bg-white text-slate-400"
+                                }`}
+                                title={`Click to change status to ${step.label}`}
+                              >
+                                <div className="flex items-center justify-between gap-1 mb-2">
+                                  <div
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center font-mono text-[10px] font-bold ${
+                                      isCurrent
+                                        ? "bg-slate-900 text-white"
+                                        : isPast
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-200 text-slate-500"
+                                    }`}
+                                  >
+                                    {isPast ? <Check className="w-3.5 h-3.5" /> : idx + 1}
+                                  </div>
+                                  <span className={`text-[9px] font-mono font-bold uppercase tracking-wider ${
+                                    isCurrent ? "text-indigo-600" : isPast ? "text-emerald-700" : "text-slate-400"
+                                  }`}>
+                                    {isCurrent ? "Active" : isPast ? "Done" : "Upcoming"}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <p className={`font-heading font-black text-xs uppercase tracking-wider truncate ${
+                                    isCurrent ? "text-slate-950" : isPast ? "text-slate-900" : "text-slate-500"
+                                  }`}>
+                                    {step.label}
+                                  </p>
+                                  <p className="text-[10px] font-mono text-slate-500 line-clamp-1 mt-0.5 hidden sm:block">
+                                    {step.description}
+                                  </p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Compact & Dense 2-Column Fields View */}

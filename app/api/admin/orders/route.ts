@@ -52,6 +52,26 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
+
+    // Bulk status update support: { ids: string[], status: string }
+    if (Array.isArray(body.ids) && body.ids.length > 0 && body.status) {
+      const { ids, status } = body;
+      const results: string[] = [];
+      for (const orderId of ids) {
+        try {
+          const oRef = doc(db, 'orders', orderId);
+          await updateDoc(oRef, {
+            status,
+            updatedAt: new Date().toISOString()
+          });
+          results.push(orderId);
+        } catch (err) {
+          console.warn(`Failed to update order ${orderId}:`, err);
+        }
+      }
+      return NextResponse.json({ success: true, updatedCount: results.length, ids: results });
+    }
+
     const { 
       id, 
       status, 
@@ -70,7 +90,7 @@ export async function PUT(request: Request) {
       adjustStock = true
     } = body;
 
-    if (!id) return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
+    if (!id) return NextResponse.json({ error: 'Order ID or ids array is required' }, { status: 400 });
 
     const orderRef = doc(db, 'orders', id);
     const existingSnap = await getDoc(orderRef);
