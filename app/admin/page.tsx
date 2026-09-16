@@ -312,8 +312,10 @@ export default function AdminPage() {
   const [inventorySearch, setInventorySearch] = useState("");
   const [inventoryFilter, setInventoryFilter] = useState<"all" | "low" | "out">("all");
 
-  // Copied feedback
+  // Copied feedback & Toast
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
+  const copyToastTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [zoomedProofImage, setZoomedProofImage] = useState<string | null>(null);
 
   // Modify Order state
@@ -434,11 +436,21 @@ export default function AdminPage() {
     setCustomConfirm({ open: true, title, message, onConfirm });
   };
 
-  const copyToClipboard = (text: string, key: string) => {
+  const copyToClipboard = (text: string, key: string, toastLabel?: string) => {
+    if (!text || text === "Not captured" || text === "None" || text === "Unassigned") return;
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(text);
       setCopiedKey(key);
       setTimeout(() => setCopiedKey(null), 2000);
+
+      if (toastLabel) {
+        const msg = `${toastLabel.toUpperCase()} SUCCESSFULLY COPIED`;
+        setCopyToast(msg);
+        if (copyToastTimerRef.current) clearTimeout(copyToastTimerRef.current);
+        copyToastTimerRef.current = setTimeout(() => {
+          setCopyToast(null);
+        }, 2500);
+      }
     }
   };
 
@@ -2708,7 +2720,6 @@ export default function AdminPage() {
 
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">Order Identifier</span>
                         <div 
                           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider border transition-all duration-500 ease-in-out ${
                             selectedOrder.status === "Completed"
@@ -2735,20 +2746,14 @@ export default function AdminPage() {
                         <h2 className="text-xl sm:text-2xl font-heading font-normal text-slate-900 tracking-tight">{selectedOrder.orderNumber}</h2>
                         <button
                           type="button"
-                          onClick={() => copyToClipboard(selectedOrder.orderNumber, "orderNumber")}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium transition-colors border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                          onClick={() => copyToClipboard(selectedOrder.orderNumber, "orderNumber", "ORDER NUMBER")}
+                          className="inline-flex items-center justify-center p-1 rounded transition-colors border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
                           title="Copy Order Number"
                         >
                           {copiedKey === "orderNumber" ? (
-                            <>
-                              <Check className="w-3 h-3 text-emerald-600" />
-                              <span className="text-emerald-700 font-bold text-[9px]">Copied</span>
-                            </>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
                           ) : (
-                            <>
-                              <Copy className="w-3 h-3 text-slate-500" />
-                              <span className="text-[9px]">Copy</span>
-                            </>
+                            <Copy className="w-3.5 h-3.5 text-slate-500" />
                           )}
                         </button>
                       </div>
@@ -3044,29 +3049,18 @@ export default function AdminPage() {
                             TELEGRAM NAME
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                          <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-tight tracking-normal truncate">
+                        <div 
+                          onClick={() => copyToClipboard(selectedOrder.customerName, "customerName", "TELEGRAM NAME")}
+                          className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy Telegram Name"
+                        >
+                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.customerName || "Customer"}
                           </span>
-                          {selectedOrder.customerName && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(selectedOrder.customerName, "customerName")}
-                              className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                              title="Copy Telegram Name"
-                            >
-                              {copiedKey === "customerName" ? (
-                                <>
-                                  <Check className="w-2 h-2 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2 h-2 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
+                          {copiedKey === "customerName" ? (
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                           )}
                         </div>
                       </div>
@@ -3079,31 +3073,20 @@ export default function AdminPage() {
                             TELEGRAM HANDLE
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                          <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-tight tracking-normal truncate">
+                        <div 
+                          onClick={() => copyToClipboard(selectedOrder.customerUsername, "customerUsername", "TELEGRAM HANDLE")}
+                          className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy Telegram Handle"
+                        >
+                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.customerUsername 
                               ? (selectedOrder.customerUsername.startsWith('@') ? selectedOrder.customerUsername : `@${selectedOrder.customerUsername}`) 
                               : "None"}
                           </span>
-                          {selectedOrder.customerUsername && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(selectedOrder.customerUsername, "customerUsername")}
-                              className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                              title="Copy Telegram Handle"
-                            >
-                              {copiedKey === "customerUsername" ? (
-                                <>
-                                  <Check className="w-2 h-2 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2 h-2 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
+                          {copiedKey === "customerUsername" ? (
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                           )}
                         </div>
                       </div>
@@ -3116,29 +3099,18 @@ export default function AdminPage() {
                             TELEGRAM UID
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                          <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-tight tracking-normal truncate">
+                        <div 
+                          onClick={() => copyToClipboard(String(selectedOrder.customerId || selectedOrder.tgUserId), "customerId", "TELEGRAM UID")}
+                          className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy Telegram UID"
+                        >
+                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.customerId || selectedOrder.tgUserId || "None"}
                           </span>
-                          {(selectedOrder.customerId || selectedOrder.tgUserId) && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(String(selectedOrder.customerId || selectedOrder.tgUserId), "customerId")}
-                              className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                              title="Copy Telegram UID"
-                            >
-                              {copiedKey === "customerId" ? (
-                                <>
-                                  <Check className="w-2 h-2 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2 h-2 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
+                          {copiedKey === "customerId" ? (
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                           )}
                         </div>
                       </div>
@@ -3151,29 +3123,18 @@ export default function AdminPage() {
                             PRIME MID
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                          <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-tight tracking-normal truncate">
+                        <div 
+                          onClick={() => copyToClipboard(selectedOrder.primeMemberId, "primeMemberId", "PRIME MID")}
+                          className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy PRIME MID"
+                        >
+                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.primeMemberId || "Unassigned"}
                           </span>
-                          {selectedOrder.primeMemberId && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(selectedOrder.primeMemberId, "primeMemberId")}
-                              className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                              title="Copy PRIME MID"
-                            >
-                              {copiedKey === "primeMemberId" ? (
-                                <>
-                                  <Check className="w-2 h-2 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2 h-2 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
+                          {copiedKey === "primeMemberId" ? (
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                           )}
                         </div>
                       </div>
@@ -3196,29 +3157,18 @@ export default function AdminPage() {
                             IP ADDRESS
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                          <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-tight tracking-normal truncate">
+                        <div 
+                          onClick={() => copyToClipboard(selectedOrder.ip || selectedOrder.deviceSnapshot?.ip, "ipAddress", "IP ADDRESS")}
+                          className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy IP Address"
+                        >
+                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.ip || selectedOrder.deviceSnapshot?.ip || "000.00.000.000"}
                           </span>
-                          {(selectedOrder.ip || selectedOrder.deviceSnapshot?.ip) && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(selectedOrder.ip || selectedOrder.deviceSnapshot?.ip, "ipAddress")}
-                              className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                              title="Copy IP Address"
-                            >
-                              {copiedKey === "ipAddress" ? (
-                                <>
-                                  <Check className="w-2 h-2 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2 h-2 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
+                          {copiedKey === "ipAddress" ? (
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                           )}
                         </div>
                       </div>
@@ -3237,29 +3187,18 @@ export default function AdminPage() {
                                 COORDINATES
                               </span>
                             </div>
-                            <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                              <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-tight tracking-normal truncate">
+                            <div 
+                              onClick={() => copyToClipboard(coords, "coordinates", "COORDINATES")}
+                              className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
+                              title="Click to copy Coordinates"
+                            >
+                              <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                                 {coords}
                               </span>
-                              {coords !== "Not captured" && (
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(coords, "coordinates")}
-                                  className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                                  title="Copy Coordinates"
-                                >
-                                  {copiedKey === "coordinates" ? (
-                                    <>
-                                      <Check className="w-2 h-2 text-emerald-600" />
-                                      <span className="text-emerald-700 font-bold">Copied</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-2 h-2 text-slate-400" />
-                                      <span>Copy</span>
-                                    </>
-                                  )}
-                                </button>
+                              {copiedKey === "coordinates" ? (
+                                <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                              ) : (
+                                <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                               )}
                             </div>
                           </div>
@@ -3284,29 +3223,18 @@ export default function AdminPage() {
                                 DEVICE IDENTIFIER
                               </span>
                             </div>
-                            <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                              <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-tight tracking-normal truncate">
+                            <div 
+                              onClick={() => copyToClipboard(devId, "deviceIdentifier", "DEVICE IDENTIFIER")}
+                              className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
+                              title="Click to copy Device Identifier"
+                            >
+                              <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                                 {devId}
                               </span>
-                              {devId !== "Not captured" && (
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(devId, "deviceIdentifier")}
-                                  className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                                  title="Copy Device Identifier"
-                                >
-                                  {copiedKey === "deviceIdentifier" ? (
-                                    <>
-                                      <Check className="w-2 h-2 text-emerald-600" />
-                                      <span className="text-emerald-700 font-bold">Copied</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-2 h-2 text-slate-400" />
-                                      <span>Copy</span>
-                                    </>
-                                  )}
-                                </button>
+                              {copiedKey === "deviceIdentifier" ? (
+                                <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                              ) : (
+                                <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                               )}
                             </div>
                           </div>
@@ -3330,29 +3258,18 @@ export default function AdminPage() {
                                 SESSION TOKEN
                               </span>
                             </div>
-                            <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                              <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-tight tracking-normal truncate">
+                            <div 
+                              onClick={() => copyToClipboard(sessToken, "sessionToken", "SESSION TOKEN")}
+                              className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
+                              title="Click to copy Session Token"
+                            >
+                              <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                                 {sessToken}
                               </span>
-                              {sessToken !== "Not captured" && (
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(sessToken, "sessionToken")}
-                                  className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                                  title="Copy Session Token"
-                                >
-                                  {copiedKey === "sessionToken" ? (
-                                    <>
-                                      <Check className="w-2 h-2 text-emerald-600" />
-                                      <span className="text-emerald-700 font-bold">Copied</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-2 h-2 text-slate-400" />
-                                      <span>Copy</span>
-                                    </>
-                                  )}
-                                </button>
+                              {copiedKey === "sessionToken" ? (
+                                <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                              ) : (
+                                <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                               )}
                             </div>
                           </div>
@@ -3367,29 +3284,18 @@ export default function AdminPage() {
                             PRECISE GPS ADDRESS
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-start gap-1.5">
-                          <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-snug tracking-normal break-words flex-1">
+                        <div 
+                          onClick={() => copyToClipboard(gpsStreetAddressText, "gpsAddress", "PRECISE GPS ADDRESS")}
+                          className="mt-0.5 flex items-start gap-1 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy Precise GPS Address"
+                        >
+                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
                             {gpsStreetAddressText}
                           </span>
-                          {gpsStreetAddressText && gpsStreetAddressText !== "Not captured" && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(gpsStreetAddressText, "gpsAddress")}
-                              className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0 mt-0.5"
-                              title="Copy Precise GPS Address"
-                            >
-                              {copiedKey === "gpsAddress" ? (
-                                <>
-                                  <Check className="w-2 h-2 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2 h-2 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
+                          {copiedKey === "gpsAddress" ? (
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
                           )}
                         </div>
                       </div>
@@ -3412,29 +3318,18 @@ export default function AdminPage() {
                             RECEIVER'S NAME
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                          <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-tight tracking-normal truncate">
+                        <div 
+                          onClick={() => copyToClipboard(selectedOrder.receiverName, "receiverName", "RECEIVER NAME")}
+                          className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy Receiver's Name"
+                        >
+                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.receiverName || "None"}
                           </span>
-                          {selectedOrder.receiverName && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(selectedOrder.receiverName, "receiverName")}
-                              className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                              title="Copy Receiver's Name"
-                            >
-                              {copiedKey === "receiverName" ? (
-                                <>
-                                  <Check className="w-2 h-2 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2 h-2 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
+                          {copiedKey === "receiverName" ? (
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                           )}
                         </div>
                       </div>
@@ -3447,29 +3342,18 @@ export default function AdminPage() {
                             RECEIVER'S PHONE
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                          <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-tight tracking-normal truncate">
+                        <div 
+                          onClick={() => copyToClipboard(selectedOrder.receiverPhone, "receiverPhone", "RECEIVER PHONE")}
+                          className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy Receiver's Phone"
+                        >
+                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.receiverPhone || "None"}
                           </span>
-                          {selectedOrder.receiverPhone && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(selectedOrder.receiverPhone, "receiverPhone")}
-                              className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                              title="Copy Receiver's Phone"
-                            >
-                              {copiedKey === "receiverPhone" ? (
-                                <>
-                                  <Check className="w-2 h-2 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2 h-2 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
+                          {copiedKey === "receiverPhone" ? (
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                           )}
                         </div>
                       </div>
@@ -3482,29 +3366,18 @@ export default function AdminPage() {
                             DELIVERY ADDRESS
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-start gap-1.5">
-                          <span className="font-ibm-condensed font-bold text-slate-950 text-[12.5px] leading-snug tracking-normal break-words flex-1">
+                        <div 
+                          onClick={() => copyToClipboard(deliveryAddressText, "deliveryAddress", "DELIVERY ADDRESS")}
+                          className="mt-0.5 flex items-start gap-1 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy Delivery Address"
+                        >
+                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
                             {deliveryAddressText || "None"}
                           </span>
-                          {deliveryAddressText && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(deliveryAddressText, "deliveryAddress")}
-                              className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0 mt-0.5"
-                              title="Copy Delivery Address"
-                            >
-                              {copiedKey === "deliveryAddress" ? (
-                                <>
-                                  <Check className="w-2 h-2 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2 h-2 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
+                          {copiedKey === "deliveryAddress" ? (
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
                           )}
                         </div>
                       </div>
@@ -3517,29 +3390,18 @@ export default function AdminPage() {
                             DELIVERY NOTES
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-start gap-1.5">
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-snug tracking-normal break-words flex-1">
+                        <div 
+                          onClick={() => copyToClipboard(selectedOrder.notes, "notes", "DELIVERY NOTES")}
+                          className="mt-0.5 flex items-start gap-1 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy Delivery Notes"
+                        >
+                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.notes || "None"}
                           </span>
-                          {selectedOrder.notes && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(selectedOrder.notes, "notes")}
-                              className="inline-flex items-center gap-0.5 px-1 py-0 h-3.5 rounded text-[8px] font-mono leading-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0 mt-0.5"
-                              title="Copy Delivery Notes"
-                            >
-                              {copiedKey === "notes" ? (
-                                <>
-                                  <Check className="w-2 h-2 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2 h-2 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
+                          {copiedKey === "notes" ? (
+                            <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
                           )}
                         </div>
                       </div>
@@ -3619,17 +3481,6 @@ export default function AdminPage() {
                         </span>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setModifyingOrder(selectedOrder);
-                        setIsModifyModalOpen(true);
-                      }}
-                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                    >
-                      <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Modify Items & Pricing</span>
-                    </button>
                   </div>
                   <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
                     {(selectedOrder.items || []).map((it: any, i: number) => {
@@ -3646,17 +3497,30 @@ export default function AdminPage() {
                               )}
                             </div>
                             <p className="text-slate-500">
-                              Qty {it.quantity} &bull; Unit {isFreeItem ? <span className="text-emerald-600 font-bold">FREE</span> : formatPHP(it.price)}
+                              Qty {it.quantity} &bull; Unit {isFreeItem ? <span className="text-emerald-600 font-bold">FREE</span> : <span className="font-ibm-condensed">{formatPHP(it.price)}</span>}
                               {it.originalPrice && it.originalPrice !== it.price && (
-                                <span className="text-slate-400 line-through ml-1.5">
+                                <span className="text-slate-400 line-through ml-1.5 font-ibm-condensed">
                                   {formatPHP(it.originalPrice)}
                                 </span>
                               )}
                             </p>
                           </div>
-                          <p className={`font-bold text-sm ${isFreeItem ? "text-emerald-600 font-black" : "text-slate-900"}`}>
-                            {isFreeItem ? "FREE" : formatPHP(Number(it.price) * (Number(it.quantity) || 1))}
-                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <p className={`font-ibm-condensed font-medium text-sm ${isFreeItem ? "text-emerald-600 font-bold" : "text-slate-900"}`}>
+                              {isFreeItem ? "FREE" : formatPHP(Number(it.price) * (Number(it.quantity) || 1))}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModifyingOrder(selectedOrder);
+                                setIsModifyModalOpen(true);
+                              }}
+                              className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                              title="Edit item price or quantity"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -3665,9 +3529,22 @@ export default function AdminPage() {
                     <div className="p-3 bg-slate-50/70 border-t border-slate-100 space-y-1.5 text-xs font-mono">
                       <div className="flex justify-between items-center text-slate-600">
                         <span>Items Subtotal</span>
-                        <span className="font-bold text-slate-900">
-                          {formatPHP(selectedOrder.subTotal || selectedOrder.items?.reduce((s: number, it: any) => s + (Number(it.price) * (Number(it.quantity) || 1)), 0) || 0)}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-ibm-condensed font-medium text-slate-900">
+                            {formatPHP(selectedOrder.subTotal || selectedOrder.items?.reduce((s: number, it: any) => s + (Number(it.price) * (Number(it.quantity) || 1)), 0) || 0)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModifyingOrder(selectedOrder);
+                              setIsModifyModalOpen(true);
+                            }}
+                            className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                            title="Edit subtotal / items"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Applied Charges */}
@@ -3683,9 +3560,22 @@ export default function AdminPage() {
                                 <span className="text-[10px] text-emerald-600 font-bold">(WAIVED / FREE)</span>
                               )}
                             </span>
-                            <span className={`font-semibold ${isChFree ? "text-emerald-600 font-bold" : "text-slate-800"}`}>
-                              {isChFree ? "FREE" : formatPHP(ch.amount || 0)}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`font-ibm-condensed font-medium ${isChFree ? "text-emerald-600 font-bold" : "text-slate-800"}`}>
+                                {isChFree ? "FREE" : formatPHP(ch.amount || 0)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setModifyingOrder(selectedOrder);
+                                  setIsModifyModalOpen(true);
+                                }}
+                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                title="Edit charge amount"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -3703,16 +3593,42 @@ export default function AdminPage() {
                               ({selectedOrder.deliveryFeePaymentMethod === "upon_delivery" ? "Paid upon delivery" : "Paid at checkout"})
                             </span>
                           </span>
-                          <span className={`font-semibold ${selectedOrder.isDeliveryFeeFree ? "text-emerald-600 font-bold" : "text-slate-800"}`}>
-                            {selectedOrder.isDeliveryFeeFree ? "FREE" : formatPHP(selectedOrder.deliveryFee)}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`font-ibm-condensed font-medium ${selectedOrder.isDeliveryFeeFree ? "text-emerald-600 font-bold" : "text-slate-800"}`}>
+                              {selectedOrder.isDeliveryFeeFree ? "FREE" : formatPHP(selectedOrder.deliveryFee)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModifyingOrder(selectedOrder);
+                                setIsModifyModalOpen(true);
+                              }}
+                              className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                              title="Edit delivery fee"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
 
                     <div className="p-3 bg-slate-100 flex items-center justify-between font-mono font-bold text-slate-900 border-t border-slate-200">
                       <span>Total Amount</span>
-                      <span className="text-base">{formatPHP(selectedOrder.totalAmount)}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base font-ibm-condensed font-semibold">{formatPHP(selectedOrder.totalAmount)}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModifyingOrder(selectedOrder);
+                            setIsModifyModalOpen(true);
+                          }}
+                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-200 rounded transition-colors cursor-pointer"
+                          title="Modify items & total amount"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
