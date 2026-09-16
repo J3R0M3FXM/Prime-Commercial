@@ -64,8 +64,10 @@ import {
   AtSign,
   Hash,
   Compass,
-  Phone
+  Phone,
+  QrCode
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
 import DiagnosticsModule from "@/app/components/admin/diagnostics-module";
@@ -317,6 +319,10 @@ export default function AdminPage() {
   // Modify Order state
   const [modifyingOrder, setModifyingOrder] = useState<any | null>(null);
   const [isModifyModalOpen, setIsModifyModalOpen] = useState<boolean>(false);
+
+  // QR Code Scanner Modal state
+  const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
+  const [qrZoomedOrder, setQrZoomedOrder] = useState<any | null>(null);
 
   // Bulk Order Selection & Actions
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -2668,58 +2674,88 @@ export default function AdminPage() {
             </div>
 
             {/* Screen-Only Order Management Container */}
-            <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 screen-only">
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">Order Identifier</span>
-                      <div 
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider border transition-all duration-500 ease-in-out ${
-                          selectedOrder.status === "Completed"
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                            : selectedOrder.status === "Processing"
-                            ? "bg-blue-50 text-blue-800 border-blue-300"
-                            : "bg-amber-50 text-amber-900 border-amber-300"
-                        } ${statusJustSaved?.orderId === selectedOrder.id ? "ring-2 ring-emerald-500 ring-offset-1 scale-105" : ""}`}
-                      >
-                        <span className={`w-2 h-2 rounded-full transition-colors duration-500 ${
-                          selectedOrder.status === "Completed"
-                            ? "bg-emerald-500"
-                            : selectedOrder.status === "Processing"
-                            ? "bg-blue-500"
-                            : "bg-amber-500"
-                        }`} />
-                        <span>{selectedOrder.status || "Pending"}</span>
-                        {statusJustSaved?.orderId === selectedOrder.id && (
-                          <span className="text-[10px] text-emerald-700 font-black ml-0.5 animate-pulse">✓ Saved</span>
-                        )}
+            <div className="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 lg:p-6 space-y-4 screen-only">
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+                  <div className="flex items-start gap-3">
+                    {/* Scannable Order QR Code Generator Badge */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQrZoomedOrder(selectedOrder);
+                        setIsQrModalOpen(true);
+                      }}
+                      className="p-1.5 bg-white border border-slate-200 rounded-xl shadow-2xs hover:shadow-md hover:border-slate-400 transition-all cursor-pointer flex flex-col items-center shrink-0 group"
+                      title="Click to enlarge QR Code for scanner terminal"
+                    >
+                      <div className="relative">
+                        <QRCodeSVG
+                          value={selectedOrder.orderNumber || "ORDER-000"}
+                          size={52}
+                          level="M"
+                          marginSize={0}
+                          fgColor="#090d16"
+                        />
+                        <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/10 transition-colors rounded flex items-center justify-center">
+                          <QrCode className="w-4 h-4 text-slate-900 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-0.5 rounded shadow-xs" />
+                        </div>
                       </div>
+                      <span className="text-[7.5px] font-mono font-bold text-slate-500 group-hover:text-slate-900 mt-1 uppercase tracking-tighter flex items-center gap-0.5">
+                        <QrCode className="w-2 h-2 text-slate-400" />
+                        <span>Scan QR</span>
+                      </span>
+                    </button>
+
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">Order Identifier</span>
+                        <div 
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider border transition-all duration-500 ease-in-out ${
+                            selectedOrder.status === "Completed"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                              : selectedOrder.status === "Processing"
+                              ? "bg-blue-50 text-blue-800 border-blue-300"
+                              : "bg-amber-50 text-amber-900 border-amber-300"
+                          } ${statusJustSaved?.orderId === selectedOrder.id ? "ring-2 ring-emerald-500 ring-offset-1 scale-105" : ""}`}
+                        >
+                          <span className={`w-2 h-2 rounded-full transition-colors duration-500 ${
+                            selectedOrder.status === "Completed"
+                              ? "bg-emerald-500"
+                              : selectedOrder.status === "Processing"
+                              ? "bg-blue-500"
+                              : "bg-amber-500"
+                          }`} />
+                          <span>{selectedOrder.status || "Pending"}</span>
+                          {statusJustSaved?.orderId === selectedOrder.id && (
+                            <span className="text-[10px] text-emerald-700 font-black ml-0.5 animate-pulse">✓ Saved</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <h2 className="text-xl sm:text-2xl font-heading font-normal text-slate-900 tracking-tight">{selectedOrder.orderNumber}</h2>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(selectedOrder.orderNumber, "orderNumber")}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium transition-colors border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                          title="Copy Order Number"
+                        >
+                          {copiedKey === "orderNumber" ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span className="text-emerald-700 font-bold text-[9px]">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3 text-slate-500" />
+                              <span className="text-[9px]">Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-xs font-mono text-slate-500 mt-1">
+                        Placed {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : "Recent"}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <h2 className="text-2xl font-heading font-normal text-slate-900 tracking-tight">{selectedOrder.orderNumber}</h2>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(selectedOrder.orderNumber, "orderNumber")}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium transition-colors border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
-                        title="Copy Order Number"
-                      >
-                        {copiedKey === "orderNumber" ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-600" />
-                            <span className="text-emerald-700 font-bold text-[9px]">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3 text-slate-500" />
-                            <span className="text-[9px]">Copy</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-xs font-mono text-slate-500 mt-1">
-                      Placed {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : "Recent"}
-                    </p>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
@@ -5100,6 +5136,80 @@ export default function AdminPage() {
           }}
           onOrderUpdated={handleOrderModified}
         />
+      )}
+
+      {/* Enlarged QR Code Scanner Terminal Modal */}
+      {isQrModalOpen && qrZoomedOrder && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-left">
+                <QrCode className="w-5 h-5 text-indigo-600" />
+                <div>
+                  <h3 className="font-heading font-black text-sm uppercase tracking-wider text-slate-900">Order Barcode QR</h3>
+                  <p className="text-[10px] font-mono text-slate-500">Fast Scan Terminal Identifier</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsQrModalOpen(false);
+                  setQrZoomedOrder(null);
+                }}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-mono font-bold cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col items-center justify-center space-y-3">
+              <div className="p-3 bg-white rounded-xl shadow-xs border border-slate-200">
+                <QRCodeSVG
+                  value={qrZoomedOrder.orderNumber || "ORDER-000"}
+                  size={200}
+                  level="H"
+                  marginSize={1}
+                  fgColor="#090d16"
+                />
+              </div>
+
+              <div>
+                <span className="font-heading font-black text-lg text-slate-900 tracking-tight block">
+                  {qrZoomedOrder.orderNumber}
+                </span>
+                <span className="text-[11px] font-mono text-slate-500">
+                  Status: <strong className="uppercase text-slate-800">{qrZoomedOrder.status || "Pending"}</strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-indigo-50/80 border border-indigo-100 rounded-xl text-left flex items-start gap-2 text-[11px] font-mono text-indigo-900">
+              <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+              <span>Scan with handheld laser readers or mobile camera scanner to quickly locate and verify parcel dispatch.</span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => copyToClipboard(qrZoomedOrder.orderNumber, "orderNumber")}
+                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold uppercase tracking-wider font-mono transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{copiedKey === "orderNumber" ? "Copied!" : "Copy Number"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsQrModalOpen(false);
+                  setQrZoomedOrder(null);
+                }}
+                className="flex-1 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold uppercase tracking-wider font-mono transition-colors cursor-pointer shadow-xs"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Real-Time Silent Sync Live Toast Notification */}
