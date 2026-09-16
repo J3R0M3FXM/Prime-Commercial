@@ -1078,28 +1078,38 @@ export default function CheckoutModal({
                   Selected Items ({selectedItems.length})
                 </span>
                 <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl bg-gray-50/50 p-2 max-h-48 overflow-y-auto">
-                  {selectedItems.map((item) => (
-                    <div key={item.id} className="p-2 flex items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <img
-                          src={item.imageUrl || "https://picsum.photos/seed/prime/100"}
-                          alt={item.name}
-                          className="w-10 h-10 object-cover rounded bg-white border border-gray-200 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <p className="font-heading font-medium uppercase text-gray-900 truncate">
-                            {item.name}
-                          </p>
-                          <p className="text-[11px] font-mono text-gray-500">
-                            {item.quantity} × {formatPHP(item.price || 0)}
-                          </p>
+                  {selectedItems.map((item) => {
+                    const isFreeItem = Boolean(item.isFree || Number(item.price) === 0);
+                    return (
+                      <div key={item.id} className="p-2 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={item.imageUrl || "https://picsum.photos/seed/prime/100"}
+                            alt={item.name}
+                            className="w-10 h-10 object-cover rounded bg-white border border-gray-200 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-heading font-medium uppercase text-gray-900 truncate">
+                                {item.name}
+                              </p>
+                              {isFreeItem && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                                  FREE
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] font-mono text-gray-500">
+                              {item.quantity} × {isFreeItem ? <span className="text-emerald-600 font-bold">FREE</span> : formatPHP(item.price || 0)}
+                            </p>
+                          </div>
                         </div>
+                        <span className={`font-mono font-semibold shrink-0 ${isFreeItem ? "text-emerald-600 font-bold" : "text-gray-900"}`}>
+                          {isFreeItem ? "FREE" : formatPHP((item.price || 0) * (item.quantity || 1))}
+                        </span>
                       </div>
-                      <span className="font-mono font-semibold text-gray-900 shrink-0">
-                        {formatPHP((item.price || 0) * (item.quantity || 1))}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

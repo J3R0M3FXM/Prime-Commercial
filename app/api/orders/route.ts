@@ -90,6 +90,27 @@ export async function POST(request: Request) {
       }
     }
 
+    const forwarded = request.headers.get("x-forwarded-for");
+    const realIp = request.headers.get("x-real-ip");
+    const clientIp = forwarded ? forwarded.split(",")[0].trim() : (realIp || "");
+
+    let gpsStreetAddress = '';
+    if (deviceSnapshot?.location?.lat && deviceSnapshot?.location?.lon) {
+      try {
+        const geoKey = process.env.GEOAPIFY_API_KEY;
+        if (geoKey) {
+          const geoUrl = `https://api.geoapify.com/v1/geocode/reverse?lat=${deviceSnapshot.location.lat}&lon=${deviceSnapshot.location.lon}&format=json&apiKey=${geoKey}`;
+          const gRes = await fetch(geoUrl, { signal: AbortSignal.timeout(2000) });
+          if (gRes.ok) {
+            const gData = await gRes.json();
+            gpsStreetAddress = gData.results?.[0]?.formatted || '';
+          }
+        }
+      } catch (e) {
+        console.warn("Could not reverse geocode order GPS:", e);
+      }
+    }
+
     const MAX_RETRIES = 5;
     let orderCreated = false;
     let finalOrderData: any = null;
@@ -254,7 +275,16 @@ export async function POST(request: Request) {
             payableOnDelivery: payableOnDelivery !== undefined ? Number(payableOnDelivery) : 0,
             status: 'Pending',
             notes: notes || 'Submitted via Telegram Mini App Storefront',
-            deviceSnapshot: deviceSnapshot || null,
+            ip: clientIp || deviceSnapshot?.ip || '',
+            gpsStreetAddress: gpsStreetAddress || deliveryAddress?.formatted || '',
+            deviceSnapshot: deviceSnapshot ? {
+              ...deviceSnapshot,
+              ip: clientIp || deviceSnapshot.ip || '',
+              location: deviceSnapshot.location ? {
+                ...deviceSnapshot.location,
+                formattedStreetAddress: gpsStreetAddress || ''
+              } : null
+            } : (clientIp ? { ip: clientIp } : null),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };

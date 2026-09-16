@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { 
   Users, 
   Package, 
@@ -40,11 +40,16 @@ import {
   Stethoscope,
   Truck,
   Receipt,
-  CreditCard
+  CreditCard,
+  Zap,
+  Bell,
+  Volume2,
+  VolumeX
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
 import DiagnosticsModule from "@/app/components/admin/diagnostics-module";
+import ModifyOrderModal from "@/app/components/admin/modify-order-modal";
 import dynamic from 'next/dynamic';
 
 const LogisticsModule = dynamic(() => import('@/app/components/admin/logistics-module'), { 
@@ -287,6 +292,68 @@ export default function AdminPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [zoomedProofImage, setZoomedProofImage] = useState<string | null>(null);
 
+  // Modify Order state
+  const [modifyingOrder, setModifyingOrder] = useState<any | null>(null);
+  const [isModifyModalOpen, setIsModifyModalOpen] = useState<boolean>(false);
+
+  // Silent Real-Time Background Sync states & refs
+  const [silentSyncEnabled, setSilentSyncEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [lastSilentSync, setLastSilentSync] = useState<Date>(new Date());
+  const [isSilentSyncing, setIsSilentSyncing] = useState(false);
+  const [liveToast, setLiveToast] = useState<{
+    id: string;
+    title: string;
+    message: string;
+    type: "proof" | "order" | "info";
+    orderId?: string;
+    orderNumber?: string;
+  } | null>(null);
+
+  const ordersRef = useRef<any[]>(orders);
+  ordersRef.current = orders;
+
+  const isSilentSyncingRef = useRef(false);
+  const prevOrderMapRef = useRef<Map<string, any>>(new Map());
+  const hasInitializedOrdersRef = useRef(false);
+
+  // Pleasant Web Audio notification chime (no external audio assets required)
+  const playChime = useCallback((type: "proof" | "order" = "proof") => {
+    if (!soundEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === "proof") {
+        // High-pitched ascending chime: 659.25Hz (E5) -> 880Hz (A5)
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(659.25, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      } else {
+        // Warm notification tone
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.14);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }
+    } catch (e) {
+      // Audio context might be restricted before user gesture, safe to ignore
+    }
+  }, [soundEnabled]);
+
   // Custom non-blocking dialogs for sandbox iframes
   const [customConfirm, setCustomConfirm] = useState<{
     open: boolean;
@@ -328,6 +395,92 @@ export default function AdminPage() {
     }
   };
 
+  // Dedicated Silent Refresh across the entire Admin Panel
+  const fetchSilentData = useCallback(async () => {
+    if (isSilentSyncingRef.current) return;
+    isSilentSyncingRef.current = true;
+    setIsSilentSyncing(true);
+
+    try {
+      const t = Date.now();
+      const [ordRes, custRes, prodRes] = await Promise.all([
+        fetch(`/api/admin/orders?_t=${t}`, { cache: "no-store" }),
+        fetch(`/api/admin/customers?_t=${t}`, { cache: "no-store" }),
+        fetch(`/api/products?_t=${t}`, { cache: "no-store" }),
+      ]);
+
+      if (ordRes.ok) {
+        const newOrders: any[] = await ordRes.json();
+        const prevMap = prevOrderMapRef.current;
+
+        if (hasInitializedOrdersRef.current && prevMap.size > 0) {
+          let detectedProofOrder: any = null;
+          let detectedNewOrder: any = null;
+
+          for (const newOrd of newOrders) {
+            const prevOrd = prevMap.get(newOrd.id);
+            if (prevOrd) {
+              const hadProof = Boolean(prevOrd.paymentProofImage);
+              const hasProof = Boolean(newOrd.paymentProofImage);
+              const proofChanged = prevOrd.paymentProofImage !== newOrd.paymentProofImage;
+
+              if ((!hadProof && hasProof) || (hadProof && hasProof && proofChanged)) {
+                detectedProofOrder = newOrd;
+                break;
+              }
+            } else {
+              detectedNewOrder = newOrd;
+            }
+          }
+
+          if (detectedProofOrder) {
+            playChime("proof");
+            setLiveToast({
+              id: `proof-${Date.now()}`,
+              title: "Payment Proof Uploaded",
+              message: `Order #${detectedProofOrder.orderNumber || ""} has received payment proof.`,
+              type: "proof",
+              orderId: detectedProofOrder.id,
+              orderNumber: detectedProofOrder.orderNumber,
+            });
+          } else if (detectedNewOrder) {
+            playChime("order");
+            setLiveToast({
+              id: `order-${Date.now()}`,
+              title: "New Order Placed",
+              message: `Order #${detectedNewOrder.orderNumber || ""} was placed by ${detectedNewOrder.customerName || "Customer"}.`,
+              type: "order",
+              orderId: detectedNewOrder.id,
+              orderNumber: detectedNewOrder.orderNumber,
+            });
+          }
+        }
+
+        const newMap = new Map<string, any>();
+        newOrders.forEach(o => newMap.set(o.id, o));
+        prevOrderMapRef.current = newMap;
+        hasInitializedOrdersRef.current = true;
+
+        setOrders(newOrders);
+        ordersRef.current = newOrders;
+      }
+
+      if (custRes.ok) {
+        setCustomers(await custRes.json());
+      }
+      if (prodRes.ok) {
+        setProducts(await prodRes.json());
+      }
+
+      setLastSilentSync(new Date());
+    } catch (err) {
+      console.warn("Silent sync error:", err);
+    } finally {
+      isSilentSyncingRef.current = false;
+      setIsSilentSyncing(false);
+    }
+  }, [playChime]);
+
   const fetchAllData = async () => {
     setRefreshing(true);
     try {
@@ -339,13 +492,59 @@ export default function AdminPage() {
       ]);
       if (custRes.ok) setCustomers(await custRes.json());
       if (prodRes.ok) setProducts(await prodRes.json());
-      if (ordRes.ok) setOrders(await ordRes.json());
+      if (ordRes.ok) {
+        const orderData = await ordRes.json();
+        setOrders(orderData);
+        ordersRef.current = orderData;
+        const map = new Map<string, any>();
+        orderData.forEach((o: any) => map.set(o.id, o));
+        prevOrderMapRef.current = map;
+        hasInitializedOrdersRef.current = true;
+      }
+      setLastSilentSync(new Date());
     } catch (e) {
       console.error("Failed to load admin data", e);
     } finally {
       setRefreshing(false);
     }
   };
+
+  // Silent Real-Time Background Polling Effect
+  useEffect(() => {
+    if (!authorized || !silentSyncEnabled) return;
+
+    // Fast 3.5s refresh on Orders Management and Order Details views, 6s on other modules
+    const pollInterval = (view === "orders" || view === "order-detail") ? 3500 : 6000;
+
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchSilentData();
+    }, pollInterval);
+
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        fetchSilentData();
+      }
+    };
+
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+    };
+  }, [authorized, silentSyncEnabled, view, fetchSilentData]);
+
+  // Auto-dismiss live toast after 7s
+  useEffect(() => {
+    if (!liveToast) return;
+    const t = setTimeout(() => {
+      setLiveToast(null);
+    }, 7000);
+    return () => clearTimeout(t);
+  }, [liveToast]);
 
   // Fetch individual customer detailed dossier
   const fetchCustomerDetail = async (id: string) => {
@@ -630,6 +829,22 @@ export default function AdminPage() {
     }
   };
 
+  // Handle successful order modification from modal
+  const handleOrderModified = (updatedOrder: any) => {
+    setOrders(prev => prev.map(o => o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o));
+    if (selectedCustomerId) {
+      fetchCustomerDetail(selectedCustomerId);
+    }
+    setLiveToast({
+      id: `mod-${Date.now()}`,
+      title: "Order Modified",
+      message: `Order #${updatedOrder.orderNumber || updatedOrder.id} successfully updated. Total: ${formatPHP(updatedOrder.totalAmount)}.`,
+      type: "info",
+      orderId: updatedOrder.id,
+      orderNumber: updatedOrder.orderNumber,
+    });
+  };
+
   // Filtered lists
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => {
@@ -684,6 +899,63 @@ export default function AdminPage() {
   const selectedOrder = useMemo(() => {
     return orders.find(o => o.id === selectedOrderId);
   }, [orders, selectedOrderId]);
+
+  // Reverse geocoding for GPS street-level address in order details
+  const [resolvedGpsAddresses, setResolvedGpsAddresses] = useState<Record<string, string>>({});
+  const [loadingGpsOrderId, setLoadingGpsOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedOrder) return;
+    const orderId = selectedOrder.id;
+    if (selectedOrder.gpsStreetAddress) {
+      setResolvedGpsAddresses(prev => ({ ...prev, [orderId]: selectedOrder.gpsStreetAddress }));
+      return;
+    }
+    const loc = selectedOrder.deviceSnapshot?.location;
+    if (loc && loc.lat && loc.lon && !resolvedGpsAddresses[orderId]) {
+      setLoadingGpsOrderId(orderId);
+      fetch(`/api/geoapify/reverse?lat=${loc.lat}&lon=${loc.lon}`)
+        .then(res => res.json())
+        .then(data => {
+          const formatted = data.results?.[0]?.formatted;
+          if (formatted) {
+            setResolvedGpsAddresses(prev => ({ ...prev, [orderId]: formatted }));
+          }
+        })
+        .catch(err => {
+          console.warn("Could not reverse geocode order GPS:", err);
+        })
+        .finally(() => {
+          setLoadingGpsOrderId(null);
+        });
+    }
+  }, [selectedOrder?.id, selectedOrder?.gpsStreetAddress, selectedOrder?.deviceSnapshot?.location?.lat, selectedOrder?.deviceSnapshot?.location?.lon, resolvedGpsAddresses]);
+
+  const deliveryAddressText = useMemo(() => {
+    if (!selectedOrder?.deliveryAddress) return "";
+    const addr = selectedOrder.deliveryAddress;
+    if (typeof addr === "string") return addr;
+    const parts = [addr.formatted || addr.address || ""];
+    if (addr.unitDetails) parts.push(`(${addr.unitDetails})`);
+    return parts.filter(Boolean).join(" ").trim();
+  }, [selectedOrder?.deliveryAddress]);
+
+  const gpsStreetAddressText = useMemo(() => {
+    if (!selectedOrder) return "Not captured";
+    if (selectedOrder.gpsStreetAddress) return selectedOrder.gpsStreetAddress;
+    if (selectedOrder.id && resolvedGpsAddresses[selectedOrder.id]) {
+      return resolvedGpsAddresses[selectedOrder.id];
+    }
+    const loc = selectedOrder.deviceSnapshot?.location;
+    if (loc && loc.lat && loc.lon) {
+      if (loadingGpsOrderId === selectedOrder.id) return "Resolving GPS street address...";
+      return `${loc.lat.toFixed(5)}, ${loc.lon.toFixed(5)}`;
+    }
+    if (selectedOrder.deliveryAddress?.formatted) {
+      return selectedOrder.deliveryAddress.formatted;
+    }
+    return "Not captured";
+  }, [selectedOrder, resolvedGpsAddresses, loadingGpsOrderId]);
 
   // Auth checking screen
   if (checkingAuth) {
@@ -804,6 +1076,24 @@ export default function AdminPage() {
               </div>
 
               <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100/90 border border-slate-200 rounded-lg text-xs font-mono">
+                  <span className="relative flex h-2 w-2">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isSilentSyncing ? "bg-emerald-500 opacity-75" : "bg-emerald-400 opacity-50"}`}></span>
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${isSilentSyncing ? "bg-emerald-600" : "bg-emerald-500"}`}></span>
+                  </span>
+                  <span className="text-slate-700 font-bold hidden sm:inline">
+                    {isSilentSyncing ? "Syncing..." : "Live Sync"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    title={soundEnabled ? "Mute notification sounds" : "Enable notification sounds"}
+                    className="ml-1 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                  >
+                    {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-600" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
+                  </button>
+                </div>
+
                 <button
                   onClick={fetchAllData}
                   disabled={refreshing}
@@ -1633,16 +1923,26 @@ export default function AdminPage() {
 
                           {/* Items table */}
                           <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
-                            {(ord.items || []).map((item: any, i: number) => (
-                              <div key={i} className="p-2.5 flex items-center justify-between">
-                                <span className="font-medium text-slate-800">
-                                  {item.quantity}x {item.name}
-                                </span>
-                                <span className="font-bold text-slate-900">
-                                  {formatPHP(Number(item.price) * (Number(item.quantity) || 1))}
-                                </span>
-                              </div>
-                            ))}
+                            {(ord.items || []).map((item: any, i: number) => {
+                              const isFreeItem = Boolean(item.isFree || Number(item.price) === 0);
+                              return (
+                                <div key={i} className="p-2.5 flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="font-medium text-slate-800 truncate">
+                                      {item.quantity}x {item.name}
+                                    </span>
+                                    {isFreeItem && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                                        FREE
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className={`font-bold shrink-0 ${isFreeItem ? "text-emerald-600 font-black" : "text-slate-900"}`}>
+                                    {isFreeItem ? "FREE" : formatPHP(Number(item.price) * (Number(item.quantity) || 1))}
+                                  </span>
+                                </div>
+                              );
+                            })}
                             <div className="p-2.5 bg-slate-50 flex items-center justify-between font-bold text-slate-900">
                               <span>Total Paid</span>
                               <span className="text-sm">{formatPHP(ord.totalAmount)}</span>
@@ -1691,13 +1991,26 @@ export default function AdminPage() {
                     </span>
                   </div>
 
-                  <button
-                    onClick={fetchAllData}
-                    disabled={refreshing}
-                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200/80 rounded-lg text-emerald-800 text-[11px] font-mono">
+                      <span className="relative flex h-2 w-2">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isSilentSyncing ? "bg-emerald-500 opacity-75" : "bg-emerald-400 opacity-50"}`}></span>
+                        <span className={`relative inline-flex rounded-full h-2 w-2 ${isSilentSyncing ? "bg-emerald-600" : "bg-emerald-500"}`}></span>
+                      </span>
+                      <span className="font-bold">
+                        {isSilentSyncing ? "Detecting..." : "Auto-Detect Active"}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={fetchAllData}
+                      disabled={refreshing}
+                      className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer"
+                      title="Manual Refresh"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -1770,6 +2083,15 @@ export default function AdminPage() {
                         }`}>
                           {ord.status || "Processing"}
                         </span>
+                        {ord.paymentProofImage ? (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-1">
+                            <Receipt className="w-2.5 h-2.5" /> Proof Uploaded
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono text-slate-400 bg-slate-100 border border-slate-200">
+                            No Proof Yet
+                          </span>
+                        )}
                       </div>
 
                       <p className="text-xs text-slate-600 font-mono mt-1">
@@ -1777,7 +2099,7 @@ export default function AdminPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
                       <div className="text-right font-mono">
                         <p className="text-sm font-black text-slate-900">
                           {formatPHP(ord.totalAmount)}
@@ -1786,6 +2108,19 @@ export default function AdminPage() {
                           {ord.items?.length || 1} line item(s)
                         </p>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setModifyingOrder(ord);
+                          setIsModifyModalOpen(true);
+                        }}
+                        className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-amber-50 hover:border-amber-300 text-slate-600 hover:text-amber-800 transition-colors shadow-2xs cursor-pointer"
+                        title="Modify Order Items & Pricing"
+                      >
+                        <Sliders className="w-3.5 h-3.5" />
+                      </button>
 
                       <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-slate-900 group-hover:text-white flex items-center justify-center transition-colors">
                         <ChevronRight className="w-4 h-4" />
@@ -1829,17 +2164,49 @@ export default function AdminPage() {
 
             <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
                   <div>
                     <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">Order Identifier</span>
-                    <h2 className="text-2xl font-heading font-black text-slate-900">{selectedOrder.orderNumber}</h2>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <h2 className="text-2xl font-heading font-normal text-slate-900 tracking-tight">{selectedOrder.orderNumber}</h2>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(selectedOrder.orderNumber, "orderNumber")}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium transition-colors border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                        title="Copy Order Number"
+                      >
+                        {copiedKey === "orderNumber" ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span className="text-emerald-700 font-bold text-[9px]">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3 text-slate-500" />
+                            <span className="text-[9px]">Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                     <p className="text-xs font-mono text-slate-500 mt-1">
-                      Placed: {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : "Recent"}
+                      Placed {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : "Recent"}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-slate-500">Status:</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModifyingOrder(selectedOrder);
+                        setIsModifyModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold uppercase tracking-wider font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Modify products, quantities, prices, or charges"
+                    >
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>Modify Order</span>
+                    </button>
+                    <span className="text-xs font-mono text-slate-500">Status</span>
                     {(["Processing", "Completed", "Pending"] as const).map(st => (
                       <button
                         key={st}
@@ -1856,90 +2223,352 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-6 border-b border-slate-100 text-xs font-mono">
-                  <div>
-                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Customer</p>
-                    <p className="text-slate-900 font-bold text-sm">{selectedOrder.customerName}</p>
-                    <p className="text-slate-500">Prime ID: {selectedOrder.primeMemberId || "Unassigned"}</p>
-                    <p className="text-slate-500">Telegram ID: {selectedOrder.customerId}</p>
-                  </div>
+                {/* Compact & Dense 2-Column Fields View */}
+                <div className="py-5 border-b border-slate-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 font-mono text-xs">
+                    
+                    {/* Telegram Name */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        Telegram Name
+                      </span>
+                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
+                        {selectedOrder.customerName || "Customer"}
+                      </span>
+                    </div>
 
-                  <div>
-                    <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Checkout Device Info</p>
-                    {selectedOrder.deviceSnapshot ? (
-                      <div className="text-slate-600">
-                        <p>IP: {selectedOrder.deviceSnapshot.ip || "Captured"}</p>
-                        <p>Browser: {selectedOrder.deviceSnapshot.browser || "Telegram Mini App"}</p>
+                    {/* Telegram Handle */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        Telegram Handle
+                      </span>
+                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
+                        {selectedOrder.customerUsername 
+                          ? (selectedOrder.customerUsername.startsWith('@') ? selectedOrder.customerUsername : `@${selectedOrder.customerUsername}`) 
+                          : "None"}
+                      </span>
+                    </div>
+
+                    {/* Telegram ID */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        Telegram ID
+                      </span>
+                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
+                        {selectedOrder.customerId || selectedOrder.tgUserId || "None"}
+                      </span>
+                    </div>
+
+                    {/* PRIME Member ID */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        PRIME Member ID
+                      </span>
+                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
+                        {selectedOrder.primeMemberId || "Unassigned"}
+                      </span>
+                    </div>
+
+                    {/* IP Address */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        IP Address
+                      </span>
+                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
+                        {selectedOrder.ip || selectedOrder.deviceSnapshot?.ip || "N/A"}
+                      </span>
+                    </div>
+
+                    {/* GPS street-level address */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          GPS street-level address
+                        </span>
+                        {selectedOrder.deviceSnapshot?.location?.source && (
+                          <span className="text-[9px] text-slate-500 bg-slate-200/60 px-1 rounded">
+                            {selectedOrder.deviceSnapshot.location.source}
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-slate-400">Standard Web Mini App Checkout</p>
-                    )}
+                      <span className="text-slate-900 font-bold text-xs leading-snug break-words">
+                        {gpsStreetAddressText}
+                      </span>
+                    </div>
+
+                    {/* Receiver's Name (with tiny copy button) */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Receiver's Name
+                        </span>
+                        {selectedOrder.receiverName && (
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(selectedOrder.receiverName, "receiverName")}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                            title="Copy Receiver's Name"
+                          >
+                            {copiedKey === "receiverName" ? (
+                              <>
+                                <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                <span className="text-emerald-700 font-bold">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
+                        {selectedOrder.receiverName || "None"}
+                      </span>
+                    </div>
+
+                    {/* Receiver's Phone (with tiny copy button) */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Receiver's Phone
+                        </span>
+                        {selectedOrder.receiverPhone && (
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(selectedOrder.receiverPhone, "receiverPhone")}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                            title="Copy Receiver's Phone"
+                          >
+                            {copiedKey === "receiverPhone" ? (
+                              <>
+                                <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                <span className="text-emerald-700 font-bold">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-slate-900 font-bold text-xs sm:text-sm truncate">
+                        {selectedOrder.receiverPhone || "None"}
+                      </span>
+                    </div>
+
+                    {/* Delivery Address (with tiny copy button) */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Delivery Address
+                        </span>
+                        {deliveryAddressText && (
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(deliveryAddressText, "deliveryAddress")}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                            title="Copy Delivery Address"
+                          >
+                            {copiedKey === "deliveryAddress" ? (
+                              <>
+                                <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                <span className="text-emerald-700 font-bold">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-slate-900 font-bold text-xs leading-snug break-words">
+                        {deliveryAddressText || "None"}
+                      </span>
+                    </div>
+
+                    {/* Notes (with tiny copy button) */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-2 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Notes
+                        </span>
+                        {selectedOrder.notes && (
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(selectedOrder.notes, "notes")}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                            title="Copy Notes"
+                          >
+                            {copiedKey === "notes" ? (
+                              <>
+                                <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                <span className="text-emerald-700 font-bold">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-slate-900 font-bold text-xs leading-snug break-words">
+                        {selectedOrder.notes || "None"}
+                      </span>
+                    </div>
+
                   </div>
                 </div>
 
                 {/* Line Items */}
                 <div className="pt-6">
-                  <h3 className="font-heading font-black text-sm uppercase text-slate-900 mb-3 tracking-wide">
-                    Purchased Items
-                  </h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-heading font-normal text-sm uppercase text-slate-900 tracking-wide flex items-center gap-1.5">
+                        <ShoppingBag className="w-4 h-4 text-slate-600" />
+                        <span>Purchased Items</span>
+                      </h3>
+                      {Array.isArray(selectedOrder.modificationHistory) && selectedOrder.modificationHistory.length > 0 && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-300 uppercase">
+                          Modified ({selectedOrder.modificationHistory.length}x)
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModifyingOrder(selectedOrder);
+                        setIsModifyModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Modify Items & Pricing</span>
+                    </button>
+                  </div>
                   <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                    {(selectedOrder.items || []).map((it: any, i: number) => (
-                      <div key={i} className="p-3 flex items-center justify-between text-xs font-mono">
-                        <div>
-                          <p className="font-bold text-slate-900">{it.name}</p>
-                          <p className="text-slate-500">Qty: {it.quantity} &bull; Unit: {formatPHP(it.price)}</p>
+                    {(selectedOrder.items || []).map((it: any, i: number) => {
+                      const isFreeItem = Boolean(it.isFree || Number(it.price) === 0);
+                      return (
+                        <div key={i} className="p-3 flex items-center justify-between text-xs font-mono">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-bold text-slate-900">{it.name}</p>
+                              {isFreeItem && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                  Free Item
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-slate-500">
+                              Qty {it.quantity} &bull; Unit {isFreeItem ? <span className="text-emerald-600 font-bold">FREE</span> : formatPHP(it.price)}
+                              {it.originalPrice && it.originalPrice !== it.price && (
+                                <span className="text-slate-400 line-through ml-1.5">
+                                  {formatPHP(it.originalPrice)}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <p className={`font-bold text-sm ${isFreeItem ? "text-emerald-600 font-black" : "text-slate-900"}`}>
+                            {isFreeItem ? "FREE" : formatPHP(Number(it.price) * (Number(it.quantity) || 1))}
+                          </p>
                         </div>
-                        <p className="font-bold text-slate-900 text-sm">
-                          {formatPHP(Number(it.price) * (Number(it.quantity) || 1))}
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     {/* Order Financial Breakdown */}
                     <div className="p-3 bg-slate-50/70 border-t border-slate-100 space-y-1.5 text-xs font-mono">
                       <div className="flex justify-between items-center text-slate-600">
-                        <span className="uppercase">Items Subtotal:</span>
+                        <span>Items Subtotal</span>
                         <span className="font-bold text-slate-900">
                           {formatPHP(selectedOrder.subTotal || selectedOrder.items?.reduce((s: number, it: any) => s + (Number(it.price) * (Number(it.quantity) || 1)), 0) || 0)}
                         </span>
                       </div>
 
                       {/* Applied Charges */}
-                      {Array.isArray(selectedOrder.appliedCharges) && selectedOrder.appliedCharges.map((ch: any, ci: number) => (
-                        <div key={ci} className="flex justify-between items-center text-slate-600">
-                          <span className="uppercase flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                            {ch.name || "Fee"}:
-                          </span>
-                          <span className="font-semibold text-slate-800">{formatPHP(ch.amount || 0)}</span>
-                        </div>
-                      ))}
+                      {Array.isArray(selectedOrder.appliedCharges) && selectedOrder.appliedCharges.map((ch: any, ci: number) => {
+                        const chargeName = String(ch.name || "Fee").replace(/:+$/, "").trim();
+                        const isChFree = Boolean(ch.isFree || Number(ch.amount) === 0);
+                        return (
+                          <div key={ci} className="flex justify-between items-center text-slate-600">
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                              <span>{chargeName}</span>
+                              {isChFree && (
+                                <span className="text-[10px] text-emerald-600 font-bold">(WAIVED / FREE)</span>
+                              )}
+                            </span>
+                            <span className={`font-semibold ${isChFree ? "text-emerald-600 font-bold" : "text-slate-800"}`}>
+                              {isChFree ? "FREE" : formatPHP(ch.amount || 0)}
+                            </span>
+                          </div>
+                        );
+                      })}
 
                       {/* Delivery Fee */}
-                      {Number(selectedOrder.deliveryFee) > 0 && (
+                      {(Number(selectedOrder.deliveryFee) > 0 || selectedOrder.isDeliveryFeeFree) && (
                         <div className="flex justify-between items-center text-slate-600">
-                          <span className="uppercase flex items-center gap-1">
+                          <span className="flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                            Delivery ({selectedOrder.courier?.name || "Courier"}):
+                            <span>Delivery ({selectedOrder.courier?.name || "Courier"})</span>
+                            {selectedOrder.isDeliveryFeeFree && (
+                              <span className="text-[10px] text-emerald-600 font-bold">(WAIVED / FREE)</span>
+                            )}
                             <span className="text-[10px] text-slate-400">
                               ({selectedOrder.deliveryFeePaymentMethod === "upon_delivery" ? "Paid upon delivery" : "Paid at checkout"})
                             </span>
                           </span>
-                          <span className="font-semibold text-slate-800">{formatPHP(selectedOrder.deliveryFee)}</span>
+                          <span className={`font-semibold ${selectedOrder.isDeliveryFeeFree ? "text-emerald-600 font-bold" : "text-slate-800"}`}>
+                            {selectedOrder.isDeliveryFeeFree ? "FREE" : formatPHP(selectedOrder.deliveryFee)}
+                          </span>
                         </div>
                       )}
                     </div>
 
-                    <div className="p-3 bg-slate-100 flex items-center justify-between font-mono font-black text-slate-900 border-t border-slate-200">
+                    <div className="p-3 bg-slate-100 flex items-center justify-between font-mono font-bold text-slate-900 border-t border-slate-200">
                       <span>Total Amount</span>
                       <span className="text-base">{formatPHP(selectedOrder.totalAmount)}</span>
                     </div>
                   </div>
+
+                  {/* Modification Audit History */}
+                  {Array.isArray(selectedOrder.modificationHistory) && selectedOrder.modificationHistory.length > 0 && (
+                    <div className="mt-3 p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl font-mono text-xs">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-900 uppercase text-[11px] mb-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Admin Modification History ({selectedOrder.modificationHistory.length})</span>
+                      </div>
+                      <div className="space-y-1 divide-y divide-amber-200/50">
+                        {selectedOrder.modificationHistory.map((h: any, hi: number) => (
+                          <div key={hi} className="pt-1.5 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-amber-950">
+                            <div>
+                              <span className="font-semibold text-amber-800">
+                                {h.modifiedAt ? new Date(h.modifiedAt).toLocaleString("en-PH") : "Modified"}:
+                              </span>{" "}
+                              <span>{h.notes || "Admin updated items or pricing"}</span>
+                            </div>
+                            <div className="text-[10px] text-amber-700 shrink-0">
+                              {h.previousTotal !== undefined && (
+                                <span>{formatPHP(h.previousTotal)} &rarr; <strong>{formatPHP(h.newTotal)}</strong></span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Payment Review Details */}
                 <div className="pt-6 mt-6 border-t border-slate-100">
-                  <h3 className="font-heading font-black text-sm uppercase text-slate-900 mb-3 tracking-wide flex items-center gap-2">
+                  <h3 className="font-heading font-normal text-sm uppercase text-slate-900 mb-3 tracking-wide flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-slate-600" />
                     <span>Transaction & Payment Verification</span>
                   </h3>
@@ -1948,7 +2577,7 @@ export default function AdminPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">Selected Gateway</p>
-                        <p className="text-sm font-bold text-slate-900 mt-0.5">
+                        <p className="text-sm font-bold text-slate-900 mt-0.5 font-mono">
                           {selectedOrder.paymentMethodName || "No Payment Method Selected / COD"}
                         </p>
                       </div>
@@ -1971,83 +2600,79 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* Image proof and status management */}
+                    {/* View Payment proof button (DO NOT PRE-LOAD IMAGE) */}
                     {selectedOrder.paymentProofImage ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-slate-200/60">
-                        {/* Receipt Thumbnail */}
-                        <div className="sm:col-span-1">
-                          <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold mb-1.5">Submitted Proof Receipt</p>
-                          <div 
-                            onClick={() => setZoomedProofImage(selectedOrder.paymentProofImage)}
-                            className="relative group border border-slate-200 rounded-xl overflow-hidden aspect-[4/5] bg-white cursor-zoom-in transition-all hover:border-slate-400 shadow-sm shrink-0"
-                          >
-                            <img 
-                              src={selectedOrder.paymentProofImage} 
-                              alt="Payment Proof Receipt" 
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold uppercase gap-1">
-                              <Eye className="w-3.5 h-3.5" /> Click to Zoom
-                            </div>
+                      <div className="pt-3 border-t border-slate-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 shrink-0">
+                            <Receipt className="w-5 h-5" />
+                          </div>
+                          <div className="font-mono">
+                            <p className="text-xs font-bold text-slate-900">Payment Proof Uploaded</p>
+                            <p className="text-[11px] text-slate-500">Image submitted for verification</p>
                           </div>
                         </div>
 
-                        {/* Verification & Action Pane */}
-                        <div className="sm:col-span-2 flex flex-col justify-between space-y-3">
-                          <div className="space-y-1.5 font-mono text-[11px] text-slate-600">
-                            <p className="font-bold text-slate-900 uppercase">Verification Instructions</p>
-                            <p className="leading-relaxed">
-                              Inspect the customer's uploaded receipt. Verify the transaction amount matches the total order value of <span className="font-bold text-black">{formatPHP(selectedOrder.totalAmount)}</span>.
-                            </p>
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleUpdateOrderPaymentStatus(selectedOrder.id, "Confirmed")}
-                                className={`flex-1 py-2.5 rounded-xl text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                  selectedOrder.paymentStatus === "Confirmed"
-                                    ? "bg-emerald-600 text-white shadow-sm cursor-default"
-                                    : "bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                }`}
-                              >
-                                <Check className="w-4 h-4" /> Approve Payment
-                              </button>
-                              <button
-                                onClick={() => handleUpdateOrderPaymentStatus(selectedOrder.id, "Declined")}
-                                className={`flex-1 py-2.5 rounded-xl text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                  selectedOrder.paymentStatus === "Declined"
-                                    ? "bg-red-600 text-white shadow-sm cursor-default"
-                                    : "bg-white hover:bg-red-50 text-red-700 border border-red-200"
-                                }`}
-                              >
-                                ✕ Reject Payment
-                              </button>
-                            </div>
-
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleUpdateOrderPaymentStatus(selectedOrder.id, "Pending Review")}
-                                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer text-center"
-                              >
-                                Reset to Pending Review
-                              </button>
-                              <a 
-                                href={selectedOrder.paymentProofImage}
-                                download={`receipt-${selectedOrder.orderNumber}.png`}
-                                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all text-center flex items-center justify-center gap-1 shrink-0"
-                              >
-                                Download
-                              </a>
-                            </div>
-                          </div>
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => setZoomedProofImage(selectedOrder.paymentProofImage)}
+                            className="flex-1 sm:flex-none px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold font-mono uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm active:scale-95"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View Payment</span>
+                          </button>
+                          <a 
+                            href={selectedOrder.paymentProofImage}
+                            download={`receipt-${selectedOrder.orderNumber}.png`}
+                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold font-mono rounded-lg transition-colors flex items-center justify-center gap-1 shrink-0"
+                            title="Download Payment Proof"
+                          >
+                            Download
+                          </a>
                         </div>
                       </div>
                     ) : (
-                      <div className="p-3 bg-white border border-slate-200 rounded-xl text-center text-xs font-mono text-slate-500">
-                        No payment proof uploaded yet for this order.
+                      <div className="p-3.5 bg-white border border-dashed border-slate-300 rounded-xl text-center text-xs font-mono text-slate-500 flex items-center justify-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        </span>
+                        <span>No payment proof uploaded yet &bull; Listening for customer upload in real time...</span>
                       </div>
                     )}
+
+                    {/* Actions: Approve / Reject / Reset */}
+                    <div className="pt-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <button
+                          onClick={() => handleUpdateOrderPaymentStatus(selectedOrder.id, "Confirmed")}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-heading font-normal uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            selectedOrder.paymentStatus === "Confirmed"
+                              ? "bg-emerald-600 text-white shadow-sm cursor-default"
+                              : "bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          }`}
+                        >
+                          <Check className="w-4 h-4" /> Approve Payment
+                        </button>
+                        <button
+                          onClick={() => handleUpdateOrderPaymentStatus(selectedOrder.id, "Declined")}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-heading font-normal uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            selectedOrder.paymentStatus === "Declined"
+                              ? "bg-red-600 text-white shadow-sm cursor-default"
+                              : "bg-white hover:bg-red-50 text-red-700 border border-red-200"
+                          }`}
+                        >
+                          ✕ Reject Payment
+                        </button>
+                        <button
+                          onClick={() => handleUpdateOrderPaymentStatus(selectedOrder.id, "Pending Review")}
+                          className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer text-center"
+                        >
+                          Reset to Pending Review
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3041,6 +3666,77 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* Modify Order Modal */}
+      {isModifyModalOpen && modifyingOrder && (
+        <ModifyOrderModal
+          order={modifyingOrder}
+          catalogProducts={products}
+          isOpen={isModifyModalOpen}
+          onClose={() => {
+            setIsModifyModalOpen(false);
+            setModifyingOrder(null);
+          }}
+          onOrderUpdated={handleOrderModified}
+        />
+      )}
+
+      {/* Real-Time Silent Sync Live Toast Notification */}
+      <AnimatePresence>
+        {liveToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[200] max-w-sm w-[calc(100%-2rem)] bg-slate-950 text-white p-4 rounded-2xl shadow-2xl border border-slate-800 backdrop-blur-md"
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-inner ${
+                liveToast.type === "proof" 
+                  ? "bg-purple-950/80 text-purple-400 border border-purple-500/30" 
+                  : "bg-emerald-950/80 text-emerald-400 border border-emerald-500/30"
+              }`}>
+                {liveToast.type === "proof" ? <Receipt className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-heading font-normal uppercase tracking-widest text-slate-400">
+                    {liveToast.type === "proof" ? "Payment Detected" : "Order Activity"}
+                  </span>
+                  <button 
+                    onClick={() => setLiveToast(null)}
+                    className="text-slate-500 hover:text-white text-xs p-0.5 rounded cursor-pointer transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <h4 className="font-heading font-black text-sm text-white tracking-wide uppercase mt-0.5">
+                  {liveToast.title}
+                </h4>
+                <p className="text-xs font-mono text-slate-300 mt-1 leading-snug">
+                  {liveToast.message}
+                </p>
+
+                {liveToast.orderId && (
+                  <button
+                    onClick={() => {
+                      setSelectedOrderId(liveToast.orderId!);
+                      setView("order-detail");
+                      setLiveToast(null);
+                    }}
+                    className="mt-3 px-3 py-1.5 bg-white text-black hover:bg-slate-200 text-xs font-heading font-normal uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Open Order #{liveToast.orderNumber || ""}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
         </div>
       </div>
