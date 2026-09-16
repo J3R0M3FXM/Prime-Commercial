@@ -264,75 +264,150 @@ export default function OrderPrintView({
         </div>
       </div>
 
-      {/* 2-Column Dossier: Customer & Fulfillment */}
-      <div className="grid grid-cols-2 gap-4 mb-6 print-break-inside-avoid">
-        {/* Customer Box */}
-        <div className="border border-slate-300 rounded-lg p-3 bg-slate-50/60">
-          <h2 className="font-heading font-bold text-xs uppercase tracking-wider text-slate-900 mb-2 pb-1 border-b border-slate-200">
-            Customer & Account Identity
+      {/* 3-Section Layout: Identity, Fingerprint, Recipient */}
+      <div className="space-y-4 mb-6 print-break-inside-avoid">
+        {/* 1. CUSTOMER & ACCOUNT IDENTITY */}
+        <div className="border border-slate-300 rounded-lg p-3.5 bg-slate-50/70">
+          <h2 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 mb-2.5 pb-1 border-b border-slate-200">
+            CUSTOMER &amp; ACCOUNT IDENTITY
           </h2>
-          <div className="space-y-1.5 font-mono text-xs">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Telegram Name:</span>
-              <span className="font-bold text-slate-900">{order.customerName || "Customer"}</span>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+            <div>
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                TELEGRAM NAME
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block">
+                {order.customerName || "Customer"}
+              </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Handle:</span>
-              <span className="font-bold text-slate-900">
+            <div>
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                TELEGRAM HANDLE
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block">
                 {order.customerUsername 
                   ? (order.customerUsername.startsWith("@") ? order.customerUsername : `@${order.customerUsername}`) 
                   : "None"}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Telegram ID:</span>
-              <span className="font-bold text-slate-900">{order.customerId || order.tgUserId || "None"}</span>
+            <div>
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                TELEGRAM UID
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block">
+                {order.customerId || order.tgUserId || "None"}
+              </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Prime Member ID:</span>
-              <span className="font-bold text-slate-900">{order.primeMemberId || "Unassigned"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">IP Address:</span>
-              <span className="text-slate-700">{order.ip || order.deviceSnapshot?.ip || "N/A"}</span>
+            <div>
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                PRIME MID
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block">
+                {order.primeMemberId || "Unassigned"}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Dispatch & Delivery Box */}
-        <div className="border border-slate-300 rounded-lg p-3 bg-slate-50/60">
-          <h2 className="font-heading font-bold text-xs uppercase tracking-wider text-slate-900 mb-2 pb-1 border-b border-slate-200">
-            Recipient & Dispatch Logistics
+        {/* 2. TRANSACTION & DEVICE FINGERPRINT */}
+        <div className="border border-slate-300 rounded-lg p-3.5 bg-slate-50/70">
+          <h2 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 mb-2.5 pb-1 border-b border-slate-200">
+            TRANSACTION &amp; DEVICE FINGERPRINT
           </h2>
-          <div className="space-y-1.5 font-mono text-xs">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Receiver's Name:</span>
-              <span className="font-bold text-slate-900">{order.receiverName || "None"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Contact Phone:</span>
-              <span className="font-bold text-slate-900">{order.receiverPhone || "None"}</span>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+            <div>
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                IP ADDRESS
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block">
+                {order.ip || order.deviceSnapshot?.ip || "000.00.000.000"}
+              </span>
             </div>
             <div>
-              <span className="text-slate-500 block">Delivery Address:</span>
-              <span className="font-bold text-slate-900 leading-tight block mt-0.5">
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                COORDINATES
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block">
+                {(order.deviceSnapshot?.location?.latitude && order.deviceSnapshot?.location?.longitude)
+                  ? `${order.deviceSnapshot.location.latitude}, ${order.deviceSnapshot.location.longitude}`
+                  : (order.coordinates || order.deviceSnapshot?.coordinates || "Not captured")}
+              </span>
+            </div>
+            <div>
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                DEVICE IDENTIFIER
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block break-all">
+                {order.deviceSnapshot?.deviceFingerprint 
+                  || order.deviceSnapshot?.device_id 
+                  || order.deviceFingerprint 
+                  || order.deviceId 
+                  || order.deviceSnapshot?.userAgentSummary 
+                  || "Not captured"}
+              </span>
+            </div>
+            <div>
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                SESSION TOKEN
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block break-all">
+                {order.sessionToken 
+                  || order.deviceSnapshot?.sessionId 
+                  || order.deviceSnapshot?.sessionToken 
+                  || order.sessionId 
+                  || order.cartToken 
+                  || "Not captured"}
+              </span>
+            </div>
+            <div className="col-span-2 pt-1 border-t border-slate-200">
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                PRECISE GPS ADDRESS
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block leading-relaxed break-words">
+                {gpsStreetAddressText}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. RECIPIENT & DELIVERY INFORMATION */}
+        <div className="border border-slate-300 rounded-lg p-3.5 bg-slate-50/70">
+          <h2 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900 mb-2.5 pb-1 border-b border-slate-200">
+            RECIPIENT &amp; DELIVERY INFORMATION
+          </h2>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+            <div>
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                RECEIVER'S NAME
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block">
+                {order.receiverName || "None"}
+              </span>
+            </div>
+            <div>
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                RECEIVER'S PHONE
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block">
+                {order.receiverPhone || "None"}
+              </span>
+            </div>
+            <div className="col-span-2 pt-1 border-t border-slate-200">
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                DELIVERY ADDRESS
+              </span>
+              <span className="font-ibm-condensed font-bold text-slate-950 text-sm block leading-relaxed break-words">
                 {deliveryAddressText || "None"}
               </span>
             </div>
-            {gpsStreetAddressText && gpsStreetAddressText !== "Not captured" && (
-              <div>
-                <span className="text-slate-500 block">GPS Street Address:</span>
-                <span className="text-slate-800 text-[11px] block mt-0.5">
-                  {gpsStreetAddressText}
-                </span>
-              </div>
-            )}
-            {order.notes && (
-              <div className="mt-1 pt-1 border-t border-slate-200">
-                <span className="text-slate-500 block">Delivery Notes:</span>
-                <span className="italic text-slate-800">{order.notes}</span>
-              </div>
-            )}
+            <div className="col-span-2 pt-1 border-t border-slate-200">
+              <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                DELIVERY NOTES
+              </span>
+              <span className="font-ibm-condensed font-medium text-slate-800 text-sm block leading-relaxed break-words">
+                {order.notes || "None"}
+              </span>
+            </div>
           </div>
         </div>
       </div>

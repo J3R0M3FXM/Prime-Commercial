@@ -37,7 +37,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link 
-          href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400&display=swap" 
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=Roboto+Condensed:wght@400;700&display=swap" 
           rel="stylesheet" 
         />
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />

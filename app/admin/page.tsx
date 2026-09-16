@@ -52,7 +52,8 @@ import {
   ArrowDownToLine,
   Boxes,
   Printer,
-  FileText
+  FileText,
+  Fingerprint
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
@@ -2705,56 +2706,97 @@ export default function AdminPage() {
                   })()}
                 </div>
 
-                {/* Structured Customer & Fulfillment Details Sections */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 py-4 border-b border-slate-100">
+                {/* Structured Customer, Fingerprint & Fulfillment Details Sections */}
+                <div className="space-y-4 py-4 border-b border-slate-100">
                   
-                  {/* Column 1: Customer Profile & Identity */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 px-0.5">
-                      <Users className="w-3.5 h-3.5 text-slate-600" />
+                  {/* 1. CUSTOMER & ACCOUNT IDENTITY */}
+                  <div className="border border-slate-200 rounded-xl p-4 sm:p-5 bg-slate-50/50 space-y-3.5 shadow-xs">
+                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200/80">
+                      <Users className="w-3.5 h-3.5 text-slate-700" />
                       <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900">
-                        Customer & Account Identity
+                        CUSTOMER &amp; ACCOUNT IDENTITY
                       </h3>
                     </div>
 
-                    <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50/40 overflow-hidden font-mono text-xs">
-                      {/* Telegram Name */}
-                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
-                          Telegram Name
-                        </span>
-                        <span className="font-bold text-slate-900 text-right truncate">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
+                      {/* Row 1, Col 1: TELEGRAM NAME */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                            TELEGRAM NAME
+                          </span>
+                          {selectedOrder.customerName && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(selectedOrder.customerName, "customerName")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                              title="Copy Telegram Name"
+                            >
+                              {copiedKey === "customerName" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal">
                           {selectedOrder.customerName || "Customer"}
-                        </span>
+                        </div>
                       </div>
 
-                      {/* Telegram Handle */}
-                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
-                          Telegram Handle
-                        </span>
-                        <span className="font-bold text-slate-900 text-right truncate">
+                      {/* Row 1, Col 2: TELEGRAM HANDLE */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                            TELEGRAM HANDLE
+                          </span>
+                          {selectedOrder.customerUsername && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(selectedOrder.customerUsername, "customerUsername")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                              title="Copy Telegram Handle"
+                            >
+                              {copiedKey === "customerUsername" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal">
                           {selectedOrder.customerUsername 
                             ? (selectedOrder.customerUsername.startsWith('@') ? selectedOrder.customerUsername : `@${selectedOrder.customerUsername}`) 
                             : "None"}
-                        </span>
+                        </div>
                       </div>
 
-                      {/* Telegram ID */}
-                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
-                          Telegram ID
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-900">
-                            {selectedOrder.customerId || selectedOrder.tgUserId || "None"}
+                      {/* Row 2, Col 1: TELEGRAM UID */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                            TELEGRAM UID
                           </span>
                           {(selectedOrder.customerId || selectedOrder.tgUserId) && (
                             <button
                               type="button"
                               onClick={() => copyToClipboard(String(selectedOrder.customerId || selectedOrder.tgUserId), "customerId")}
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
-                              title="Copy Telegram ID"
+                              title="Copy Telegram UID"
                             >
                               {copiedKey === "customerId" ? (
                                 <>
@@ -2770,23 +2812,23 @@ export default function AdminPage() {
                             </button>
                           )}
                         </div>
+                        <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal">
+                          {selectedOrder.customerId || selectedOrder.tgUserId || "None"}
+                        </div>
                       </div>
 
-                      {/* PRIME Member ID */}
-                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
-                          Prime Member ID
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-900">
-                            {selectedOrder.primeMemberId || "Unassigned"}
+                      {/* Row 2, Col 2: PRIME MID */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                            PRIME MID
                           </span>
                           {selectedOrder.primeMemberId && (
                             <button
                               type="button"
                               onClick={() => copyToClipboard(selectedOrder.primeMemberId, "primeMemberId")}
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
-                              title="Copy PRIME Member ID"
+                              title="Copy PRIME MID"
                             >
                               {copiedKey === "primeMemberId" ? (
                                 <>
@@ -2802,44 +2844,237 @@ export default function AdminPage() {
                             </button>
                           )}
                         </div>
-                      </div>
-
-                      {/* IP Address */}
-                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
-                          IP Address
-                        </span>
-                        <span className="font-bold text-slate-900 text-right truncate">
-                          {selectedOrder.ip || selectedOrder.deviceSnapshot?.ip || "N/A"}
-                        </span>
+                        <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal">
+                          {selectedOrder.primeMemberId || "Unassigned"}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Column 2: Fulfillment & Delivery Logistics */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 px-0.5">
-                      <Truck className="w-3.5 h-3.5 text-slate-600" />
+                  {/* 2. TRANSACTION & DEVICE FINGERPRINT */}
+                  <div className="border border-slate-200 rounded-xl p-4 sm:p-5 bg-slate-50/50 space-y-3.5 shadow-xs">
+                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200/80">
+                      <Fingerprint className="w-3.5 h-3.5 text-slate-700" />
                       <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900">
-                        Recipient & Delivery Logistics
+                        TRANSACTION &amp; DEVICE FINGERPRINT
                       </h3>
                     </div>
 
-                    <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50/40 overflow-hidden font-mono text-xs">
-                      {/* Receiver's Name */}
-                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
-                          Receiver's Name
-                        </span>
-                        <div className="flex items-center gap-1.5 truncate">
-                          <span className="font-bold text-slate-900 truncate">
-                            {selectedOrder.receiverName || "None"}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
+                      {/* Row 1, Col 1: IP ADDRESS */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                            IP ADDRESS
+                          </span>
+                          {(selectedOrder.ip || selectedOrder.deviceSnapshot?.ip) && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(selectedOrder.ip || selectedOrder.deviceSnapshot?.ip, "ipAddress")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                              title="Copy IP Address"
+                            >
+                              {copiedKey === "ipAddress" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal">
+                          {selectedOrder.ip || selectedOrder.deviceSnapshot?.ip || "000.00.000.000"}
+                        </div>
+                      </div>
+
+                      {/* Row 1, Col 2: COORDINATES */}
+                      {(() => {
+                        const coords = (selectedOrder.deviceSnapshot?.location?.latitude && selectedOrder.deviceSnapshot?.location?.longitude)
+                          ? `${selectedOrder.deviceSnapshot.location.latitude}, ${selectedOrder.deviceSnapshot.location.longitude}`
+                          : (selectedOrder.coordinates || selectedOrder.deviceSnapshot?.coordinates || "Not captured");
+
+                        return (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                                COORDINATES
+                              </span>
+                              {coords !== "Not captured" && (
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(coords, "coordinates")}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                                  title="Copy Coordinates"
+                                >
+                                  {copiedKey === "coordinates" ? (
+                                    <>
+                                      <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                      <span className="text-emerald-700 font-bold">Copied</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                      <span>Copy</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                            <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal">
+                              {coords}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Row 2, Col 1: DEVICE IDENTIFIER */}
+                      {(() => {
+                        const devId = selectedOrder.deviceSnapshot?.deviceFingerprint 
+                          || selectedOrder.deviceSnapshot?.device_id 
+                          || selectedOrder.deviceFingerprint 
+                          || selectedOrder.deviceId 
+                          || selectedOrder.deviceSnapshot?.userAgentSummary 
+                          || selectedOrder.deviceSnapshot?.platform 
+                          || "Not captured";
+
+                        return (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                                DEVICE IDENTIFIER
+                              </span>
+                              {devId !== "Not captured" && (
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(devId, "deviceIdentifier")}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                                  title="Copy Device Identifier"
+                                >
+                                  {copiedKey === "deviceIdentifier" ? (
+                                    <>
+                                      <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                      <span className="text-emerald-700 font-bold">Copied</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                      <span>Copy</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                            <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal break-all">
+                              {devId}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Row 2, Col 2: SESSION TOKEN */}
+                      {(() => {
+                        const sessToken = selectedOrder.sessionToken 
+                          || selectedOrder.deviceSnapshot?.sessionId 
+                          || selectedOrder.deviceSnapshot?.sessionToken 
+                          || selectedOrder.sessionId 
+                          || selectedOrder.cartToken 
+                          || "Not captured";
+
+                        return (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                                SESSION TOKEN
+                              </span>
+                              {sessToken !== "Not captured" && (
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(sessToken, "sessionToken")}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                                  title="Copy Session Token"
+                                >
+                                  {copiedKey === "sessionToken" ? (
+                                    <>
+                                      <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                      <span className="text-emerald-700 font-bold">Copied</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                      <span>Copy</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                            <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal break-all">
+                              {sessToken}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Row 3, Full Width: PRECISE GPS ADDRESS */}
+                      <div className="col-span-1 sm:col-span-2 space-y-1 pt-2 border-t border-slate-200/60">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                            PRECISE GPS ADDRESS
+                          </span>
+                          {gpsStreetAddressText && gpsStreetAddressText !== "Not captured" && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(gpsStreetAddressText, "gpsAddress")}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+                              title="Copy Precise GPS Address"
+                            >
+                              {copiedKey === "gpsAddress" ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal leading-relaxed break-words">
+                          {gpsStreetAddressText}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. RECIPIENT & DELIVERY INFORMATION */}
+                  <div className="border border-slate-200 rounded-xl p-4 sm:p-5 bg-slate-50/50 space-y-3.5 shadow-xs">
+                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200/80">
+                      <Truck className="w-3.5 h-3.5 text-slate-700" />
+                      <h3 className="font-heading font-normal text-xs uppercase tracking-wider text-slate-900">
+                        RECIPIENT &amp; DELIVERY INFORMATION
+                      </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
+                      {/* Row 1, Col 1: RECEIVER'S NAME */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                            RECEIVER'S NAME
                           </span>
                           {selectedOrder.receiverName && (
                             <button
                               type="button"
                               onClick={() => copyToClipboard(selectedOrder.receiverName, "receiverName")}
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer shrink-0"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
                               title="Copy Receiver's Name"
                             >
                               {copiedKey === "receiverName" ? (
@@ -2856,22 +3091,22 @@ export default function AdminPage() {
                             </button>
                           )}
                         </div>
+                        <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal">
+                          {selectedOrder.receiverName || "None"}
+                        </div>
                       </div>
 
-                      {/* Receiver's Phone */}
-                      <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide shrink-0">
-                          Receiver's Phone
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-900">
-                            {selectedOrder.receiverPhone || "None"}
+                      {/* Row 1, Col 2: RECEIVER'S PHONE */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                            RECEIVER'S PHONE
                           </span>
                           {selectedOrder.receiverPhone && (
                             <button
                               type="button"
                               onClick={() => copyToClipboard(selectedOrder.receiverPhone, "receiverPhone")}
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer shrink-0"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
                               title="Copy Receiver's Phone"
                             >
                               {copiedKey === "receiverPhone" ? (
@@ -2888,13 +3123,16 @@ export default function AdminPage() {
                             </button>
                           )}
                         </div>
+                        <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal">
+                          {selectedOrder.receiverPhone || "None"}
+                        </div>
                       </div>
 
-                      {/* Delivery Address */}
-                      <div className="px-3.5 py-2.5 space-y-1">
+                      {/* Row 2, Full Width: DELIVERY ADDRESS */}
+                      <div className="col-span-1 sm:col-span-2 space-y-1 pt-2 border-t border-slate-200/60">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-                            Delivery Address
+                          <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                            DELIVERY ADDRESS
                           </span>
                           {deliveryAddressText && (
                             <button
@@ -2917,62 +3155,23 @@ export default function AdminPage() {
                             </button>
                           )}
                         </div>
-                        <p className="text-slate-900 font-bold leading-relaxed break-words">
+                        <div className="font-ibm-condensed font-bold text-slate-950 text-sm tracking-normal leading-relaxed break-words">
                           {deliveryAddressText || "None"}
-                        </p>
-                      </div>
-
-                      {/* GPS Street-Level Address */}
-                      <div className="px-3.5 py-2.5 space-y-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-                              GPS Street-Level Address
-                            </span>
-                            {selectedOrder.deviceSnapshot?.location?.source && (
-                              <span className="text-[9px] font-bold text-slate-600 bg-slate-200/80 px-1.5 py-0.2 rounded">
-                                {selectedOrder.deviceSnapshot.location.source}
-                              </span>
-                            )}
-                          </div>
-                          {gpsStreetAddressText && gpsStreetAddressText !== "Not captured" && (
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(gpsStreetAddressText, "gpsAddress")}
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
-                              title="Copy GPS Street Address"
-                            >
-                              {copiedKey === "gpsAddress" ? (
-                                <>
-                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
-                                  <span className="text-emerald-700 font-bold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2.5 h-2.5 text-slate-400" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
-                          )}
                         </div>
-                        <p className="text-slate-900 font-bold leading-relaxed break-words">
-                          {gpsStreetAddressText}
-                        </p>
                       </div>
 
-                      {/* Delivery Notes */}
-                      <div className="px-3.5 py-2.5 space-y-1">
+                      {/* Row 3, Full Width: DELIVERY NOTES */}
+                      <div className="col-span-1 sm:col-span-2 space-y-1 pt-2 border-t border-slate-200/60">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-                            Delivery Notes & Instructions
+                          <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
+                            DELIVERY NOTES
                           </span>
                           {selectedOrder.notes && (
                             <button
                               type="button"
                               onClick={() => copyToClipboard(selectedOrder.notes, "notes")}
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
-                              title="Copy Notes"
+                              title="Copy Delivery Notes"
                             >
                               {copiedKey === "notes" ? (
                                 <>
@@ -2988,11 +3187,10 @@ export default function AdminPage() {
                             </button>
                           )}
                         </div>
-                        <p className="text-slate-800 font-medium leading-relaxed break-words">
-                          {selectedOrder.notes || "No special instructions provided."}
-                        </p>
+                        <div className="font-ibm-condensed font-medium text-slate-800 text-sm tracking-normal leading-relaxed break-words">
+                          {selectedOrder.notes || "None"}
+                        </div>
                       </div>
-
                     </div>
                   </div>
 
