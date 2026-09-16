@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { getClientFingerprint, getClientLocation } from "./components/fingerprint-collector";
 import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
+import OrderHistoryModal from "./components/order-history-modal";
 import { useCart } from "./components/cart-context";
-import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus } from "lucide-react";
+import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 
 export default function Shopfront() {
@@ -21,6 +22,7 @@ export default function Shopfront() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
 
   const { cart, cartCount, addToCart, updateQuantity } = useCart();
 
@@ -208,17 +210,32 @@ export default function Shopfront() {
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
         <div className="px-4 py-3 flex items-center justify-between">
           <h1 className="text-2xl font-heading font-black tracking-widest uppercase">PRIME</h1>
-          <button 
-            onClick={() => setIsCartOpen(true)}
-            className="relative p-2 text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <ShoppingBag className="w-6 h-6" />
-            {cartCount > 0 && (
-              <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
-                {cartCount}
-              </span>
-            )}
-          </button>
+          
+          <div className="flex items-center gap-2">
+            {/* Customer Order History Button */}
+            <button 
+              onClick={() => setIsOrderHistoryOpen(true)}
+              className="px-2.5 py-1.5 text-gray-700 hover:text-black hover:bg-gray-100 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer border border-gray-200/80 shadow-2xs text-xs font-heading font-bold uppercase tracking-wider"
+              title="View your past and active orders"
+            >
+              <Receipt className="w-4 h-4 text-slate-700" />
+              <span>Orders</span>
+            </button>
+
+            {/* Cart Button */}
+            <button 
+              onClick={() => setIsCartOpen(true)}
+              className="relative p-2 text-gray-900 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+              title="Shopping Cart"
+            >
+              <ShoppingBag className="w-6 h-6" />
+              {cartCount > 0 && (
+                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Search & Filter Controls */}
@@ -357,6 +374,7 @@ export default function Shopfront() {
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
       {selectedProduct && <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
+      <OrderHistoryModal isOpen={isOrderHistoryOpen} onClose={() => setIsOrderHistoryOpen(false)} />
     </div>
   );
 }

@@ -23,7 +23,8 @@ import {
   Sparkles,
   ShoppingBag,
   Copy,
-  Download
+  Download,
+  ExternalLink
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
@@ -299,6 +300,32 @@ export default function CheckoutModal({
       setIsSubmittingProof(false);
     }
   }, [isOpen]);
+
+  // Live real-time sync for order updates & courier tracking button when on Step 5
+  useEffect(() => {
+    if (currentStep !== 5 || !completedOrder) return;
+    const orderId = completedOrder.id || completedOrder.orderNumber;
+    if (!orderId) return;
+
+    const syncInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/orders?_t=${Date.now()}`, { cache: "no-store" });
+        if (res.ok) {
+          const orders = await res.json();
+          if (Array.isArray(orders)) {
+            const found = orders.find((o: any) => o.id === orderId || o.orderNumber === orderId);
+            if (found) {
+              setCompletedOrder((prev: any) => ({ ...prev, ...found }));
+            }
+          }
+        }
+      } catch (err) {
+        // silent background sync error
+      }
+    }, 3500);
+
+    return () => clearInterval(syncInterval);
+  }, [currentStep, completedOrder?.id, completedOrder?.orderNumber]);
 
   // Address Autocomplete Search
   const handleAddressSearch = (query: string) => {
@@ -582,6 +609,17 @@ export default function CheckoutModal({
 
       const orderResult = await res.json();
       setCompletedOrder(orderResult);
+
+      // Save to localStorage for instant customer Order History accessibility
+      try {
+        const stored = JSON.parse(localStorage.getItem("prime_customer_orders") || "[]");
+        const updated = [orderResult, ...stored.filter((o: any) => o.id !== orderResult.id && o.orderNumber !== orderResult.orderNumber)];
+        localStorage.setItem("prime_customer_orders", JSON.stringify(updated));
+        window.dispatchEvent(new Event("prime_orders_updated"));
+      } catch (e) {
+        console.warn("Failed to persist order to local storage", e);
+      }
+
       setCurrentStep(5);
       onOrderSuccess(orderResult);
 
@@ -1249,6 +1287,35 @@ export default function CheckoutModal({
                   <span className="font-bold text-slate-900 text-sm">{formatPHP(completedOrder.totalAmount || 0)}</span>
                 </div>
               </div>
+
+              {/* Live Courier Tracking Interactive Card */}
+              {completedOrder.trackingUrl && (
+                <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 max-w-md mx-auto space-y-3 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Truck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-heading font-bold text-xs uppercase tracking-wider text-blue-950">
+                        Shipment &amp; Courier Tracking
+                      </h4>
+                      <p className="text-[10px] font-mono text-blue-700">
+                        Live tracking URL provided by administrator
+                      </p>
+                    </div>
+                  </div>
+
+                  <a
+                    href={completedOrder.trackingUrl.startsWith("http") ? completedOrder.trackingUrl : `https://${completedOrder.trackingUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Track Shipment</span>
+                  </a>
+                </div>
+              )}
 
               {/* Settle Payment Section */}
               <div className="border-t border-gray-200 pt-6 space-y-4">

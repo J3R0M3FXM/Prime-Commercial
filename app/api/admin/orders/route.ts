@@ -77,6 +77,7 @@ export async function PUT(request: Request) {
       status, 
       notes, 
       paymentStatus, 
+      trackingUrl,
       items, 
       subTotal, 
       appliedCharges, 
@@ -103,6 +104,7 @@ export async function PUT(request: Request) {
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
     if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
+    if (trackingUrl !== undefined) updateData.trackingUrl = trackingUrl;
 
     // Items modification
     if (items !== undefined && Array.isArray(items)) {

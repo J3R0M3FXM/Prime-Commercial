@@ -53,7 +53,10 @@ import {
   Boxes,
   Printer,
   FileText,
-  Fingerprint
+  Fingerprint,
+  Link2,
+  HelpCircle,
+  Info
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
@@ -1046,6 +1049,45 @@ export default function AdminPage() {
   const selectedOrder = useMemo(() => {
     return orders.find(o => o.id === selectedOrderId);
   }, [orders, selectedOrderId]);
+
+  // Tracking URL state for Order Details
+  const [trackingUrlInput, setTrackingUrlInput] = useState<string>("");
+  const [isSavingTrackingUrl, setIsSavingTrackingUrl] = useState<boolean>(false);
+  const [trackingSavedSuccess, setTrackingSavedSuccess] = useState<boolean>(false);
+  const [showStatusGuide, setShowStatusGuide] = useState<boolean>(false);
+
+  // Sync tracking input when selectedOrderId or selectedOrder changes
+  useEffect(() => {
+    if (selectedOrder) {
+      setTrackingUrlInput(selectedOrder.trackingUrl || "");
+      setTrackingSavedSuccess(false);
+    }
+  }, [selectedOrderId, selectedOrder?.trackingUrl]);
+
+  const handleSaveTrackingUrl = async (orderId: string, url: string) => {
+    setIsSavingTrackingUrl(true);
+    setTrackingSavedSuccess(false);
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: orderId, trackingUrl: url.trim() })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to update tracking URL");
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, trackingUrl: url.trim() } : o));
+      setTrackingSavedSuccess(true);
+      setTimeout(() => setTrackingSavedSuccess(false), 3000);
+      showAlert("Courier tracking URL updated and customer tracking button activated.", "Tracking URL Saved", "success");
+    } catch (e: any) {
+      console.error(e);
+      showAlert(`Failed to save tracking URL: ${e.message || String(e)}`, "Error", "error");
+    } finally {
+      setIsSavingTrackingUrl(false);
+    }
+  };
 
   // Reverse geocoding for GPS street-level address in order details
   const [resolvedGpsAddresses, setResolvedGpsAddresses] = useState<Record<string, string>>({});
@@ -2586,7 +2628,23 @@ export default function AdminPage() {
                       <Sliders className="w-3.5 h-3.5" />
                       <span>Modify Order</span>
                     </button>
-                    <span className="text-xs font-mono text-slate-500">Status</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-mono text-slate-500">Status</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowStatusGuide(prev => !prev)}
+                        className={`p-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-mono ${
+                          showStatusGuide 
+                            ? "bg-blue-100 text-blue-800 font-bold" 
+                            : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                        }`}
+                        title="Click to view guide: Difference between Pending & Processing"
+                        aria-label="Status Explainer Guide"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5" />
+                        <span className="text-[10px] hidden sm:inline">Guide</span>
+                      </button>
+                    </div>
                     {(["Processing", "Completed", "Pending"] as const).map(st => (
                       <button
                         key={st}
@@ -2603,15 +2661,72 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+                {/* Status Explanation Popover / Guide for Administrative Staff */}
+                {showStatusGuide && (
+                  <div className="mt-4 p-4 rounded-xl bg-blue-50/90 border border-blue-200 shadow-xs animate-in fade-in duration-150">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Info className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
+                        <h4 className="font-heading font-bold text-xs uppercase tracking-wider text-blue-950">
+                          Administrative Status Guide: Pending vs. Processing
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowStatusGuide(false)}
+                        className="text-blue-600 hover:text-blue-900 text-xs font-mono font-bold cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                      {/* PENDING EXPLANATION */}
+                      <div className="p-3 bg-white rounded-lg border border-amber-200/80 space-y-1.5 shadow-2xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
+                          <span className="font-heading font-bold text-xs uppercase tracking-wider text-amber-900">
+                            PENDING (Awaiting Verification)
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-mono text-slate-700 leading-relaxed">
+                          Initial status right after customer submission. The order is placed, but payment proof (GCash / Bank transfer) has <strong>not yet been approved</strong> or verified by staff. Do NOT dispatch items while in Pending.
+                        </p>
+                        <div className="text-[10px] font-mono text-amber-800 bg-amber-50/80 px-2 py-1 rounded border border-amber-200">
+                          Action: Verify customer payment receipt &amp; confirm inventory availability.
+                        </div>
+                      </div>
+
+                      {/* PROCESSING EXPLANATION */}
+                      <div className="p-3 bg-white rounded-lg border border-blue-200/80 space-y-1.5 shadow-2xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0"></span>
+                          <span className="font-heading font-bold text-xs uppercase tracking-wider text-blue-950">
+                            PROCESSING (In Fulfillment &amp; Transit)
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-mono text-slate-700 leading-relaxed">
+                          Set to <strong>Processing</strong> once payment is verified or approved for Cash on Delivery. Order is being picked from inventory, packed, handed over to courier, or actively in transit to the customer.
+                        </p>
+                        <div className="text-[10px] font-mono text-blue-800 bg-blue-50/80 px-2 py-1 rounded border border-blue-200">
+                          Action: Pack items, assign courier tracking link, and dispatch parcel.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Visual Step-Based Order Progress Timeline */}
                 <div className="py-5 px-3 sm:px-4 bg-slate-50/80 rounded-xl border border-slate-200/80 my-5">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-[10px] font-mono uppercase tracking-widest font-bold text-slate-400">
                       Order Lifecycle Progress
                     </span>
-                    <span className="text-[11px] font-mono font-bold text-slate-700">
-                      Current Stage: <span className="uppercase text-slate-900 font-black">{selectedOrder.status || "Pending"}</span>
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono font-bold text-slate-700">
+                        Current Stage: <span className="uppercase text-slate-900 font-black">{selectedOrder.status || "Pending"}</span>
+                      </span>
+                    </div>
                   </div>
 
                   {(() => {
@@ -2701,6 +2816,30 @@ export default function AdminPage() {
                             );
                           })}
                         </div>
+
+                        {/* Administrative Status Legend */}
+                        <div className="mt-3 pt-3 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] font-mono text-slate-500">
+                          <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                            <Info className="w-3 h-3 text-slate-400" />
+                            <span>STATUS GUIDE FOR STAFF:</span>
+                          </div>
+                          <div className="flex items-center gap-3 flex-wrap text-[10px]">
+                            <span className="inline-flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                              <strong className="text-amber-900 font-bold">Pending:</strong> Payment unverified / awaiting review
+                            </span>
+                            <span className="text-slate-300 hidden sm:inline">•</span>
+                            <span className="inline-flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                              <strong className="text-blue-950 font-bold">Processing:</strong> Payment confirmed, picking/packing or in transit
+                            </span>
+                            <span className="text-slate-300 hidden sm:inline">•</span>
+                            <span className="inline-flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                              <strong className="text-emerald-950 font-bold">Completed:</strong> Delivered &amp; fulfilled
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     );
                   })()}
@@ -2715,7 +2854,7 @@ export default function AdminPage() {
                       CUSTOMER &amp; ACCOUNT IDENTITY
                     </h3>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3.5">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-3.5">
                       {/* TELEGRAM NAME */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-1">
@@ -2854,7 +2993,7 @@ export default function AdminPage() {
                       TRANSACTION &amp; DEVICE FINGERPRINT
                     </h3>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3.5">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-3.5">
                       {/* IP ADDRESS */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-1">
@@ -3015,7 +3154,7 @@ export default function AdminPage() {
                       })()}
 
                       {/* PRECISE GPS ADDRESS */}
-                      <div className="col-span-1 sm:col-span-2 space-y-1">
+                      <div className="col-span-2 space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
                             PRECISE GPS ADDRESS
@@ -3054,7 +3193,7 @@ export default function AdminPage() {
                       RECIPIENT &amp; DELIVERY INFORMATION
                     </h3>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3.5">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-3.5">
                       {/* RECEIVER'S NAME */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-1">
@@ -3120,7 +3259,7 @@ export default function AdminPage() {
                       </div>
 
                       {/* DELIVERY ADDRESS */}
-                      <div className="col-span-1 sm:col-span-2 space-y-1">
+                      <div className="col-span-2 space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
                             DELIVERY ADDRESS
@@ -3152,7 +3291,7 @@ export default function AdminPage() {
                       </div>
 
                       {/* DELIVERY NOTES */}
-                      <div className="col-span-1 sm:col-span-2 space-y-1">
+                      <div className="col-span-2 space-y-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-500">
                             DELIVERY NOTES
@@ -3181,6 +3320,64 @@ export default function AdminPage() {
                         <div className="font-ibm-condensed font-medium text-slate-800 text-sm tracking-normal leading-relaxed break-words">
                           {selectedOrder.notes || "None"}
                         </div>
+                      </div>
+
+                      {/* COURIER TRACKING URL */}
+                      <div className="col-span-2 pt-3 border-t border-slate-100 space-y-2">
+                        <div className="flex items-center justify-between gap-1">
+                          <label htmlFor={`tracking-url-input-${selectedOrder.id}`} className="font-heading font-normal text-[11px] uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                            <Truck className="w-3.5 h-3.5 text-slate-500" />
+                            <span>COURIER TRACKING URL</span>
+                          </label>
+                          {selectedOrder.trackingUrl && (
+                            <a
+                              href={selectedOrder.trackingUrl.startsWith('http') ? selectedOrder.trackingUrl : `https://${selectedOrder.trackingUrl}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors cursor-pointer"
+                              title="Open tracking link in new tab"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" />
+                              <span>Open URL</span>
+                            </a>
+                          )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            id={`tracking-url-input-${selectedOrder.id}`}
+                            type="url"
+                            value={trackingUrlInput}
+                            onChange={(e) => setTrackingUrlInput(e.target.value)}
+                            placeholder="e.g. https://www.lalamove.com/order/... or courier tracking link"
+                            className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveTrackingUrl(selectedOrder.id, trackingUrlInput)}
+                            disabled={isSavingTrackingUrl}
+                            className="px-4 py-2 bg-slate-900 hover:bg-black disabled:opacity-50 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-xs"
+                          >
+                            {isSavingTrackingUrl ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Saving...</span>
+                              </>
+                            ) : trackingSavedSuccess ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>Saved</span>
+                              </>
+                            ) : (
+                              <>
+                                <Link2 className="w-3.5 h-3.5" />
+                                <span>Save Tracking</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-[10px] font-mono text-slate-400">
+                          When set, an interactive &quot;Track Shipment&quot; button will automatically display to the customer in their live order status.
+                        </p>
                       </div>
                     </div>
                   </div>

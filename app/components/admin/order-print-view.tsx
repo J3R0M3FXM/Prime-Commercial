@@ -408,6 +408,16 @@ export default function OrderPrintView({
                 {order.notes || "None"}
               </span>
             </div>
+            {order.trackingUrl && (
+              <div className="col-span-2">
+                <span className="font-heading font-normal text-[10px] uppercase tracking-wider text-slate-500 block">
+                  COURIER TRACKING URL
+                </span>
+                <span className="font-ibm-condensed font-bold text-slate-950 text-sm block leading-relaxed break-words">
+                  {order.trackingUrl}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
