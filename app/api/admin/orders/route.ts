@@ -76,6 +76,7 @@ export async function PUT(request: Request) {
       id, 
       status, 
       notes, 
+      internalNotes,
       paymentStatus, 
       trackingUrl,
       items, 
@@ -103,6 +104,7 @@ export async function PUT(request: Request) {
     const updateData: any = { updatedAt: new Date().toISOString() };
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
+    if (internalNotes !== undefined) updateData.internalNotes = internalNotes;
     if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
     if (trackingUrl !== undefined) updateData.trackingUrl = trackingUrl;
 

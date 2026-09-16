@@ -56,13 +56,17 @@ import {
   Fingerprint,
   Link2,
   HelpCircle,
-  Info
+  Info,
+  Share2,
+  MessageSquare,
+  Send
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
 import DiagnosticsModule from "@/app/components/admin/diagnostics-module";
 import ModifyOrderModal from "@/app/components/admin/modify-order-modal";
 import OrderPrintView from "@/app/components/admin/order-print-view";
+import ShareOrderModal from "@/app/components/admin/share-order-modal";
 import dynamic from 'next/dynamic';
 
 const LogisticsModule = dynamic(() => import('@/app/components/admin/logistics-module'), { 
@@ -803,20 +807,34 @@ export default function AdminPage() {
     }
   };
 
-  // Order status update
+  // Order status update with background animation transition & feedback
   const handleUpdateOrderStatus = async (orderId: string, status: string) => {
+    setStatusUpdatingId(orderId);
+    setUpdatingToStatus(status);
     try {
-      await fetch("/api/admin/orders", {
+      const res = await fetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: orderId, status })
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to update order status");
+      }
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+      setStatusJustSaved({ orderId, status, ts: Date.now() });
+      setTimeout(() => {
+        setStatusJustSaved(null);
+      }, 3500);
       if (selectedCustomerId) {
         fetchCustomerDetail(selectedCustomerId);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      showAlert(`Failed to update status: ${e.message || String(e)}`, "Error", "error");
+    } finally {
+      setStatusUpdatingId(null);
+      setUpdatingToStatus(null);
     }
   };
 
@@ -1056,6 +1074,20 @@ export default function AdminPage() {
   const [trackingSavedSuccess, setTrackingSavedSuccess] = useState<boolean>(false);
   const [showStatusGuide, setShowStatusGuide] = useState<boolean>(false);
 
+  // Status Animation & Feedback State
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [updatingToStatus, setUpdatingToStatus] = useState<string | null>(null);
+  const [statusJustSaved, setStatusJustSaved] = useState<{ orderId: string; status: string; ts: number } | null>(null);
+
+  // Share Order Modal State
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+
+  // Internal Notes State for Order Details
+  const [internalNoteInput, setInternalNoteInput] = useState<string>("");
+  const [internalNoteAuthor, setInternalNoteAuthor] = useState<string>("Staff Admin");
+  const [isSavingInternalNote, setIsSavingInternalNote] = useState<boolean>(false);
+  const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
+
   // Sync tracking input when selectedOrderId or selectedOrder changes
   useEffect(() => {
     if (selectedOrder) {
@@ -1086,6 +1118,63 @@ export default function AdminPage() {
       showAlert(`Failed to save tracking URL: ${e.message || String(e)}`, "Error", "error");
     } finally {
       setIsSavingTrackingUrl(false);
+    }
+  };
+
+  const handleAddInternalNote = async (orderId: string, noteContent: string) => {
+    if (!noteContent.trim()) return;
+    setIsSavingInternalNote(true);
+    try {
+      const existingNotes = Array.isArray(selectedOrder?.internalNotes) ? selectedOrder.internalNotes : [];
+      const newNoteObj = {
+        id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        note: noteContent.trim(),
+        author: internalNoteAuthor.trim() || "Staff Admin",
+        createdAt: new Date().toISOString()
+      };
+      const updatedNotes = [newNoteObj, ...existingNotes];
+
+      const res = await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: orderId, internalNotes: updatedNotes })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save internal note");
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, internalNotes: updatedNotes } : o));
+      setInternalNoteInput("");
+      setLiveToast({
+        id: `note-${Date.now()}`,
+        title: "Internal Note Added",
+        message: "Comment appended to order log with timestamp.",
+        type: "info"
+      });
+    } catch (err: any) {
+      console.error(err);
+      showAlert(`Failed to save internal note: ${err.message || String(err)}`, "Error", "error");
+    } finally {
+      setIsSavingInternalNote(false);
+    }
+  };
+
+  const handleDeleteInternalNote = async (orderId: string, noteId: string) => {
+    try {
+      const existingNotes = Array.isArray(selectedOrder?.internalNotes) ? selectedOrder.internalNotes : [];
+      const updatedNotes = existingNotes.filter((n: any) => n.id !== noteId);
+
+      const res = await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: orderId, internalNotes: updatedNotes })
+      });
+      if (!res.ok) throw new Error("Failed to delete internal note");
+
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, internalNotes: updatedNotes } : o));
+    } catch (err: any) {
+      console.error(err);
+      showAlert("Failed to delete internal note.", "Error", "error");
     }
   };
 
@@ -2575,10 +2664,33 @@ export default function AdminPage() {
 
             {/* Screen-Only Order Management Container */}
             <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 screen-only">
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
                   <div>
-                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">Order Identifier</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">Order Identifier</span>
+                      <div 
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider border transition-all duration-500 ease-in-out ${
+                          selectedOrder.status === "Completed"
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                            : selectedOrder.status === "Processing"
+                            ? "bg-blue-50 text-blue-800 border-blue-300"
+                            : "bg-amber-50 text-amber-900 border-amber-300"
+                        } ${statusJustSaved?.orderId === selectedOrder.id ? "ring-2 ring-emerald-500 ring-offset-1 scale-105" : ""}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full transition-colors duration-500 ${
+                          selectedOrder.status === "Completed"
+                            ? "bg-emerald-500"
+                            : selectedOrder.status === "Processing"
+                            ? "bg-blue-500"
+                            : "bg-amber-500"
+                        }`} />
+                        <span>{selectedOrder.status || "Pending"}</span>
+                        {statusJustSaved?.orderId === selectedOrder.id && (
+                          <span className="text-[10px] text-emerald-700 font-black ml-0.5 animate-pulse">✓ Saved</span>
+                        )}
+                      </div>
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <h2 className="text-2xl font-heading font-normal text-slate-900 tracking-tight">{selectedOrder.orderNumber}</h2>
                       <button
@@ -2618,6 +2730,16 @@ export default function AdminPage() {
 
                     <button
                       type="button"
+                      onClick={() => setIsShareModalOpen(true)}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg text-xs font-bold uppercase tracking-wider font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                      title="Share Order Summary & Telegram Deep Link"
+                    >
+                      <Share2 className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Share Order</span>
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => {
                         setModifyingOrder(selectedOrder);
                         setIsModifyModalOpen(true);
@@ -2645,19 +2767,36 @@ export default function AdminPage() {
                         <span className="text-[10px] hidden sm:inline">Guide</span>
                       </button>
                     </div>
-                    {(["Processing", "Completed", "Pending"] as const).map(st => (
-                      <button
-                        key={st}
-                        onClick={() => handleUpdateOrderStatus(selectedOrder.id, st)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider font-mono transition-all cursor-pointer ${
-                          selectedOrder.status === st
-                            ? "bg-slate-900 text-white shadow-sm"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        }`}
-                      >
-                        {st}
-                      </button>
-                    ))}
+                    {(["Processing", "Completed", "Pending"] as const).map(st => {
+                      const isActive = selectedOrder.status === st;
+                      const isUpdatingThis = statusUpdatingId === selectedOrder.id && updatingToStatus === st;
+                      const isJustSavedThis = statusJustSaved?.orderId === selectedOrder.id && statusJustSaved?.status === st;
+
+                      let activeStyles = "bg-slate-900 text-white shadow-sm";
+                      if (st === "Completed") activeStyles = "bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400";
+                      if (st === "Processing") activeStyles = "bg-blue-600 text-white shadow-sm ring-1 ring-blue-400";
+                      if (st === "Pending") activeStyles = "bg-amber-500 text-slate-950 shadow-sm ring-1 ring-amber-400";
+
+                      return (
+                        <button
+                          key={st}
+                          disabled={statusUpdatingId === selectedOrder.id}
+                          onClick={() => handleUpdateOrderStatus(selectedOrder.id, st)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider font-mono transition-all duration-500 ease-in-out cursor-pointer flex items-center gap-1 active:scale-95 ${
+                            isActive
+                              ? `${activeStyles} ${isJustSavedThis ? "ring-2 ring-emerald-400 ring-offset-1 scale-102" : ""}`
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                          }`}
+                        >
+                          {isUpdatingThis ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : isJustSavedThis ? (
+                            <Check className="w-3 h-3 text-white" />
+                          ) : null}
+                          <span>{st}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -3632,6 +3771,165 @@ export default function AdminPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Internal Notes & Staff Activity Log */}
+                <div className="pt-6 mt-6 border-t border-slate-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-slate-600" />
+                      <h3 className="font-heading font-normal text-sm uppercase text-slate-900 tracking-wide">
+                        Internal Notes &amp; Staff Activity Log
+                      </h3>
+                      {Array.isArray(selectedOrder.internalNotes) && selectedOrder.internalNotes.length > 0 && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          {selectedOrder.internalNotes.length} {selectedOrder.internalNotes.length === 1 ? 'note' : 'notes'}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      Private comments &amp; timestamped logs visible only to admin staff
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
+                    {/* Quick Insert Suggestions */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-mono font-bold uppercase text-slate-400 tracking-wider">Quick Suggestions:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          "Called customer at 2pm, confirmed address",
+                          "Damaged in transit, waiting for replacement",
+                          "Customer requested delivery time window change",
+                          "Payment verified manually with bank record",
+                          "Dispatched with courier rider"
+                        ].map((tpl, tplIdx) => (
+                          <button
+                            key={tplIdx}
+                            type="button"
+                            onClick={() => setInternalNoteInput(tpl)}
+                            className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-mono text-slate-700 transition-colors cursor-pointer text-left"
+                          >
+                            + {tpl}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Note Input Field */}
+                    <div className="space-y-2 bg-white p-3 rounded-xl border border-slate-200">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="flex-1">
+                          <label htmlFor={`internal-note-input-${selectedOrder.id}`} className="sr-only">Add internal note</label>
+                          <input
+                            id={`internal-note-input-${selectedOrder.id}`}
+                            type="text"
+                            value={internalNoteInput}
+                            onChange={(e) => setInternalNoteInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleAddInternalNote(selectedOrder.id, internalNoteInput);
+                              }
+                            }}
+                            placeholder="Add internal note (e.g. 'Called customer at 2pm', 'Damaged in transit, waiting for replacement')..."
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <input
+                            type="text"
+                            value={internalNoteAuthor}
+                            onChange={(e) => setInternalNoteAuthor(e.target.value)}
+                            placeholder="Staff Name"
+                            title="Author name"
+                            className="w-28 px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-slate-900"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAddInternalNote(selectedOrder.id, internalNoteInput)}
+                            disabled={!internalNoteInput.trim() || isSavingInternalNote}
+                            className="px-4 py-2 bg-slate-900 hover:bg-black disabled:opacity-40 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
+                          >
+                            {isSavingInternalNote ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Saving...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Append Note</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Note List */}
+                    {Array.isArray(selectedOrder.internalNotes) && selectedOrder.internalNotes.length > 0 ? (
+                      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                        {selectedOrder.internalNotes.map((noteItem: any, noteIdx: number) => {
+                          const noteKey = noteItem.id || `note-${noteIdx}`;
+                          return (
+                            <div 
+                              key={noteKey}
+                              className="p-3 bg-white border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-start justify-between gap-2 text-xs font-mono group"
+                            >
+                              <div className="space-y-1 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-800 border border-slate-200 uppercase">
+                                    {noteItem.author || "Staff Admin"}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {noteItem.createdAt ? new Date(noteItem.createdAt).toLocaleString("en-PH", {
+                                      dateStyle: "medium",
+                                      timeStyle: "short"
+                                    }) : "Recent"}
+                                  </span>
+                                </div>
+                                <p className="text-slate-800 text-xs leading-relaxed break-words font-medium">
+                                  {noteItem.note}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0 self-end sm:self-start opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(noteItem.note);
+                                    setCopiedNoteId(noteKey);
+                                    setTimeout(() => setCopiedNoteId(null), 2000);
+                                  }}
+                                  className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Copy Note Text"
+                                >
+                                  {copiedNoteId === noteKey ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteInternalNote(selectedOrder.id, noteItem.id)}
+                                  className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                  title="Delete Note"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-white border border-dashed border-slate-200 rounded-xl text-center text-xs font-mono text-slate-400">
+                        No internal staff comments recorded for this order yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -3641,6 +3939,15 @@ export default function AdminPage() {
               deliveryAddressText={deliveryAddressText}
               gpsStreetAddressText={gpsStreetAddressText}
               format={printPaperFormat}
+            />
+
+            {/* Share Order Modal */}
+            <ShareOrderModal
+              isOpen={isShareModalOpen}
+              onClose={() => setIsShareModalOpen(false)}
+              order={selectedOrder}
+              deliveryAddressText={deliveryAddressText}
+              gpsStreetAddressText={gpsStreetAddressText}
             />
           </motion.div>
         );
