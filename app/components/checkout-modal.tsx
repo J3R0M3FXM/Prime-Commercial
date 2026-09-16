@@ -24,11 +24,15 @@ import {
   ShoppingBag,
   Copy,
   Download,
-  ExternalLink
+  ExternalLink,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
 import { getClientFingerprint, getClientLocation } from "./fingerprint-collector";
+import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 
 // Dynamic map import to ensure zero SSR conflicts
 const AddressPickerMap = dynamic(() => import("./address-picker-map"), {
@@ -128,6 +132,8 @@ export default function CheckoutModal({
   const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [addressError, setAddressError] = useState("");
+  const [addressValidation, setAddressValidation] = useState<AddressValidationResult | null>(null);
+  const [isValidatingAddress, setIsValidatingAddress] = useState<boolean>(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Step 3: Couriers & Delivery Pricing State
@@ -327,6 +333,57 @@ export default function CheckoutModal({
     return () => clearInterval(syncInterval);
   }, [currentStep, completedOrder?.id, completedOrder?.orderNumber]);
 
+  // Perform full address validation (local logic + online Geoapify verification)
+  const performAddressValidation = async (targetAddr: string, unit: string, currentCoords: { lat: number; lon: number }) => {
+    setIsValidatingAddress(true);
+    const localResult = validateAddressLocally(targetAddr, unit, currentCoords);
+    setAddressValidation(localResult);
+
+    if (localResult.isValid && targetAddr && targetAddr.trim().length >= 5) {
+      try {
+        const res = await fetch("/api/geoapify/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            address: targetAddr,
+            unitDetails: unit,
+            lat: currentCoords.lat,
+            lon: currentCoords.lon,
+          }),
+        });
+        if (res.ok) {
+          const apiData = await res.json();
+          setAddressValidation((prev) => ({
+            ...prev,
+            ...apiData,
+            isValid: apiData.isValid ?? prev?.isValid ?? true,
+            status: apiData.status || prev?.status || "verified",
+            score: apiData.score || prev?.score || "high",
+            message: apiData.message || prev?.message || "Address verified.",
+            missingFields: apiData.missingFields || prev?.missingFields || [],
+          }));
+        }
+      } catch (e) {
+        // Retain local validation result on network issue
+      }
+    }
+    setIsValidatingAddress(false);
+  };
+
+  // Real-time Address Validation Sync Effect (Triggered when on Step 2)
+  useEffect(() => {
+    if (currentStep !== 2) return;
+    const targetAddr = selectedAddress || addressSearch;
+    if (targetAddr || hasSelectedAddress) {
+      const timer = setTimeout(() => {
+        performAddressValidation(targetAddr, unitDetails, coords);
+      }, 400);
+      return () => clearTimeout(timer);
+    } else {
+      setAddressValidation(null);
+    }
+  }, [currentStep, selectedAddress, addressSearch, unitDetails, coords, hasSelectedAddress]);
+
   // Address Autocomplete Search
   const handleAddressSearch = (query: string) => {
     setAddressSearch(query);
@@ -518,10 +575,20 @@ export default function CheckoutModal({
 
   const handleNextFromStep2 = () => {
     setAddressError("");
-    if (!selectedAddress || !hasSelectedAddress) {
+    const targetAddr = selectedAddress || addressSearch;
+
+    if (!targetAddr || !hasSelectedAddress) {
       setAddressError("Please select a suggested address or drop a pin on the map.");
       return;
     }
+
+    const validation = validateAddressLocally(targetAddr, unitDetails, coords);
+    if (!validation.isValid) {
+      setAddressError(validation.message);
+      setAddressValidation(validation);
+      return;
+    }
+
     // Fetch couriers if not already fetched
     if (availableCouriers.length === 0) {
       fetchCouriersForLocation(coords.lat, coords.lon);
@@ -911,6 +978,70 @@ export default function CheckoutModal({
                   />
                 </div>
               </div>
+
+              {/* Real-Time Address Validation Status Banner */}
+              {addressValidation && (
+                <div className={`p-3 rounded-xl border flex flex-col gap-1.5 transition-all text-xs font-mono ${
+                  addressValidation.status === "verified"
+                    ? "bg-emerald-50/90 border-emerald-200 text-emerald-950"
+                    : addressValidation.status === "warning"
+                    ? "bg-amber-50/90 border-amber-200 text-amber-950"
+                    : "bg-red-50/90 border-red-200 text-red-950"
+                }`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {addressValidation.status === "verified" && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      )}
+                      {addressValidation.status === "warning" && (
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      )}
+                      {addressValidation.status === "error" && (
+                        <XCircle className="w-4 h-4 text-red-600 shrink-0" />
+                      )}
+                      <span className="font-heading font-bold uppercase tracking-wider text-[11px] truncate">
+                        {addressValidation.status === "verified" && "Address Validated"}
+                        {addressValidation.status === "warning" && "Address Notice"}
+                        {addressValidation.status === "error" && "Validation Alert"}
+                      </span>
+                      {addressValidation.score && (
+                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${
+                          addressValidation.score === "high" ? "bg-emerald-200 text-emerald-900" :
+                          addressValidation.score === "medium" ? "bg-amber-200 text-amber-900" :
+                          "bg-red-200 text-red-900"
+                        }`}>
+                          {addressValidation.score} precision
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => performAddressValidation(selectedAddress || addressSearch, unitDetails, coords)}
+                      disabled={isValidatingAddress}
+                      className="px-2 py-0.5 bg-white border border-gray-300 rounded text-[10px] font-bold uppercase hover:bg-gray-100 transition-colors flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                    >
+                      {isValidatingAddress ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-gray-500" />
+                      ) : (
+                        <ShieldCheck className="w-3 h-3 text-gray-600" />
+                      )}
+                      <span>Re-validate</span>
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] font-mono leading-relaxed opacity-90">
+                    {addressValidation.message}
+                  </p>
+
+                  {addressValidation.missingFields && addressValidation.missingFields.includes("unit_building") && (
+                    <div className="mt-1 pt-1.5 border-t border-amber-200/60 flex items-center gap-1.5 text-[10.5px] text-amber-800">
+                      <Building className="w-3 h-3 shrink-0 text-amber-600" />
+                      <span>Tip: Adding Unit, Floor, or Building Name above helps courier locate drop-off accurately.</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -1161,7 +1292,15 @@ export default function CheckoutModal({
                 </div>
 
                 <div className="flex justify-between items-start pt-1 border-t border-gray-200">
-                  <span className="text-gray-500 uppercase text-[10px]">Address</span>
+                  <span className="text-gray-500 uppercase text-[10px] flex items-center gap-1">
+                    <span>Address</span>
+                    {addressValidation?.status === "verified" && (
+                      <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-0.5">
+                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                        <span>Validated</span>
+                      </span>
+                    )}
+                  </span>
                   <span className="font-medium text-gray-900 text-right max-w-xs break-words">
                     {selectedAddress}
                     {unitDetails && <span className="block text-gray-500 text-[11px]">{unitDetails}</span>}

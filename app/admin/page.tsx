@@ -74,6 +74,7 @@ import DiagnosticsModule from "@/app/components/admin/diagnostics-module";
 import ModifyOrderModal from "@/app/components/admin/modify-order-modal";
 import OrderPrintView from "@/app/components/admin/order-print-view";
 import ShareOrderModal from "@/app/components/admin/share-order-modal";
+import { StaticOrderMap } from "@/app/components/static-order-map";
 import dynamic from 'next/dynamic';
 
 const LogisticsModule = dynamic(() => import('@/app/components/admin/logistics-module'), { 
@@ -347,7 +348,33 @@ export default function AdminPage() {
 
   // Silent Real-Time Background Sync states & refs
   const [silentSyncEnabled, setSilentSyncEnabled] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Sound preferences persisted in localStorage per event type
+  const [soundSettings, setSoundSettings] = useState<{
+    master: boolean;
+    newOrder: boolean;
+    paymentProof: boolean;
+  }>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin_sound_settings");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return { master: true, newOrder: true, paymentProof: true };
+  });
+
+  const [isSoundSettingsModalOpen, setIsSoundSettingsModalOpen] = useState(false);
+
+  // Sync sound settings to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("admin_sound_settings", JSON.stringify(soundSettings));
+      } catch (e) {}
+    }
+  }, [soundSettings]);
+
   const [lastSilentSync, setLastSilentSync] = useState<Date>(new Date());
   const [isSilentSyncing, setIsSilentSyncing] = useState(false);
   const [liveToast, setLiveToast] = useState<{
@@ -366,9 +393,13 @@ export default function AdminPage() {
   const prevOrderMapRef = useRef<Map<string, any>>(new Map());
   const hasInitializedOrdersRef = useRef(false);
 
-  // Pleasant Web Audio notification chime (no external audio assets required)
-  const playChime = useCallback((type: "proof" | "order" = "proof") => {
-    if (!soundEnabled) return;
+  // Web Audio notification chime with per-event sound toggles
+  const playChime = useCallback((type: "proof" | "order" = "proof", forcePlay = false) => {
+    if (!forcePlay) {
+      if (!soundSettings.master) return;
+      if (type === "proof" && !soundSettings.paymentProof) return;
+      if (type === "order" && !soundSettings.newOrder) return;
+    }
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
@@ -389,7 +420,7 @@ export default function AdminPage() {
         osc.start(now);
         osc.stop(now + 0.45);
       } else {
-        // Warm notification tone
+        // Warm notification tone: 523.25Hz (C5) -> 659.25Hz (E5)
         osc.type = "sine";
         osc.frequency.setValueAtTime(523.25, now);
         osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.14);
@@ -401,7 +432,7 @@ export default function AdminPage() {
     } catch (e) {
       // Audio context might be restricted before user gesture, safe to ignore
     }
-  }, [soundEnabled]);
+  }, [soundSettings]);
 
   // Custom non-blocking dialogs for sandbox iframes
   const [customConfirm, setCustomConfirm] = useState<{
@@ -1387,11 +1418,16 @@ export default function AdminPage() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => setSoundEnabled(!soundEnabled)}
-                    title={soundEnabled ? "Mute notification sounds" : "Enable notification sounds"}
-                    className="ml-1 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                    onClick={() => setIsSoundSettingsModalOpen(true)}
+                    title="Notification Sound Settings (New Order vs Payment Proof)"
+                    className="ml-1 p-1 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1"
                   >
-                    {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-600" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
+                    {soundSettings.master ? (
+                      <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <VolumeX className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                    <span className="text-[10px] font-mono uppercase font-bold text-slate-500 hidden md:inline">Audio</span>
                   </button>
                 </div>
 
@@ -2720,6 +2756,7 @@ export default function AdminPage() {
 
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
+                        {/* ORDER STATUS BADGE */}
                         <div 
                           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider border transition-all duration-500 ease-in-out ${
                             selectedOrder.status === "Completed"
@@ -2741,9 +2778,44 @@ export default function AdminPage() {
                             <span className="text-[10px] text-emerald-700 font-black ml-0.5 animate-pulse">✓ Saved</span>
                           )}
                         </div>
+
+                        {/* PRIORITY SCORE BADGE */}
+                        {(() => {
+                          const createdAtTime = selectedOrder.createdAt ? new Date(selectedOrder.createdAt).getTime() : Date.now();
+                          const ageMinutes = Math.floor((Date.now() - createdAtTime) / (1000 * 60));
+                          const isPending = (selectedOrder.status || "Pending") === "Pending";
+                          const isCriticalPending = isPending && ageMinutes >= 45;
+
+                          let scoreLabel = "PRIORITY: NORMAL";
+                          let scoreClasses = "bg-slate-100 text-slate-700 border-slate-200";
+
+                          if (isCriticalPending) {
+                            scoreLabel = `CRITICAL PENDING (${ageMinutes}m)`;
+                            scoreClasses = "bg-red-50 text-red-800 border-red-300 animate-pulse font-bold ring-1 ring-red-400";
+                          } else if (isPending) {
+                            scoreLabel = `PRIORITY: MEDIUM (${ageMinutes}m)`;
+                            scoreClasses = "bg-amber-50 text-amber-900 border-amber-300 font-bold";
+                          } else if (selectedOrder.status === "Processing") {
+                            scoreLabel = "PRIORITY: PROCESSING";
+                            scoreClasses = "bg-blue-50 text-blue-800 border-blue-200 font-semibold";
+                          } else if (selectedOrder.status === "Completed") {
+                            scoreLabel = "PRIORITY: FULFILLED";
+                            scoreClasses = "bg-emerald-50 text-emerald-800 border-emerald-200";
+                          }
+
+                          return (
+                            <div 
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono tracking-wider uppercase border ${scoreClasses}`}
+                              title={`Order Age: ${ageMinutes} minutes | Status: ${selectedOrder.status || "Pending"}`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${isCriticalPending ? "bg-red-600 animate-ping" : isPending ? "bg-amber-500" : "bg-blue-500"}`} />
+                              <span>Priority Score: {scoreLabel}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <h2 className="text-xl sm:text-2xl font-heading font-normal text-slate-900 tracking-tight">{selectedOrder.orderNumber}</h2>
+                      <div className="flex items-center gap-2 mt-1">
+                        <h2 className="text-xl sm:text-2xl font-ibm-condensed font-medium text-slate-900 tracking-tight">{selectedOrder.orderNumber}</h2>
                         <button
                           type="button"
                           onClick={() => copyToClipboard(selectedOrder.orderNumber, "orderNumber", "ORDER NUMBER")}
@@ -2757,7 +2829,7 @@ export default function AdminPage() {
                           )}
                         </button>
                       </div>
-                      <p className="text-xs font-mono text-slate-500 mt-1">
+                      <p className="text-xs font-mono text-slate-500 mt-0.5">
                         Placed {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : "Recent"}
                       </p>
                     </div>
@@ -3138,6 +3210,59 @@ export default function AdminPage() {
                           )}
                         </div>
                       </div>
+
+                      {/* ORDER HISTORY SUMMARY */}
+                      <div className="col-span-2 pt-1 border-t border-slate-100">
+                        <div className="flex items-center gap-1 leading-none text-slate-400">
+                          <ShoppingBag className="w-2.5 h-2.5 shrink-0 text-slate-400" />
+                          <span className="font-heading font-medium text-[9.5px] uppercase tracking-wider text-slate-400">
+                            ORDER HISTORY SUMMARY
+                          </span>
+                        </div>
+                        {(() => {
+                          const userTgId = String(selectedOrder.customerId || selectedOrder.tgUserId || "");
+                          const userTgUsername = selectedOrder.customerUsername || "";
+
+                          const userCompletedCount = orders.filter((o) => {
+                            const matchId = userTgId && (String(o.customerId) === userTgId || String(o.tgUserId) === userTgId);
+                            const matchUser = userTgUsername && o.customerUsername && o.customerUsername.toLowerCase() === userTgUsername.toLowerCase();
+                            return (matchId || matchUser) && o.status === "Completed";
+                          }).length;
+
+                          const userTotalCount = orders.filter((o) => {
+                            const matchId = userTgId && (String(o.customerId) === userTgId || String(o.tgUserId) === userTgId);
+                            const matchUser = userTgUsername && o.customerUsername && o.customerUsername.toLowerCase() === userTgUsername.toLowerCase();
+                            return matchId || matchUser;
+                          }).length;
+
+                          const handleFilterUserOrders = () => {
+                            const filterVal = userTgId || userTgUsername || selectedOrder.customerName || "";
+                            setOrderSearch(filterVal);
+                            setView("orders");
+                            setCopyToast(`FILTERING ORDERS MANAGEMENT LIST FOR: ${filterVal}`);
+                            if (copyToastTimerRef.current) clearTimeout(copyToastTimerRef.current);
+                            copyToastTimerRef.current = setTimeout(() => setCopyToast(null), 3500);
+                          };
+
+                          return (
+                            <button
+                              type="button"
+                              onClick={handleFilterUserOrders}
+                              className="mt-0.5 flex items-center gap-2 cursor-pointer group hover:text-indigo-600 transition-colors text-left"
+                              title="Click to view all orders by this Telegram user in Orders Management"
+                            >
+                              <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal group-hover:text-indigo-600 group-hover:underline transition-colors flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold uppercase bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span>{userCompletedCount} Successful Orders</span>
+                                </span>
+                                <span className="text-slate-500 font-normal text-[11px]">({userTotalCount} Total Placed)</span>
+                                <ExternalLink className="w-3 h-3 text-indigo-500 opacity-80 group-hover:opacity-100 transition-opacity ml-0.5" />
+                              </span>
+                            </button>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
 
@@ -3404,6 +3529,40 @@ export default function AdminPage() {
                             <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
                           )}
                         </div>
+                      </div>
+
+                      {/* STATIC DELIVERY ROUTE MAP */}
+                      <div className="col-span-2 pt-2 border-t border-slate-100">
+                        {(() => {
+                          let mapLat: number | null = null;
+                          let mapLon: number | null = null;
+
+                          if (selectedOrder.deviceSnapshot?.location?.latitude && selectedOrder.deviceSnapshot?.location?.longitude) {
+                            mapLat = Number(selectedOrder.deviceSnapshot.location.latitude);
+                            mapLon = Number(selectedOrder.deviceSnapshot.location.longitude);
+                          } else if (selectedOrder.deliveryLocation?.lat && selectedOrder.deliveryLocation?.lon) {
+                            mapLat = Number(selectedOrder.deliveryLocation.lat);
+                            mapLon = Number(selectedOrder.deliveryLocation.lon);
+                          } else if (typeof selectedOrder.coordinates === "string" && selectedOrder.coordinates.includes(",")) {
+                            const parts = selectedOrder.coordinates.split(",");
+                            mapLat = parseFloat(parts[0].trim());
+                            mapLon = parseFloat(parts[1].trim());
+                          } else if (selectedOrder.coordinates?.lat && (selectedOrder.coordinates?.lon || selectedOrder.coordinates?.lng)) {
+                            mapLat = Number(selectedOrder.coordinates.lat);
+                            mapLon = Number(selectedOrder.coordinates.lon || selectedOrder.coordinates.lng);
+                          }
+
+                          return (
+                            <StaticOrderMap
+                              lat={mapLat}
+                              lon={mapLon}
+                              addressText={deliveryAddressText || selectedOrder.address || gpsStreetAddressText}
+                              receiverName={selectedOrder.receiverName || selectedOrder.customerName}
+                              orderNumber={selectedOrder.orderNumber}
+                              distanceKm={selectedOrder.calculatedDistance || selectedOrder.distanceKm}
+                            />
+                          );
+                        })()}
                       </div>
 
                       {/* COURIER TRACKING URL */}
@@ -5120,6 +5279,165 @@ export default function AdminPage() {
                   setQrZoomedOrder(null);
                 }}
                 className="flex-1 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold uppercase tracking-wider font-mono transition-colors cursor-pointer shadow-xs"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Sound Settings Modal */}
+      {isSoundSettingsModalOpen && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shrink-0">
+                  <Volume2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-heading font-black text-sm uppercase tracking-wider text-slate-900">
+                    Audio Sound Settings
+                  </h3>
+                  <p className="text-[10px] font-mono text-slate-500">
+                    Configure sound alerts for specific event types
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSoundSettingsModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-mono font-bold cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Settings Toggles List */}
+            <div className="space-y-4 font-mono text-xs">
+              {/* MASTER AUDIO TOGGLE */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="font-bold text-slate-900 text-xs block uppercase">
+                    Master Sound Alerts
+                  </span>
+                  <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
+                    Enable or disable all notification chimes globally across the admin dashboard.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSoundSettings(prev => ({ ...prev, master: !prev.master }))}
+                  className={`w-11 h-6 rounded-full transition-colors p-0.5 flex items-center cursor-pointer ${
+                    soundSettings.master ? "bg-emerald-600 justify-end" : "bg-slate-300 justify-start"
+                  }`}
+                >
+                  <span className="w-5 h-5 rounded-full bg-white shadow-md block" />
+                </button>
+              </div>
+
+              {/* EVENT SPECIFIC TOGGLES */}
+              <div className="space-y-3 pt-1">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                  Event-Specific Audio Chimes
+                </span>
+
+                {/* 1. NEW ORDER PLACED */}
+                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2 shadow-2xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Zap className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div>
+                        <span className="font-bold text-slate-900 text-xs block">
+                          New Order Placed
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          Warm chime when a new customer order arrives
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!soundSettings.master}
+                      onClick={() => setSoundSettings(prev => ({ ...prev, newOrder: !prev.newOrder }))}
+                      className={`w-10 h-5.5 rounded-full transition-colors p-0.5 flex items-center cursor-pointer ${
+                        !soundSettings.master ? "opacity-50 cursor-not-allowed bg-slate-200 justify-start" :
+                        soundSettings.newOrder ? "bg-emerald-600 justify-end" : "bg-slate-300 justify-start"
+                      }`}
+                    >
+                      <span className="w-4.5 h-4.5 rounded-full bg-white shadow-md block" />
+                    </button>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={() => playChime("order", true)}
+                      className="text-[10px] font-mono font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Volume2 className="w-3 h-3 text-indigo-600" />
+                      <span>Test Chime</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. PAYMENT PROOF UPLOADED */}
+                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2 shadow-2xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Receipt className="w-4 h-4 text-purple-600 shrink-0" />
+                      <div>
+                        <span className="font-bold text-slate-900 text-xs block">
+                          Payment Proof Uploaded
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          High-pitched chime when GCash / Bank proof is uploaded
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!soundSettings.master}
+                      onClick={() => setSoundSettings(prev => ({ ...prev, paymentProof: !prev.paymentProof }))}
+                      className={`w-10 h-5.5 rounded-full transition-colors p-0.5 flex items-center cursor-pointer ${
+                        !soundSettings.master ? "opacity-50 cursor-not-allowed bg-slate-200 justify-start" :
+                        soundSettings.paymentProof ? "bg-purple-600 justify-end" : "bg-slate-300 justify-start"
+                      }`}
+                    >
+                      <span className="w-4.5 h-4.5 rounded-full bg-white shadow-md block" />
+                    </button>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={() => playChime("proof", true)}
+                      className="text-[10px] font-mono font-bold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Volume2 className="w-3 h-3 text-purple-600" />
+                      <span>Test Chime</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[10.5px] font-mono text-slate-600 flex items-start gap-2">
+              <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+              <span>
+                All audio preferences are saved automatically to your browser's <strong>localStorage</strong> and will persist across future staff admin sessions.
+              </span>
+            </div>
+
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setIsSoundSettingsModalOpen(false)}
+                className="w-full py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold uppercase tracking-wider font-mono transition-colors cursor-pointer shadow-xs"
               >
                 Done
               </button>
