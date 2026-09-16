@@ -39,7 +39,8 @@ import {
   AlertTriangle,
   Stethoscope,
   Truck,
-  Receipt
+  Receipt,
+  CreditCard
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
@@ -53,6 +54,11 @@ const LogisticsModule = dynamic(() => import('@/app/components/admin/logistics-m
 
 const ChargesModule = dynamic(() => import('@/app/components/admin/charges-module'), { ssr: false });
 
+const PaymentsModule = dynamic(() => import('@/app/components/admin/payments-module'), { 
+  ssr: false,
+  loading: () => <div className="p-8 text-center text-slate-500 font-mono text-sm">Loading Payments...</div>
+});
+
 type AdminView = 
   | "dashboard" 
   | "customers" 
@@ -65,7 +71,8 @@ type AdminView =
   | "analytics"
   | "diagnostics"
   | "logistics"
-  | "charges";
+  | "charges"
+  | "payments";
 
 const ImageUploadField = ({
   label,
@@ -231,6 +238,7 @@ export default function AdminPage() {
 
   // Copied feedback
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [zoomedProofImage, setZoomedProofImage] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, key: string) => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -464,6 +472,22 @@ export default function AdminPage() {
         body: JSON.stringify({ id: orderId, status })
       });
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+      if (selectedCustomerId) {
+        fetchCustomerDetail(selectedCustomerId);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUpdateOrderPaymentStatus = async (orderId: string, paymentStatus: string) => {
+    try {
+      await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: orderId, paymentStatus })
+      });
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentStatus } : o));
       if (selectedCustomerId) {
         fetchCustomerDetail(selectedCustomerId);
       }
@@ -728,12 +752,13 @@ export default function AdminPage() {
                   { id: "customers", name: "Customers", icon: Users, desc: "Profiles & Device Info", count: customers.length },
                   { id: "orders", name: "Orders", icon: ClipboardList, desc: "Order History & Status", count: orders.length },
                   { id: "products", name: "Products", icon: Package, desc: "Catalog Configuration", count: products.length },
-                  { id: "inventory", name: "Inventory", icon: Sliders, desc: "Stock Adjustments", count: `${products.reduce((a, p) => a + (p.stock || 0), 0)} units` },
+                  { id: "inventory", name: "Inventory", icon: Sliders, desc: "Stock Adjustments", count: `${products.reduce((a: any, p: any) => a + (p.stock || 0), 0)} units` },
                   { id: "settings", name: "Settings", icon: Lock, desc: "Security & Access Rules", count: "Protected" },
                   { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Store & Order Insights", count: "Live" },
                   { id: "diagnostics", name: "Diagnostics", icon: Activity, desc: "Health, APIs & Font Audit", count: "9 Systems + DOM" },
                   { id: "logistics", name: "Logistics", icon: Truck, desc: "Warehouses & Couriers", count: "Routes" },
-                  { id: "charges", name: "Charges", icon: Receipt, desc: "Global Additional Fees", count: "Config" }
+                  { id: "charges", name: "Charges", icon: Receipt, desc: "Global Additional Fees", count: "Config" },
+                  { id: "payments", name: "Payments", icon: CreditCard, desc: "Config Payment Methods", count: "Active Methods" }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -1755,6 +1780,120 @@ export default function AdminPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Payment Review Details */}
+                <div className="pt-6 mt-6 border-t border-slate-100">
+                  <h3 className="font-heading font-black text-sm uppercase text-slate-900 mb-3 tracking-wide flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-slate-600" />
+                    <span>Transaction & Payment Verification</span>
+                  </h3>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">Selected Gateway</p>
+                        <p className="text-sm font-bold text-slate-900 mt-0.5">
+                          {selectedOrder.paymentMethodName || "No Payment Method Selected / COD"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold sm:text-right">Payment Verification Status</p>
+                        <div className="mt-1 sm:text-right">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold uppercase tracking-wider ${
+                            selectedOrder.paymentStatus === "Confirmed"
+                              ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                              : selectedOrder.paymentStatus === "Declined"
+                              ? "bg-red-100 text-red-800 border border-red-200"
+                              : selectedOrder.paymentStatus === "Pending Review"
+                              ? "bg-amber-100 text-amber-800 border border-amber-200 animate-pulse"
+                              : "bg-slate-100 text-slate-600 border border-slate-200"
+                          }`}>
+                            {selectedOrder.paymentStatus || "Pending Submission"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Image proof and status management */}
+                    {selectedOrder.paymentProofImage ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-slate-200/60">
+                        {/* Receipt Thumbnail */}
+                        <div className="sm:col-span-1">
+                          <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold mb-1.5">Submitted Proof Receipt</p>
+                          <div 
+                            onClick={() => setZoomedProofImage(selectedOrder.paymentProofImage)}
+                            className="relative group border border-slate-200 rounded-xl overflow-hidden aspect-[4/5] bg-white cursor-zoom-in transition-all hover:border-slate-400 shadow-sm shrink-0"
+                          >
+                            <img 
+                              src={selectedOrder.paymentProofImage} 
+                              alt="Payment Proof Receipt" 
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold uppercase gap-1">
+                              <Eye className="w-3.5 h-3.5" /> Click to Zoom
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Verification & Action Pane */}
+                        <div className="sm:col-span-2 flex flex-col justify-between space-y-3">
+                          <div className="space-y-1.5 font-mono text-[11px] text-slate-600">
+                            <p className="font-bold text-slate-900 uppercase">Verification Instructions</p>
+                            <p className="leading-relaxed">
+                              Inspect the customer's uploaded receipt. Verify the transaction amount matches the total order value of <span className="font-bold text-black">{formatPHP(selectedOrder.totalAmount)}</span>.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleUpdateOrderPaymentStatus(selectedOrder.id, "Confirmed")}
+                                className={`flex-1 py-2.5 rounded-xl text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                  selectedOrder.paymentStatus === "Confirmed"
+                                    ? "bg-emerald-600 text-white shadow-sm cursor-default"
+                                    : "bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                }`}
+                              >
+                                <Check className="w-4 h-4" /> Approve Payment
+                              </button>
+                              <button
+                                onClick={() => handleUpdateOrderPaymentStatus(selectedOrder.id, "Declined")}
+                                className={`flex-1 py-2.5 rounded-xl text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                  selectedOrder.paymentStatus === "Declined"
+                                    ? "bg-red-600 text-white shadow-sm cursor-default"
+                                    : "bg-white hover:bg-red-50 text-red-700 border border-red-200"
+                                }`}
+                              >
+                                ✕ Reject Payment
+                              </button>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleUpdateOrderPaymentStatus(selectedOrder.id, "Pending Review")}
+                                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer text-center"
+                              >
+                                Reset to Pending Review
+                              </button>
+                              <a 
+                                href={selectedOrder.paymentProofImage}
+                                download={`receipt-${selectedOrder.orderNumber}.png`}
+                                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all text-center flex items-center justify-center gap-1 shrink-0"
+                              >
+                                Download
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-white border border-slate-200 rounded-xl text-center text-xs font-mono text-slate-500">
+                        No payment proof uploaded yet for this order.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -2591,7 +2730,77 @@ export default function AdminPage() {
             </div>
           </motion.div>
         )}
+
+        {/* ========================================================================= */}
+        {/* 12. PAYMENTS SECTION: PAYMENT SYSTEMS CONFIGURATOR                         */}
+        {/* ========================================================================= */}
+        {view === "payments" && (
+          <motion.div
+            key="payments"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <button
+                  onClick={() => setView("dashboard")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                </button>
+                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">
+                  Payment Configuration
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+              <PaymentsModule />
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
+
+      {/* High-Resolution Zoom Lightbox for Payment Receipts */}
+      {zoomedProofImage && (
+        <div 
+          onClick={() => setZoomedProofImage(null)}
+          className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4 cursor-zoom-out backdrop-blur-xs"
+        >
+          <div className="relative max-w-2xl w-full max-h-[85vh] flex flex-col items-center gap-4 bg-transparent">
+            <button 
+              onClick={() => setZoomedProofImage(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 font-bold uppercase text-xs tracking-widest font-mono flex items-center gap-1 cursor-pointer"
+            >
+              Close ✕
+            </button>
+            <img 
+              src={zoomedProofImage} 
+              alt="High-Res Zoomed Receipt Proof" 
+              className="max-w-full max-h-[75vh] object-contain rounded-2xl border border-white/10 shadow-2xl bg-white"
+              onClick={(e) => e.stopPropagation()} 
+            />
+            <div className="flex gap-3" onClick={(e) => e.stopPropagation()}>
+              <a 
+                href={zoomedProofImage}
+                download="payment-proof-highres.png"
+                className="px-6 py-2.5 bg-white text-black font-heading font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-gray-100 transition-colors shadow-lg"
+              >
+                Download Receipt
+              </a>
+              <button 
+                onClick={() => setZoomedProofImage(null)}
+                className="px-6 py-2.5 bg-white/10 border border-white/20 text-white font-heading font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-white/20 transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

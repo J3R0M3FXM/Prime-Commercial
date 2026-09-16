@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, getDoc, doc, runTransaction } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, runTransaction, updateDoc } from 'firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -177,7 +177,7 @@ export async function POST(request: Request) {
             totalAmount: calculatedTotal,
             payableNow: payableNow !== undefined ? Number(payableNow) : calculatedTotal,
             payableOnDelivery: payableOnDelivery !== undefined ? Number(payableOnDelivery) : 0,
-            status: 'Processing',
+            status: 'Pending',
             notes: notes || 'Submitted via Telegram Mini App Storefront',
             deviceSnapshot: deviceSnapshot || null,
             createdAt: new Date().toISOString(),
@@ -236,6 +236,36 @@ export async function GET(request: Request) {
 
     return NextResponse.json(orders);
   } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const data = await request.json();
+    const {
+      orderId,
+      paymentMethodId,
+      paymentMethodName,
+      paymentProofImage
+    } = data;
+
+    if (!orderId) {
+      return NextResponse.json({ error: "Missing order ID" }, { status: 400 });
+    }
+
+    const orderDocRef = doc(db, 'orders', orderId);
+    await updateDoc(orderDocRef, {
+      paymentMethodId: paymentMethodId || '',
+      paymentMethodName: paymentMethodName || '',
+      paymentProofImage: paymentProofImage || '',
+      paymentStatus: 'Pending Review',
+      updatedAt: new Date().toISOString()
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Error updating order payment proof:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

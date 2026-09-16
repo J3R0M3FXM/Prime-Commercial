@@ -21,7 +21,9 @@ import {
   Receipt, 
   Clock, 
   Sparkles,
-  ShoppingBag
+  ShoppingBag,
+  Copy,
+  Download
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
@@ -68,6 +70,15 @@ export default function CheckoutModal({
 }: CheckoutModalProps) {
   // Step state: 1 = Contact & Receiver, 2 = Address & Map, 3 = Courier & Delivery Fee, 4 = Review & Place Order, 5 = Confirmation
   const [currentStep, setCurrentStep] = useState<number>(1);
+
+  // Payment States
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<any>(null);
+  const [uploadedProofImage, setUploadedProofImage] = useState<string>("");
+  const [isSubmittingProof, setIsSubmittingProof] = useState(false);
+  const [proofSubmitSuccess, setProofSubmitSuccess] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -251,6 +262,42 @@ export default function CheckoutModal({
       }
     };
     fetchCharges();
+  }, [isOpen]);
+
+  // Fetch active payment methods when step becomes 5 (order placed) or when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchPaymentMethods = async () => {
+      try {
+        setIsLoadingPaymentMethods(true);
+        const res = await fetch(`/api/admin/payments?_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Pragma": "no-cache" }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            // Only show active payment methods
+            setPaymentMethods(data.filter((m: any) => m.isActive !== false));
+          }
+        }
+      } catch (e) {
+        console.warn("Could not fetch payment methods:", e);
+      } finally {
+        setIsLoadingPaymentMethods(false);
+      }
+    };
+    fetchPaymentMethods();
+  }, [isOpen]);
+
+  // Reset payment states when closed
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedPaymentMethod(null);
+      setUploadedProofImage("");
+      setProofSubmitSuccess(false);
+      setIsSubmittingProof(false);
+    }
   }, [isOpen]);
 
   // Address Autocomplete Search
@@ -1159,78 +1206,324 @@ export default function CheckoutModal({
 
           {/* ================= STEP 5: ORDER CONFIRMATION ================= */}
           {currentStep === 5 && completedOrder && (
-            <div className="py-6 px-2 text-center space-y-5">
-              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border-2 border-emerald-200">
-                <Check className="w-8 h-8" />
+            <div className="py-4 px-1 space-y-6">
+              {/* Success Banner */}
+              <div className="text-center space-y-2.5">
+                <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto border-2 border-amber-200">
+                  <Clock className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-heading font-bold text-gray-900 uppercase tracking-wide">
+                    Order Submitted - Pending Review
+                  </h3>
+                  <p className="text-xs text-gray-500 font-mono mt-1">
+                    Your order #{completedOrder.id || completedOrder.orderNumber} is registered as <strong className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">PENDING</strong> and awaits payment verification.
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <h3 className="text-xl font-heading font-bold text-gray-900 uppercase tracking-wide">
-                  Order Successfully Placed!
-                </h3>
-                <p className="text-xs text-gray-500 font-mono mt-1">
-                  Thank you for shopping with PRIME Shop.
-                </p>
+              {/* Order summary collapsible card */}
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 font-mono text-xs space-y-2.5 max-w-md mx-auto">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                  <span className="text-gray-400 uppercase text-[9px] font-bold">Order Identifier</span>
+                  <span className="font-bold text-gray-900">{completedOrder.id || completedOrder.orderNumber}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                  <span className="text-gray-400 uppercase text-[9px] font-bold">Receiver Name</span>
+                  <span className="font-medium text-gray-900 uppercase">{completedOrder.receiverName}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                  <span className="text-gray-400 uppercase text-[9px] font-bold">Payable amount</span>
+                  <span className="font-bold text-slate-900 text-sm">{formatPHP(completedOrder.totalAmount || 0)}</span>
+                </div>
               </div>
 
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 max-w-md mx-auto text-left font-mono text-xs space-y-3">
-                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                  <span className="text-gray-400 uppercase text-[10px]">Order Number</span>
-                  <span className="font-bold text-sm text-black">{completedOrder.id || completedOrder.orderNumber}</span>
+              {/* Settle Payment Section */}
+              <div className="border-t border-gray-200 pt-6 space-y-4">
+                <div className="text-center">
+                  <h4 className="text-sm font-heading font-bold uppercase tracking-wider text-gray-900">
+                    Settle Your Payment
+                  </h4>
+                  <p className="text-xs text-gray-500 font-mono mt-1">
+                    Select a payment method from the configured options below:
+                  </p>
                 </div>
 
-                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                  <span className="text-gray-400 uppercase text-[10px]">Receiver</span>
-                  <span className="font-medium text-gray-900">{completedOrder.receiverName}</span>
-                </div>
-
-                {/* Items Purchased Group */}
-                <div className="space-y-1 pb-1">
-                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">Items Purchased</span>
-                  {((completedOrder.items && completedOrder.items.length > 0) ? completedOrder.items : selectedItems).map((item: any, idx: number) => (
-                    <div key={item.id || idx} className="flex justify-between items-center text-gray-600">
-                      <span className="truncate max-w-[240px]">
-                        {item.name} <span className="text-gray-400">x{item.quantity}</span>
-                      </span>
-                      <span>{formatPHP((Number(item.price) || 0) * (Number(item.quantity) || 1))}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Breakdown of charges */}
-                <div className="pt-2 border-t border-gray-200 space-y-1">
-                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">Breakdown of charges</span>
-                  <div className="flex justify-between items-center text-gray-600">
-                    <span>Items Subtotal</span>
-                    <span>{formatPHP(completedOrder.subTotal || 0)}</span>
+                {isLoadingPaymentMethods ? (
+                  <div className="p-8 text-center bg-gray-50 border border-gray-200 rounded-xl flex flex-col items-center justify-center gap-2 text-xs font-mono text-gray-500">
+                    <Loader2 className="w-5 h-5 animate-spin text-black" />
+                    <span>Loading payment options...</span>
                   </div>
-                  
-                  {Array.isArray(completedOrder.appliedCharges) && completedOrder.appliedCharges.map((charge: any, idx: number) => (
-                    <div key={idx} className="flex justify-between items-center text-gray-600">
-                      <span>{charge.name}</span>
-                      <span>{formatPHP(charge.computedAmount || charge.amount || 0)}</span>
-                    </div>
-                  ))}
-
-                  <div className="flex justify-between items-center text-gray-600">
-                    <span>Delivery Fee ({completedOrder.courier?.name ? formatCourierName(completedOrder.courier.name) : "Courier"})</span>
-                    <span>{formatPHP(completedOrder.deliveryFee || 0)}</span>
+                ) : paymentMethods.length === 0 ? (
+                  <div className="p-6 text-center bg-gray-50 rounded-xl border border-gray-200 text-xs font-mono text-gray-600">
+                    No active payment methods are currently configured by the administrator. Please contact shop support to settle payment manually.
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Method Tiles Selection */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      {paymentMethods.map((method) => {
+                        const isSelected = selectedPaymentMethod?.id === method.id;
+                        return (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPaymentMethod(method);
+                              setProofSubmitSuccess(false);
+                              setUploadedProofImage("");
+                            }}
+                            className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center text-center gap-2 cursor-pointer ${
+                              isSelected
+                                ? "border-black bg-black/5"
+                                : "border-gray-200 bg-white hover:border-gray-300"
+                            }`}
+                          >
+                            {method.logo ? (
+                              <img
+                                src={method.logo}
+                                alt={method.name}
+                                className="w-10 h-10 object-contain p-0.5 rounded-lg border border-gray-100 bg-white"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gray-100 text-gray-600 flex items-center justify-center rounded-lg">
+                                <CreditCard className="w-5 h-5" />
+                              </div>
+                            )}
+                            <div className="min-w-0 w-full">
+                              <p className="text-xs font-heading font-bold text-gray-900 truncate">
+                                {method.name}
+                              </p>
+                              <p className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">
+                                {method.paymentType === "qr_code" && "QR Code"}
+                                {method.paymentType === "api" && "API Online"}
+                                {method.paymentType === "crypto" && "Crypto"}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                <div className="flex justify-between items-center pt-2 mt-2 border-t border-gray-200">
-                  <span className="text-gray-900 font-bold uppercase text-[10px]">Total Order Value</span>
-                  <span className="font-bold text-gray-900">{formatPHP(completedOrder.totalAmount || 0)}</span>
-                </div>
+                    {/* Expandable Selected Method Details */}
+                    {selectedPaymentMethod && (
+                      <div className="p-4 rounded-xl border border-gray-200 bg-white space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
+                        <div className="border-b border-gray-100 pb-2 flex items-center justify-between">
+                          <h5 className="text-xs font-heading font-black uppercase text-gray-900">
+                            Instructions for {selectedPaymentMethod.name}
+                          </h5>
+                          <span className="text-[10px] font-mono text-gray-400 uppercase">
+                            {selectedPaymentMethod.paymentType === "qr_code" && "Static QR"}
+                            {selectedPaymentMethod.paymentType === "crypto" && "Wallet Deposit"}
+                            {selectedPaymentMethod.paymentType === "api" && "Integrated Webhook"}
+                          </span>
+                        </div>
 
-                {completedOrder.payableOnDelivery > 0 && (
-                  <div className="p-2 bg-amber-50 rounded border border-amber-200 text-amber-800 text-[11px]">
-                    Note: <strong>{formatPHP(completedOrder.payableOnDelivery)}</strong> delivery fee is payable directly to your courier rider upon arrival.
+                        {/* QR Code Block */}
+                        {selectedPaymentMethod.paymentType === "qr_code" && (
+                          <div className="flex flex-col items-center justify-center gap-3">
+                            {selectedPaymentMethod.qrCodeImage ? (
+                              <div className="p-2 border border-gray-200 rounded-lg bg-white">
+                                <img
+                                  src={selectedPaymentMethod.qrCodeImage}
+                                  alt="Static QR Code"
+                                  className="w-48 h-48 object-contain"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-48 h-48 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 font-mono text-xs">
+                                No static QR code uploaded
+                              </div>
+                            )}
+
+                            {selectedPaymentMethod.qrCodeImage && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const link = document.createElement("a");
+                                  link.href = selectedPaymentMethod.qrCodeImage;
+                                  link.download = `PRIME_QR_${selectedPaymentMethod.name.replace(/\s+/g, '_')}.png`;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                }}
+                                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-heading font-bold text-xs uppercase tracking-wider rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Download QR Code</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Crypto Block */}
+                        {selectedPaymentMethod.paymentType === "crypto" && (
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 font-heading">
+                              Wallet Deposit Address
+                            </label>
+                            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 p-2.5 rounded-lg">
+                              <span className="font-mono text-xs text-gray-700 break-all select-all flex-1">
+                                {selectedPaymentMethod.walletAddress || "No wallet address specified"}
+                              </span>
+                              {selectedPaymentMethod.walletAddress && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(selectedPaymentMethod.walletAddress || "");
+                                    setCopiedText(true);
+                                    setTimeout(() => setCopiedText(false), 2000);
+                                  }}
+                                  className="p-2 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 rounded-md transition-colors cursor-pointer shrink-0"
+                                  title="Copy address"
+                                >
+                                  {copiedText ? (
+                                    <span className="text-[10px] font-bold text-emerald-600 uppercase">Copied!</span>
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* API Block */}
+                        {selectedPaymentMethod.paymentType === "api" && (
+                          <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-lg space-y-1">
+                            <p className="text-xs text-blue-900 font-medium">
+                              Online checkout API is active.
+                            </p>
+                            <p className="text-[11px] text-blue-700 font-mono">
+                              Public Key: {selectedPaymentMethod.publicKey ? `${selectedPaymentMethod.publicKey.slice(0, 8)}...` : "None"}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Upload Proof of Payment Container */}
+                        {!proofSubmitSuccess ? (
+                          <div className="border-t border-gray-100 pt-4 space-y-3">
+                            <div className="space-y-1">
+                              <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-900 font-heading">
+                                Upload Proof of Payment <span className="text-red-500">*</span>
+                              </label>
+                              <p className="text-[10px] text-gray-400 font-mono">
+                                Upload the uncompressed transfer receipt screenshot from your bank app.
+                              </p>
+                            </div>
+
+                            {/* Drag & Drop Click Uploader */}
+                            <div className="space-y-2">
+                              {uploadedProofImage ? (
+                                <div className="space-y-2">
+                                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center p-2">
+                                    <img
+                                      src={uploadedProofImage}
+                                      alt="Proof Preview"
+                                      className="max-h-56 object-contain rounded"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setUploadedProofImage("")}
+                                    className="text-xs text-red-600 font-bold uppercase tracking-wider hover:underline block cursor-pointer"
+                                  >
+                                    Remove & upload different image
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="relative border-2 border-dashed border-gray-300 hover:border-black rounded-xl p-6 transition-all bg-gray-50/50 flex flex-col items-center justify-center text-center cursor-pointer">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => {
+                                          setUploadedProofImage(reader.result as string);
+                                        };
+                                        reader.readAsDataURL(file);
+                                      }
+                                    }}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  />
+                                  <CreditCard className="w-8 h-8 text-gray-400 mb-2" />
+                                  <span className="text-xs font-bold text-gray-900 block font-heading">
+                                    Select Receipt Image
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-mono mt-1">
+                                    PNG, JPG, JPEG up to 10MB (Highest resolution)
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Submit Button */}
+                            {uploadedProofImage && (
+                              <button
+                                type="button"
+                                disabled={isSubmittingProof}
+                                onClick={async () => {
+                                  try {
+                                    setIsSubmittingProof(true);
+                                    const res = await fetch("/api/orders", {
+                                      method: "PUT",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        orderId: completedOrder.id || completedOrder.orderNumber,
+                                        paymentMethodId: selectedPaymentMethod.id,
+                                        paymentMethodName: selectedPaymentMethod.name,
+                                        paymentProofImage: uploadedProofImage,
+                                      })
+                                    });
+                                    if (res.ok) {
+                                      setProofSubmitSuccess(true);
+                                    } else {
+                                      const errData = await res.json().catch(() => ({}));
+                                      alert(errData.error || "Failed to submit payment proof");
+                                    }
+                                  } catch (e) {
+                                    console.error(e);
+                                    alert("Submission failed. Please try again.");
+                                  } finally {
+                                    setIsSubmittingProof(false);
+                                  }
+                                }}
+                                className="w-full py-3 bg-black hover:bg-slate-800 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                              >
+                                {isSubmittingProof ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                                    <span>Uploading Receipt...</span>
+                                  </>
+                                ) : (
+                                  <span>Submit Payment Proof</span>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl space-y-1.5 animate-in zoom-in-95 duration-200">
+                            <div className="flex items-center gap-1.5">
+                              <Check className="w-4 h-4 text-emerald-600" />
+                              <span className="text-xs font-bold uppercase font-heading">
+                                Payment Proof Uploaded Successfully!
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-mono text-emerald-700 leading-relaxed">
+                              Your receipt has been linked securely to Order #{completedOrder.id || completedOrder.orderNumber} in highest quality. An administrator will review your payment shortly to authorize dispatch.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              <div className="pt-3">
+              {/* Continue / Close Shopping */}
+              <div className="pt-4 border-t border-gray-100 flex justify-center">
                 <button
                   type="button"
                   onClick={onClose}

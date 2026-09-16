@@ -24,6 +24,10 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    match /payment_methods/{methodId} {
+      allow read, write: if true;
+    }
+    
     match /warehouses/{warehouseId} {
       allow read: if true;
       allow write: if true; // In production, this should be isAdmin(), but keeping consistent with open API approach for now

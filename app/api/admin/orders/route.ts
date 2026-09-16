@@ -38,13 +38,14 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const { id, status, notes } = await request.json();
+    const { id, status, notes, paymentStatus } = await request.json();
     if (!id) return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
 
     const orderRef = doc(db, 'orders', id);
     const updateData: any = { updatedAt: new Date().toISOString() };
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
+    if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
 
     await updateDoc(orderRef, updateData);
     return NextResponse.json({ success: true, ...updateData });

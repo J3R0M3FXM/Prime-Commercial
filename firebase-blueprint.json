@@ -75,9 +75,30 @@
         "items": { "type": "array" },
         "totalAmount": { "type": "number" },
         "status": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "paymentMethodId": { "type": "string" },
+        "paymentMethodName": { "type": "string" },
+        "paymentProofImage": { "type": "string" },
+        "paymentStatus": { "type": "string" }
       },
       "required": ["orderNumber", "customerId", "totalAmount"]
+    },
+    "PaymentMethod": {
+      "title": "PaymentMethod",
+      "description": "Payment method configuration",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logo": { "type": "string" },
+        "paymentType": { "type": "string", "enum": ["qr_code", "api", "crypto"] },
+        "qrCodeImage": { "type": "string" },
+        "webhookUrl": { "type": "string" },
+        "publicKey": { "type": "string" },
+        "secretKey": { "type": "string" },
+        "walletAddress": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["name", "paymentType", "isActive"]
     }
   },
   "firestore": {
@@ -100,6 +121,10 @@
     "/orders/{orderId}": {
       "schema": "Order",
       "description": "Customer orders collection"
+    },
+    "/payment_methods/{methodId}": {
+      "schema": "PaymentMethod",
+      "description": "Configured payment methods"
     }
   }
 }
