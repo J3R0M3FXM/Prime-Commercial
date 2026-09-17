@@ -1,10 +1,10 @@
 # Project Instructions & Persistent Rules
 
 ## Typography Rules
-- The font family for `.font-mono`, technical labels, numbers, codes, order details, and secondary notices is strictly **Open Sans Condensed** (`'Open Sans Condensed', 'Open Sans', 'Arial Narrow', sans-serif`).
-- `IBM Plex Mono` and `Arial Narrow` have been replaced with **Open Sans Condensed** across all storefront and admin modules. All future implementations using monospace, receipt, order, or technical labels must use Open Sans Condensed (`font-mono` / `'Open Sans Condensed', 'Open Sans', sans-serif`).
+- The font family for `.font-mono`, technical labels, numbers, codes, order details, and secondary notices is strictly **Lato Condensed** (`'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif`).
+- `IBM Plex Mono`, `Arial Narrow`, and `Open Sans Condensed` have been replaced with **Lato Condensed** / **Lato** across all storefront and admin modules. All future implementations using monospace, receipt, order, or technical labels must use Lato Condensed (`font-mono` / `'Lato Condensed', 'Lato', sans-serif`).
 - Headings and section titles use **Roboto Condensed Regular** (weight 400).
-- Body and layout text use **Open Sans Condensed** / sans-serif.
+- Body and layout text use **Lato Condensed** / **Lato** / sans-serif.
 
 ## Checkout UI Rules
 - In the multi-step checkout modal header, never display verbose or highlighted badges like "STEP 1 OF 4" or pills with colored borders/backgrounds.

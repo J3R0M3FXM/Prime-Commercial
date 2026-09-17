@@ -6,6 +6,7 @@
       "name": "secure-telegram-shopfront",
       "dependencies": {
         "@fontsource/ibm-plex-mono": "^5.3.0",
+        "@fontsource/lato": "^5.3.0",
         "@fontsource/open-sans-condensed": "^4.5.5",
         "@fontsource/open-sauce-sans": "^5.3.0",
         "@fontsource/roboto-condensed": "^5.3.0",
@@ -124,6 +125,8 @@
     "@firebase/webchannel-wrapper": ["@firebase/webchannel-wrapper@1.0.7", "", {}, "sha512-phBFwieDLvkZGYN9CE9ZFNEIoBVksprzsnCzQejCmCHtgwCXReeuRpoEGN9C4EbhONztv8NRV1tau6Rb9pONwQ=="],
 
     "@fontsource/ibm-plex-mono": ["@fontsource/ibm-plex-mono@5.3.0", "", {}, "sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q=="],
+
+    "@fontsource/lato": ["@fontsource/lato@5.3.0", "", {}, "sha512-0WhF/4rhrw+ErIyneKvhHn2YAl+xf8GDtllgOgOzDmeaSlLQtjpChXaQOpWhG2BchQW0WJy2zLV12Hdg0ndOMw=="],
 
     "@fontsource/open-sans-condensed": ["@fontsource/open-sans-condensed@4.5.5", "", {}, "sha512-ah6DBSWgjWEG20tVJnvcUQ/8XTfnGpuOGK4HLTF91vtrGg7PyrdEMlao/O1+S4i+SzeuJCmf5Qbc3eWponBL3Q=="],
 
