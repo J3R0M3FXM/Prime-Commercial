@@ -93,6 +93,7 @@ type AdminView =
   | "dashboard" 
   | "customers" 
   | "customer-detail" 
+  | "device-accounts"
   | "orders" 
   | "order-detail" 
   | "products" 
@@ -288,6 +289,7 @@ export default function AdminPage() {
   const [view, setView] = useState<AdminView>("dashboard");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedDeviceIdForAccounts, setSelectedDeviceIdForAccounts] = useState<string | null>(null);
   const [customerDetail, setCustomerDetail] = useState<{ customer: any; fingerprints: any[]; orders: any[] } | null>(null);
   const [loadingCustomerDetail, setLoadingCustomerDetail] = useState(false);
 
@@ -2457,6 +2459,203 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
+        {/* 3.5 DEVICE LINKED ACCOUNTS SECTION: LINKED ACCOUNTS FOR FLAGGED DEVICE */}
+        {/* ========================================================================= */}
+        {view === "device-accounts" && (
+          <motion.div
+            key="view-device-accounts"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setView(selectedOrderId ? "order-detail" : "orders")}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" /> Back to {selectedOrderId ? "Order Detail" : "Orders"}
+                  </button>
+                  <span className="text-slate-300">/</span>
+                  <h2 className="text-base sm:text-lg font-heading font-black tracking-wide uppercase text-slate-900 flex items-center gap-2">
+                    <span>Linked Accounts by Device ID</span>
+                  </h2>
+                </div>
+
+                <button
+                  onClick={fetchAllData}
+                  disabled={refreshing}
+                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer"
+                  title="Refresh Data"
+                >
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Main Content */}
+            {(() => {
+              const devId = selectedDeviceIdForAccounts || "Unassigned";
+              const linkedAccounts = getAccountsLinkedToDevice(devId);
+              const isRisk = linkedAccounts.length >= 2;
+
+              return (
+                <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+                  
+                  {/* Hardware Header Card */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">Target Device Hardware Identifier</span>
+                          {isRisk ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-red-100 text-red-800 border border-red-300 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-red-600" />
+                              <span>Multi-Account Hardware Flagged</span>
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              Single Account Verified
+                            </span>
+                          )}
+                        </div>
+
+                        <div 
+                          onClick={() => copyToClipboard(devId, "pageDevId", "DEVICE IDENTIFIER")}
+                          className="flex items-center gap-2 cursor-pointer group hover:text-indigo-600 transition-colors"
+                          title="Click to copy Device ID"
+                        >
+                          <Smartphone className="w-5 h-5 text-slate-700 shrink-0" />
+                          <span className="font-mono text-sm sm:text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors break-all">
+                            {devId}
+                          </span>
+                          {copiedKey === "pageDevId" ? (
+                            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-center font-mono">
+                          <p className="text-[9px] uppercase font-bold text-slate-400">Linked Accounts</p>
+                          <p className={`text-lg font-black ${isRisk ? "text-red-600" : "text-slate-900"}`}>{linkedAccounts.length}</p>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-center font-mono">
+                          <p className="text-[9px] uppercase font-bold text-slate-400">Total Orders</p>
+                          <p className="text-lg font-black text-slate-900">
+                            {linkedAccounts.reduce((sum, acc) => sum + acc.orderCount, 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {isRisk && (
+                      <div className="bg-red-50/80 border border-red-200/90 rounded-xl p-3.5 flex items-start gap-3 text-xs font-mono">
+                        <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5 text-red-900">
+                          <p className="font-bold uppercase tracking-wide text-[11px]">Hardware Risk Notice</p>
+                          <p className="text-[11px] text-red-800 leading-relaxed">
+                            This hardware device has been recorded placing orders across {linkedAccounts.length} distinct customer accounts. Select any account below to open its full Customer Profile, order history, and security dossier.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Compact List of Linked Accounts */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide flex items-center gap-2">
+                        <Users className="w-4 h-4 text-slate-600" />
+                        <span>Accounts Linked to Device ({linkedAccounts.length})</span>
+                      </h3>
+                      <span className="text-[11px] font-mono text-slate-400">
+                        Click any account card to open full Customer Profile
+                      </span>
+                    </div>
+
+                    {linkedAccounts.length === 0 ? (
+                      <div className="p-8 text-center bg-slate-50 rounded-xl text-xs font-mono text-slate-400">
+                        No active accounts found matching this Device Identifier.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {linkedAccounts.map((acc, index) => {
+                          const targetCustId = acc.customerRecord?.id || acc.telegramId || acc.primeMemberId || acc.accountId;
+
+                          return (
+                            <div
+                              key={acc.accountId || index}
+                              onClick={() => {
+                                if (targetCustId) {
+                                  setSelectedCustomerId(targetCustId);
+                                  fetchCustomerDetail(targetCustId);
+                                  setView("customer-detail");
+                                }
+                              }}
+                              className="bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-900 rounded-xl p-4 transition-all duration-150 shadow-2xs hover:shadow-md cursor-pointer group flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono text-xs select-none"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold font-heading text-sm shrink-0 group-hover:scale-105 transition-transform">
+                                  {acc.customerName.charAt(0).toUpperCase()}
+                                </div>
+
+                                <div className="min-w-0 space-y-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-bold text-slate-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
+                                      {acc.customerName}
+                                    </h4>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                                      {acc.primeMemberId}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
+                                    {acc.telegramId && (
+                                      <span>Telegram UID: <strong className="text-slate-800 font-semibold">{acc.telegramId}</strong></span>
+                                    )}
+                                    {acc.phone && acc.phone !== "Not provided" && (
+                                      <span>Phone: <strong className="text-slate-800 font-semibold">{acc.phone}</strong></span>
+                                    )}
+                                    {acc.lastActive && (
+                                      <span>Last Active: {new Date(acc.lastActive).toLocaleDateString()}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 border-slate-200/80 pt-2 sm:pt-0">
+                                <div className="text-right">
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase">Orders on Device</p>
+                                  <p className="font-bold text-slate-900 text-xs">
+                                    {acc.orderCount} {acc.orderCount === 1 ? 'order' : 'orders'} &bull; <span className="text-emerald-700 font-bold">{formatPHP(acc.totalSpent)}</span>
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 group-hover:bg-black text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors shadow-xs">
+                                  <span>View Profile</span>
+                                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
         {/* 4. ORDERS SECTION: SEPARATE FULL PAGE WITH STICKY NON-SCROLLING SEARCH BAR */}
         {/* ========================================================================= */}
         {view === "orders" && (
@@ -3474,11 +3673,20 @@ export default function AdminPage() {
                               
                               {/* Red triangle flag if device is linked to multiple accounts */}
                               {isMultiAccount && (
-                                <span title={`Flagged: Device linked to ${linkedAccounts.length} accounts`}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedDeviceIdForAccounts(devId);
+                                    setView("device-accounts");
+                                  }}
+                                  className="inline-flex items-center shrink-0 cursor-pointer text-red-600 hover:text-red-700 hover:scale-110 active:scale-95 transition-all ml-0.5"
+                                  title={`Flagged: Device linked to ${linkedAccounts.length} accounts. Click to view linked accounts.`}
+                                >
                                   <AlertTriangle 
-                                    className="w-3.5 h-3.5 text-red-600 fill-red-100 shrink-0 ml-0.5" 
+                                    className="w-2.5 h-2.5 text-red-600 fill-red-100 shrink-0" 
                                   />
-                                </span>
+                                </button>
                               )}
                             </div>
                             <div 
