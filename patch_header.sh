@@ -1,0 +1,1 @@
+sed -i 's|<h1 className="text-2xl font-heading font-black tracking-widest uppercase">PRIME</h1>|<img src="/primenbg.jpeg" alt="Prime Logo" className="h-10 w-auto object-contain mix-blend-multiply" style={{ filter: "grayscale(100%) contrast(150%) brightness(60%) drop-shadow(0px 2px 3px rgba(0,0,0,0.4))" }} />|g' app/page.tsx

@@ -211,7 +211,13 @@ export default function Shopfront() {
       {/* Sticky Header & Search */}
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
         <div className="px-4 py-3 flex items-center justify-between">
-          <h1 className="text-2xl font-heading font-black tracking-widest uppercase">PRIME</h1>
+          <div className="flex items-center">
+            <img 
+              src="/prime-logo-metallic.png" 
+              alt="PRIME" 
+              className="h-8 sm:h-9 w-auto object-contain shrink-0" 
+            />
+          </div>
           
           <div className="relative">
             {/* Hamburger Menu Button */}

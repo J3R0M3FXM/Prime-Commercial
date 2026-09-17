@@ -41,27 +41,22 @@ function MapRecenter({ center }: { center: [number, number] }) {
   return null;
 }
 
-function MapInstanceCapture({ setMap }: { setMap: (map: any) => void }) {
-  const map = useMap();
-  useEffect(() => { setMap(map); }, [map, setMap]);
-  return null;
-}
+
 
 function MapControls({
-  map,
   onUseMyLocation,
   isLocating,
   onLocationChange,
   safeLat,
   safeLon
 }: {
-  map: any;
   onUseMyLocation?: () => void;
   isLocating?: boolean;
   onLocationChange: (lat: number, lon: number) => void;
   safeLat: number;
   safeLon: number;
 }) {
+  const map = useMap();
   const handleDropPinAtCenter = () => {
     if (!map) return;
     const center = map.getCenter();
@@ -153,7 +148,7 @@ export default function AddressPickerMap({
   const safeLat = typeof lat === 'number' && !isNaN(lat) ? lat : 14.5995;
   const safeLon = typeof lon === 'number' && !isNaN(lon) ? lon : 120.9842;
   const position: [number, number] = [safeLat, safeLon];
-  const [mapInstance, setMapInstance] = useState<any>(null);
+  
 
   return (
     <div className="w-full h-44 sm:h-48 md:h-52 rounded-xl overflow-hidden border border-gray-300 relative shadow-inner bg-gray-100 isolate z-0">
@@ -182,18 +177,14 @@ export default function AddressPickerMap({
             }
           }}
         />
-        <MapInstanceCapture setMap={setMapInstance} />
-      </MapContainer>
-      {mapInstance && (
         <MapControls
-          map={mapInstance}
           onUseMyLocation={onUseMyLocation}
           isLocating={isLocating}
           onLocationChange={onLocationChange}
           safeLat={safeLat}
           safeLon={safeLon}
         />
-      )}
+      </MapContainer>
     </div>
   );
 }

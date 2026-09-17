@@ -1407,10 +1407,14 @@ export default function AdminPage() {
         <div className="w-full max-w-[430px] h-screen sm:h-[880px] sm:rounded-[40px] bg-gray-950 text-gray-100 flex flex-col items-center justify-center p-6 overflow-hidden relative shadow-2xl border-0 sm:border-[10px] border-slate-900">
           <div className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-slate-900 rounded-b-2xl z-50"></div>
           <div className="w-full max-w-sm bg-gray-900/80 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-xl">
-            <div className="w-12 h-12 rounded-xl bg-white text-black flex items-center justify-center mx-auto mb-6 shadow-lg">
-              <Lock className="w-6 h-6" />
+            <div className="flex justify-center mb-6">
+              <img 
+                src="/prime-logo-metallic.png" 
+                alt="PRIME" 
+                className="h-10 w-auto object-contain" 
+              />
             </div>
-            <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase text-white">Prime Admin</h1>
+            <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase text-white">Admin</h1>
             <p className="text-[11px] text-gray-400 text-center mb-6 font-mono">
               Authorized Account: ID 1085949511
             </p>
@@ -1464,6 +1468,11 @@ export default function AdminPage() {
             {/* Header */}
             <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-slate-200">
               <div className="flex items-center gap-4">
+                <img 
+                  src="/prime-logo-metallic.png" 
+                  alt="PRIME" 
+                  className="h-9 sm:h-10 w-auto object-contain shrink-0" 
+                />
                 {adminUser?.photoUrl ? (
                   <img src={adminUser.photoUrl} alt="Admin" className="w-14 h-14 rounded-2xl object-cover shadow-sm border border-slate-200 shrink-0" />
                 ) : (
@@ -1474,7 +1483,7 @@ export default function AdminPage() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h1 className="text-2xl sm:text-3xl font-heading font-black tracking-widest uppercase text-slate-900">
-                      Prime Admin
+                      Admin
                     </h1>
                     <span className="text-[10px] font-mono bg-black text-white px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
                       Telegram ID: {adminUser?.id || "1085949511"}
@@ -1989,6 +1998,7 @@ export default function AdminPage() {
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm overflow-hidden relative">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
                     <div className="flex items-center gap-4">
+                
                       {customerDetail.customer.photoUrl ? (
                         <img src={customerDetail.customer.photoUrl} alt={customerDetail.customer.tgName} className="w-16 h-16 rounded-2xl object-cover shadow-lg border border-slate-200 shrink-0" />
                       ) : (
