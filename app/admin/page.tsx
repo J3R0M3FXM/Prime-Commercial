@@ -1626,47 +1626,8 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Quick Metrics Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Customers</p>
-                <p className="text-2xl font-heading font-black text-slate-900">{customers.length}</p>
-                <p className="text-[10px] text-slate-500 font-mono mt-1">Registered accounts</p>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Orders</p>
-                <p className="text-2xl font-heading font-normal text-slate-900">{orders.length}</p>
-                <p className="text-[10px] text-emerald-600 font-mono mt-1">
-                  {formatPHP(orders.reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0))} volume
-                </p>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Products</p>
-                <p className="text-2xl font-heading font-black text-slate-900">{products.length}</p>
-                <p className="text-[10px] text-slate-500 font-mono mt-1">
-                  {products.filter(p => (p.stock ?? 0) > 0).length} in stock
-                </p>
-              </div>
-              <button 
-                onClick={() => setView("diagnostics")}
-                className="bg-white border border-slate-200 hover:border-emerald-500 rounded-xl p-4 shadow-sm text-left transition-all cursor-pointer group"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Diagnostics & Health</p>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 transition-colors" />
-                </div>
-                <p className="text-2xl font-heading font-normal text-emerald-600 flex items-center gap-1.5">
-                  <Activity className="w-5 h-5 text-emerald-600 animate-pulse" /> 9 Systems
-                </p>
-                <p className="text-[10px] text-slate-500 font-mono mt-1 group-hover:text-emerald-700">Check APIs & Infrastructure &rarr;</p>
-              </button>
-            </div>
-
-            {/* Glossy Tiles (3 per row) */}
+            {/* Management Section Tiles (3 per row) */}
             <div className="mb-4">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 font-mono">
-                Management Sections
-              </h3>
               <div className="grid grid-cols-3 gap-3 sm:gap-4">
                 {[
                   { id: "customers", name: "Customers", icon: Users, desc: "Profiles & Device Info", count: customers.length },
