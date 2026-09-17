@@ -276,15 +276,21 @@ export async function POST(request: Request) {
             status: 'Pending',
             notes: notes || '',
             ip: clientIp || deviceSnapshot?.ip || '',
+            deviceId: deviceSnapshot?.deviceId || deviceSnapshot?.device_id || body.deviceId || '',
+            sessionToken: body.sessionToken || deviceSnapshot?.sessionToken || '',
+            coordinates: body.coordinates || (deviceSnapshot?.location?.lat && deviceSnapshot?.location?.lon ? `${deviceSnapshot.location.lat}, ${deviceSnapshot.location.lon}` : ''),
             gpsStreetAddress: gpsStreetAddress || deliveryAddress?.formatted || '',
             deviceSnapshot: deviceSnapshot ? {
               ...deviceSnapshot,
+              deviceId: deviceSnapshot.deviceId || body.deviceId || '',
+              sessionToken: deviceSnapshot.sessionToken || body.sessionToken || '',
               ip: clientIp || deviceSnapshot.ip || '',
               location: deviceSnapshot.location ? {
                 ...deviceSnapshot.location,
-                formattedStreetAddress: gpsStreetAddress || ''
+                formattedStreetAddress: gpsStreetAddress || '',
+                streetAddress: gpsStreetAddress || deviceSnapshot.location.streetAddress || ''
               } : null
-            } : (clientIp ? { ip: clientIp } : null),
+            } : (clientIp ? { ip: clientIp, deviceId: body.deviceId || '', sessionToken: body.sessionToken || '' } : null),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };

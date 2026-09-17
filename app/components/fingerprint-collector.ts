@@ -4,6 +4,7 @@ export interface DeviceData {
   appId: string;
   deviceId: string;
   hardwareId: string;
+  sessionToken?: string;
   browser: string;
   platform: string;
   screenResolution: string;
@@ -17,6 +18,33 @@ export interface DeviceData {
   deviceMemory: string;
   touchSupport: string;
   timestamp: string;
+}
+
+export function getOrCreateSessionToken(deviceId?: string, customerId?: string): string {
+  if (typeof window === "undefined") return "SESS_HMAC_SERVER";
+  try {
+    let token = sessionStorage.getItem("prime_session_token");
+    if (!token) {
+      const dev = deviceId || "DEV_GUEST";
+      const ts = Date.now().toString();
+      const cid = customerId || "GUEST";
+      const raw = `${dev}:${ts}:${cid}:${Math.random().toString()}`;
+
+      let hash = 0;
+      for (let i = 0; i < raw.length; i++) {
+        const char = raw.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0;
+      }
+      const hashHex = Math.abs(hash).toString(16).toUpperCase().padStart(8, "0");
+      const randomBits = Math.floor(Math.random() * 0xFFFFFFFF).toString(16).toUpperCase().padStart(8, "0");
+      token = `SESS_HMAC_${hashHex}${randomBits}`;
+      sessionStorage.setItem("prime_session_token", token);
+    }
+    return token;
+  } catch {
+    return `SESS_HMAC_${Date.now().toString(16).toUpperCase()}00000000`;
+  }
 }
 
 export async function getClientFingerprint(): Promise<DeviceData> {
@@ -94,10 +122,13 @@ export async function getClientFingerprint(): Promise<DeviceData> {
   }
   const hardwareId = "HW_" + Math.abs(hash).toString(16).toUpperCase().padStart(8, "0");
 
+  const sessionToken = getOrCreateSessionToken(deviceId);
+
   return {
     appId,
     deviceId,
     hardwareId,
+    sessionToken,
     browser: userAgent,
     platform,
     screenResolution,

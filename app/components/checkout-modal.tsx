@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
-import { getClientFingerprint, getClientLocation } from "./fingerprint-collector";
+import { getClientFingerprint, getClientLocation, getOrCreateSessionToken } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 
 // Dynamic map import to ensure zero SSR conflicts
@@ -657,9 +657,20 @@ export default function CheckoutModal({
         payableNow,
         payableOnDelivery,
         notes: customerNotes.trim(),
+        deviceId: fpData.deviceId,
+        sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
+        coordinates: coords.lat && coords.lon ? `${coords.lat}, ${coords.lon}` : (locData.lat && locData.lon ? `${locData.lat}, ${locData.lon}` : ""),
         deviceSnapshot: {
           ...fpData,
-          location: locData,
+          deviceId: fpData.deviceId,
+          sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
+          location: {
+            ...locData,
+            lat: coords.lat || locData.lat,
+            lon: coords.lon || locData.lon,
+            latitude: coords.lat || locData.lat,
+            longitude: coords.lon || locData.lon,
+          },
         },
       };
 
