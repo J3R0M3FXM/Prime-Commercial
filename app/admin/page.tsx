@@ -1078,11 +1078,15 @@ export default function AdminPage() {
 
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
+      const searchLower = orderSearch.toLowerCase();
       const matchSearch = 
-        (o.orderNumber || "").toLowerCase().includes(orderSearch.toLowerCase()) ||
-        (o.customerName || "").toLowerCase().includes(orderSearch.toLowerCase()) ||
-        (o.primeMemberId || "").toLowerCase().includes(orderSearch.toLowerCase()) ||
-        (o.status || "").toLowerCase().includes(orderSearch.toLowerCase());
+        (o.orderNumber || "").toLowerCase().includes(searchLower) ||
+        (o.customerName || "").toLowerCase().includes(searchLower) ||
+        (o.customerUsername || "").toLowerCase().includes(searchLower) ||
+        (String(o.customerId || "")).toLowerCase().includes(searchLower) ||
+        (String(o.tgUserId || "")).toLowerCase().includes(searchLower) ||
+        (o.primeMemberId || "").toLowerCase().includes(searchLower) ||
+        (o.status || "").toLowerCase().includes(searchLower);
 
       if (!matchSearch) return false;
       if (orderFilter !== "all") return o.status === orderFilter;
@@ -2643,13 +2647,27 @@ export default function AdminPage() {
         {/* 5. ORDER DETAIL PAGE: SEPARATE FULL VIEW                                  */}
         {/* ========================================================================= */}
         {view === "order-detail" && selectedOrder && (() => {
-          const deliveryAddressText = [
-            selectedOrder.deliveryAddress?.street,
-            selectedOrder.deliveryAddress?.barangay,
-            selectedOrder.deliveryAddress?.city,
-            selectedOrder.deliveryAddress?.province,
-            selectedOrder.deliveryAddress?.zipCode
-          ].filter(Boolean).join(", ") || (typeof selectedOrder.deliveryAddress === "string" ? selectedOrder.deliveryAddress : "") || selectedOrder.address || "";
+          const deliveryAddressText = (() => {
+            const rawDelAddr = selectedOrder.deliveryAddress;
+            if (typeof rawDelAddr === "string" && rawDelAddr.trim()) return rawDelAddr.trim();
+            if (rawDelAddr && typeof rawDelAddr === "object") {
+              const formatted = rawDelAddr.formatted || rawDelAddr.fullAddress || rawDelAddr.address || rawDelAddr.streetAddress || "";
+              const unit = rawDelAddr.unitDetails || rawDelAddr.unit || rawDelAddr.houseNumber || "";
+              if (unit && formatted && !formatted.toLowerCase().includes(unit.toLowerCase())) {
+                return `${unit}, ${formatted}`;
+              }
+              if (formatted) return formatted;
+              const parts = [
+                rawDelAddr.street || rawDelAddr.streetAddress,
+                rawDelAddr.barangay || rawDelAddr.subdivision,
+                rawDelAddr.city,
+                rawDelAddr.province || rawDelAddr.region,
+                rawDelAddr.zipCode || rawDelAddr.postalCode
+              ].filter(Boolean);
+              if (parts.length > 0) return parts.join(", ");
+            }
+            return selectedOrder.address || selectedOrder.fullAddress || selectedOrder.shippingAddress || selectedOrder.receiverAddress || selectedOrder.deliveryAddressText || "";
+          })();
 
           const gpsStreetAddressText = selectedOrder.deviceSnapshot?.location?.streetAddress 
             || selectedOrder.deviceSnapshot?.location?.display_name 
@@ -2778,41 +2796,6 @@ export default function AdminPage() {
                             <span className="text-[10px] text-emerald-700 font-black ml-0.5 animate-pulse">✓ Saved</span>
                           )}
                         </div>
-
-                        {/* PRIORITY SCORE BADGE */}
-                        {(() => {
-                          const createdAtTime = selectedOrder.createdAt ? new Date(selectedOrder.createdAt).getTime() : Date.now();
-                          const ageMinutes = Math.floor((Date.now() - createdAtTime) / (1000 * 60));
-                          const isPending = (selectedOrder.status || "Pending") === "Pending";
-                          const isCriticalPending = isPending && ageMinutes >= 45;
-
-                          let scoreLabel = "PRIORITY: NORMAL";
-                          let scoreClasses = "bg-slate-100 text-slate-700 border-slate-200";
-
-                          if (isCriticalPending) {
-                            scoreLabel = `CRITICAL PENDING (${ageMinutes}m)`;
-                            scoreClasses = "bg-red-50 text-red-800 border-red-300 animate-pulse font-bold ring-1 ring-red-400";
-                          } else if (isPending) {
-                            scoreLabel = `PRIORITY: MEDIUM (${ageMinutes}m)`;
-                            scoreClasses = "bg-amber-50 text-amber-900 border-amber-300 font-bold";
-                          } else if (selectedOrder.status === "Processing") {
-                            scoreLabel = "PRIORITY: PROCESSING";
-                            scoreClasses = "bg-blue-50 text-blue-800 border-blue-200 font-semibold";
-                          } else if (selectedOrder.status === "Completed") {
-                            scoreLabel = "PRIORITY: FULFILLED";
-                            scoreClasses = "bg-emerald-50 text-emerald-800 border-emerald-200";
-                          }
-
-                          return (
-                            <div 
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono tracking-wider uppercase border ${scoreClasses}`}
-                              title={`Order Age: ${ageMinutes} minutes | Status: ${selectedOrder.status || "Pending"}`}
-                            >
-                              <span className={`w-1.5 h-1.5 rounded-full ${isCriticalPending ? "bg-red-600 animate-ping" : isPending ? "bg-amber-500" : "bg-blue-500"}`} />
-                              <span>Priority Score: {scoreLabel}</span>
-                            </div>
-                          );
-                        })()}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <h2 className="text-xl sm:text-2xl font-ibm-condensed font-medium text-slate-900 tracking-tight">{selectedOrder.orderNumber}</h2>
@@ -3126,7 +3109,7 @@ export default function AdminPage() {
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Telegram Name"
                         >
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
+                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.customerName || "Customer"}
                           </span>
                           {copiedKey === "customerName" ? (
@@ -3150,7 +3133,7 @@ export default function AdminPage() {
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Telegram Handle"
                         >
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
+                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.customerUsername 
                               ? (selectedOrder.customerUsername.startsWith('@') ? selectedOrder.customerUsername : `@${selectedOrder.customerUsername}`) 
                               : "None"}
@@ -3176,7 +3159,7 @@ export default function AdminPage() {
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Telegram UID"
                         >
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
+                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.customerId || selectedOrder.tgUserId || "None"}
                           </span>
                           {copiedKey === "customerId" ? (
@@ -3200,7 +3183,7 @@ export default function AdminPage() {
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy PRIME MID"
                         >
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
+                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.primeMemberId || "Unassigned"}
                           </span>
                           {copiedKey === "primeMemberId" ? (
@@ -3220,23 +3203,22 @@ export default function AdminPage() {
                           </span>
                         </div>
                         {(() => {
+                          const userPrimeId = selectedOrder.primeMemberId || "";
                           const userTgId = String(selectedOrder.customerId || selectedOrder.tgUserId || "");
                           const userTgUsername = selectedOrder.customerUsername || "";
 
-                          const userCompletedCount = orders.filter((o) => {
+                          const matchCustomer = (o: any) => {
+                            const matchPrime = userPrimeId && o.primeMemberId && o.primeMemberId.toLowerCase() === userPrimeId.toLowerCase();
                             const matchId = userTgId && (String(o.customerId) === userTgId || String(o.tgUserId) === userTgId);
                             const matchUser = userTgUsername && o.customerUsername && o.customerUsername.toLowerCase() === userTgUsername.toLowerCase();
-                            return (matchId || matchUser) && o.status === "Completed";
-                          }).length;
+                            return Boolean(matchPrime || matchId || matchUser);
+                          };
 
-                          const userTotalCount = orders.filter((o) => {
-                            const matchId = userTgId && (String(o.customerId) === userTgId || String(o.tgUserId) === userTgId);
-                            const matchUser = userTgUsername && o.customerUsername && o.customerUsername.toLowerCase() === userTgUsername.toLowerCase();
-                            return matchId || matchUser;
-                          }).length;
+                          const userCompletedCount = orders.filter((o) => matchCustomer(o) && o.status === "Completed").length;
+                          const userTotalCount = orders.filter((o) => matchCustomer(o)).length;
 
                           const handleFilterUserOrders = () => {
-                            const filterVal = userTgId || userTgUsername || selectedOrder.customerName || "";
+                            const filterVal = userPrimeId || userTgId || userTgUsername || selectedOrder.customerName || "";
                             setOrderSearch(filterVal);
                             setView("orders");
                             setCopyToast(`FILTERING ORDERS MANAGEMENT LIST FOR: ${filterVal}`);
@@ -3249,9 +3231,9 @@ export default function AdminPage() {
                               type="button"
                               onClick={handleFilterUserOrders}
                               className="mt-0.5 flex items-center gap-2 cursor-pointer group hover:text-indigo-600 transition-colors text-left"
-                              title="Click to view all orders by this Telegram user in Orders Management"
+                              title="Click to view all orders by this customer in Orders Management"
                             >
-                              <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal group-hover:text-indigo-600 group-hover:underline transition-colors flex items-center gap-1.5">
+                              <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal group-hover:text-indigo-600 group-hover:underline transition-colors flex items-center gap-1.5">
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold uppercase bg-emerald-50 text-emerald-800 border border-emerald-200">
                                   <Check className="w-2.5 h-2.5 text-emerald-600" />
                                   <span>{userCompletedCount} Successful Orders</span>
@@ -3287,7 +3269,7 @@ export default function AdminPage() {
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy IP Address"
                         >
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
+                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.ip || selectedOrder.deviceSnapshot?.ip || "000.00.000.000"}
                           </span>
                           {copiedKey === "ipAddress" ? (
@@ -3317,7 +3299,7 @@ export default function AdminPage() {
                               className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                               title="Click to copy Coordinates"
                             >
-                              <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
+                              <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                                 {coords}
                               </span>
                               {copiedKey === "coordinates" ? (
@@ -3353,7 +3335,7 @@ export default function AdminPage() {
                               className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                               title="Click to copy Device Identifier"
                             >
-                              <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
+                              <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                                 {devId}
                               </span>
                               {copiedKey === "deviceIdentifier" ? (
@@ -3388,7 +3370,7 @@ export default function AdminPage() {
                               className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                               title="Click to copy Session Token"
                             >
-                              <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
+                              <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                                 {sessToken}
                               </span>
                               {copiedKey === "sessionToken" ? (
@@ -3414,7 +3396,7 @@ export default function AdminPage() {
                           className="mt-0.5 flex items-start gap-1 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Precise GPS Address"
                         >
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
+                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
                             {gpsStreetAddressText}
                           </span>
                           {copiedKey === "gpsAddress" ? (
@@ -3448,7 +3430,7 @@ export default function AdminPage() {
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Receiver's Name"
                         >
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
+                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.receiverName || "None"}
                           </span>
                           {copiedKey === "receiverName" ? (
@@ -3472,7 +3454,7 @@ export default function AdminPage() {
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Receiver's Phone"
                         >
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
+                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                             {selectedOrder.receiverPhone || "None"}
                           </span>
                           {copiedKey === "receiverPhone" ? (
@@ -3496,7 +3478,7 @@ export default function AdminPage() {
                           className="mt-0.5 flex items-start gap-1 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Delivery Address"
                         >
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
+                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
                             {deliveryAddressText || "None"}
                           </span>
                           {copiedKey === "deliveryAddress" ? (
@@ -3520,8 +3502,8 @@ export default function AdminPage() {
                           className="mt-0.5 flex items-start gap-1 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Delivery Notes"
                         >
-                          <span className="font-ibm-condensed font-medium text-slate-800 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
-                            {selectedOrder.notes || "None"}
+                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
+                            {selectedOrder.notes && selectedOrder.notes.trim() ? selectedOrder.notes.trim() : "None"}
                           </span>
                           {copiedKey === "notes" ? (
                             <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
@@ -3529,40 +3511,6 @@ export default function AdminPage() {
                             <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
                           )}
                         </div>
-                      </div>
-
-                      {/* STATIC DELIVERY ROUTE MAP */}
-                      <div className="col-span-2 pt-2 border-t border-slate-100">
-                        {(() => {
-                          let mapLat: number | null = null;
-                          let mapLon: number | null = null;
-
-                          if (selectedOrder.deviceSnapshot?.location?.latitude && selectedOrder.deviceSnapshot?.location?.longitude) {
-                            mapLat = Number(selectedOrder.deviceSnapshot.location.latitude);
-                            mapLon = Number(selectedOrder.deviceSnapshot.location.longitude);
-                          } else if (selectedOrder.deliveryLocation?.lat && selectedOrder.deliveryLocation?.lon) {
-                            mapLat = Number(selectedOrder.deliveryLocation.lat);
-                            mapLon = Number(selectedOrder.deliveryLocation.lon);
-                          } else if (typeof selectedOrder.coordinates === "string" && selectedOrder.coordinates.includes(",")) {
-                            const parts = selectedOrder.coordinates.split(",");
-                            mapLat = parseFloat(parts[0].trim());
-                            mapLon = parseFloat(parts[1].trim());
-                          } else if (selectedOrder.coordinates?.lat && (selectedOrder.coordinates?.lon || selectedOrder.coordinates?.lng)) {
-                            mapLat = Number(selectedOrder.coordinates.lat);
-                            mapLon = Number(selectedOrder.coordinates.lon || selectedOrder.coordinates.lng);
-                          }
-
-                          return (
-                            <StaticOrderMap
-                              lat={mapLat}
-                              lon={mapLon}
-                              addressText={deliveryAddressText || selectedOrder.address || gpsStreetAddressText}
-                              receiverName={selectedOrder.receiverName || selectedOrder.customerName}
-                              orderNumber={selectedOrder.orderNumber}
-                              distanceKm={selectedOrder.calculatedDistance || selectedOrder.distanceKm}
-                            />
-                          );
-                        })()}
                       </div>
 
                       {/* COURIER TRACKING URL */}

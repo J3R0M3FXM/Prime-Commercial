@@ -274,7 +274,7 @@ export async function POST(request: Request) {
             payableNow: payableNow !== undefined ? Number(payableNow) : calculatedTotal,
             payableOnDelivery: payableOnDelivery !== undefined ? Number(payableOnDelivery) : 0,
             status: 'Pending',
-            notes: notes || 'Submitted via Telegram Mini App Storefront',
+            notes: notes || '',
             ip: clientIp || deviceSnapshot?.ip || '',
             gpsStreetAddress: gpsStreetAddress || deliveryAddress?.formatted || '',
             deviceSnapshot: deviceSnapshot ? {

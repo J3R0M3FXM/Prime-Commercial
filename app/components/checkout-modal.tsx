@@ -656,7 +656,7 @@ export default function CheckoutModal({
         totalAmount: overallOrderValue,
         payableNow,
         payableOnDelivery,
-        notes: customerNotes.trim() || `Delivery for ${receiverName.trim().toUpperCase()}`,
+        notes: customerNotes.trim(),
         deviceSnapshot: {
           ...fpData,
           location: locData,
