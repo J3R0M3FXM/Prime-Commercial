@@ -24,6 +24,7 @@ import {
   ShoppingBag,
   Copy,
   Download,
+  QrCode,
   ExternalLink,
   CheckCircle2,
   AlertTriangle,
@@ -84,6 +85,9 @@ export default function CheckoutModal({
   const [isSubmittingProof, setIsSubmittingProof] = useState(false);
   const [proofSubmitSuccess, setProofSubmitSuccess] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+  const [currentPaymentPage, setCurrentPaymentPage] = useState(0);
+  const [isPaymentQrModalOpen, setIsPaymentQrModalOpen] = useState(false);
+  const [zoomedPaymentMethod, setZoomedPaymentMethod] = useState<any>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -135,6 +139,34 @@ export default function CheckoutModal({
   const [addressValidation, setAddressValidation] = useState<AddressValidationResult | null>(null);
   const [isValidatingAddress, setIsValidatingAddress] = useState<boolean>(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Touch swipe states for payment methods carousel
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = (totalPages: number) => {
+    if (touchStartX.current === null || touchEndX.current === null) return;
+    const diff = touchStartX.current - touchEndX.current;
+    const threshold = 50; // swipe threshold in pixels
+    if (diff > threshold) {
+      // Swiped left -> next page
+      setCurrentPaymentPage((prev) => Math.min(prev + 1, totalPages - 1));
+    } else if (diff < -threshold) {
+      // Swiped right -> prev page
+      setCurrentPaymentPage((prev) => Math.max(0, prev - 1));
+    }
+    // reset
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
 
   // Step 3: Couriers & Delivery Pricing State
   const [availableCouriers, setAvailableCouriers] = useState<any[]>([]);
@@ -304,6 +336,9 @@ export default function CheckoutModal({
       setUploadedProofImage("");
       setProofSubmitSuccess(false);
       setIsSubmittingProof(false);
+      setCurrentPaymentPage(0);
+      setIsPaymentQrModalOpen(false);
+      setZoomedPaymentMethod(null);
     }
   }, [isOpen]);
 
@@ -1489,50 +1524,93 @@ export default function CheckoutModal({
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Method Tiles Selection */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                      {paymentMethods.map((method) => {
-                        const isSelected = selectedPaymentMethod?.id === method.id;
-                        return (
-                          <button
-                            key={method.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedPaymentMethod(method);
-                              setProofSubmitSuccess(false);
-                              setUploadedProofImage("");
-                            }}
-                            className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center text-center gap-2 cursor-pointer ${
-                              isSelected
-                                ? "border-black bg-black/5"
-                                : "border-gray-200 bg-white hover:border-gray-300"
-                            }`}
+                    {/* Method Tiles Selection (5 columns per row, max 2 rows per page, swipe left/right + dot indicators) */}
+                    {(() => {
+                      const itemsPerPage = 10;
+                      const totalPages = Math.ceil(paymentMethods.length / itemsPerPage);
+                      
+                      // Safety: if the current page is out of bounds, clip it
+                      const pageIndex = Math.min(currentPaymentPage, Math.max(0, totalPages - 1));
+                      const slicedMethods = paymentMethods.slice(pageIndex * itemsPerPage, (pageIndex + 1) * itemsPerPage);
+
+                      return (
+                        <div className="space-y-3">
+                          {/* Outer Container with Swipe Events */}
+                          <div 
+                            className="relative overflow-hidden w-full select-none cursor-grab active:cursor-grabbing"
+                            onTouchStart={handleTouchStart}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={() => handleTouchEnd(totalPages)}
                           >
-                            {method.logo ? (
-                              <img
-                                src={method.logo}
-                                alt={method.name}
-                                className="w-10 h-10 object-contain p-0.5 rounded-lg border border-gray-100 bg-white"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-gray-100 text-gray-600 flex items-center justify-center rounded-lg">
-                                <CreditCard className="w-5 h-5" />
-                              </div>
-                            )}
-                            <div className="min-w-0 w-full">
-                              <p className="text-xs font-heading font-bold text-gray-900 truncate">
-                                {method.name}
-                              </p>
-                              <p className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">
-                                {((method.paymentType || method.type || "").toLowerCase() === "qr_code" || (method.paymentType || method.type || "").toLowerCase() === "qr" || (method.paymentType || method.type || "").toLowerCase().includes("qr")) ? "QR Code" : 
-                                 ((method.paymentType || method.type || "").toLowerCase() === "api" || (method.paymentType || method.type || "").toLowerCase() === "webhook") ? "API Online" : 
-                                 ((method.paymentType || method.type || "").toLowerCase() === "crypto") ? "Crypto" : "Other"}
-                              </p>
+                            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                              {slicedMethods.map((method) => {
+                                const isSelected = selectedPaymentMethod?.id === method.id;
+                                const pType = (method.paymentType || method.type || "").toLowerCase();
+                                const isQr = pType === "qr_code" || pType === "qr" || pType.includes("qr");
+                                const qrImg = method.qrCodeImage || method.qrCode || method.qrImage || method.qr_code_image || "";
+
+                                return (
+                                  <button
+                                    key={method.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedPaymentMethod(method);
+                                      setProofSubmitSuccess(false);
+                                      setUploadedProofImage("");
+                                      // If it is a QR payment method, pop up the QR Code immediately
+                                      if (isQr && qrImg) {
+                                        setZoomedPaymentMethod(method);
+                                        setIsPaymentQrModalOpen(true);
+                                      }
+                                    }}
+                                    className={`p-1.5 py-2 sm:p-2 sm:py-2.5 rounded-lg border-2 transition-all flex flex-col items-center justify-center text-center gap-1 cursor-pointer h-14 sm:h-16 relative ${
+                                      isSelected
+                                        ? "border-black bg-black/5"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                    }`}
+                                  >
+                                    {method.logo ? (
+                                      <img
+                                        src={method.logo}
+                                        alt={method.name}
+                                        className="w-5 h-5 sm:w-6 sm:h-6 object-contain p-0.5 rounded-md border border-gray-100 bg-white"
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    ) : (
+                                      <div className="w-5 h-5 sm:w-6 sm:h-6 bg-gray-100 text-gray-600 flex items-center justify-center rounded-md">
+                                        <CreditCard className="w-3.5 h-3.5" />
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 w-full">
+                                      <p className="text-[9px] sm:text-[10px] font-heading font-bold text-gray-900 truncate">
+                                        {method.name}
+                                      </p>
+                                    </div>
+                                  </button>
+                                );
+                              })}
                             </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                          </div>
+
+                          {/* Page indicators */}
+                          {totalPages > 1 && (
+                            <div className="flex items-center justify-center gap-1.5 py-1">
+                              {Array.from({ length: totalPages }).map((_, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => setCurrentPaymentPage(idx)}
+                                  className={`w-1.5 h-1.5 rounded-full transition-all cursor-pointer ${
+                                    idx === pageIndex ? "bg-black w-3" : "bg-gray-300 hover:bg-gray-400"
+                                  }`}
+                                  title={`Go to page ${idx + 1}`}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Expandable Selected Method Details */}
                     {(() => {
@@ -1845,6 +1923,101 @@ export default function CheckoutModal({
         )}
 
       </div>
+
+      {/* Enlarged Payment QR Code Pop-up Modal */}
+      {isPaymentQrModalOpen && zoomedPaymentMethod && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-left">
+                <QrCode className="w-5 h-5 text-black shrink-0" />
+                <div>
+                  <h3 className="font-heading font-black text-sm uppercase tracking-wider text-slate-900">
+                    Payment QR Code
+                  </h3>
+                  <p className="text-[10px] font-mono text-slate-500">
+                    Scan or download to make payment
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPaymentQrModalOpen(false);
+                  setZoomedPaymentMethod(null);
+                }}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-mono font-bold cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col items-center justify-center space-y-3">
+              {(zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image) ? (
+                <div className="p-3 bg-white rounded-xl shadow-xs border border-slate-200">
+                  <img
+                    src={zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image}
+                    alt={`${zoomedPaymentMethod.name} QR Code`}
+                    className="w-48 h-48 object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              ) : (
+                <div className="w-48 h-48 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 font-mono text-xs">
+                  No QR image uploaded
+                </div>
+              )}
+
+              <div>
+                <span className="font-heading font-black text-lg text-slate-900 tracking-tight block">
+                  {zoomedPaymentMethod.name}
+                </span>
+                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block mt-0.5">
+                  {zoomedPaymentMethod.accountNumber ? `Account: ${zoomedPaymentMethod.accountNumber}` : "Static QR Code"}
+                </span>
+              </div>
+            </div>
+
+            {zoomedPaymentMethod.accountName && (
+              <div className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-left text-[11px] font-mono text-gray-700">
+                <div className="font-bold text-gray-400 uppercase text-[9px] tracking-wider">Account Name</div>
+                <div className="font-bold uppercase text-slate-800 mt-0.5">{zoomedPaymentMethod.accountName}</div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pt-1">
+              {(zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const link = document.createElement("a");
+                    link.href = zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image;
+                    link.download = `PRIME_QR_${zoomedPaymentMethod.name.replace(/\s+/g, '_')}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold uppercase tracking-wider font-mono transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPaymentQrModalOpen(false);
+                  setZoomedPaymentMethod(null);
+                }}
+                className="flex-1 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold uppercase tracking-wider font-mono transition-colors cursor-pointer shadow-xs"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
