@@ -7,7 +7,7 @@ import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
 import { useCart } from "./components/cart-context";
-import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt } from "lucide-react";
+import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Menu, X, Home } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 
 export default function Shopfront() {
@@ -23,6 +23,8 @@ export default function Shopfront() {
   const [errorMsg, setErrorMsg] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isBackToShopfrontModalOpen, setIsBackToShopfrontModalOpen] = useState(false);
 
   const { cart, cartCount, addToCart, updateQuantity } = useCart();
 
@@ -211,30 +213,84 @@ export default function Shopfront() {
         <div className="px-4 py-3 flex items-center justify-between">
           <h1 className="text-2xl font-heading font-black tracking-widest uppercase">PRIME</h1>
           
-          <div className="flex items-center gap-2">
-            {/* Customer Order History Button */}
+          <div className="relative">
+            {/* Hamburger Menu Button */}
             <button 
-              onClick={() => setIsOrderHistoryOpen(true)}
-              className="px-2.5 py-1.5 text-gray-700 hover:text-black hover:bg-gray-100 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer border border-gray-200/80 shadow-2xs text-xs font-heading font-bold uppercase tracking-wider"
-              title="View your past and active orders"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-2.5 text-gray-900 hover:bg-gray-100 rounded-xl transition-all cursor-pointer border border-gray-200/80 shadow-2xs flex items-center gap-1.5 font-heading font-bold uppercase text-xs"
+              title="Menu"
             >
-              <Receipt className="w-4 h-4 text-slate-700" />
-              <span>Orders</span>
-            </button>
-
-            {/* Cart Button */}
-            <button 
-              onClick={() => setIsCartOpen(true)}
-              className="relative p-2 text-gray-900 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-              title="Shopping Cart"
-            >
-              <ShoppingBag className="w-6 h-6" />
+              {isMenuOpen ? <X className="w-4.5 h-4.5" /> : <Menu className="w-4.5 h-4.5" />}
+              <span>Menu</span>
               {cartCount > 0 && (
-                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
+                <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full font-mono">
                   {cartCount}
                 </span>
               )}
             </button>
+
+            {/* Hamburger Dropdown Pop-up Menu */}
+            {isMenuOpen && (
+              <>
+                {/* Backdrop overlay */}
+                <div 
+                  className="fixed inset-0 z-40 bg-black/5" 
+                  onClick={() => setIsMenuOpen(false)}
+                />
+                
+                {/* Dropdown Box */}
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-50">
+                  <div className="px-3.5 py-1.5 border-b border-gray-100 mb-1">
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400 font-mono">Navigation Menu</span>
+                  </div>
+                  
+                  {/* Cart Option */}
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsCartOpen(true);
+                    }}
+                    className="w-full text-left px-3.5 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-700 hover:text-black hover:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ShoppingBag className="w-4 h-4 text-slate-700" />
+                      <span>Shopping Bag</span>
+                    </div>
+                    {cartCount > 0 ? (
+                      <span className="bg-slate-900 text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">
+                        {cartCount}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono text-gray-400">Empty</span>
+                    )}
+                  </button>
+
+                  {/* Orders Option */}
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsOrderHistoryOpen(true);
+                    }}
+                    className="w-full text-left px-3.5 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-700 hover:text-black hover:bg-slate-50 transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <Receipt className="w-4 h-4 text-slate-700" />
+                    <span>Your Orders</span>
+                  </button>
+
+                  {/* Back to Shopfront Option */}
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsBackToShopfrontModalOpen(true);
+                    }}
+                    className="w-full text-left px-3.5 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50/50 transition-colors flex items-center gap-2 border-t border-gray-100 cursor-pointer pt-3 mt-1"
+                  >
+                    <Home className="w-4 h-4 text-emerald-600" />
+                    <span>Back to Shopfront</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -375,6 +431,48 @@ export default function Shopfront() {
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
       {selectedProduct && <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
       <OrderHistoryModal isOpen={isOrderHistoryOpen} onClose={() => setIsOrderHistoryOpen(false)} />
+
+      {/* Back to Shopfront Confirmation Modal */}
+      {isBackToShopfrontModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs" 
+            onClick={() => setIsBackToShopfrontModalOpen(false)}
+          />
+          <div className="relative bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl border border-gray-100 animate-in zoom-in-95 duration-150">
+            <h3 className="font-heading font-bold text-lg text-slate-950 uppercase tracking-widest mb-2">
+              Back to Shopfront
+            </h3>
+            <p className="text-xs text-slate-600 font-mono leading-relaxed mb-6">
+              Would you like to return to the main catalog page and reset all of your search queries and filter settings?
+            </p>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setIsBackToShopfrontModalOpen(false)}
+                className="px-4 py-2 text-xs font-heading font-bold uppercase tracking-wider text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setSelectedCategory("All");
+                  setIsBackToShopfrontModalOpen(false);
+                  if (typeof window !== "undefined") {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
+                className="px-5 py-2 text-xs font-heading font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg transition-colors cursor-pointer"
+              >
+                Confirm & Return
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

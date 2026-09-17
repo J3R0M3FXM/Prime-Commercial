@@ -229,7 +229,10 @@ export async function POST(request: Request) {
           });
 
           // 4. Create the order with accurate financial snapshotting
-          const itemsSubtotal = Number(subTotal) || items.reduce((sum: number, it: any) => sum + (Number(it.price) * (Number(it.quantity) || 1)), 0);
+          const itemsSubtotal = Number(subTotal) || items.reduce((sum: number, it: any) => {
+            const isFree = Boolean(it.isFree || Number(it.price) === 0);
+            return sum + (isFree ? 0 : (Number(it.price) || 0)) * (Number(it.quantity) || 1);
+          }, 0);
           const sanitizedCharges = Array.isArray(appliedCharges) ? appliedCharges.map((ch: any) => {
             const entry: Record<string, any> = {
               id: String(ch.id || ''),
@@ -255,13 +258,22 @@ export async function POST(request: Request) {
             customerName: customerName || 'Customer',
             customerUsername: customerUsername || '',
             primeMemberId: finalMemberId || '',
-            items: items.map((it: any) => ({
-              id: it.id || '',
-              name: it.name || 'Unknown Product',
-              price: Number(it.price) || 0,
-              quantity: Number(it.quantity) || 1,
-              imageUrl: it.imageUrl || ''
-            })),
+            items: items.map((it: any) => {
+              const rawPrice = Number(it.price);
+              const price = Number.isFinite(rawPrice) ? Math.max(0, rawPrice) : 0;
+              const isFree = Boolean(it.isFree || price === 0);
+              return {
+                id: String(it.id || ''),
+                productId: it.productId ? String(it.productId) : (String(it.id || '').includes('_') ? String(it.id).split('_')[0] : String(it.id || '')),
+                variantId: it.variantId && it.variantId !== 'default' ? String(it.variantId) : (String(it.id || '').includes('_') ? String(it.id).split('_')[1] : null),
+                name: String(it.name || 'Product'),
+                price: isFree ? 0 : price,
+                originalPrice: it.originalPrice !== undefined ? Number(it.originalPrice) : (price || 0),
+                isFree,
+                quantity: Math.max(1, parseInt(String(it.quantity || 1), 10)),
+                imageUrl: it.imageUrl || ''
+              };
+            }),
             subTotal: itemsSubtotal,
             appliedCharges: sanitizedCharges,
             deliveryFee: safeDeliveryFee,

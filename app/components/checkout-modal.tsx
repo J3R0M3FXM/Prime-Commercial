@@ -649,15 +649,20 @@ export default function CheckoutModal({
       const locData = await getClientLocation(1500);
 
       const orderData = {
-        items: selectedItems.map((it) => ({
-          id: it.id,
-          productId: it.productId || (typeof it.id === 'string' && it.id.includes('_') ? it.id.split('_')[0] : it.id),
-          variantId: it.variantId || (typeof it.id === 'string' && it.id.includes('_') ? it.id.split('_')[1] : 'default'),
-          name: it.name,
-          price: Number(it.price) || 0,
-          quantity: Number(it.quantity) || 1,
-          imageUrl: it.imageUrl || "",
-        })),
+        items: selectedItems.map((it) => {
+          const isFree = Boolean(it.isFree || Number(it.price) === 0);
+          return {
+            id: it.id,
+            productId: it.productId || (typeof it.id === 'string' && it.id.includes('_') ? it.id.split('_')[0] : it.id),
+            variantId: it.variantId || (typeof it.id === 'string' && it.id.includes('_') ? it.id.split('_')[1] : 'default'),
+            name: it.name,
+            price: isFree ? 0 : (Number(it.price) || 0),
+            originalPrice: Number(it.originalPrice || it.price || 0),
+            isFree,
+            quantity: Number(it.quantity) || 1,
+            imageUrl: it.imageUrl || "",
+          };
+        }),
         customerId: tgCustomer.id,
         customerName: tgCustomer.name,
         customerUsername: tgCustomer.username,
