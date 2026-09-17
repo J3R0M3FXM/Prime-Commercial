@@ -1463,102 +1463,71 @@ export default function AdminPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.22 }}
-            className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8"
+            className="flex-1 w-full mx-auto flex flex-col"
           >
-            {/* Header */}
-            <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-slate-200">
-              <div className="flex items-center gap-4">
-                <img 
-                  src="/prime-logo-metallic.png" 
-                  alt="PRIME" 
-                  className="h-7 sm:h-[28px] w-auto object-contain shrink-0 drop-shadow-xs" 
-                />
-                {adminUser?.photoUrl ? (
-                  <img src={adminUser.photoUrl} alt="Admin" className="w-14 h-14 rounded-2xl object-cover shadow-sm border border-slate-200 shrink-0" />
-                ) : (
-                  <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-heading font-black text-xl uppercase shadow-sm shrink-0">
-                    A
-                  </div>
-                )}
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h1 className="text-2xl sm:text-3xl font-heading font-black tracking-widest uppercase text-slate-900">
-                      Admin
-                    </h1>
-                    <span className="text-[10px] font-mono bg-black text-white px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
-                      Telegram ID: {adminUser?.id || "1085949511"}
+            {/* Harmonized Sticky Header matching Shopfront */}
+            <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
+              <div className="px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center">
+                  <img 
+                    src="/prime-logo-metallic.png" 
+                    alt="PRIME" 
+                    className="h-7 sm:h-[28px] w-auto object-contain shrink-0 drop-shadow-xs" 
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/90 border border-slate-200 rounded-lg text-xs font-mono">
+                    <span className="relative flex h-2 w-2">
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isSilentSyncing ? "bg-emerald-500 opacity-75" : "bg-emerald-400 opacity-50"}`}></span>
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${isSilentSyncing ? "bg-emerald-600" : "bg-emerald-500"}`}></span>
                     </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
-                    <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Direct Access Active
+                    <span className="text-slate-700 font-bold hidden sm:inline">
+                      {isSilentSyncing ? "Syncing..." : "Live Sync"}
                     </span>
-                    <span className="text-slate-300">&bull;</span>
-                    <button 
-                      onClick={() => {
-                        if (typeof window !== "undefined") {
-                          localStorage.setItem("skip_admin_redirect", "true");
-                          sessionStorage.setItem("skip_admin_redirect", "true");
-                          window.location.href = "/";
-                        }
-                      }}
-                      className="text-slate-700 hover:text-black font-medium underline cursor-pointer bg-transparent border-none p-0 align-baseline font-mono text-xs"
+                    <button
+                      type="button"
+                      onClick={() => setIsSoundSettingsModalOpen(true)}
+                      title="Notification Sound Settings (New Order vs Payment Proof)"
+                      className="ml-0.5 sm:ml-1 p-0.5 sm:p-1 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1"
                     >
-                      Open Storefront
+                      {soundSettings.master ? (
+                        <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <VolumeX className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                      <span className="text-[10px] font-mono uppercase font-bold text-slate-500 hidden md:inline">Audio</span>
                     </button>
                   </div>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100/90 border border-slate-200 rounded-lg text-xs font-mono">
-                  <span className="relative flex h-2 w-2">
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isSilentSyncing ? "bg-emerald-500 opacity-75" : "bg-emerald-400 opacity-50"}`}></span>
-                    <span className={`relative inline-flex rounded-full h-2 w-2 ${isSilentSyncing ? "bg-emerald-600" : "bg-emerald-500"}`}></span>
-                  </span>
-                  <span className="text-slate-700 font-bold hidden sm:inline">
-                    {isSilentSyncing ? "Syncing..." : "Live Sync"}
-                  </span>
                   <button
-                    type="button"
-                    onClick={() => setIsSoundSettingsModalOpen(true)}
-                    title="Notification Sound Settings (New Order vs Payment Proof)"
-                    className="ml-1 p-1 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1"
+                    onClick={fetchAllData}
+                    disabled={refreshing}
+                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium hover:bg-slate-100 transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
                   >
-                    {soundSettings.master ? (
-                      <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
-                    ) : (
-                      <VolumeX className="w-3.5 h-3.5 text-slate-400" />
-                    )}
-                    <span className="text-[10px] font-mono uppercase font-bold text-slate-500 hidden md:inline">Audio</span>
+                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-slate-900" : "text-slate-500"}`} />
+                    <span className="hidden sm:inline">Refresh</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        sessionStorage.removeItem("prime_admin_authorized");
+                        localStorage.removeItem("prime_admin_authorized");
+                        sessionStorage.removeItem("prime_admin_photo_url");
+                        localStorage.removeItem("prime_admin_photo_url");
+                      }
+                      setAuthorized(false);
+                    }}
+                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium text-red-600 hover:bg-red-50 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    Lock
                   </button>
                 </div>
-
-                <button
-                  onClick={fetchAllData}
-                  disabled={refreshing}
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium hover:bg-slate-100 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-slate-900" : "text-slate-500"}`} />
-                  Refresh
-                </button>
-                <button
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      sessionStorage.removeItem("prime_admin_authorized");
-                      localStorage.removeItem("prime_admin_authorized");
-                      sessionStorage.removeItem("prime_admin_photo_url");
-                      localStorage.removeItem("prime_admin_photo_url");
-                    }
-                    setAuthorized(false);
-                  }}
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium text-red-600 hover:bg-red-50 transition-colors shadow-sm cursor-pointer"
-                >
-                  Lock
-                </button>
               </div>
             </header>
+
+            {/* Dashboard Content Area */}
+            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
 
             {/* PWA Installation Card Banner */}
             {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (
@@ -1734,6 +1703,7 @@ export default function AdminPage() {
                   </button>
                 ))}
               </div>
+            </div>
             </div>
           </motion.div>
         )}
