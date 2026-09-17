@@ -215,7 +215,7 @@ export default function Shopfront() {
             <img 
               src="/prime-logo-metallic.png" 
               alt="PRIME" 
-              className="h-8 sm:h-9 w-auto object-contain shrink-0" 
+              className="h-[38px] w-auto object-contain shrink-0 drop-shadow-xs" 
             />
           </div>
           

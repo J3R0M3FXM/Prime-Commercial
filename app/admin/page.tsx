@@ -1411,7 +1411,7 @@ export default function AdminPage() {
               <img 
                 src="/prime-logo-metallic.png" 
                 alt="PRIME" 
-                className="h-10 w-auto object-contain" 
+                className="h-[38px] w-auto object-contain drop-shadow-xs" 
               />
             </div>
             <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase text-white">Admin</h1>
@@ -1471,7 +1471,7 @@ export default function AdminPage() {
                 <img 
                   src="/prime-logo-metallic.png" 
                   alt="PRIME" 
-                  className="h-9 sm:h-10 w-auto object-contain shrink-0" 
+                  className="h-[38px] w-auto object-contain shrink-0 drop-shadow-xs" 
                 />
                 {adminUser?.photoUrl ? (
                   <img src={adminUser.photoUrl} alt="Admin" className="w-14 h-14 rounded-2xl object-cover shadow-sm border border-slate-200 shrink-0" />
