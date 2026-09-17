@@ -331,7 +331,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             <button 
               disabled={selectedItems.length === 0}
               onClick={() => setIsCheckoutOpen(true)}
-              className="w-full bg-black text-white font-bold py-4 rounded hover:bg-gray-800 transition-colors uppercase tracking-widest text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Proceed to Checkout ({selectedItems.length})
             </button>

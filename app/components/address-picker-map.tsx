@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
-import { Navigation, Loader2, MapPin, Plus, Minus } from "lucide-react";
+import "leaflet/dist/leaflet.css";
+import { MapPin, Navigation, Minus, Plus, Loader2 } from "lucide-react";
 
-// Fix Leaflet's default icon path issues in Next.js
+// Fix standard marker icon issue in react-leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
@@ -41,22 +41,29 @@ function MapRecenter({ center }: { center: [number, number] }) {
   return null;
 }
 
+function MapInstanceCapture({ setMap }: { setMap: (map: any) => void }) {
+  const map = useMap();
+  useEffect(() => { setMap(map); }, [map, setMap]);
+  return null;
+}
+
 function MapControls({
+  map,
   onUseMyLocation,
   isLocating,
   onLocationChange,
   safeLat,
   safeLon
 }: {
+  map: any;
   onUseMyLocation?: () => void;
   isLocating?: boolean;
   onLocationChange: (lat: number, lon: number) => void;
   safeLat: number;
   safeLon: number;
 }) {
-  const map = useMap();
-
   const handleDropPinAtCenter = () => {
+    if (!map) return;
     const center = map.getCenter();
     onLocationChange(center.lat, center.lng);
   };
@@ -69,7 +76,7 @@ function MapControls({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            map.zoomIn();
+            if (map) map.setZoom(map.getZoom() + 1);
           }}
           className="w-8 h-8 bg-white/95 hover:bg-white active:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center cursor-pointer transition-all active:scale-95"
           title="Zoom In"
@@ -81,7 +88,7 @@ function MapControls({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            map.zoomOut();
+            if (map) map.setZoom(map.getZoom() - 1);
           }}
           className="w-8 h-8 bg-white/95 hover:bg-white active:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center cursor-pointer transition-all active:scale-95"
           title="Zoom Out"
@@ -146,6 +153,7 @@ export default function AddressPickerMap({
   const safeLat = typeof lat === 'number' && !isNaN(lat) ? lat : 14.5995;
   const safeLon = typeof lon === 'number' && !isNaN(lon) ? lon : 120.9842;
   const position: [number, number] = [safeLat, safeLon];
+  const [mapInstance, setMapInstance] = useState<any>(null);
 
   return (
     <div className="w-full h-44 sm:h-48 md:h-52 rounded-xl overflow-hidden border border-gray-300 relative shadow-inner bg-gray-100 isolate z-0">
@@ -161,10 +169,8 @@ export default function AddressPickerMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-
         <MapRecenter center={position} />
         <MapClickHandler onLocationChange={onLocationChange} />
-
         <Marker
           position={position}
           draggable={true}
@@ -176,15 +182,18 @@ export default function AddressPickerMap({
             }
           }}
         />
-
+        <MapInstanceCapture setMap={setMapInstance} />
+      </MapContainer>
+      {mapInstance && (
         <MapControls
+          map={mapInstance}
           onUseMyLocation={onUseMyLocation}
           isLocating={isLocating}
           onLocationChange={onLocationChange}
           safeLat={safeLat}
           safeLon={safeLon}
         />
-      </MapContainer>
+      )}
     </div>
   );
 }

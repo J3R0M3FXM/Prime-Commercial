@@ -1,0 +1,1 @@
+sed -i 's/const position: \[number, number\] = \[safeLat, safeLon\];/const position: [number, number] = [safeLat, safeLon];\n  const [mapInstance, setMapInstance] = useState<any>(null);/g' app/components/address-picker-map.tsx

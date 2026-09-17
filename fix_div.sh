@@ -1,0 +1,2 @@
+sed -i 's|              {/\* Delivery Fee Payment Option: Upon Checkout vs Upon Delivery \*/}|              {/\* Delivery Fee Payment Option: Upon Checkout vs Upon Delivery \*/}\n              {selectedCourier \&\& (\n                <div className="space-y-3 pt-2">|g' app/components/checkout-modal.tsx
+sed -i 's|<div className="border-b border-gray-100 pb-1.5">||g' app/components/checkout-modal.tsx
