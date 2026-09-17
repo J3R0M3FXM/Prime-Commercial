@@ -26,8 +26,26 @@ export async function GET(request: Request) {
 
     // 1. Single Customer Profile
     if (customerId) {
-      const userRef = doc(db, 'users', customerId);
-      const userSnap = await getDoc(userRef);
+      let userRef = doc(db, 'users', customerId);
+      let userSnap = await getDoc(userRef);
+      let targetId = customerId;
+
+      if (!userSnap.exists()) {
+        const usersCol = collection(db, 'users');
+        const qPrime = query(usersCol, where('primeMemberId', '==', customerId), limit(1));
+        const primeSnap = await getDocs(qPrime);
+        if (!primeSnap.empty) {
+          userSnap = primeSnap.docs[0];
+          targetId = userSnap.id;
+        } else {
+          const qTg = query(usersCol, where('tgUserId', '==', customerId), limit(1));
+          const tgSnap = await getDocs(qTg);
+          if (!tgSnap.empty) {
+            userSnap = tgSnap.docs[0];
+            targetId = userSnap.id;
+          }
+        }
+      }
 
       if (!userSnap.exists()) {
         return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
@@ -38,7 +56,7 @@ export async function GET(request: Request) {
       // Fetch all recorded sessions for this customer
       let fingerprints: any[] = [];
       try {
-        const fpCol = collection(db, 'users', customerId, 'fingerprints');
+        const fpCol = collection(db, 'users', targetId, 'fingerprints');
         const fpSnap = await getDocs(fpCol);
         fingerprints = fpSnap.docs.map(d => ({
           id: d.id,
@@ -51,7 +69,7 @@ export async function GET(request: Request) {
           return tB - tA;
         });
       } catch (err) {
-        console.warn(`Failed to fetch sessions for customer ${customerId}:`, err);
+        console.warn(`Failed to fetch sessions for customer ${targetId}:`, err);
       }
 
       const currentDeviceId = userData.deviceId || userData.latestFingerprint?.deviceId || fingerprints[0]?.deviceId || "";
