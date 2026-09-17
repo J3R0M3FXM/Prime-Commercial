@@ -88,6 +88,8 @@ export default function CheckoutModal({
   const [currentPaymentPage, setCurrentPaymentPage] = useState(0);
   const [isPaymentQrModalOpen, setIsPaymentQrModalOpen] = useState(false);
   const [zoomedPaymentMethod, setZoomedPaymentMethod] = useState<any>(null);
+  const proofInputRef = useRef<HTMLInputElement>(null);
+  const [isPreviewProofOpen, setIsPreviewProofOpen] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -1131,61 +1133,44 @@ export default function CheckoutModal({
                     No couriers currently available for this route. Please re-adjust address or contact support.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-4 gap-2">
                     {availableCouriers.map((courier) => {
                       const isSelected = selectedCourierId === courier.id || availableCouriers.length === 1;
                       return (
-                        <div
-                          key={courier.id}
-                          onClick={() => setSelectedCourierId(courier.id)}
-                          className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                            isSelected
-                              ? "border-black bg-black/5 shadow-sm"
-                              : "border-gray-200 bg-white hover:border-gray-300"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
+                        <div key={courier.id} className="flex flex-col items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCourierId(courier.id)}
+                            className={`w-full aspect-square rounded-xl border-2 transition-all flex flex-col items-center justify-center p-2 relative ${
+                              isSelected
+                                ? "border-black bg-black/5 shadow-sm"
+                                : "border-gray-200 bg-white hover:border-gray-300"
+                            }`}
+                          >
                             {courier.logo ? (
                               <img
                                 src={courier.logo}
                                 alt={courier.name}
-                                className="w-12 h-12 object-contain rounded-lg bg-white border border-gray-100 p-1 shrink-0"
+                                className={`w-full h-full object-contain ${isSelected ? 'opacity-30' : 'opacity-20'}`}
+                                referrerPolicy="no-referrer"
                               />
                             ) : (
-                              <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
-                                <Truck className="w-6 h-6" />
-                              </div>
+                              <Truck className={`w-8 h-8 ${isSelected ? 'text-gray-400' : 'text-gray-300 opacity-30'}`} />
                             )}
-
-                            <div>
-                              <h4 className="text-sm font-heading font-bold text-gray-900">
-                                {formatCourierName(courier.name)}
-                              </h4>
-                              <p className="text-[11px] text-gray-500 font-mono">
-                                {courier.type || "Express Delivery"}
-                              </p>
-                              <span className="text-[10px] text-gray-400 font-mono">
-                                {calculatedDistance > 0 ? `${calculatedDistance} km` : "Standard Distance"}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className="font-heading font-black text-gray-900 text-[11px] sm:text-sm drop-shadow-md bg-white/70 px-1 rounded-sm">
+                                {formatPHP(courier.calculatedFee || 0)}
                               </span>
                             </div>
-                          </div>
-
-                          <div className="text-right">
-                            <span className="text-base font-heading font-bold text-gray-900 block">
-                              {formatPHP(courier.calculatedFee || 0)}
-                            </span>
-                            <div className="mt-1 flex justify-end">
-                              <div
-                                className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                  isSelected
-                                    ? "bg-black border-black text-white"
-                                    : "border-gray-300 bg-white"
-                                }`}
-                              >
-                                {isSelected && <Check className="w-3 h-3" />}
+                            {isSelected && (
+                              <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-black rounded-full flex items-center justify-center">
+                                <Check className="w-2.5 h-2.5 text-white" />
                               </div>
-                            </div>
-                          </div>
+                            )}
+                          </button>
+                          <span className="text-[9px] sm:text-[10px] font-heading font-bold text-gray-900 truncate w-full text-center leading-tight">
+                            {formatCourierName(courier.name)}
+                          </span>
                         </div>
                       );
                     })}
@@ -1555,43 +1540,40 @@ export default function CheckoutModal({
                                 const qrImg = method.qrCodeImage || method.qrCode || method.qrImage || method.qr_code_image || "";
 
                                 return (
-                                  <button
-                                    key={method.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedPaymentMethod(method);
-                                      setProofSubmitSuccess(false);
-                                      setUploadedProofImage("");
-                                      // If it is a QR payment method, pop up the QR Code immediately
-                                      if (isQr && qrImg) {
-                                        setZoomedPaymentMethod(method);
-                                        setIsPaymentQrModalOpen(true);
-                                      }
-                                    }}
-                                    className={`p-1.5 py-2 sm:p-2 sm:py-2.5 rounded-lg border-2 transition-all flex flex-col items-center justify-center text-center gap-1 cursor-pointer h-14 sm:h-16 relative ${
-                                      isSelected
-                                        ? "border-black bg-black/5"
-                                        : "border-gray-200 bg-white hover:border-gray-300"
-                                    }`}
-                                  >
-                                    {method.logo ? (
-                                      <img
-                                        src={method.logo}
-                                        alt={method.name}
-                                        className="w-5 h-5 sm:w-6 sm:h-6 object-contain p-0.5 rounded-md border border-gray-100 bg-white"
-                                        referrerPolicy="no-referrer"
-                                      />
-                                    ) : (
-                                      <div className="w-5 h-5 sm:w-6 sm:h-6 bg-gray-100 text-gray-600 flex items-center justify-center rounded-md">
-                                        <CreditCard className="w-3.5 h-3.5" />
-                                      </div>
-                                    )}
-                                    <div className="min-w-0 w-full">
-                                      <p className="text-[9px] sm:text-[10px] font-heading font-bold text-gray-900 truncate">
-                                        {method.name}
-                                      </p>
-                                    </div>
-                                  </button>
+                                  <div key={method.id} className="flex flex-col items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedPaymentMethod(method);
+                                        setProofSubmitSuccess(false);
+                                        setUploadedProofImage("");
+                                        // If it is a QR payment method, pop up the QR Code immediately
+                                        if (isQr && qrImg) {
+                                          setZoomedPaymentMethod(method);
+                                          setIsPaymentQrModalOpen(true);
+                                        }
+                                      }}
+                                      className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl border-2 transition-all flex items-center justify-center p-1.5 cursor-pointer relative ${
+                                        isSelected
+                                          ? "border-black bg-black/5"
+                                          : "border-gray-200 bg-white hover:border-gray-300"
+                                      }`}
+                                    >
+                                      {method.logo ? (
+                                        <img
+                                          src={method.logo}
+                                          alt={method.name}
+                                          className="w-full h-full object-contain"
+                                          referrerPolicy="no-referrer"
+                                        />
+                                      ) : (
+                                        <CreditCard className="w-6 h-6 text-gray-400" />
+                                      )}
+                                    </button>
+                                    <span className="text-[9px] sm:text-[10px] font-heading font-bold text-gray-900 truncate w-full text-center">
+                                      {method.name}
+                                    </span>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -1639,43 +1621,6 @@ export default function CheckoutModal({
                             </span>
                           </div>
 
-                          {/* QR Code Block */}
-                          {isQr && (
-                            <div className="flex flex-col items-center justify-center gap-3">
-                              {qrImg ? (
-                                <div className="p-2 border border-gray-200 rounded-lg bg-white">
-                                  <img
-                                    src={qrImg}
-                                    alt="Static QR Code"
-                                    className="w-48 h-48 object-contain"
-                                  />
-                                </div>
-                              ) : (
-                                <div className="w-48 h-48 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 font-mono text-xs">
-                                  No static QR code uploaded
-                                </div>
-                              )}
-
-                              {qrImg && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const link = document.createElement("a");
-                                    link.href = qrImg;
-                                    link.download = `PRIME_QR_${selectedPaymentMethod.name.replace(/\s+/g, '_')}.png`;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                  }}
-                                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-heading font-bold text-xs uppercase tracking-wider rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                  <span>Download QR Code</span>
-                                </button>
-                              )}
-                            </div>
-                          )}
-
                           {/* Crypto Block */}
                           {isCrypto && (
                             <div className="space-y-2">
@@ -1721,121 +1666,94 @@ export default function CheckoutModal({
                           )}
 
                           {/* Upload Proof of Payment Container */}
-                        {!proofSubmitSuccess ? (
                           <div className="border-t border-gray-100 pt-4 space-y-3">
-                            <div className="space-y-1">
-                              <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-900 font-heading">
-                                Upload Proof of Payment <span className="text-red-500">*</span>
-                              </label>
-                              <p className="text-[10px] text-gray-400 font-mono">
-                                Upload the uncompressed transfer receipt screenshot from your bank app.
-                              </p>
-                            </div>
-
-                            {/* Drag & Drop Click Uploader */}
-                            <div className="space-y-2">
-                              {uploadedProofImage ? (
-                                <div className="space-y-2">
-                                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center p-2">
-                                    <img
-                                      src={uploadedProofImage}
-                                      alt="Proof Preview"
-                                      className="max-h-56 object-contain rounded"
-                                    />
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setUploadedProofImage("")}
-                                    className="text-xs text-red-600 font-bold uppercase tracking-wider hover:underline block cursor-pointer"
-                                  >
-                                    Remove & upload different image
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="relative border-2 border-dashed border-gray-300 hover:border-black rounded-xl p-6 transition-all bg-gray-50/50 flex flex-col items-center justify-center text-center cursor-pointer">
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        const reader = new FileReader();
-                                        reader.onloadend = () => {
-                                          setUploadedProofImage(reader.result as string);
-                                        };
-                                        reader.readAsDataURL(file);
-                                      }
-                                    }}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                  />
-                                  <CreditCard className="w-8 h-8 text-gray-400 mb-2" />
-                                  <span className="text-xs font-bold text-gray-900 block font-heading">
-                                    Select Receipt Image
-                                  </span>
-                                  <span className="text-[10px] text-gray-400 font-mono mt-1">
-                                    PNG, JPG, JPEG up to 10MB (Highest resolution)
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Submit Button */}
-                            {uploadedProofImage && (
+                            <input
+                              type="file"
+                              accept="image/*"
+                              ref={proofInputRef}
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setUploadedProofImage(reader.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                            
+                            {!uploadedProofImage ? (
                               <button
                                 type="button"
-                                disabled={isSubmittingProof}
-                                onClick={async () => {
-                                  try {
-                                    setIsSubmittingProof(true);
-                                    const res = await fetch("/api/orders", {
-                                      method: "PUT",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({
-                                        orderId: completedOrder.id || completedOrder.orderNumber,
-                                        paymentMethodId: selectedPaymentMethod.id,
-                                        paymentMethodName: selectedPaymentMethod.name,
-                                        paymentProofImage: uploadedProofImage,
-                                      })
-                                    });
-                                    if (res.ok) {
-                                      setProofSubmitSuccess(true);
-                                    } else {
-                                      const errData = await res.json().catch(() => ({}));
-                                      alert(errData.error || "Failed to submit payment proof");
-                                    }
-                                  } catch (e) {
-                                    console.error(e);
-                                    alert("Submission failed. Please try again.");
-                                  } finally {
-                                    setIsSubmittingProof(false);
-                                  }
-                                }}
-                                className="w-full py-3 bg-black hover:bg-slate-800 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                                onClick={() => proofInputRef.current?.click()}
+                                className="w-full py-3.5 bg-black hover:bg-gray-900 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-md"
                               >
-                                {isSubmittingProof ? (
-                                  <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                                    <span>Uploading Receipt...</span>
-                                  </>
-                                ) : (
-                                  <span>Submit Payment Proof</span>
-                                )}
+                                <span>Attach Payment Proof</span>
                               </button>
+                            ) : (
+                              <div className="space-y-3 animate-in fade-in duration-200">
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsPreviewProofOpen(true)}
+                                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-heading font-bold uppercase tracking-wider text-[10px] sm:text-xs rounded-xl transition-all cursor-pointer flex justify-center items-center"
+                                  >
+                                    <span>Preview</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => proofInputRef.current?.click()}
+                                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-heading font-bold uppercase tracking-wider text-[10px] sm:text-xs rounded-xl transition-all cursor-pointer flex justify-center items-center"
+                                  >
+                                    <span>Replace</span>
+                                  </button>
+                                </div>
+                                
+                                <button
+                                  type="button"
+                                  disabled={isSubmittingProof}
+                                  onClick={async () => {
+                                    try {
+                                      setIsSubmittingProof(true);
+                                      const res = await fetch("/api/orders", {
+                                        method: "PUT",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({
+                                          orderId: completedOrder.id || completedOrder.orderNumber,
+                                          paymentMethodId: selectedPaymentMethod.id,
+                                          paymentMethodName: selectedPaymentMethod.name,
+                                          paymentProofImage: uploadedProofImage,
+                                        })
+                                      });
+                                      if (res.ok) {
+                                        setProofSubmitSuccess(true);
+                                      } else {
+                                        const errData = await res.json().catch(() => ({}));
+                                        alert(errData.error || "Failed to submit payment proof");
+                                      }
+                                    } catch (e) {
+                                      console.error(e);
+                                      alert("Submission failed. Please try again.");
+                                    } finally {
+                                      setIsSubmittingProof(false);
+                                    }
+                                  }}
+                                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                                >
+                                  {isSubmittingProof ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                                      <span>Verifying...</span>
+                                    </>
+                                  ) : (
+                                    <span>Submit for Verification</span>
+                                  )}
+                                </button>
+                              </div>
                             )}
                           </div>
-                        ) : (
-                          <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl space-y-1.5 animate-in zoom-in-95 duration-200">
-                            <div className="flex items-center gap-1.5">
-                              <Check className="w-4 h-4 text-emerald-600" />
-                              <span className="text-xs font-bold uppercase font-heading">
-                                Payment Proof Uploaded Successfully!
-                              </span>
-                            </div>
-                            <p className="text-[11px] font-mono text-emerald-700 leading-relaxed">
-                              Your receipt has been linked securely to Order #{completedOrder.id || completedOrder.orderNumber} in highest quality. An administrator will review your payment shortly to authorize dispatch.
-                            </p>
-                          </div>
-                        )}
                         </div>
                       );
                     })()}
@@ -1929,6 +1847,52 @@ export default function CheckoutModal({
 
       </div>
 
+      {/* Upload Proof Preview Modal */}
+      {isPreviewProofOpen && uploadedProofImage && (
+        <div className="fixed inset-0 z-[2500] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
+          <button 
+            onClick={() => setIsPreviewProofOpen(false)} 
+            className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img 
+            src={uploadedProofImage} 
+            alt="Payment Proof Preview" 
+            className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
+          />
+        </div>
+      )}
+
+      {/* Success Submission Animated Modal */}
+      {proofSubmitSuccess && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-300">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2">
+              <Check className="w-8 h-8" />
+            </div>
+            <h3 className="font-heading font-black text-xl uppercase tracking-widest text-slate-900">
+              Submitted
+            </h3>
+            <p className="text-xs font-mono text-slate-600 leading-relaxed">
+              Your payment proof has been submitted and will undergo verification. 
+              You can monitor the status of your order in <strong className="text-black">MY ORDERS</strong>. 
+              You will receive a notification via Telegram chat as your order progresses.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setProofSubmitSuccess(false);
+                onClose();
+              }}
+              className="mt-4 w-full py-3 bg-black hover:bg-slate-900 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl transition-colors cursor-pointer"
+            >
+              Got it, thanks!
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Enlarged Payment QR Code Pop-up Modal */}
       {isPaymentQrModalOpen && zoomedPaymentMethod && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150">
@@ -1994,13 +1958,29 @@ export default function CheckoutModal({
               {(zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image) && (
                 <button
                   type="button"
-                  onClick={() => {
-                    const link = document.createElement("a");
-                    link.href = zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image;
-                    link.download = `PRIME_QR_${zoomedPaymentMethod.name.replace(/\s+/g, '_')}.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                  onClick={async () => {
+                    try {
+                      const url = zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image;
+                      const response = await fetch(url);
+                      const blob = await response.blob();
+                      const objectUrl = URL.createObjectURL(blob);
+                      const link = document.createElement("a");
+                      link.href = objectUrl;
+                      link.download = `PRIME_QR_${zoomedPaymentMethod.name.replace(/\s+/g, '_')}.png`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(objectUrl);
+                    } catch(err) {
+                      // Fallback if fetch fails due to CORS
+                      const link = document.createElement("a");
+                      link.href = zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image;
+                      link.download = `PRIME_QR_${zoomedPaymentMethod.name.replace(/\s+/g, '_')}.png`;
+                      link.target = "_blank";
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }
                   }}
                   className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold uppercase tracking-wider font-mono transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
                 >
