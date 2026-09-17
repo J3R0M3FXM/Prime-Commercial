@@ -291,7 +291,7 @@ export async function POST(request: Request) {
             deviceId: deviceSnapshot?.deviceId || deviceSnapshot?.device_id || body.deviceId || '',
             sessionToken: body.sessionToken || deviceSnapshot?.sessionToken || '',
             coordinates: body.coordinates || (deviceSnapshot?.location?.lat && deviceSnapshot?.location?.lon ? `${deviceSnapshot.location.lat}, ${deviceSnapshot.location.lon}` : ''),
-            gpsStreetAddress: gpsStreetAddress || deliveryAddress?.formatted || '',
+            gpsStreetAddress: gpsStreetAddress || '',
             deviceSnapshot: deviceSnapshot ? {
               ...deviceSnapshot,
               deviceId: deviceSnapshot.deviceId || body.deviceId || '',

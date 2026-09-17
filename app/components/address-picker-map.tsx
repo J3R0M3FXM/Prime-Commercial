@@ -64,7 +64,7 @@ function MapControls({
   return (
     <>
       {/* Zoom Controls on the LEFT */}
-      <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 pointer-events-auto">
+      <div className="absolute top-2.5 left-2.5 z-[1000] flex flex-col gap-1.5 pointer-events-auto">
         <button
           type="button"
           onClick={(e) => {
@@ -92,7 +92,7 @@ function MapControls({
       </div>
 
       {/* Action Controls on the RIGHT (Same size w-8 h-8, aligned with zoom buttons) */}
-      <div className="absolute top-2.5 right-2.5 z-10 flex flex-col gap-1.5 pointer-events-auto">
+      <div className="absolute top-2.5 right-2.5 z-[1000] flex flex-col gap-1.5 pointer-events-auto">
         {onUseMyLocation && (
           <button
             type="button"
@@ -127,7 +127,7 @@ function MapControls({
       </div>
 
       {/* Coordinate status tag at bottom-right */}
-      <div className="absolute bottom-2 right-2 z-10 pointer-events-none">
+      <div className="absolute bottom-2 right-2 z-[1000] pointer-events-none">
         <span className="bg-white/90 backdrop-blur-xs text-[10px] font-mono text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 shadow-xs">
           {safeLat.toFixed(4)}, {safeLon.toFixed(4)}
         </span>

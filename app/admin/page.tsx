@@ -1381,9 +1381,6 @@ export default function AdminPage() {
       if (loadingGpsOrderId === selectedOrder.id) return "Resolving GPS street address...";
       return `${loc.lat.toFixed(5)}, ${loc.lon.toFixed(5)}`;
     }
-    if (selectedOrder.deliveryAddress?.formatted) {
-      return selectedOrder.deliveryAddress.formatted;
-    }
     return "Not captured";
   }, [selectedOrder, resolvedGpsAddresses, loadingGpsOrderId]);
 
@@ -2979,9 +2976,6 @@ export default function AdminPage() {
             if (selectedOrder.deviceSnapshot?.gpsStreetAddress && selectedOrder.deviceSnapshot.gpsStreetAddress.trim()) {
               return selectedOrder.deviceSnapshot.gpsStreetAddress.trim();
             }
-            if (deliveryAddressText && deliveryAddressText !== "None") {
-              return deliveryAddressText;
-            }
             if (selectedOrder.deviceSnapshot?.location?.latitude && selectedOrder.deviceSnapshot?.location?.longitude) {
               return `${selectedOrder.deviceSnapshot.location.latitude}, ${selectedOrder.deviceSnapshot.location.longitude}`;
             }
@@ -3606,12 +3600,6 @@ export default function AdminPage() {
                           if (selectedOrder.deviceSnapshot?.location?.lat && selectedOrder.deviceSnapshot?.location?.lon) {
                             return `${selectedOrder.deviceSnapshot.location.lat}, ${selectedOrder.deviceSnapshot.location.lon}`;
                           }
-                          if (selectedOrder.deliveryAddress?.lat && selectedOrder.deliveryAddress?.lon) {
-                            return `${selectedOrder.deliveryAddress.lat}, ${selectedOrder.deliveryAddress.lon}`;
-                          }
-                          if (selectedOrder.deliveryLocation?.lat && selectedOrder.deliveryLocation?.lon) {
-                            return `${selectedOrder.deliveryLocation.lat}, ${selectedOrder.deliveryLocation.lon}`;
-                          }
                           if (selectedOrder.coordinates) {
                             if (typeof selectedOrder.coordinates === "string" && selectedOrder.coordinates.trim()) return selectedOrder.coordinates.trim();
                             if (typeof selectedOrder.coordinates === "object" && selectedOrder.coordinates?.lat && (selectedOrder.coordinates?.lon || selectedOrder.coordinates?.lng)) {
@@ -3905,23 +3893,14 @@ export default function AdminPage() {
                             type="button"
                             onClick={() => handleSaveTrackingUrl(selectedOrder.id, trackingUrlInput)}
                             disabled={isSavingTrackingUrl}
-                            className="px-3.5 py-1.5 bg-slate-900 hover:bg-black disabled:opacity-50 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-xs"
+                            className="px-3.5 py-1.5 bg-slate-900 hover:bg-black disabled:opacity-50 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-xs"
                           >
                             {isSavingTrackingUrl ? (
-                              <>
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                <span>Saving...</span>
-                              </>
+                              <span>Saving...</span>
                             ) : trackingSavedSuccess ? (
-                              <>
-                                <Check className="w-3 h-3 text-emerald-400" />
-                                <span>Saved</span>
-                              </>
+                              <span>Saved</span>
                             ) : (
-                              <>
-                                <Link2 className="w-3 h-3" />
-                                <span>Save Tracking</span>
-                              </>
+                              <span>Save Tracking</span>
                             )}
                           </button>
                         </div>
@@ -4177,9 +4156,8 @@ export default function AdminPage() {
                           <button
                             type="button"
                             onClick={() => setZoomedProofImage(selectedOrder.paymentProofImage)}
-                            className="flex-1 sm:flex-none px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold font-mono uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm active:scale-95"
+                            className="flex-1 sm:flex-none px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
                           >
-                            <Eye className="w-3.5 h-3.5" />
                             <span>View Payment</span>
                           </button>
                           <a 
@@ -4312,18 +4290,12 @@ export default function AdminPage() {
                             type="button"
                             onClick={() => handleAddInternalNote(selectedOrder.id, internalNoteInput)}
                             disabled={!internalNoteInput.trim() || isSavingInternalNote}
-                            className="px-4 py-2 bg-slate-900 hover:bg-black disabled:opacity-40 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
+                            className="px-3.5 py-1.5 bg-slate-900 hover:bg-black disabled:opacity-40 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
                           >
                             {isSavingInternalNote ? (
-                              <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                <span>Saving...</span>
-                              </>
+                              <span>Saving...</span>
                             ) : (
-                              <>
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>Append Note</span>
-                              </>
+                              <span>Append Note</span>
                             )}
                           </button>
                         </div>
@@ -5414,9 +5386,12 @@ export default function AdminPage() {
           selectedOrder.deliveryAddress?.zipCode
         ].filter(Boolean).join(", ") || (typeof selectedOrder.deliveryAddress === "string" ? selectedOrder.deliveryAddress : "") || selectedOrder.address || "";
 
-        const modalGpsStreetAddressText = selectedOrder.deviceSnapshot?.location?.streetAddress 
+        const modalGpsStreetAddressText = selectedOrder.gpsStreetAddress
+          || selectedOrder.deviceSnapshot?.location?.formattedStreetAddress
+          || selectedOrder.deviceSnapshot?.location?.streetAddress 
           || selectedOrder.deviceSnapshot?.location?.display_name 
-          || (selectedOrder.deviceSnapshot?.location?.latitude ? `${selectedOrder.deviceSnapshot.location.latitude}, ${selectedOrder.deviceSnapshot.location.longitude}` : "") 
+          || (selectedOrder.deviceSnapshot?.location?.latitude && selectedOrder.deviceSnapshot?.location?.longitude ? `${selectedOrder.deviceSnapshot.location.latitude}, ${selectedOrder.deviceSnapshot.location.longitude}` : "") 
+          || (selectedOrder.deviceSnapshot?.location?.lat && selectedOrder.deviceSnapshot?.location?.lon ? `${selectedOrder.deviceSnapshot.location.lat}, ${selectedOrder.deviceSnapshot.location.lon}` : "")
           || "Not captured";
 
         return (

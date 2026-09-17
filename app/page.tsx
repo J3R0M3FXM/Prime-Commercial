@@ -415,7 +415,7 @@ export default function Shopfront() {
                           e.stopPropagation();
                           setSelectedProduct(p);
                         }}
-                        className="w-full bg-black text-white py-2 text-[10px] sm:text-xs font-heading font-normal uppercase tracking-widest rounded-lg hover:bg-neutral-800 active:bg-neutral-900 transition-colors cursor-pointer text-center"
+                        className="w-full px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center"
                       >
                         {isOutOfStock ? "SOLD OUT" : "VIEW OPTIONS"}
                       </button>

@@ -305,9 +305,8 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
                   <button 
                     onClick={handleAddToCart} 
-                    className="w-full flex items-center justify-center gap-2.5 bg-black text-white py-3.5 rounded-xl font-heading font-bold uppercase tracking-widest text-xs hover:bg-gray-800 transition-colors shadow-md cursor-pointer"
+                    className="w-full px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center"
                   >
-                    <ShoppingCart className="w-4 h-4" />
                     <span>Add to Cart — {formatPHP(finalPrice * localQuantity)}</span>
                   </button>
                 </div>

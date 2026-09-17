@@ -619,13 +619,6 @@ export default function CheckoutModal({
       return;
     }
 
-    const validation = validateAddressLocally(targetAddr, unitDetails, coords);
-    if (!validation.isValid) {
-      setAddressError(validation.message);
-      setAddressValidation(validation);
-      return;
-    }
-
     // Fetch couriers if not already fetched
     if (availableCouriers.length === 0) {
       fetchCouriersForLocation(coords.lat, coords.lon);
@@ -1032,69 +1025,7 @@ export default function CheckoutModal({
                 </div>
               </div>
 
-              {/* Real-Time Address Validation Status Banner */}
-              {addressValidation && (
-                <div className={`p-3 rounded-xl border flex flex-col gap-1.5 transition-all text-xs font-mono ${
-                  addressValidation.status === "verified"
-                    ? "bg-emerald-50/90 border-emerald-200 text-emerald-950"
-                    : addressValidation.status === "warning"
-                    ? "bg-amber-50/90 border-amber-200 text-amber-950"
-                    : "bg-red-50/90 border-red-200 text-red-950"
-                }`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {addressValidation.status === "verified" && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      )}
-                      {addressValidation.status === "warning" && (
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                      )}
-                      {addressValidation.status === "error" && (
-                        <XCircle className="w-4 h-4 text-red-600 shrink-0" />
-                      )}
-                      <span className="font-heading font-bold uppercase tracking-wider text-[11px] truncate">
-                        {addressValidation.status === "verified" && "Address Validated"}
-                        {addressValidation.status === "warning" && "Address Notice"}
-                        {addressValidation.status === "error" && "Validation Alert"}
-                      </span>
-                      {addressValidation.score && (
-                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${
-                          addressValidation.score === "high" ? "bg-emerald-200 text-emerald-900" :
-                          addressValidation.score === "medium" ? "bg-amber-200 text-amber-900" :
-                          "bg-red-200 text-red-900"
-                        }`}>
-                          {addressValidation.score} precision
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => performAddressValidation(selectedAddress || addressSearch, unitDetails, coords)}
-                      disabled={isValidatingAddress}
-                      className="px-2 py-0.5 bg-white border border-gray-300 rounded text-[10px] font-bold uppercase hover:bg-gray-100 transition-colors flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
-                    >
-                      {isValidatingAddress ? (
-                        <Loader2 className="w-3 h-3 animate-spin text-gray-500" />
-                      ) : (
-                        <ShieldCheck className="w-3 h-3 text-gray-600" />
-                      )}
-                      <span>Re-validate</span>
-                    </button>
-                  </div>
-
-                  <p className="text-[11px] font-mono leading-relaxed opacity-90">
-                    {addressValidation.message}
-                  </p>
-
-                  {addressValidation.missingFields && addressValidation.missingFields.includes("unit_building") && (
-                    <div className="mt-1 pt-1.5 border-t border-amber-200/60 flex items-center gap-1.5 text-[10.5px] text-amber-800">
-                      <Building className="w-3 h-3 shrink-0 text-amber-600" />
-                      <span>Tip: Adding Unit, Floor, or Building Name above helps courier locate drop-off accurately.</span>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Real-Time Address Validation Status Banner Removed */}
             </div>
           )}
 
@@ -1141,7 +1072,7 @@ export default function CheckoutModal({
                           <button
                             type="button"
                             onClick={() => setSelectedCourierId(courier.id)}
-                            className={`w-full aspect-square rounded-xl border-2 transition-all flex flex-col items-center justify-center p-2 relative ${
+                            className={`w-full aspect-[3/2] rounded-xl border-2 transition-all flex flex-col items-center justify-center p-2 relative ${
                               isSelected
                                 ? "border-black bg-black/5 shadow-sm"
                                 : "border-gray-200 bg-white hover:border-gray-300"
@@ -1330,12 +1261,6 @@ export default function CheckoutModal({
                 <div className="flex justify-between items-start pt-1 border-t border-gray-200">
                   <span className="text-gray-500 uppercase text-[10px] flex items-center gap-1">
                     <span>Address</span>
-                    {addressValidation?.status === "verified" && (
-                      <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-0.5">
-                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                        <span>Validated</span>
-                      </span>
-                    )}
                   </span>
                   <span className="font-medium text-gray-900 text-right max-w-xs break-words">
                     {selectedAddress}
@@ -1553,7 +1478,7 @@ export default function CheckoutModal({
                                           setIsPaymentQrModalOpen(true);
                                         }
                                       }}
-                                      className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl border-2 transition-all flex items-center justify-center p-1.5 cursor-pointer relative ${
+                                      className={`w-full aspect-[3/2] rounded-xl border-2 transition-all flex items-center justify-center p-1.5 cursor-pointer relative ${
                                         isSelected
                                           ? "border-black bg-black/5"
                                           : "border-gray-200 bg-white hover:border-gray-300"
@@ -1688,7 +1613,7 @@ export default function CheckoutModal({
                               <button
                                 type="button"
                                 onClick={() => proofInputRef.current?.click()}
-                                className="w-full py-3.5 bg-black hover:bg-gray-900 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-md"
+                                className="w-full px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs"
                               >
                                 <span>Attach Payment Proof</span>
                               </button>
@@ -1785,10 +1710,9 @@ export default function CheckoutModal({
               <button
                 type="button"
                 onClick={handleNextFromStep1}
-                className="px-6 py-3 bg-black hover:bg-gray-800 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer"
+                className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs"
               >
                 <span>Continue to Address</span>
-                <ChevronRight className="w-4 h-4" />
               </button>
             )}
 
@@ -1796,10 +1720,9 @@ export default function CheckoutModal({
               <button
                 type="button"
                 onClick={handleNextFromStep2}
-                className="px-6 py-3 bg-black hover:bg-gray-800 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer"
+                className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs"
               >
                 <span>Select Courier</span>
-                <ChevronRight className="w-4 h-4" />
               </button>
             )}
 
@@ -1808,10 +1731,9 @@ export default function CheckoutModal({
                 type="button"
                 onClick={handleNextFromStep3}
                 disabled={!selectedCourier}
-                className="px-6 py-3 bg-black hover:bg-gray-800 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span>Review Order</span>
-                <ChevronRight className="w-4 h-4" />
               </button>
             )}
 
@@ -1826,18 +1748,12 @@ export default function CheckoutModal({
                   type="button"
                   onClick={handleSubmitOrder}
                   disabled={isSubmittingOrder}
-                  className="px-8 py-3.5 bg-black hover:bg-gray-800 text-white font-heading font-bold uppercase tracking-widest text-xs rounded-xl flex items-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmittingOrder ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Submitting Order...</span>
-                    </>
+                    <span>Submitting...</span>
                   ) : (
-                    <>
-                      <span>Confirm & Place Order</span>
-                      <Check className="w-4 h-4" />
-                    </>
+                    <span>Confirm & Place Order</span>
                   )}
                 </button>
               </div>
@@ -1885,7 +1801,7 @@ export default function CheckoutModal({
                 setProofSubmitSuccess(false);
                 onClose();
               }}
-              className="mt-4 w-full py-3 bg-black hover:bg-slate-900 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl transition-colors cursor-pointer"
+              className="mt-4 w-full px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs"
             >
               Got it, thanks!
             </button>
@@ -1994,7 +1910,7 @@ export default function CheckoutModal({
                   setIsPaymentQrModalOpen(false);
                   setZoomedPaymentMethod(null);
                 }}
-                className="flex-1 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold uppercase tracking-wider font-mono transition-colors cursor-pointer shadow-xs"
+                className="flex-1 px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs"
               >
                 Done
               </button>
