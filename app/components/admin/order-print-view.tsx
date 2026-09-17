@@ -124,7 +124,7 @@ export default function OrderPrintView({
             {order.notes && (
               <div className="mt-1 bg-slate-100 p-1 rounded text-[10px]">
                 <span className="font-bold block">NOTES:</span>
-                <span className="italic">{order.notes}</span>
+                <span className="italic">{order.notes || "Non"}</span>
               </div>
             )}
           </div>
@@ -170,7 +170,7 @@ export default function OrderPrintView({
             <span>{formatPHP(subtotal)}</span>
           </div>
 
-          {Array.isArray(order.charges) && order.charges.map((c: any, i: number) => (
+          {Array.isArray(order.appliedCharges || order.charges) && (order.appliedCharges || order.charges).map((c: any, i: number) => (
             <div key={i} className="flex justify-between text-[10px]">
               <span>+ {c.name || "Fee"}:</span>
               <span>{formatPHP(c.amount || 0)}</span>
@@ -405,7 +405,7 @@ export default function OrderPrintView({
                 DELIVERY NOTES
               </span>
               <span className="font-ibm-condensed font-medium text-slate-800 text-sm block leading-relaxed break-words">
-                {order.notes || "None"}
+                {order.notes || "Non"}
               </span>
             </div>
             {order.trackingUrl && (
@@ -511,10 +511,10 @@ export default function OrderPrintView({
               <span className="font-bold text-slate-900">{formatPHP(subtotal)}</span>
             </div>
 
-            {Array.isArray(order.charges) && order.charges.map((c: any, i: number) => (
+            {Array.isArray(order.appliedCharges || order.charges) && (order.appliedCharges || order.charges).map((c: any, i: number) => (
               <div key={i} className="flex justify-between text-slate-600">
                 <span>+ {c.name || "Charge"}:</span>
-                <span className="font-bold text-slate-900">{formatPHP(c.amount || 0)}</span>
+                <span className="font-bold text-slate-900 font-ibm-condensed">{formatPHP(c.amount || 0)}</span>
               </div>
             ))}
 

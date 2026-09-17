@@ -280,7 +280,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="font-heading font-normal uppercase text-gray-900 line-clamp-1">{item.name || "Product"}</h3>
-                        <p className="text-sm font-medium text-gray-600">{formatPHP(item.price || 0)}</p>
+                        <p className="text-sm font-medium text-gray-600 font-ibm-condensed">{formatPHP(item.price || 0)}</p>
                       </div>
                       <button 
                         onClick={() => removeFromCart && removeFromCart(item.id)}
@@ -321,7 +321,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-base">
                 <span className="font-heading font-bold uppercase tracking-wider text-gray-700">Subtotal:</span>
-                <span className="font-heading font-bold text-xl text-black">{formatPHP(cartTotal || 0)}</span>
+                <span className="font-heading font-bold text-xl text-black font-ibm-condensed">{formatPHP(cartTotal || 0)}</span>
               </div>
               <p className="text-[11px] text-gray-500 font-mono">
                 Delivery fees & applicable charges are calculated during checkout.

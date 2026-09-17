@@ -496,7 +496,7 @@ export default function OrderHistoryModal({
 
                           {/* Row 3: Amount and Action indicator */}
                           <div className="text-right shrink-0">
-                            <span className="font-heading font-bold text-sm text-slate-950 block">
+                            <span className="font-ibm-condensed font-bold text-sm text-slate-950 block">
                               {formatPHP(order.totalAmount || order.payableNow || 0)}
                             </span>
                             <span className="text-[10px] font-mono text-slate-500 group-hover:text-black flex items-center justify-end gap-0.5 mt-0.5">
@@ -691,16 +691,16 @@ export default function OrderHistoryModal({
                   {/* Subtotal */}
                   <div className="flex justify-between items-center text-gray-600">
                     <span>Items Subtotal:</span>
-                    <span className="font-semibold text-gray-900">
-                      {formatPHP(selectedOrder.subtotal || selectedOrder.itemsSubtotal || selectedOrder.items?.reduce((s: number, i: any) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0) || 0)}
+                    <span className="font-semibold text-gray-900 font-ibm-condensed">
+                      {formatPHP(selectedOrder.subTotal || selectedOrder.subtotal || selectedOrder.itemsSubtotal || selectedOrder.items?.reduce((s: number, i: any) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0) || 0)}
                     </span>
                   </div>
 
                   {/* Charges list if present */}
-                  {Array.isArray(selectedOrder.charges) && selectedOrder.charges.map((ch: any, i: number) => (
+                  {Array.isArray(selectedOrder.appliedCharges || selectedOrder.charges) && (selectedOrder.appliedCharges || selectedOrder.charges).map((ch: any, i: number) => (
                     <div key={i} className="flex justify-between items-center text-gray-600">
                       <span>{ch.name}:</span>
-                      <span className="font-semibold text-gray-900">{formatPHP(ch.computedAmount || ch.amount || 0)}</span>
+                      <span className="font-semibold text-gray-900 font-ibm-condensed">{formatPHP(ch.computedAmount || ch.amount || 0)}</span>
                     </div>
                   ))}
 
@@ -714,7 +714,7 @@ export default function OrderHistoryModal({
                         </span>
                       )}
                     </div>
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-semibold text-gray-900 font-ibm-condensed">
                       {formatPHP(selectedOrder.deliveryFee || selectedOrder.courier?.fee || 0)}
                     </span>
                   </div>
@@ -722,7 +722,7 @@ export default function OrderHistoryModal({
                   {/* Grand Total */}
                   <div className="pt-2 border-t border-gray-200 flex justify-between items-center text-sm font-heading font-bold text-gray-900">
                     <span>Total Amount:</span>
-                    <span className="text-base text-slate-950 font-bold">
+                    <span className="text-base text-slate-950 font-bold font-ibm-condensed">
                       {formatPHP(selectedOrder.totalAmount || selectedOrder.payableNow || 0)}
                     </span>
                   </div>
@@ -753,22 +753,18 @@ export default function OrderHistoryModal({
                       <span className="text-[10px] uppercase text-gray-400 block font-bold">Delivery Address</span>
                       <span className="text-slate-800 leading-relaxed block">
                         {selectedOrder.deliveryAddress?.formatted || selectedOrder.deliveryAddress?.address || selectedOrder.address || "N/A"}
-                        {selectedOrder.deliveryAddress?.unitDetails && (
-                          <span className="block text-gray-500 text-[11px] mt-0.5">
-                            Unit / Landmark: {selectedOrder.deliveryAddress.unitDetails}
-                          </span>
-                        )}
+                        <span className="block text-gray-500 text-[11px] mt-0.5">
+                          Unit / Landmark: {selectedOrder.deliveryAddress?.unitDetails || "Non"}
+                        </span>
                       </span>
                     </div>
 
-                    {selectedOrder.notes && (
-                      <div className="sm:col-span-2">
-                        <span className="text-[10px] uppercase text-gray-400 block font-bold">Delivery Notes / Instructions</span>
-                        <span className="text-slate-700 italic block">
-                          {selectedOrder.notes}
-                        </span>
-                      </div>
-                    )}
+                    <div className="sm:col-span-2">
+                      <span className="text-[10px] uppercase text-gray-400 block font-bold">Delivery Notes / Instructions</span>
+                      <span className="text-slate-700 italic block">
+                        {selectedOrder.notes || "Non"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 

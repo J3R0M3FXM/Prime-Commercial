@@ -678,7 +678,7 @@ export default function CheckoutModal({
           formatted: selectedAddress,
           lat: coords.lat,
           lon: coords.lon,
-          unitDetails: unitDetails.trim(),
+          unitDetails: unitDetails.trim() || "Non",
         },
         courier: selectedCourier ? {
           id: selectedCourier.id,
@@ -691,7 +691,7 @@ export default function CheckoutModal({
         totalAmount: overallOrderValue,
         payableNow,
         payableOnDelivery,
-        notes: customerNotes.trim(),
+        notes: customerNotes.trim() || "Non",
         deviceId: fpData.deviceId,
         sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
         coordinates: coords.lat && coords.lon ? `${coords.lat}, ${coords.lon}` : (locData.lat && locData.lon ? `${locData.lat}, ${locData.lon}` : ""),
@@ -1349,7 +1349,7 @@ export default function CheckoutModal({
                   </span>
                   <span className="font-medium text-gray-900 text-right max-w-xs break-words">
                     {selectedAddress}
-                    {unitDetails && <span className="block text-gray-500 text-[11px]">{unitDetails}</span>}
+                    <span className="block text-gray-500 text-[11px]">Unit/Landmark: {unitDetails.trim() || "Non"}</span>
                   </span>
                 </div>
 
@@ -1370,7 +1370,7 @@ export default function CheckoutModal({
                 {/* Subtotal */}
                 <div className="flex justify-between items-center text-xs font-mono">
                   <span className="text-gray-600 font-medium">Items Subtotal:</span>
-                  <span className="font-semibold text-gray-900">{formatPHP(itemsSubtotal)}</span>
+                  <span className="font-semibold text-gray-900 font-ibm-condensed">{formatPHP(itemsSubtotal)}</span>
                 </div>
 
                 {/* Active Admin Charges */}
@@ -1382,7 +1382,7 @@ export default function CheckoutModal({
                         <span className="text-[10px] text-gray-400">({charge.rate || (charge as any).amount}%)</span>
                       )}
                     </span>
-                    <span className="font-semibold text-gray-900">{formatPHP(charge.computedAmount)}</span>
+                    <span className="font-semibold text-gray-900 font-ibm-condensed">{formatPHP(charge.computedAmount)}</span>
                   </div>
                 ))}
 
@@ -1398,7 +1398,7 @@ export default function CheckoutModal({
                       </span>
                     )}
                   </div>
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-gray-900 font-ibm-condensed">
                     {formatPHP(courierDeliveryFee)}
                   </span>
                 </div>
@@ -1409,7 +1409,7 @@ export default function CheckoutModal({
                     <span className="font-heading font-bold uppercase tracking-wide text-gray-900 text-sm">
                       Total Payable Now:
                     </span>
-                    <span className="font-heading font-bold text-2xl text-black">
+                    <span className="font-heading font-bold text-2xl text-black font-ibm-condensed">
                       {formatPHP(payableNow)}
                     </span>
                   </div>
@@ -1417,7 +1417,7 @@ export default function CheckoutModal({
                   {deliveryPaymentMethod === "upon_delivery" && (
                     <div className="flex justify-between items-center text-xs font-mono text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
                       <span className="font-medium">To be paid to Courier upon delivery:</span>
-                      <span className="font-bold">{formatPHP(courierDeliveryFee)}</span>
+                      <span className="font-bold font-ibm-condensed">{formatPHP(courierDeliveryFee)}</span>
                     </div>
                   )}
                 </div>
@@ -1469,7 +1469,7 @@ export default function CheckoutModal({
                 </div>
                 <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                   <span className="text-gray-400 uppercase text-[9px] font-bold">Payable amount</span>
-                  <span className="font-bold text-slate-900 text-sm">{formatPHP(completedOrder.totalAmount || 0)}</span>
+                  <span className="font-bold text-slate-900 text-sm font-ibm-condensed">{formatPHP(completedOrder.totalAmount || 0)}</span>
                 </div>
               </div>
 
