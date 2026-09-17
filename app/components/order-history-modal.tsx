@@ -697,26 +697,39 @@ export default function OrderHistoryModal({
                   </div>
 
                   {/* Charges list if present */}
-                  {Array.isArray(selectedOrder.appliedCharges || selectedOrder.charges) && (selectedOrder.appliedCharges || selectedOrder.charges).map((ch: any, i: number) => (
-                    <div key={i} className="flex justify-between items-center text-gray-600">
-                      <span>{ch.name}:</span>
-                      <span className="font-semibold text-gray-900 font-ibm-condensed">{formatPHP(ch.computedAmount || ch.amount || 0)}</span>
-                    </div>
-                  ))}
+                  {Array.isArray(selectedOrder.appliedCharges || selectedOrder.charges) && (selectedOrder.appliedCharges || selectedOrder.charges).map((ch: any, i: number) => {
+                    const isChFree = Boolean(ch.isFree || Number(ch.computedAmount || ch.amount) === 0);
+                    return (
+                      <div key={i} className="flex justify-between items-center text-gray-600">
+                        <span>{ch.name}:</span>
+                        <span className={`font-semibold font-ibm-condensed ${isChFree ? "text-emerald-600 font-bold" : "text-gray-900"}`}>
+                          {isChFree ? "WAIVED / FREE" : formatPHP(ch.computedAmount || ch.amount || 0)}
+                        </span>
+                      </div>
+                    );
+                  })}
 
                   {/* Delivery Fee */}
                   <div className="flex justify-between items-center text-gray-600">
                     <div>
-                      <span>Delivery Fee ({selectedOrder.courier?.name || "Courier"}):</span>
-                      {selectedOrder.deliveryFeePaymentMethod === "upon_delivery" && (
-                        <span className="block text-[10px] text-amber-700 font-bold">
-                          Paid upon delivery
+                      <span>Delivery Fee ({selectedOrder.courier?.name || selectedOrder.courierName || "Courier"}):</span>
+                      {selectedOrder.deliveryFeePaymentMethod === "upon_delivery" ? (
+                        <span className="block text-[10px] text-amber-700 font-bold uppercase tracking-wider">
+                          PAY UPON DELIVERY (COD)
+                        </span>
+                      ) : (
+                        <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider">
+                          PAY UPON CHECKOUT
                         </span>
                       )}
                     </div>
-                    <span className="font-semibold text-gray-900 font-ibm-condensed">
-                      {formatPHP(selectedOrder.deliveryFee || selectedOrder.courier?.fee || 0)}
-                    </span>
+                    {Boolean(selectedOrder.isDeliveryFeeFree || Number(selectedOrder.deliveryFee) === 0) ? (
+                      <span className="font-bold text-emerald-600 font-ibm-condensed">WAIVED / FREE</span>
+                    ) : (
+                      <span className="font-semibold text-gray-900 font-ibm-condensed">
+                        {formatPHP(selectedOrder.deliveryFee || selectedOrder.courier?.fee || 0)}
+                      </span>
+                    )}
                   </div>
 
                   {/* Grand Total */}
@@ -726,6 +739,24 @@ export default function OrderHistoryModal({
                       {formatPHP(selectedOrder.totalAmount || selectedOrder.payableNow || 0)}
                     </span>
                   </div>
+
+                  {/* Payable Splits if COD */}
+                  {selectedOrder.deliveryFeePaymentMethod === "upon_delivery" && (
+                    <div className="mt-2.5 pt-2 border-t border-dashed border-gray-200 space-y-1.5 text-[11px]">
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>Amount Paid Now (Checkout):</span>
+                        <span className="font-bold text-slate-900 font-ibm-condensed">
+                          {formatPHP(selectedOrder.payableNow ?? (Number(selectedOrder.totalAmount) - Number(selectedOrder.deliveryFee)))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-amber-800 bg-amber-50 p-1.5 rounded border border-amber-200">
+                        <span className="font-bold">Pay to Courier upon delivery:</span>
+                        <span className="font-black font-ibm-condensed">
+                          {formatPHP(selectedOrder.payableOnDelivery ?? selectedOrder.deliveryFee ?? 0)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Recipient & Delivery Details */}
@@ -734,34 +765,35 @@ export default function OrderHistoryModal({
                     Recipient &amp; Delivery Info
                   </h4>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                     <div>
                       <span className="text-[10px] uppercase text-gray-400 block font-bold">Receiver Name</span>
-                      <span className="font-bold text-slate-900 uppercase">
+                      <span className="font-ibm-condensed font-medium text-slate-800 uppercase">
                         {selectedOrder.receiverName || "N/A"}
                       </span>
                     </div>
-
-                    <div>
+                    <div className="text-right">
                       <span className="text-[10px] uppercase text-gray-400 block font-bold">Receiver Phone</span>
-                      <span className="font-bold text-slate-900">
+                      <span className="font-ibm-condensed font-medium text-slate-800">
                         {selectedOrder.receiverPhone || "N/A"}
                       </span>
                     </div>
+                  </div>
 
-                    <div className="sm:col-span-2">
+                  <div className="space-y-2.5">
+                    <div>
                       <span className="text-[10px] uppercase text-gray-400 block font-bold">Delivery Address</span>
-                      <span className="text-slate-800 leading-relaxed block">
+                      <span className="text-slate-800 leading-relaxed block font-ibm-condensed font-medium">
                         {selectedOrder.deliveryAddress?.formatted || selectedOrder.deliveryAddress?.address || selectedOrder.address || "N/A"}
-                        <span className="block text-gray-500 text-[11px] mt-0.5">
+                        <span className="block text-gray-500 text-[11px] mt-0.5 font-ibm-condensed font-medium">
                           Unit / Landmark: {selectedOrder.deliveryAddress?.unitDetails || "Non"}
                         </span>
                       </span>
                     </div>
 
-                    <div className="sm:col-span-2">
+                    <div>
                       <span className="text-[10px] uppercase text-gray-400 block font-bold">Delivery Notes / Instructions</span>
-                      <span className="text-slate-700 italic block">
+                      <span className="text-slate-700 italic block font-ibm-condensed font-medium">
                         {selectedOrder.notes || "Non"}
                       </span>
                     </div>
@@ -928,24 +960,9 @@ export default function OrderHistoryModal({
 
         {/* ================= MODAL FOOTER ================= */}
         <div className="border-t border-gray-100 bg-gray-50 px-5 py-3 flex items-center justify-between">
-          {selectedOrderId ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedOrderId(null);
-                setProofSuccess(false);
-                setProofImage("");
-              }}
-              className="text-xs font-mono font-bold text-gray-700 hover:text-black flex items-center gap-1.5 cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Compact List</span>
-            </button>
-          ) : (
-            <span className="text-[11px] font-mono text-gray-400">
-              Orders update automatically
-            </span>
-          )}
+          <span className="text-[11px] font-mono text-gray-400">
+            Orders update automatically
+          </span>
 
           <button
             type="button"
