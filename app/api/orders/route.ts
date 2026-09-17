@@ -247,9 +247,9 @@ export async function POST(request: Request) {
           }) : [];
           const chargesTotal = sanitizedCharges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
           const safeDeliveryFee = Number(deliveryFee) || 0;
-          const calculatedTotal = totalAmount !== undefined 
-            ? Number(totalAmount) 
-            : (itemsSubtotal + chargesTotal + (deliveryFeePaymentMethod === 'upon_checkout' ? safeDeliveryFee : 0));
+          const isDeliveryUponDelivery = String(deliveryFeePaymentMethod || '').toLowerCase() === 'upon_delivery';
+          // If paid upon delivery, the total amount payable to the shop excludes the courier fee
+          const calculatedTotal = itemsSubtotal + chargesTotal + (isDeliveryUponDelivery ? 0 : safeDeliveryFee);
           
           finalOrderData = {
             orderNumber,
@@ -277,14 +277,14 @@ export async function POST(request: Request) {
             subTotal: itemsSubtotal,
             appliedCharges: sanitizedCharges,
             deliveryFee: safeDeliveryFee,
-            deliveryFeePaymentMethod: deliveryFeePaymentMethod || 'upon_checkout',
+            deliveryFeePaymentMethod: isDeliveryUponDelivery ? 'upon_delivery' : 'upon_checkout',
             receiverName: receiverName || '',
             receiverPhone: receiverPhone || '',
             deliveryAddress: deliveryAddress || null,
             courier: courier || null,
             totalAmount: calculatedTotal,
-            payableNow: payableNow !== undefined ? Number(payableNow) : calculatedTotal,
-            payableOnDelivery: payableOnDelivery !== undefined ? Number(payableOnDelivery) : 0,
+            payableNow: calculatedTotal,
+            payableOnDelivery: isDeliveryUponDelivery ? safeDeliveryFee : 0,
             status: 'Pending',
             notes: notes || '',
             ip: clientIp || deviceSnapshot?.ip || '',

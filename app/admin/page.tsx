@@ -2840,7 +2840,13 @@ export default function AdminPage() {
                       <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
                         <div className="text-right font-mono">
                           <p className="text-sm font-black text-slate-900">
-                            {formatPHP(ord.totalAmount)}
+                            {formatPHP(
+                              ord.deliveryFeePaymentMethod === "upon_delivery"
+                                ? (ord.payableNow !== undefined 
+                                    ? Number(ord.payableNow)
+                                    : ((Number(ord.subTotal) || 0) + (Array.isArray(ord.appliedCharges) ? ord.appliedCharges.reduce((s: number, c: any) => s + (Number(c.amount) || 0), 0) : 0)))
+                                : ord.totalAmount
+                            )}
                           </p>
                           <p className="text-[10px] text-slate-500">
                             {ord.items?.length || 1} line item(s)
@@ -3999,23 +4005,27 @@ export default function AdminPage() {
                       )}
                     </div>
 
-                    <div className="p-3 bg-slate-100 flex items-center justify-between font-mono font-bold text-slate-900 border-t border-slate-200">
-                      <span>Total Amount</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-base font-ibm-condensed font-semibold">{formatPHP(selectedOrder.totalAmount)}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setModifyingOrder(selectedOrder);
-                            setIsModifyModalOpen(true);
-                          }}
-                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-200 rounded transition-colors cursor-pointer"
-                          title="Modify items & total amount"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+                    {(() => {
+                      const isFeeUponDelivery = selectedOrder.deliveryFeePaymentMethod === "upon_delivery";
+                      const chargesSum = Array.isArray(selectedOrder.appliedCharges) 
+                        ? selectedOrder.appliedCharges.reduce((acc: number, c: any) => acc + (Number(c.amount) || 0), 0) 
+                        : 0;
+                      const subTotalVal = Number(selectedOrder.subTotal) || 0;
+                      const itemsAndCharges = subTotalVal + chargesSum;
+                      // When marked upon delivery, total payable to shop must NOT include the courier delivery fee
+                      const effectiveTotal = isFeeUponDelivery
+                        ? (selectedOrder.payableNow !== undefined 
+                            ? Number(selectedOrder.payableNow) 
+                            : itemsAndCharges)
+                        : (Number(selectedOrder.totalAmount) || (itemsAndCharges + (Number(selectedOrder.deliveryFee) || 0)));
+
+                      return (
+                        <div className="p-3 bg-slate-100 flex items-center justify-between font-mono font-bold text-slate-900 border-t border-slate-200">
+                          <span>Total Amount</span>
+                          <span className="text-base font-ibm-condensed font-semibold">{formatPHP(effectiveTotal)}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Modification Audit History */}

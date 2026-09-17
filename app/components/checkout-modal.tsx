@@ -554,9 +554,10 @@ export default function CheckoutModal({
     }
   };
 
-  // Current selected courier object
+  // Current selected courier object - do not pre-select any provider
   const selectedCourier = useMemo(() => {
-    return availableCouriers.find((c) => c.id === selectedCourierId) || availableCouriers[0] || null;
+    if (!selectedCourierId) return null;
+    return availableCouriers.find((c) => c.id === selectedCourierId) || null;
   }, [availableCouriers, selectedCourierId]);
 
   // Calculations
@@ -590,8 +591,10 @@ export default function CheckoutModal({
   }, [deliveryPaymentMethod, courierDeliveryFee]);
 
   const overallOrderValue = useMemo(() => {
-    return itemsSubtotal + totalChargesAmount + courierDeliveryFee;
-  }, [itemsSubtotal, totalChargesAmount, courierDeliveryFee]);
+    return deliveryPaymentMethod === "upon_checkout"
+      ? itemsSubtotal + totalChargesAmount + courierDeliveryFee
+      : itemsSubtotal + totalChargesAmount;
+  }, [itemsSubtotal, totalChargesAmount, courierDeliveryFee, deliveryPaymentMethod]);
 
   // Step Navigations & Validations
   const handleNextFromStep1 = () => {
@@ -1066,13 +1069,13 @@ export default function CheckoutModal({
                 ) : (
                   <div className="grid grid-cols-4 gap-2">
                     {availableCouriers.map((courier) => {
-                      const isSelected = selectedCourierId === courier.id || availableCouriers.length === 1;
+                      const isSelected = selectedCourierId === courier.id;
                       return (
-                        <div key={courier.id} className="flex flex-col items-center gap-1.5">
+                        <div key={courier.id} className="flex flex-col items-center gap-1">
                           <button
                             type="button"
                             onClick={() => setSelectedCourierId(courier.id)}
-                            className={`w-full aspect-video rounded-xl border-2 transition-all flex flex-col items-center justify-center p-0.5 relative overflow-hidden ${
+                            className={`w-full h-[52px] sm:h-[60px] rounded-xl border-2 transition-all flex flex-col items-center justify-center p-1 relative overflow-hidden ${
                               isSelected
                                 ? "border-slate-900 shadow-sm ring-1 ring-slate-900"
                                 : "border-gray-200 bg-white hover:border-gray-300"
@@ -1082,25 +1085,23 @@ export default function CheckoutModal({
                               <img
                                 src={courier.logo}
                                 alt={courier.name}
-                                className={`w-full h-full object-cover rounded-[10px]`}
+                                className="w-full h-full object-contain rounded-[8px]"
                                 referrerPolicy="no-referrer"
                               />
                             ) : (
-                              <Truck className={`w-8 h-8 ${isSelected ? 'text-gray-400' : 'text-gray-300 opacity-30'}`} />
+                              <Truck className={`w-7 h-7 ${isSelected ? 'text-gray-600' : 'text-gray-300 opacity-40'}`} />
                             )}
-                            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                              <span className="font-heading font-black text-gray-900 text-[11px] sm:text-sm drop-shadow-md bg-white/70 px-1 rounded-sm">
-                                {formatPHP(courier.calculatedFee || 0)}
-                              </span>
-                            </div>
                             {isSelected && (
-                              <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-black rounded-full flex items-center justify-center">
+                              <div className="absolute top-1 right-1 w-4 h-4 bg-black rounded-full flex items-center justify-center shadow-xs">
                                 <Check className="w-2.5 h-2.5 text-white" />
                               </div>
                             )}
                           </button>
-                          <span className="text-[9px] sm:text-[10px] font-heading font-bold text-gray-900 truncate w-full text-center leading-tight">
+                          <span className="text-[10px] sm:text-xs font-heading font-bold text-gray-900 truncate w-full text-center leading-tight">
                             {formatCourierName(courier.name)}
+                          </span>
+                          <span className="text-xs sm:text-[13px] font-mono font-bold text-slate-950 tracking-tight text-center">
+                            {formatPHP(courier.calculatedFee || 0)}
                           </span>
                         </div>
                       );
@@ -1112,17 +1113,16 @@ export default function CheckoutModal({
               {/* Delivery Fee Payment Option: Upon Checkout vs Upon Delivery */}
               {selectedCourier && (
                 <div className="space-y-3 pt-2">
-                  
-                  <div className="border-b border-slate-100 pb-3 mb-4">
-                    <p className="text-xs text-slate-700 font-mono leading-relaxed">
-                      You have chosen <span className="font-bold text-slate-900">{selectedCourier?.name}</span> to handle your delivery from PRIME Network Distribution &amp; Fulfillment Center with a corresponding charge of <span className="font-bold text-slate-900">{formatPHP(courierDeliveryFee)}</span>. How would you like to pay for the charge?
+                  <div className="border-b border-slate-100 pb-3 mb-4 text-center">
+                    <p className="text-xs text-slate-700 font-mono leading-relaxed max-w-lg mx-auto">
+                      You have chosen <span className="font-bold text-slate-900">{selectedCourier?.name}</span> to handle your delivery from PRIME Network Distribution &amp; Fulfillment Center with a corresponding charge of <span className="font-bold text-slate-900 font-mono">{formatPHP(courierDeliveryFee)}</span>. How would you like to pay for the charge?
                     </p>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
                     <button
                       type="button"
                       onClick={() => setDeliveryPaymentMethod("upon_checkout")}
-                      className={`flex-1 px-3.5 py-1.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center border ${
+                      className={`px-3.5 py-2.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center border ${
                         deliveryPaymentMethod === "upon_checkout"
                           ? "bg-slate-900 border-slate-900 text-white hover:bg-black"
                           : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
@@ -1133,7 +1133,7 @@ export default function CheckoutModal({
                     <button
                       type="button"
                       onClick={() => setDeliveryPaymentMethod("upon_delivery")}
-                      className={`flex-1 px-3.5 py-1.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center border ${
+                      className={`px-3.5 py-2.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center border ${
                         deliveryPaymentMethod === "upon_delivery"
                           ? "bg-slate-900 border-slate-900 text-white hover:bg-black"
                           : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
@@ -1142,7 +1142,6 @@ export default function CheckoutModal({
                       UPON DELIVERY
                     </button>
                   </div>
-
                 </div>
               )}
             </div>
@@ -1341,9 +1340,27 @@ export default function CheckoutModal({
                   <span className="text-gray-400 uppercase text-[9px] font-bold">Receiver Name</span>
                   <span className="font-medium text-gray-900 uppercase">{completedOrder.receiverName}</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                  <span className="text-gray-400 uppercase text-[9px] font-bold">Payable amount</span>
-                  <span className="font-bold text-slate-900 text-sm font-ibm-condensed">{formatPHP(completedOrder.totalAmount || 0)}</span>
+                <div className="border-b border-gray-200 pb-2 space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 uppercase text-[9px] font-bold">Payable amount</span>
+                    <span className="font-bold text-slate-900 text-sm font-mono">
+                      {formatPHP(
+                        completedOrder.deliveryFeePaymentMethod === "upon_delivery"
+                          ? (completedOrder.payableNow !== undefined 
+                              ? Number(completedOrder.payableNow) 
+                              : (Number(completedOrder.totalAmount || 0) > Number(completedOrder.deliveryFee || 0) 
+                                  ? Number(completedOrder.totalAmount || 0) - Number(completedOrder.deliveryFee || 0) 
+                                  : Number(completedOrder.totalAmount || 0)))
+                          : (completedOrder.totalAmount || 0)
+                      )}
+                    </span>
+                  </div>
+                  {completedOrder.deliveryFeePaymentMethod === "upon_delivery" && (
+                    <div className="flex justify-between items-center text-[10px] text-amber-800 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                      <span>Delivery Fee to Courier on arrival:</span>
+                      <span className="font-bold font-mono">{formatPHP(completedOrder.deliveryFee || 0)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1437,7 +1454,7 @@ export default function CheckoutModal({
                                           setIsPaymentQrModalOpen(true);
                                         }
                                       }}
-                                      className={`w-full aspect-video rounded-xl border-2 transition-all flex items-center justify-center p-0.5 cursor-pointer relative overflow-hidden ${
+                                      className={`w-full h-[48px] sm:h-[56px] rounded-xl border-2 transition-all flex items-center justify-center p-1 cursor-pointer relative overflow-hidden ${
                                         isSelected
                                           ? "border-slate-900 shadow-sm ring-1 ring-slate-900"
                                           : "border-gray-200 bg-white hover:border-gray-300"
@@ -1447,14 +1464,14 @@ export default function CheckoutModal({
                                         <img
                                           src={method.logo}
                                           alt={method.name}
-                                          className="w-full h-full object-cover rounded-[10px]"
+                                          className="w-full h-full object-contain rounded-[8px]"
                                           referrerPolicy="no-referrer"
                                         />
                                       ) : (
-                                        <CreditCard className="w-6 h-6 text-gray-400" />
+                                        <CreditCard className="w-5 h-5 text-gray-400" />
                                       )}
                                     </button>
-                                    <span className="text-[9px] sm:text-[10px] font-heading font-bold text-gray-900 truncate w-full text-center">
+                                    <span className="text-xs sm:text-[13px] font-heading font-bold text-gray-900 truncate w-full text-center leading-tight">
                                       {method.name}
                                     </span>
                                   </div>
@@ -1572,7 +1589,7 @@ export default function CheckoutModal({
                               <button
                                 type="button"
                                 onClick={() => proofInputRef.current?.click()}
-                                className="w-full px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+                                className="w-full px-3.5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs active:scale-95 flex items-center justify-center"
                               >
                                 <span>Attach Payment Proof</span>
                               </button>
@@ -1582,14 +1599,14 @@ export default function CheckoutModal({
                                   <button
                                     type="button"
                                     onClick={() => setIsPreviewProofOpen(true)}
-                                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-heading font-bold uppercase tracking-wider text-[10px] sm:text-xs rounded-xl transition-all cursor-pointer flex justify-center items-center"
+                                    className="flex-1 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-heading font-bold uppercase tracking-wider text-xs rounded-lg transition-all cursor-pointer shadow-2xs flex justify-center items-center active:scale-95"
                                   >
                                     <span>Preview</span>
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => proofInputRef.current?.click()}
-                                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-heading font-bold uppercase tracking-wider text-[10px] sm:text-xs rounded-xl transition-all cursor-pointer flex justify-center items-center"
+                                    className="flex-1 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-heading font-bold uppercase tracking-wider text-xs rounded-lg transition-all cursor-pointer shadow-2xs flex justify-center items-center active:scale-95"
                                   >
                                     <span>Replace</span>
                                   </button>
@@ -1624,15 +1641,15 @@ export default function CheckoutModal({
                                       setIsSubmittingProof(false);
                                     }
                                   }}
-                                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                                  className="w-full px-3.5 py-2.5 bg-slate-900 hover:bg-black text-white font-heading font-bold uppercase tracking-wider text-xs rounded-lg flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
                                 >
                                   {isSubmittingProof ? (
                                     <>
                                       <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                                      <span>Verifying...</span>
+                                      <span>Submitting for Review...</span>
                                     </>
                                   ) : (
-                                    <span>Submit for Verification</span>
+                                    <span>Submit for Review</span>
                                   )}
                                 </button>
                               </div>

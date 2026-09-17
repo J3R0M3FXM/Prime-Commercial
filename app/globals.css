@@ -4,7 +4,7 @@
   --font-sans: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif;
   --font-heading: 'Roboto Condensed', sans-serif;
   --font-mono: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif;
-  --font-ibm-condensed: 'IBM Plex Sans Condensed', 'IBM Plex Mono', 'Lato Condensed', 'Lato', sans-serif;
+  --font-ibm-condensed: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif;
 }
 
 /* Base Body & Layout Font: Lato Condensed / Lato */
@@ -26,9 +26,9 @@ h1, h2, h3, h4, h5, h6, .font-heading, label {
   letter-spacing: -0.01em;
 }
 
-/* IBM Plex Condensed / IBM Flex Condensed for Order Details Data Values */
+/* System-wide replacement of IBM Plex/Flex Condensed with Lato Condensed */
 .font-ibm-condensed, .font-value {
-  font-family: 'IBM Plex Sans Condensed', 'IBM Plex Mono', 'Lato Condensed', 'Lato', sans-serif !important;
+  font-family: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif !important;
 }
 
 /* Universal Form Controls font inheritance */

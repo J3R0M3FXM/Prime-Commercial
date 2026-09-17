@@ -496,8 +496,16 @@ export default function OrderHistoryModal({
 
                           {/* Row 3: Amount and Action indicator */}
                           <div className="text-right shrink-0">
-                            <span className="font-ibm-condensed font-bold text-sm text-slate-950 block">
-                              {formatPHP(order.totalAmount || order.payableNow || 0)}
+                            <span className="font-mono font-bold text-sm text-slate-950 block">
+                              {formatPHP(
+                                order.deliveryFeePaymentMethod === "upon_delivery"
+                                  ? (order.payableNow !== undefined 
+                                      ? Number(order.payableNow) 
+                                      : (Number(order.totalAmount || 0) > Number(order.deliveryFee || 0) 
+                                          ? Number(order.totalAmount || 0) - Number(order.deliveryFee || 0) 
+                                          : Number(order.totalAmount || 0)))
+                                  : (order.totalAmount || order.payableNow || 0)
+                              )}
                             </span>
                             <span className="text-[10px] font-mono text-slate-500 group-hover:text-black flex items-center justify-end gap-0.5 mt-0.5">
                               <span>Details</span>
@@ -735,8 +743,16 @@ export default function OrderHistoryModal({
                   {/* Grand Total */}
                   <div className="pt-2 border-t border-gray-200 flex justify-between items-center text-sm font-heading font-bold text-gray-900">
                     <span>Total Amount:</span>
-                    <span className="text-base text-slate-950 font-bold font-ibm-condensed">
-                      {formatPHP(selectedOrder.totalAmount || selectedOrder.payableNow || 0)}
+                    <span className="text-base text-slate-950 font-bold font-mono">
+                      {formatPHP(
+                        selectedOrder.deliveryFeePaymentMethod === "upon_delivery"
+                          ? (selectedOrder.payableNow !== undefined 
+                              ? Number(selectedOrder.payableNow) 
+                              : (Number(selectedOrder.totalAmount || 0) > Number(selectedOrder.deliveryFee || 0) 
+                                  ? Number(selectedOrder.totalAmount || 0) - Number(selectedOrder.deliveryFee || 0) 
+                                  : Number(selectedOrder.totalAmount || 0)))
+                          : (selectedOrder.totalAmount || selectedOrder.payableNow || 0)
+                      )}
                     </span>
                   </div>
 
