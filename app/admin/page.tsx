@@ -1254,7 +1254,7 @@ export default function AdminPage() {
   };
 
   // Bulk status update handler
-  const handleBulkUpdateOrderStatus = async (newStatus: "Processing" | "Completed" | "Pending") => {
+  const handleBulkUpdateOrderStatus = async (newStatus: string) => {
     if (selectedOrderIds.length === 0) return;
     setIsBulkUpdating(true);
     try {
@@ -3132,7 +3132,7 @@ export default function AdminPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 4. ORDERS SECTION: REFACTORED ORDER MANAGEMENT MATCHING DESIGN SPEC        */}
+        {/* 4. ORDERS SECTION: CLEAN & COMPACT ORDER MANAGEMENT                       */}
         {/* ========================================================================= */}
         {view === "orders" && (
           <motion.div
@@ -3141,501 +3141,361 @@ export default function AdminPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.22 }}
-            className="flex-1 flex flex-col min-h-screen bg-slate-100 text-slate-900 font-sans"
+            className="flex-1 flex flex-col min-h-screen bg-slate-50 text-slate-900 font-sans"
           >
-            {/* Top Command Banner */}
-            <div className="bg-slate-950 text-white px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-blue-400" />
-                <span className="text-xs font-mono font-bold tracking-wider uppercase text-slate-200">
-                  PRIME CENTRAL COMMAND
-                </span>
-              </div>
-              <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400">
-                <span className="hidden sm:inline uppercase">
-                  {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()} | {new Date().toLocaleTimeString('en-US')}
-                </span>
-                <span className="bg-blue-950/80 text-blue-300 border border-blue-800/80 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase">
-                  FULL SYSTEM CORE ACCESS
-                </span>
-              </div>
-            </div>
-
-            {/* Header Title Section */}
-            <div className="bg-white border-b border-slate-200/80 px-4 sm:px-6 py-4">
-              <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-50 border border-blue-200/80 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
-                    <ShoppingBag className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase font-mono">
-                      ORDER MANAGEMENT
-                    </h1>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      View, manage and process all customer orders.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 self-end sm:self-center">
-                  <button
-                    type="button"
-                    onClick={() => setIsNewOrderModalOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold font-mono px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>+ New Order</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Content Area */}
-            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5">
-              {/* Status Filter Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
-                {[
-                  { key: "all", label: "ALL", count: orderStatusCounts.all },
-                  { key: "Pending", label: "PENDING", count: orderStatusCounts.Pending },
-                  { key: "For Payment", label: "FOR PAYMENT", count: orderStatusCounts["For Payment"] },
-                  { key: "Paid", label: "PAID", count: orderStatusCounts.Paid },
-                  { key: "Processing", label: "PROCESSING", count: orderStatusCounts.Processing },
-                  { key: "For Dispatch", label: "FOR DISPATCH", count: orderStatusCounts["For Dispatch"] },
-                  { key: "Dispatched", label: "DISPATCHED", count: orderStatusCounts.Dispatched },
-                  { key: "Completed", label: "COMPLETED", count: orderStatusCounts.Completed },
-                  { key: "Cancelled", label: "CANCELLED", count: orderStatusCounts.Cancelled },
-                ].map((st) => {
-                  const isActive = orderFilter.toLowerCase() === st.key.toLowerCase();
-                  return (
+            {/* Sticky non-scrolling header & search bar */}
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-3">
+                {/* Header row */}
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
                     <button
-                      key={st.key}
-                      onClick={() => {
-                        setOrderFilter(st.key);
+                      onClick={() => setView("dashboard")}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                    </button>
+                    <span className="text-slate-300">/</span>
+                    <h2 className="text-sm sm:text-base font-heading font-black tracking-wide uppercase text-slate-900 flex items-center gap-2">
+                      <span>Orders Management</span>
+                      <span className="text-[10px] font-mono bg-slate-900 text-white px-2 py-0.5 rounded-full font-bold">
+                        {filteredOrders.length}
+                      </span>
+                    </h2>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setIsNewOrderModalOpen(true)}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>New Order</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleExportOrdersCSV(filteredOrders)}
+                      className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                      title="Export currently displayed orders to CSV"
+                    >
+                      <Download className="w-3.5 h-3.5 text-slate-700" />
+                      <span className="hidden sm:inline">Export CSV</span>
+                    </button>
+
+                    <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200/80 rounded-lg text-emerald-800 text-[11px] font-mono">
+                      <span className="relative flex h-2 w-2">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isSilentSyncing ? "bg-emerald-500 opacity-75" : "bg-emerald-400 opacity-50"}`}></span>
+                        <span className={`relative inline-flex rounded-full h-2 w-2 ${isSilentSyncing ? "bg-emerald-600" : "bg-emerald-500"}`}></span>
+                      </span>
+                      <span className="font-bold">
+                        {isSilentSyncing ? "Syncing..." : "Live Sync Active"}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={fetchAllData}
+                      disabled={refreshing}
+                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer"
+                      title="Refresh Orders"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search & Filter pills row */}
+                <div className="flex flex-col md:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={orderSearch}
+                      onChange={(e) => {
+                        setOrderSearch(e.target.value);
                         setCurrentPage(1);
                       }}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        isActive
-                          ? "bg-slate-900 border-slate-900 text-white shadow-md"
-                          : "bg-white border-slate-200/80 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="text-[10px] font-mono font-bold tracking-wider uppercase opacity-80">
-                        {st.label}
-                      </div>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className={`text-base font-black font-mono ${isActive ? "text-white" : "text-slate-900"}`}>
-                          {st.count}
-                        </span>
-                        <span
-                          className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      placeholder="Search Order #, Customer Name, Telegram @handle, or Status..."
+                      className="w-full pl-9 pr-4 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-slate-900 focus:bg-white transition-all text-slate-900"
+                    />
+                  </div>
+
+                  {/* Filter tabs */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+                    {[
+                      { key: "all", label: "All" },
+                      { key: "Pending", label: "Pending" },
+                      { key: "For Payment", label: "For Payment" },
+                      { key: "Paid", label: "Paid" },
+                      { key: "Processing", label: "Processing" },
+                      { key: "For Dispatch", label: "For Dispatch" },
+                      { key: "Dispatched", label: "Dispatched" },
+                      { key: "Completed", label: "Completed" },
+                      { key: "Cancelled", label: "Cancelled" },
+                    ].map((st) => {
+                      const isActive = orderFilter.toLowerCase() === st.key.toLowerCase();
+                      const count = st.key === "all" ? orderStatusCounts.all : (orderStatusCounts[st.key] || 0);
+                      return (
+                        <button
+                          key={st.key}
+                          onClick={() => {
+                            setOrderFilter(st.key);
+                            setCurrentPage(1);
+                          }}
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                             isActive
-                              ? "bg-blue-600 text-white"
-                              : "bg-slate-100 text-slate-600 border border-slate-200"
+                              ? "bg-slate-900 text-white shadow-xs"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                           }`}
                         >
-                          {st.count}
-                        </span>
-                      </div>
+                          <span>{st.label}</span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                            isActive ? "bg-slate-700 text-white" : "bg-slate-200 text-slate-700"
+                          }`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Bulk Action Toolbar */}
+                <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0) {
+                          setSelectedOrderIds([]);
+                        } else {
+                          setSelectedOrderIds(filteredOrders.map(o => o.id));
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer text-[11px]"
+                    >
+                      {selectedOrderIds.length > 0 && selectedOrderIds.length === filteredOrders.length ? (
+                        <CheckSquare className="w-3.5 h-3.5 text-slate-900" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5 text-slate-500" />
+                      )}
+                      <span>
+                        {selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0
+                          ? "Deselect All"
+                          : `Select All (${filteredOrders.length})`}
+                      </span>
                     </button>
-                  );
-                })}
-              </div>
 
-              {/* Search, Sort, Filter, and Export Toolbar */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="relative flex-1 w-full">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={orderSearch}
-                    onChange={(e) => {
-                      setOrderSearch(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    placeholder="Search Order ID, Customer..."
-                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-blue-600 focus:bg-white transition-all text-slate-800 placeholder:text-slate-400"
-                  />
-                </div>
+                    {selectedOrderIds.length > 0 && (
+                      <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                        {selectedOrderIds.length} selected
+                      </span>
+                    )}
+                  </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
-                  {/* Sort Selection */}
-                  <select
-                    value={orderSortKey}
-                    onChange={(e) => setOrderSortKey(e.target.value as any)}
-                    className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-700 focus:outline-none focus:border-blue-600 cursor-pointer"
-                  >
-                    <option value="date-desc">Sort: Newest First</option>
-                    <option value="date-asc">Sort: Oldest First</option>
-                    <option value="amount-desc">Sort: Highest Amount</option>
-                    <option value="amount-asc">Sort: Lowest Amount</option>
-                    <option value="customer-asc">Sort: Customer Name</option>
-                  </select>
-
-                  {/* Export CSV */}
-                  <button
-                    type="button"
-                    onClick={() => handleExportOrdersCSV(filteredOrders)}
-                    className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                  >
-                    <Download className="w-3.5 h-3.5 text-slate-600" />
-                    <span>Export CSV</span>
-                  </button>
+                  {selectedOrderIds.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                        Set Status:
+                      </span>
+                      {(["Pending", "Processing", "Completed", "Cancelled"] as const).map(st => (
+                        <button
+                          key={st}
+                          disabled={isBulkUpdating}
+                          onClick={() => handleBulkUpdateOrderStatus(st)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-all cursor-pointer border ${
+                            st === "Completed"
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
+                              : st === "Processing"
+                              ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-700"
+                              : st === "Pending"
+                              ? "bg-amber-600 hover:bg-amber-700 text-white border-amber-700"
+                              : "bg-red-600 hover:bg-red-700 text-white border-red-700"
+                          } ${isBulkUpdating ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          {st}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderIds([])}
+                        className="px-2 py-0.5 text-slate-500 hover:text-slate-800 text-[10px] underline cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* Order Cards List */}
+            {/* Compact Orders List */}
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-2">
               {filteredOrders.length === 0 ? (
-                <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
-                  <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <h3 className="font-heading font-black text-slate-800 uppercase tracking-wide text-sm mb-1">
+                <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-xs">
+                  <ClipboardList className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                  <h3 className="font-heading font-black text-slate-800 uppercase tracking-wide text-xs mb-1">
                     No orders found
                   </h3>
-                  <p className="text-xs text-slate-500 font-mono">
-                    No orders match your current filter or search criteria.
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    No orders match your current search or filter.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {filteredOrders
-                    .slice((currentPage - 1) * 8, currentPage * 8)
-                    .map((ord) => {
-                      const firstItem = ord.items?.[0];
-                      const strainName = firstItem ? (firstItem.name || firstItem.productName || "Standard Order") : "Product Item";
-                      const weightSpec = firstItem?.weight || firstItem?.spec || firstItem?.variantName || (ord.items?.length > 1 ? `${ord.items.length} items` : "1,000g");
+                filteredOrders
+                  .slice((currentPage - 1) * 10, currentPage * 10)
+                  .map((ord) => {
+                    const isSelected = selectedOrderIds.includes(ord.id);
+                    const firstItem = ord.items?.[0];
+                    const itemDesc = firstItem 
+                      ? `${firstItem.name || firstItem.productName || "Item"}${firstItem.weight || firstItem.spec ? ` (${firstItem.weight || firstItem.spec})` : ""}${ord.items.length > 1 ? ` +${ord.items.length - 1} more` : ""}`
+                      : `${ord.items?.length || 1} line item(s)`;
 
-                      const currentStatus = (ord.status || "Pending").trim();
-                      const lowerStatus = currentStatus.toLowerCase();
+                    const ordStatus = (ord.status || "Pending").trim();
+                    const statusClass = 
+                      ordStatus.toLowerCase() === "completed"
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                        : ordStatus.toLowerCase() === "processing"
+                        ? "bg-purple-100 text-purple-800 border-purple-200"
+                        : ordStatus.toLowerCase() === "paid"
+                        ? "bg-blue-100 text-blue-800 border-blue-200"
+                        : ordStatus.toLowerCase() === "dispatched" || ordStatus.toLowerCase() === "for dispatch"
+                        ? "bg-sky-100 text-sky-800 border-sky-200"
+                        : ordStatus.toLowerCase() === "cancelled"
+                        ? "bg-red-100 text-red-800 border-red-200"
+                        : "bg-amber-100 text-amber-800 border-amber-200";
 
-                      const formattedDateDisplay = (() => {
-                        if (!ord.createdAt) return "Jul 22, 2026 • 01:21 PM";
-                        try {
-                          const d = new Date(ord.createdAt);
-                          if (isNaN(d.getTime())) return String(ord.createdAt);
-                          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                          const m = months[d.getMonth()];
-                          const day = d.getDate();
-                          const yr = d.getFullYear();
-                          let hrs = d.getHours();
-                          const mins = d.getMinutes().toString().padStart(2, "0");
-                          const ampm = hrs >= 12 ? "PM" : "AM";
-                          hrs = hrs % 12;
-                          hrs = hrs ? hrs : 12;
-                          return `${m} ${day}, ${yr} • ${hrs.toString().padStart(2, "0")}:${mins} ${ampm}`;
-                        } catch {
-                          return String(ord.createdAt);
-                        }
-                      })();
+                    return (
+                      <div
+                        key={ord.id}
+                        onClick={() => {
+                          setSelectedOrderId(ord.id);
+                          setView("order-detail");
+                        }}
+                        className={`group border rounded-xl px-3.5 py-2.5 shadow-2xs hover:shadow-sm transition-all duration-150 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          isSelected
+                            ? "bg-indigo-50/60 border-indigo-400"
+                            : "bg-white hover:bg-slate-50/80 border-slate-200/90 hover:border-slate-400"
+                        }`}
+                      >
+                        {/* Left column: Checkbox + Order Info */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedOrderIds(prev =>
+                                prev.includes(ord.id) ? prev.filter(id => id !== ord.id) : [...prev, ord.id]
+                              );
+                            }}
+                            className="p-0.5 rounded hover:bg-slate-200 text-slate-600 cursor-pointer shrink-0"
+                            title={isSelected ? "Deselect" : "Select"}
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-4 h-4 text-indigo-600" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-300 group-hover:text-slate-500" />
+                            )}
+                          </button>
 
-                      return (
-                        <div
-                          key={ord.id}
-                          className="bg-white border border-slate-200/90 hover:border-blue-400 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all duration-150 flex flex-col md:flex-row md:items-center justify-between gap-4"
-                        >
-                          {/* Column 1: Order Details & Customer */}
-                          <div className="space-y-1 min-w-[220px]">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-black text-slate-900 text-sm sm:text-base">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-black text-xs text-slate-900 tracking-tight">
                                 {ord.orderNumber?.startsWith("#") ? ord.orderNumber : `#${ord.orderNumber || ord.id}`}
                               </span>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {ord.createdAt ? new Date(ord.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Recent"}
+                              </span>
+                              <span className={`px-2 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${statusClass}`}>
+                                {ordStatus}
+                              </span>
+                              {ord.paymentProofImage && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                                  <Receipt className="w-2.5 h-2.5" /> Proof
+                                </span>
+                              )}
                             </div>
-                            <div className="text-[11px] font-mono text-slate-400">
-                              {formattedDateDisplay}
-                            </div>
-                            <div className="pt-1">
-                              <div className="font-bold text-slate-900 text-xs sm:text-sm">
-                                {ord.customerName || "Customer"}
-                              </div>
-                              <div className="text-blue-600 font-mono text-[11px] font-semibold flex items-center gap-1 mt-0.5">
-                                <Send className="w-3 h-3 text-blue-500" />
-                                <span>@{ (ord.customerUsername || ord.customerTelegramId || ord.customerName || "user").replace(/^@/, '') }</span>
-                              </div>
+
+                            <div className="text-[11px] text-slate-600 font-mono mt-0.5 truncate flex items-center gap-2">
+                              <span>Customer: <strong className="text-slate-900">{ord.customerName}</strong></span>
+                              {(ord.customerUsername || ord.customerTelegramId) && (
+                                <span className="text-blue-600 font-semibold">@{ (ord.customerUsername || ord.customerTelegramId || "").replace(/^@/, '') }</span>
+                              )}
+                              <span className="text-slate-400 hidden md:inline">• {itemDesc}</span>
                             </div>
                           </div>
+                        </div>
 
-                          {/* Column 2: Product Strain & Weight */}
-                          <div className="flex flex-col items-start md:items-center justify-center text-left md:text-center px-0 md:px-4">
-                            <span className="font-bold text-slate-800 text-xs sm:text-sm">
-                              {strainName}
-                            </span>
-                            <span className="mt-1 px-2.5 py-0.5 bg-slate-100 rounded-lg text-slate-700 font-mono font-bold text-[11px] border border-slate-200/60">
-                              {weightSpec}
-                            </span>
-                          </div>
-
-                          {/* Column 3: Status Badge & Total Price */}
-                          <div className="flex flex-col items-start md:items-end justify-center">
-                            {/* Status Pill Badge */}
-                            {lowerStatus === "pending" && (
-                              <div className="bg-amber-50 text-amber-700 border border-amber-200/80 font-mono font-bold text-[11px] px-3 py-1 rounded-lg flex items-center gap-1.5 uppercase">
-                                <Clock className="w-3.5 h-3.5 text-amber-600" />
-                                <span>PENDING</span>
-                              </div>
-                            )}
-                            {lowerStatus === "for payment" && (
-                              <div className="bg-blue-50 text-blue-700 border border-blue-200/80 font-mono font-bold text-[11px] px-3 py-1 rounded-lg flex items-center gap-1.5 uppercase">
-                                <CreditCard className="w-3.5 h-3.5 text-blue-600" />
-                                <span>FOR PAYMENT</span>
-                              </div>
-                            )}
-                            {lowerStatus === "paid" && (
-                              <div className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-mono font-bold text-[11px] px-3 py-1 rounded-lg flex items-center gap-1.5 uppercase">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>PAID</span>
-                              </div>
-                            )}
-                            {lowerStatus === "processing" && (
-                              <div className="bg-purple-50 text-purple-700 border border-purple-200/80 font-mono font-bold text-[11px] px-3 py-1 rounded-lg flex items-center gap-1.5 uppercase">
-                                <Cpu className="w-3.5 h-3.5 text-purple-600" />
-                                <span>PROCESSING</span>
-                              </div>
-                            )}
-                            {lowerStatus === "for dispatch" && (
-                              <div className="bg-sky-50 text-sky-700 border border-sky-200/80 font-mono font-bold text-[11px] px-3 py-1 rounded-lg flex items-center gap-1.5 uppercase">
-                                <Truck className="w-3.5 h-3.5 text-sky-600" />
-                                <span>FOR DISPATCH</span>
-                              </div>
-                            )}
-                            {lowerStatus === "dispatched" && (
-                              <div className="bg-blue-50 text-blue-700 border border-blue-200/80 font-mono font-bold text-[11px] px-3 py-1 rounded-lg flex items-center gap-1.5 uppercase">
-                                <Truck className="w-3.5 h-3.5 text-blue-600" />
-                                <span>DISPATCHED</span>
-                              </div>
-                            )}
-                            {lowerStatus === "completed" && (
-                              <div className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-mono font-bold text-[11px] px-3 py-1 rounded-lg flex items-center gap-1.5 uppercase">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>COMPLETED</span>
-                              </div>
-                            )}
-                            {lowerStatus === "cancelled" && (
-                              <div className="bg-red-50 text-red-700 border border-red-200/80 font-mono font-bold text-[11px] px-3 py-1 rounded-lg flex items-center gap-1.5 uppercase">
-                                <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
-                                <span>CANCELLED</span>
-                              </div>
-                            )}
-
-                            <div className="font-mono font-black text-slate-900 text-sm sm:text-base mt-1.5">
+                        {/* Right column: Amount + Actions */}
+                        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                          <div className="text-left sm:text-right font-mono">
+                            <p className="text-xs sm:text-sm font-black text-slate-900">
                               {formatPHP(ord.totalAmount || ord.subTotal || 0)}
-                            </div>
-                            <div className="text-[10px] font-mono text-slate-400">
+                            </p>
+                            <p className="text-[10px] text-slate-400">
                               {ord.paymentMethodName || "GCash"}
-                            </div>
+                            </p>
                           </div>
 
-                          {/* Column 4: Stacked Action Buttons */}
-                          <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 min-w-[160px]">
-                            {/* Primary Action Button */}
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => {
-                                if (lowerStatus === "pending") {
-                                  setSelectedOrderId(ord.id);
-                                  setView("order-detail");
-                                } else if (lowerStatus === "for payment") {
-                                  showAlert(`Payment instructions sent to @${(ord.customerUsername || 'user').replace(/^@/, '')}`, "Action Complete", "info");
-                                } else if (lowerStatus === "paid") {
-                                  handleUpdateSingleOrderStatus(ord.id, "Processing");
-                                } else if (lowerStatus === "processing") {
-                                  handleUpdateSingleOrderStatus(ord.id, "For Dispatch");
-                                } else if (lowerStatus === "for dispatch") {
-                                  handleUpdateSingleOrderStatus(ord.id, "Dispatched");
-                                } else if (lowerStatus === "dispatched") {
-                                  setSelectedOrderId(ord.id);
-                                  setView("order-detail");
-                                } else if (lowerStatus === "completed") {
-                                  setSelectedOrderId(ord.id);
-                                  setView("order-detail");
-                                } else {
-                                  setSelectedOrderId(ord.id);
-                                  setView("order-detail");
-                                }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setModifyingOrder(ord);
+                                setIsModifyModalOpen(true);
                               }}
-                              className="w-full bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-mono font-bold text-xs py-2 px-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              title="Modify Order Items & Pricing"
                             >
-                              {lowerStatus === "pending" && (
-                                <>
-                                  <FileText className="w-3.5 h-3.5" />
-                                  <span>View Details</span>
-                                </>
-                              )}
-                              {lowerStatus === "for payment" && (
-                                <>
-                                  <Send className="w-3.5 h-3.5" />
-                                  <span>Send Payment Info</span>
-                                </>
-                              )}
-                              {lowerStatus === "paid" && (
-                                <>
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>Confirm Payment</span>
-                                </>
-                              )}
-                              {lowerStatus === "processing" && (
-                                <>
-                                  <CheckSquare className="w-3.5 h-3.5" />
-                                  <span>Mark Ready</span>
-                                </>
-                              )}
-                              {lowerStatus === "for dispatch" && (
-                                <>
-                                  <User className="w-3.5 h-3.5" />
-                                  <span>Assign Courier</span>
-                                </>
-                              )}
-                              {lowerStatus === "dispatched" && (
-                                <>
-                                  <MapPin className="w-3.5 h-3.5" />
-                                  <span>Track Delivery</span>
-                                </>
-                              )}
-                              {lowerStatus === "completed" && (
-                                <>
-                                  <Receipt className="w-3.5 h-3.5" />
-                                  <span>View Receipt</span>
-                                </>
-                              )}
-                              {lowerStatus === "cancelled" && (
-                                <>
-                                  <FileText className="w-3.5 h-3.5" />
-                                  <span>View Details</span>
-                                </>
-                              )}
+                              <Sliders className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Secondary Action Button */}
                             <button
                               type="button"
-                              onClick={() => {
-                                if (lowerStatus === "pending") {
-                                  setModifyingOrder(ord);
-                                  setIsModifyModalOpen(true);
-                                } else if (lowerStatus === "for payment") {
-                                  handleUpdateSingleOrderStatus(ord.id, "Cancelled");
-                                } else if (lowerStatus === "paid") {
-                                  handleUpdateSingleOrderStatus(ord.id, "Cancelled");
-                                } else if (lowerStatus === "processing") {
-                                  setModifyingOrder(ord);
-                                  setIsModifyModalOpen(true);
-                                } else if (lowerStatus === "for dispatch") {
-                                  handleUpdateSingleOrderStatus(ord.id, "Pending");
-                                } else if (lowerStatus === "dispatched") {
-                                  showAlert(`Contacting courier for order #${ord.orderNumber || ord.id}`, "Courier Alert", "info");
-                                } else if (lowerStatus === "completed") {
-                                  showAlert(`Reorder requested for ${ord.customerName}`, "Reorder Initiated", "info");
-                                } else if (lowerStatus === "cancelled") {
-                                  handleDeleteSingleOrder(ord.id);
-                                } else {
-                                  setModifyingOrder(ord);
-                                  setIsModifyModalOpen(true);
-                                }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedOrderId(ord.id);
+                                setView("order-detail");
                               }}
-                              className={`w-full font-mono font-bold text-xs py-2 px-3.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                lowerStatus === "for payment" || lowerStatus === "cancelled"
-                                  ? "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/80"
-                                  : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80"
-                              }`}
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-mono text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
                             >
-                              {lowerStatus === "pending" && (
-                                <>
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                  <span>Edit Order</span>
-                                </>
-                              )}
-                              {lowerStatus === "for payment" && (
-                                <>
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Cancel Order</span>
-                                </>
-                              )}
-                              {lowerStatus === "paid" && (
-                                <>
-                                  <RefreshCw className="w-3.5 h-3.5" />
-                                  <span>Refund</span>
-                                </>
-                              )}
-                              {lowerStatus === "processing" && (
-                                <>
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                  <span>Update Note</span>
-                                </>
-                              )}
-                              {lowerStatus === "for dispatch" && (
-                                <>
-                                  <Clock className="w-3.5 h-3.5" />
-                                  <span>Hold Order</span>
-                                </>
-                              )}
-                              {lowerStatus === "dispatched" && (
-                                <>
-                                  <Phone className="w-3.5 h-3.5" />
-                                  <span>Contact Courier</span>
-                                </>
-                              )}
-                              {lowerStatus === "completed" && (
-                                <>
-                                  <RefreshCw className="w-3.5 h-3.5" />
-                                  <span>Reorder</span>
-                                </>
-                              )}
-                              {lowerStatus === "cancelled" && (
-                                <>
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Delete Order</span>
-                                </>
-                              )}
+                              <span>View</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
-                      );
-                    })}
-                </div>
+                      </div>
+                    );
+                  })
               )}
 
-              {/* Pagination Footer */}
+              {/* Compact Pagination */}
               {filteredOrders.length > 0 && (() => {
-                const totalPages = Math.max(1, Math.ceil(filteredOrders.length / 8));
-                const startIdx = (currentPage - 1) * 8 + 1;
-                const endIdx = Math.min(currentPage * 8, filteredOrders.length);
-
+                const totalPages = Math.max(1, Math.ceil(filteredOrders.length / 10));
+                if (totalPages <= 1) return null;
                 return (
-                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 font-mono text-xs text-slate-600">
+                  <div className="bg-white border border-slate-200 rounded-xl px-3 py-2 flex items-center justify-between font-mono text-xs text-slate-600 mt-3">
                     <div>
-                      Showing <strong className="text-slate-900">{startIdx}</strong> to <strong className="text-slate-900">{endIdx}</strong> of <strong className="text-slate-900">{filteredOrders.length}</strong> orders
+                      Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong> ({filteredOrders.length} orders)
                     </div>
-
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <button
                         type="button"
                         disabled={currentPage <= 1}
                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg font-bold transition-colors cursor-pointer"
+                        className="px-2 py-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed rounded text-[11px] font-bold cursor-pointer"
                       >
-                        &lt;
+                        Prev
                       </button>
-
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                        <button
-                          key={pg}
-                          type="button"
-                          onClick={() => setCurrentPage(pg)}
-                          className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
-                            currentPage === pg
-                              ? "bg-blue-600 text-white shadow-xs"
-                              : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                          }`}
-                        >
-                          {pg}
-                        </button>
-                      ))}
-
                       <button
                         type="button"
                         disabled={currentPage >= totalPages}
                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg font-bold transition-colors cursor-pointer"
+                        className="px-2 py-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed rounded text-[11px] font-bold cursor-pointer"
                       >
-                        &gt;
+                        Next
                       </button>
                     </div>
                   </div>
