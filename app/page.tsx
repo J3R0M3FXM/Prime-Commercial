@@ -8,7 +8,7 @@ import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
 import AccountModal from "./components/account-modal";
 import { useCart } from "./components/cart-context";
-import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Menu, X, Home, User } from "lucide-react";
+import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Bell, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 
 export default function Shopfront() {
@@ -25,8 +25,16 @@ export default function Shopfront() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBackToShopfrontModalOpen, setIsBackToShopfrontModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("shop");
+  const [noticeToast, setNoticeToast] = useState<string | null>(null);
+
+  const showFeatureToast = (featureName: string) => {
+    setNoticeToast(`${featureName} module is under development`);
+    setTimeout(() => {
+      setNoticeToast(null);
+    }, 2800);
+  };
 
   const { cart, cartCount, addToCart, updateQuantity } = useCart();
 
@@ -242,104 +250,22 @@ export default function Shopfront() {
               className="h-7 sm:h-[28px] w-auto object-contain shrink-0 drop-shadow-xs" 
             />
           </div>
-          
-          <div className="relative flex items-center">
-            {/* Plain Hamburger Menu Icon matching Prime logo height */}
-            <button 
-              type="button"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-0 text-gray-900 hover:text-black transition-colors cursor-pointer flex items-center justify-center relative bg-transparent border-0"
-              title="Menu"
-              aria-label="Toggle navigation menu"
-            >
-              {isMenuOpen ? (
-                <X className="h-7 w-7 sm:h-[28px] sm:w-[28px]" />
-              ) : (
-                <Menu className="h-7 w-7 sm:h-[28px] sm:w-[28px]" />
-              )}
-              {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full font-mono shadow-xs">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-
-            {/* Hamburger Dropdown Pop-up Menu */}
-            {isMenuOpen && (
-              <>
-                {/* Backdrop overlay */}
-                <div 
-                  className="fixed inset-0 z-40 bg-black/5" 
-                  onClick={() => setIsMenuOpen(false)}
-                />
-                
-                {/* Dropdown Box */}
-                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-50">
-                  <div className="px-3.5 py-1.5 border-b border-gray-100 mb-1">
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400 font-mono">Navigation Menu</span>
-                  </div>
-                  
-                  {/* Cart Option */}
-                  <button
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setIsCartOpen(true);
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-700 hover:text-black hover:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <ShoppingBag className="w-4 h-4 text-slate-700" />
-                      <span>Shopping Bag</span>
-                    </div>
-                    {cartCount > 0 ? (
-                      <span className="bg-slate-900 text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">
-                        {cartCount}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-mono text-gray-400">Empty</span>
-                    )}
-                  </button>
-
-                  {/* Orders Option */}
-                  <button
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setIsOrderHistoryOpen(true);
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-700 hover:text-black hover:bg-slate-50 transition-colors flex items-center gap-2 cursor-pointer"
-                  >
-                    <Receipt className="w-4 h-4 text-slate-700" />
-                    <span>Your Orders</span>
-                  </button>
-
-                  {/* Account Option */}
-                  <button
-                    id="menu-your-account-btn"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setIsAccountOpen(true);
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-700 hover:text-black hover:bg-slate-50 transition-colors flex items-center gap-2 cursor-pointer"
-                  >
-                    <User className="w-4 h-4 text-slate-700" />
-                    <span>Your Account</span>
-                  </button>
-
-                  {/* Back to Shopfront Option */}
-                  <button
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setIsBackToShopfrontModalOpen(true);
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50/50 transition-colors flex items-center gap-2 border-t border-gray-100 cursor-pointer pt-3 mt-1"
-                  >
-                    <Home className="w-4 h-4 text-emerald-600" />
-                    <span>Back to Shopfront</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    localStorage.removeItem("skip_admin_redirect");
+                    sessionStorage.removeItem("skip_admin_redirect");
+                  }
+                  router.push("/admin");
+                }}
+                className="bg-slate-900 hover:bg-black text-white px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
+              >
+                Admin Panel
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Search & Filter Controls */}
@@ -391,21 +317,14 @@ export default function Shopfront() {
                 ? variants.every((v: any) => (v.stock ?? 0) <= 0)
                 : (p.stock ?? 0) <= 0;
 
-              // Price range logic
-              let priceDisplay = formatPHP(p.price || 0);
+              // Lowest price logic
+              let lowestPrice = Number(p.price) || 0;
               if (variants.length > 0) {
-                const prices = variants.map((v: any) => Number(v.price) || 0);
-                const minPrice = Math.min(...prices);
-                const maxPrice = Math.max(...prices);
-                if (minPrice === maxPrice) {
-                  priceDisplay = formatPHP(minPrice);
-                } else {
-                  priceDisplay = `${formatPHP(minPrice)} - ${formatPHP(maxPrice)}`;
+                const prices = variants.map((v: any) => Number(v.price) || 0).filter((pr: number) => pr > 0);
+                if (prices.length > 0) {
+                  lowestPrice = Math.min(...prices);
                 }
               }
-
-              // Ratings logic
-              const rating = p.rating || "4.5";
 
               return (
                 <div 
@@ -435,63 +354,30 @@ export default function Shopfront() {
                     )}
                   </div>
                   
-                  <div className="p-3 sm:p-5 flex flex-col flex-1 justify-between">
-                    <div>
-                      {/* Category - Enlarged font size */}
-                      <p className="text-xs sm:text-sm font-mono font-bold text-gray-500 uppercase tracking-wider mb-1">
-                        {p.category || "General"}
-                      </p>
-                      
-                      {/* Product Name */}
-                      <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-tight mb-1 text-sm sm:text-lg">
-                        {p.name}
-                      </h3>
+                  <div className="p-3 sm:p-4 flex flex-col flex-1 justify-between gap-2">
+                    {/* Product Name */}
+                    <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-tight text-sm sm:text-base">
+                      {p.name}
+                    </h3>
 
-                      {/* 5 Stars Rating placed right below product name */}
-                      <div className="flex items-center gap-1.5 my-1.5">
-                        <div className="flex items-center text-amber-400">
-                          {[1, 2, 3, 4, 5].map((starIndex) => {
-                            const ratingNum = Math.min(5, Math.max(0, Number(rating) || 4.5));
-                            const fillPercent = Math.max(0, Math.min(100, (ratingNum - (starIndex - 1)) * 100));
-                            return (
-                              <span key={starIndex} className="relative inline-block text-xs sm:text-sm leading-none">
-                                <span className="text-gray-200">★</span>
-                                {fillPercent > 0 && (
-                                  <span 
-                                    className="absolute top-0 left-0 overflow-hidden text-amber-400 select-none"
-                                    style={{ width: `${fillPercent}%` }}
-                                  >
-                                    ★
-                                  </span>
-                                )}
-                              </span>
-                            );
-                          })}
-                        </div>
-                        <span className="text-[11px] sm:text-xs font-mono font-bold text-gray-600">
-                          {Number(rating).toFixed(1)}
-                        </span>
+                    {/* Horizontally Aligned Lowest Price (Left) & Cart Icon (Right) */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-auto">
+                      <div className="text-left font-mono font-bold text-base sm:text-lg text-gray-950">
+                        {formatPHP(lowestPrice)}
                       </div>
 
-                      {/* Price Range right below ratings, enlarged & aligned to the right */}
-                      <div className="text-right mt-1 mb-2.5">
-                        <span className="font-mono font-bold text-base sm:text-xl text-gray-950">
-                          {priceDisplay}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {/* Repositioned button replacing the previous line separator position */}
-                    <div className="pt-0">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedProduct(p);
                         }}
-                        className="w-full px-3.5 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center"
+                        disabled={isOutOfStock}
+                        className="p-2 sm:p-2.5 bg-slate-900 hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
+                        title={isOutOfStock ? "Sold Out" : "Select Options / Add to Cart"}
+                        aria-label="Select Options"
                       >
-                        {isOutOfStock ? "SOLD OUT" : "VIEW OPTIONS"}
+                        <ShoppingCart className="w-4 h-4 sm:w-4 sm:h-4" />
                       </button>
                     </div>
                   </div>
@@ -557,6 +443,118 @@ export default function Shopfront() {
           setIsOrderHistoryOpen(true);
         }}
       />
+
+      {/* Feature Notification Toast */}
+      {noticeToast && (
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-4 py-2 rounded-xl shadow-xl border border-slate-800 text-xs font-mono flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <Info className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{noticeToast}</span>
+        </div>
+      )}
+
+      {/* Fixed Non-Scrolling Bottom Navigation Bar (sitting right above system footer) */}
+      <nav className="fixed bottom-[20px] left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/90 shadow-lg px-0.5 py-1.5 flex items-center justify-between font-['Roboto_Condensed'] select-none">
+        {/* 1. SHOP */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("shop");
+            setSearchTerm("");
+            setSelectedCategory("All");
+            if (typeof window !== "undefined") {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          className={`flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors cursor-pointer ${
+            activeTab === "shop" ? "text-slate-950 font-normal" : "text-gray-500 hover:text-gray-900 font-light"
+          }`}
+        >
+          <Store className="w-4 h-4 mb-0.5 shrink-0" />
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">SHOP</span>
+        </button>
+
+        {/* 2. CART */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("cart");
+            setIsCartOpen(true);
+          }}
+          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-500 hover:text-gray-900 cursor-pointer relative"
+        >
+          <div className="relative">
+            <ShoppingCart className="w-4 h-4 mb-0.5 shrink-0" />
+            {cartCount > 0 && (
+              <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[8px] font-bold px-1 rounded-full font-mono shadow-2xs">
+                {cartCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">CART</span>
+        </button>
+
+        {/* 3. ORDERS */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("orders");
+            setIsOrderHistoryOpen(true);
+          }}
+          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-500 hover:text-gray-900 cursor-pointer"
+        >
+          <Receipt className="w-4 h-4 mb-0.5 shrink-0" />
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">ORDERS</span>
+        </button>
+
+        {/* 4. NOTIFICATIONS */}
+        <button
+          type="button"
+          onClick={() => {
+            showFeatureToast("NOTIFICATIONS");
+          }}
+          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
+        >
+          <Bell className="w-4 h-4 mb-0.5 shrink-0" />
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">NOTIFICATIONS</span>
+        </button>
+
+        {/* 5. MEDIA */}
+        <button
+          type="button"
+          onClick={() => {
+            showFeatureToast("MEDIA");
+          }}
+          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
+        >
+          <Film className="w-4 h-4 mb-0.5 shrink-0" />
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">MEDIA</span>
+        </button>
+
+        {/* 6. ACCOUNT */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("account");
+            setIsAccountOpen(true);
+          }}
+          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-500 hover:text-gray-900 cursor-pointer"
+        >
+          <User className="w-4 h-4 mb-0.5 shrink-0" />
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">ACCOUNT</span>
+        </button>
+
+        {/* 7. SUPPORT */}
+        <button
+          type="button"
+          onClick={() => {
+            showFeatureToast("SUPPORT");
+          }}
+          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
+        >
+          <Headphones className="w-4 h-4 mb-0.5 shrink-0" />
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">SUPPORT</span>
+        </button>
+      </nav>
     </div>
   );
 }

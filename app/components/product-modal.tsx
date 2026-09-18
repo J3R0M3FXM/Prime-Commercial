@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useCart } from './cart-context';
-import { X, Check, Minus, Plus, ShoppingCart, Star } from 'lucide-react';
+import { X, Check, Minus, Plus, ShoppingCart, Info } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
 
 export default function ProductModal({ product, onClose }: { product: any, onClose: () => void }) {
@@ -168,15 +168,8 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
                 </div>
               </div>
 
-              {/* Ratings and Stocks */}
-              <div className="flex items-center gap-4 py-2 border-y border-gray-100">
-                <div className="flex items-center gap-1 text-amber-500">
-                  <Star className="w-4 h-4 fill-amber-500" />
-                  <span className="text-sm font-mono font-bold text-gray-700">
-                    {Number(selectedVariant.rating || 4.5).toFixed(1)}
-                  </span>
-                </div>
-                <div className="h-4 w-px bg-gray-200"></div>
+              {/* Stocks Status */}
+              <div className="flex items-center py-2 border-y border-gray-100">
                 <div className="text-xs font-mono font-bold uppercase tracking-wider">
                   {isOutOfStock ? (
                     <span className="text-red-500">Unavailable</span>
@@ -184,6 +177,12 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
                     <span className="text-gray-500">Stock: <span className="text-gray-900">{selectedVariant.stock}</span></span>
                   )}
                 </div>
+              </div>
+
+              {/* Selection Note for Customers */}
+              <div className="bg-amber-50 border border-amber-200/90 rounded-xl p-2.5 flex items-center gap-2 text-amber-900 text-xs font-mono">
+                <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Note: Please select an option or variant before adding to cart.</span>
               </div>
 
               {/* Description */}

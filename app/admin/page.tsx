@@ -3162,29 +3162,31 @@ export default function AdminPage() {
                         {filteredOrders.length}
                       </span>
                     </h2>
+
+                    {/* Plain Export & Refresh icons right next to heading */}
+                    <div className="flex items-center gap-1 ml-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleExportOrdersCSV(filteredOrders)}
+                        className="p-1 text-slate-500 hover:text-slate-950 transition-colors cursor-pointer"
+                        title="Export CSV"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={fetchAllData}
+                        disabled={refreshing}
+                        className="p-1 text-slate-500 hover:text-slate-950 transition-colors cursor-pointer"
+                        title="Refresh Orders"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => setIsNewOrderModalOpen(true)}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>New Order</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleExportOrdersCSV(filteredOrders)}
-                      className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                      title="Export currently displayed orders to CSV"
-                    >
-                      <Download className="w-3.5 h-3.5 text-slate-700" />
-                      <span className="hidden sm:inline">Export CSV</span>
-                    </button>
-
-                    <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200/80 rounded-lg text-emerald-800 text-[11px] font-mono">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200/80 rounded-lg text-emerald-800 text-[11px] font-mono">
                       <span className="relative flex h-2 w-2">
                         <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isSilentSyncing ? "bg-emerald-500 opacity-75" : "bg-emerald-400 opacity-50"}`}></span>
                         <span className={`relative inline-flex rounded-full h-2 w-2 ${isSilentSyncing ? "bg-emerald-600" : "bg-emerald-500"}`}></span>
@@ -3193,21 +3195,12 @@ export default function AdminPage() {
                         {isSilentSyncing ? "Syncing..." : "Live Sync Active"}
                       </span>
                     </div>
-
-                    <button
-                      onClick={fetchAllData}
-                      disabled={refreshing}
-                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer"
-                      title="Refresh Orders"
-                    >
-                      <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-                    </button>
                   </div>
                 </div>
 
-                {/* Search & Filter pills row */}
-                <div className="flex flex-col md:flex-row gap-2">
-                  <div className="relative flex-1">
+                {/* Search Bar + Inline Filter Selector */}
+                <div className="flex flex-col sm:flex-row gap-2 items-center w-full">
+                  <div className="relative flex-1 w-full">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="text"
@@ -3221,111 +3214,28 @@ export default function AdminPage() {
                     />
                   </div>
 
-                  {/* Filter tabs */}
-                  <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
-                    {[
-                      { key: "all", label: "All" },
-                      { key: "Pending", label: "Pending" },
-                      { key: "For Payment", label: "For Payment" },
-                      { key: "Paid", label: "Paid" },
-                      { key: "Processing", label: "Processing" },
-                      { key: "For Dispatch", label: "For Dispatch" },
-                      { key: "Dispatched", label: "Dispatched" },
-                      { key: "Completed", label: "Completed" },
-                      { key: "Cancelled", label: "Cancelled" },
-                    ].map((st) => {
-                      const isActive = orderFilter.toLowerCase() === st.key.toLowerCase();
-                      const count = st.key === "all" ? orderStatusCounts.all : (orderStatusCounts[st.key] || 0);
-                      return (
-                        <button
-                          key={st.key}
-                          onClick={() => {
-                            setOrderFilter(st.key);
-                            setCurrentPage(1);
-                          }}
-                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-                            isActive
-                              ? "bg-slate-900 text-white shadow-xs"
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          }`}
-                        >
-                          <span>{st.label}</span>
-                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                            isActive ? "bg-slate-700 text-white" : "bg-slate-200 text-slate-700"
-                          }`}>
-                            {count}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Bulk Action Toolbar */}
-                <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0) {
-                          setSelectedOrderIds([]);
-                        } else {
-                          setSelectedOrderIds(filteredOrders.map(o => o.id));
-                        }
+                  {/* Filter Dropdown right next to Search Bar */}
+                  <div className="relative shrink-0 w-full sm:w-auto">
+                    <select
+                      value={orderFilter}
+                      onChange={(e) => {
+                        setOrderFilter(e.target.value);
+                        setCurrentPage(1);
                       }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer text-[11px]"
+                      className="w-full sm:w-auto pl-3 pr-8 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-slate-900 cursor-pointer appearance-none"
                     >
-                      {selectedOrderIds.length > 0 && selectedOrderIds.length === filteredOrders.length ? (
-                        <CheckSquare className="w-3.5 h-3.5 text-slate-900" />
-                      ) : (
-                        <Square className="w-3.5 h-3.5 text-slate-500" />
-                      )}
-                      <span>
-                        {selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0
-                          ? "Deselect All"
-                          : `Select All (${filteredOrders.length})`}
-                      </span>
-                    </button>
-
-                    {selectedOrderIds.length > 0 && (
-                      <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
-                        {selectedOrderIds.length} selected
-                      </span>
-                    )}
+                      <option value="all">ALL STATUSES ({orderStatusCounts.all || 0})</option>
+                      <option value="Pending">PENDING ({orderStatusCounts.Pending || 0})</option>
+                      <option value="For Payment">FOR PAYMENT ({orderStatusCounts["For Payment"] || 0})</option>
+                      <option value="Paid">PAID ({orderStatusCounts.Paid || 0})</option>
+                      <option value="Processing">PROCESSING ({orderStatusCounts.Processing || 0})</option>
+                      <option value="For Dispatch">FOR DISPATCH ({orderStatusCounts["For Dispatch"] || 0})</option>
+                      <option value="Dispatched">DISPATCHED ({orderStatusCounts.Dispatched || 0})</option>
+                      <option value="Completed">COMPLETED ({orderStatusCounts.Completed || 0})</option>
+                      <option value="Cancelled">CANCELLED ({orderStatusCounts.Cancelled || 0})</option>
+                    </select>
+                    <Filter className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                   </div>
-
-                  {selectedOrderIds.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                        Set Status:
-                      </span>
-                      {(["Pending", "Processing", "Completed", "Cancelled"] as const).map(st => (
-                        <button
-                          key={st}
-                          disabled={isBulkUpdating}
-                          onClick={() => handleBulkUpdateOrderStatus(st)}
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-all cursor-pointer border ${
-                            st === "Completed"
-                              ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
-                              : st === "Processing"
-                              ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-700"
-                              : st === "Pending"
-                              ? "bg-amber-600 hover:bg-amber-700 text-white border-amber-700"
-                              : "bg-red-600 hover:bg-red-700 text-white border-red-700"
-                          } ${isBulkUpdating ? "opacity-50 cursor-not-allowed" : ""}`}
-                        >
-                          {st}
-                        </button>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedOrderIds([])}
-                        className="px-2 py-0.5 text-slate-500 hover:text-slate-800 text-[10px] underline cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -3346,7 +3256,6 @@ export default function AdminPage() {
                 filteredOrders
                   .slice((currentPage - 1) * 10, currentPage * 10)
                   .map((ord) => {
-                    const isSelected = selectedOrderIds.includes(ord.id);
                     const firstItem = ord.items?.[0];
                     const itemDesc = firstItem 
                       ? `${firstItem.name || firstItem.productName || "Item"}${firstItem.weight || firstItem.spec ? ` (${firstItem.weight || firstItem.spec})` : ""}${ord.items.length > 1 ? ` +${ord.items.length - 1} more` : ""}`
@@ -3373,32 +3282,10 @@ export default function AdminPage() {
                           setSelectedOrderId(ord.id);
                           setView("order-detail");
                         }}
-                        className={`group border rounded-xl px-3.5 py-2.5 shadow-2xs hover:shadow-sm transition-all duration-150 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                          isSelected
-                            ? "bg-indigo-50/60 border-indigo-400"
-                            : "bg-white hover:bg-slate-50/80 border-slate-200/90 hover:border-slate-400"
-                        }`}
+                        className="group border rounded-xl px-3.5 py-2.5 shadow-2xs hover:shadow-sm transition-all duration-150 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white hover:bg-slate-50/80 border-slate-200/90 hover:border-slate-400"
                       >
-                        {/* Left column: Checkbox + Order Info */}
+                        {/* Left column: Order Info */}
                         <div className="flex items-center gap-3 min-w-0">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedOrderIds(prev =>
-                                prev.includes(ord.id) ? prev.filter(id => id !== ord.id) : [...prev, ord.id]
-                              );
-                            }}
-                            className="p-0.5 rounded hover:bg-slate-200 text-slate-600 cursor-pointer shrink-0"
-                            title={isSelected ? "Deselect" : "Select"}
-                          >
-                            {isSelected ? (
-                              <CheckSquare className="w-4 h-4 text-indigo-600" />
-                            ) : (
-                              <Square className="w-4 h-4 text-slate-300 group-hover:text-slate-500" />
-                            )}
-                          </button>
-
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-mono font-black text-xs text-slate-900 tracking-tight">
@@ -5340,7 +5227,6 @@ export default function AdminPage() {
                         finalProduct.stock = finalProduct.stock ?? 10;
                         finalProduct.price = finalProduct.price ?? 49.99;
                       }
-                      finalProduct.rating = finalProduct.rating ?? 4.5;
                       finalProduct.lowStockThreshold = finalProduct.lowStockThreshold ?? 10;
 
                       handleSaveProduct(finalProduct);
@@ -5388,7 +5274,7 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
                           Sort Priority
@@ -5413,22 +5299,6 @@ export default function AdminPage() {
                           required
                           value={editingProduct?.lowStockThreshold ?? 10}
                           onChange={(e) => setEditingProduct({ ...editingProduct, lowStockThreshold: parseInt(e.target.value) || 0 })}
-                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
-                          Rating (1-5)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="1"
-                          max="5"
-                          required
-                          value={editingProduct?.rating ?? 4.5}
-                          onChange={(e) => setEditingProduct({ ...editingProduct, rating: parseFloat(e.target.value) || 4.5 })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-mono"
                         />
                       </div>
@@ -5480,7 +5350,6 @@ export default function AdminPage() {
                               id: Math.random().toString(36).substring(2, 9),
                               name: "",
                               imageUrl: "",
-                              rating: 4.5,
                               stock: 10,
                               price: editingProduct?.price || 49.99,
                               tag: "NONE"
@@ -5545,7 +5414,7 @@ export default function AdminPage() {
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-4 gap-1.5">
+                              <div className="grid grid-cols-3 gap-1.5">
                                 <div>
                                   <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Price (₱)</label>
                                   <input
@@ -5570,22 +5439,6 @@ export default function AdminPage() {
                                     onChange={(e) => {
                                       const updated = [...(editingProduct?.variants || [])];
                                       updated[index] = { ...updated[index], stock: parseInt(e.target.value) || 0 };
-                                      setEditingProduct({ ...editingProduct, variants: updated });
-                                    }}
-                                    className="w-full p-1.5 bg-white border border-slate-200 rounded-md text-[11px] focus:outline-none font-mono"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Rating</label>
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    min="1"
-                                    max="5"
-                                    value={v.rating ?? 4.5}
-                                    onChange={(e) => {
-                                      const updated = [...(editingProduct?.variants || [])];
-                                      updated[index] = { ...updated[index], rating: parseFloat(e.target.value) || 4.5 };
                                       setEditingProduct({ ...editingProduct, variants: updated });
                                     }}
                                     className="w-full p-1.5 bg-white border border-slate-200 rounded-md text-[11px] focus:outline-none font-mono"
