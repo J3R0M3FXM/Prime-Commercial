@@ -11,6 +11,7 @@ import {
   QrCode, 
   Webhook, 
   Coins, 
+  Landmark,
   Eye, 
   EyeOff,
   Image as ImageIcon
@@ -20,12 +21,14 @@ interface PaymentMethod {
   id: string;
   name: string;
   logo: string;
-  paymentType: "qr_code" | "api" | "crypto";
+  paymentType: "qr_code" | "manual_transfer" | "api" | "crypto";
   qrCodeImage?: string;
   webhookUrl?: string;
   publicKey?: string;
   secretKey?: string;
   walletAddress?: string;
+  accountName?: string;
+  accountNumber?: string;
   isActive: boolean;
 }
 
@@ -156,12 +159,14 @@ export default function PaymentsModule() {
   // Form Fields
   const [name, setName] = useState("");
   const [logo, setLogo] = useState("");
-  const [paymentType, setPaymentType] = useState<"qr_code" | "api" | "crypto">("qr_code");
+  const [paymentType, setPaymentType] = useState<"qr_code" | "manual_transfer" | "api" | "crypto">("qr_code");
   const [qrCodeImage, setQrCodeImage] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [publicKey, setPublicKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
   const [isActive, setIsActive] = useState(true);
 
   const fetchMethods = async () => {
@@ -194,6 +199,8 @@ export default function PaymentsModule() {
     setPublicKey("");
     setSecretKey("");
     setWalletAddress("");
+    setAccountName("");
+    setAccountNumber("");
     setIsActive(true);
     setEditingId(null);
     setErrorMsg("");
@@ -203,12 +210,14 @@ export default function PaymentsModule() {
     setEditingId(m.id);
     setName(m.name);
     setLogo(m.logo);
-    setPaymentType(m.paymentType);
+    setPaymentType(m.paymentType || "qr_code");
     setQrCodeImage(m.qrCodeImage || "");
     setWebhookUrl(m.webhookUrl || "");
     setPublicKey(m.publicKey || "");
     setSecretKey(m.secretKey || "");
     setWalletAddress(m.walletAddress || "");
+    setAccountName(m.accountName || "");
+    setAccountNumber(m.accountNumber || "");
     setIsActive(m.isActive);
     setIsOpen(true);
   };
@@ -217,6 +226,11 @@ export default function PaymentsModule() {
     e.preventDefault();
     if (!name.trim()) {
       setErrorMsg("Payment method name is required");
+      return;
+    }
+
+    if (paymentType === "manual_transfer" && (!accountName.trim() || !accountNumber.trim())) {
+      setErrorMsg("Account Name and Account Number are required for Manual Transfer");
       return;
     }
 
@@ -233,6 +247,8 @@ export default function PaymentsModule() {
         publicKey: paymentType === "api" ? publicKey : "",
         secretKey: paymentType === "api" ? secretKey : "",
         walletAddress: paymentType === "crypto" ? walletAddress : "",
+        accountName: paymentType === "manual_transfer" ? accountName.trim() : "",
+        accountNumber: paymentType === "manual_transfer" ? accountNumber.trim() : "",
         isActive
       };
 
@@ -370,10 +386,16 @@ export default function PaymentsModule() {
                               Static QR Code
                             </>
                           )}
+                          {method.paymentType === "manual_transfer" && (
+                            <>
+                              <Landmark className="w-3 h-3 text-slate-500" />
+                              Manual Bank / E-Wallet
+                            </>
+                          )}
                           {method.paymentType === "api" && (
                             <>
                               <Webhook className="w-3 h-3 text-slate-500" />
-                              Online API API
+                              Online API
                             </>
                           )}
                           {method.paymentType === "crypto" && (
@@ -384,8 +406,13 @@ export default function PaymentsModule() {
                           )}
                         </span>
                         <span>&bull;</span>
-                        <span className="truncate max-w-[200px]">
+                        <span className="truncate max-w-[220px]">
                           {method.paymentType === "qr_code" && (method.qrCodeImage ? "QR Uploaded" : "No QR Uploaded")}
+                          {method.paymentType === "manual_transfer" && (
+                            method.accountName || method.accountNumber 
+                              ? `${method.accountName || 'No Name'} • ${method.accountNumber || 'No Acc'}`
+                              : "No details configured"
+                          )}
                           {method.paymentType === "crypto" && (method.walletAddress ? method.walletAddress : "No wallet address")}
                           {method.paymentType === "api" && (method.webhookUrl ? method.webhookUrl : "No webhook")}
                         </span>
@@ -501,6 +528,7 @@ export default function PaymentsModule() {
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-slate-900"
                   >
                     <option value="qr_code">Static QR Code Scan</option>
+                    <option value="manual_transfer">Manual Transfer (Online Banking / E-Wallet)</option>
                     <option value="api">Online checkout API Webhook</option>
                     <option value="crypto">Cryptocurrency Wallet Deposit</option>
                   </select>
@@ -514,6 +542,50 @@ export default function PaymentsModule() {
                     onChange={(base64) => setQrCodeImage(base64)}
                     required
                   />
+                )}
+
+                {paymentType === "manual_transfer" && (
+                  <div className="space-y-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 font-heading">
+                        Account Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={accountName}
+                        onChange={(e) => setAccountName(e.target.value)}
+                        placeholder="e.g. Juan Dela Cruz / Store Official"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-slate-900"
+                      />
+                      <p className="text-[9px] text-slate-400 font-mono">
+                        Registered name on the receiving bank account or e-wallet.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 font-heading">
+                        Account / Mobile Number <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={accountNumber}
+                        onChange={(e) => setAccountNumber(e.target.value)}
+                        placeholder="e.g. 0917-123-4567 or 1234-5678-9012"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-slate-900"
+                      />
+                      <p className="text-[9px] text-slate-400 font-mono">
+                        Account number or mobile number for customers to copy and transfer payment.
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-amber-50/60 border border-amber-200/60 rounded-lg">
+                      <p className="text-[10px] text-amber-800 leading-snug font-mono">
+                        Customers will be shown this Account Name and Account Number with one-click copy buttons at checkout to transfer payment via their online banking or e-wallet apps.
+                      </p>
+                    </div>
+                  </div>
                 )}
 
                 {paymentType === "crypto" && (

@@ -95,12 +95,16 @@ export async function POST(request: Request) {
     const clientIp = forwarded ? forwarded.split(",")[0].trim() : (realIp || "");
 
     let gpsStreetAddress = '';
-    if (deviceSnapshot?.location?.lat && deviceSnapshot?.location?.lon) {
+    const rawDevLat = Number(deviceSnapshot?.location?.lat ?? deviceSnapshot?.location?.latitude);
+    const rawDevLon = Number(deviceSnapshot?.location?.lon ?? deviceSnapshot?.location?.longitude);
+    const hasValidDeviceCoords = Number.isFinite(rawDevLat) && Number.isFinite(rawDevLon) && (rawDevLat !== 0 || rawDevLon !== 0);
+
+    if (hasValidDeviceCoords) {
       try {
         const geoKey = process.env.GEOAPIFY_API_KEY;
         if (geoKey) {
-          const geoUrl = `https://api.geoapify.com/v1/geocode/reverse?lat=${deviceSnapshot.location.lat}&lon=${deviceSnapshot.location.lon}&format=json&apiKey=${geoKey}`;
-          const gRes = await fetch(geoUrl, { signal: AbortSignal.timeout(2000) });
+          const geoUrl = `https://api.geoapify.com/v1/geocode/reverse?lat=${rawDevLat}&lon=${rawDevLon}&format=json&apiKey=${geoKey}`;
+          const gRes = await fetch(geoUrl, { signal: AbortSignal.timeout(3000) });
           if (gRes.ok) {
             const gData = await gRes.json();
             gpsStreetAddress = gData.results?.[0]?.formatted || '';
@@ -290,17 +294,21 @@ export async function POST(request: Request) {
             ip: clientIp || deviceSnapshot?.ip || '',
             deviceId: deviceSnapshot?.deviceId || deviceSnapshot?.device_id || body.deviceId || '',
             sessionToken: body.sessionToken || deviceSnapshot?.sessionToken || '',
-            coordinates: body.coordinates || (deviceSnapshot?.location?.lat && deviceSnapshot?.location?.lon ? `${deviceSnapshot.location.lat}, ${deviceSnapshot.location.lon}` : ''),
-            gpsStreetAddress: gpsStreetAddress || '',
+            coordinates: hasValidDeviceCoords ? `${rawDevLat}, ${rawDevLon}` : '',
+            gpsStreetAddress: hasValidDeviceCoords ? (gpsStreetAddress || `${rawDevLat.toFixed(5)}, ${rawDevLon.toFixed(5)}`) : '',
             deviceSnapshot: deviceSnapshot ? {
               ...deviceSnapshot,
               deviceId: deviceSnapshot.deviceId || body.deviceId || '',
               sessionToken: deviceSnapshot.sessionToken || body.sessionToken || '',
               ip: clientIp || deviceSnapshot.ip || '',
-              location: deviceSnapshot.location ? {
+              location: hasValidDeviceCoords ? {
                 ...deviceSnapshot.location,
+                lat: rawDevLat,
+                lon: rawDevLon,
+                latitude: rawDevLat,
+                longitude: rawDevLon,
                 formattedStreetAddress: gpsStreetAddress || '',
-                streetAddress: gpsStreetAddress || deviceSnapshot.location.streetAddress || ''
+                streetAddress: gpsStreetAddress || ''
               } : null
             } : (clientIp ? { ip: clientIp, deviceId: body.deviceId || '', sessionToken: body.sessionToken || '' } : null),
             createdAt: new Date().toISOString(),

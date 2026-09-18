@@ -200,7 +200,7 @@ export async function getClientLocation(timeoutMs = 2500): Promise<LocationResul
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
-        resolve({ lat: 0, lon: 0, source: "Approximate Location" });
+        resolve({ lat: 0, lon: 0, source: "Unavailable" });
       }
     }, timeoutMs);
 
@@ -223,13 +223,13 @@ export async function getClientLocation(timeoutMs = 2500): Promise<LocationResul
           settled = true;
           clearTimeout(timer);
           console.warn("GPS position request denied or timed out:", err.message);
-          resolve({ lat: 0, lon: 0, source: "Approximate Location" });
+          resolve({ lat: 0, lon: 0, source: "Unavailable" });
         }
       },
       {
-        enableHighAccuracy: false, // Don't force blocking satellite sensor during fast submit
+        enableHighAccuracy: true,
         timeout: timeoutMs,
-        maximumAge: 60000
+        maximumAge: 0
       }
     );
   });

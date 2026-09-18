@@ -85,6 +85,7 @@ export default function CheckoutModal({
   const [isSubmittingProof, setIsSubmittingProof] = useState(false);
   const [proofSubmitSuccess, setProofSubmitSuccess] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [currentPaymentPage, setCurrentPaymentPage] = useState(0);
   const [isPaymentQrModalOpen, setIsPaymentQrModalOpen] = useState(false);
   const [zoomedPaymentMethod, setZoomedPaymentMethod] = useState<any>(null);
@@ -141,6 +142,21 @@ export default function CheckoutModal({
   const [addressValidation, setAddressValidation] = useState<AddressValidationResult | null>(null);
   const [isValidatingAddress, setIsValidatingAddress] = useState<boolean>(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Dedicated physical device location state (NEVER polluted with user-entered delivery addresses)
+  const [deviceGps, setDeviceGps] = useState<{ lat: number; lon: number; accuracy?: number } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    // Attempt background acquisition of genuine customer device GPS for telemetry
+    getClientLocation(4000).then((loc) => {
+      if (loc && Number(loc.lat) && Number(loc.lon) && (Number(loc.lat) !== 0 || Number(loc.lon) !== 0)) {
+        setDeviceGps({ lat: Number(loc.lat), lon: Number(loc.lon), accuracy: loc.accuracy });
+      }
+    }).catch((err) => {
+      console.warn("Telemetry device location capture skipped:", err);
+    });
+  }, [isOpen]);
 
   // Touch swipe states for payment methods carousel
   const touchStartX = useRef<number | null>(null);
@@ -503,6 +519,7 @@ export default function CheckoutModal({
         setIsLocating(false);
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
+        setDeviceGps({ lat, lon, accuracy: Math.round(pos.coords.accuracy) });
         setCoords({ lat, lon });
         setHasSelectedAddress(true);
         reverseGeocode(lat, lon);
@@ -644,7 +661,26 @@ export default function CheckoutModal({
       setSubmitError("");
 
       const fpData = await getClientFingerprint();
-      const locData = await getClientLocation(1500);
+
+      // Retrieve verified physical device GPS location (STRICTLY ISOLATED FROM DELIVERY DESTINATION)
+      let actualDevLat = deviceGps?.lat ? Number(deviceGps.lat) : 0;
+      let actualDevLon = deviceGps?.lon ? Number(deviceGps.lon) : 0;
+      let actualDevAcc = deviceGps?.accuracy || 0;
+
+      if (!actualDevLat || !actualDevLon) {
+        try {
+          const freshLoc = await getClientLocation(2500);
+          if (freshLoc && Number(freshLoc.lat) && Number(freshLoc.lon) && (Number(freshLoc.lat) !== 0 || Number(freshLoc.lon) !== 0)) {
+            actualDevLat = Number(freshLoc.lat);
+            actualDevLon = Number(freshLoc.lon);
+            actualDevAcc = freshLoc.accuracy || 0;
+          }
+        } catch (e) {
+          console.warn("Telemetry device GPS capture skipped:", e);
+        }
+      }
+
+      const hasGenuineDeviceGps = Number.isFinite(actualDevLat) && Number.isFinite(actualDevLon) && (actualDevLat !== 0 || actualDevLon !== 0);
 
       const orderData = {
         items: selectedItems.map((it) => {
@@ -697,18 +733,19 @@ export default function CheckoutModal({
         notes: customerNotes.trim() || "Non",
         deviceId: fpData.deviceId,
         sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
-        coordinates: coords.lat && coords.lon ? `${coords.lat}, ${coords.lon}` : (locData.lat && locData.lon ? `${locData.lat}, ${locData.lon}` : ""),
+        coordinates: hasGenuineDeviceGps ? `${actualDevLat}, ${actualDevLon}` : "",
         deviceSnapshot: {
           ...fpData,
           deviceId: fpData.deviceId,
           sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
-          location: {
-            ...locData,
-            lat: coords.lat || locData.lat,
-            lon: coords.lon || locData.lon,
-            latitude: coords.lat || locData.lat,
-            longitude: coords.lon || locData.lon,
-          },
+          location: hasGenuineDeviceGps ? {
+            lat: actualDevLat,
+            lon: actualDevLon,
+            latitude: actualDevLat,
+            longitude: actualDevLon,
+            accuracy: actualDevAcc,
+            source: "Actual Device Hardware GPS"
+          } : null,
         },
       };
 
@@ -1505,6 +1542,7 @@ export default function CheckoutModal({
                       if (!selectedPaymentMethod) return null;
                       const pType = (selectedPaymentMethod.paymentType || selectedPaymentMethod.type || "").toLowerCase();
                       const isQr = pType === "qr_code" || pType === "qr" || pType.includes("qr");
+                      const isManual = pType === "manual_transfer" || pType === "manual" || pType === "bank_transfer" || pType === "transfer";
                       const isCrypto = pType === "crypto";
                       const isApi = pType === "api" || pType === "webhook";
                       const qrImg = selectedPaymentMethod.qrCodeImage || selectedPaymentMethod.qrCode || selectedPaymentMethod.qrImage || selectedPaymentMethod.qr_code_image || "";
@@ -1517,10 +1555,91 @@ export default function CheckoutModal({
                             </h5>
                             <span className="text-[10px] font-mono text-gray-400 uppercase">
                               {isQr && "Static QR"}
+                              {isManual && "Manual Transfer"}
                               {isCrypto && "Wallet Deposit"}
                               {isApi && "Integrated Webhook"}
                             </span>
                           </div>
+
+                          {/* Manual Transfer (Bank / E-Wallet) Block */}
+                          {isManual && (
+                            <div className="space-y-3">
+                              <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 space-y-1">
+                                <span className="text-[11px] font-heading font-black text-amber-900 uppercase tracking-wide block">
+                                  Transfer Payment Details
+                                </span>
+                                <p className="text-[11px] text-amber-800 font-mono leading-relaxed">
+                                  Transfer <strong>₱{payableNow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> using your bank or e-wallet app to the account details below, then attach your screenshot or receipt.
+                                </p>
+                              </div>
+
+                              {/* Account Name */}
+                              <div className="space-y-1">
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 font-heading">
+                                  Account Name
+                                </label>
+                                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 p-2.5 rounded-lg">
+                                  <span className="font-heading font-bold text-xs sm:text-sm text-gray-900 flex-1 truncate select-all">
+                                    {selectedPaymentMethod.accountName || "Store Official Account"}
+                                  </span>
+                                  {selectedPaymentMethod.accountName && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(selectedPaymentMethod.accountName || "");
+                                        setCopiedField("name");
+                                        setTimeout(() => setCopiedField(null), 2000);
+                                      }}
+                                      className="px-2.5 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-md transition-colors cursor-pointer shrink-0 flex items-center gap-1 text-[10px] font-mono font-bold"
+                                      title="Copy Account Name"
+                                    >
+                                      {copiedField === "name" ? (
+                                        <span className="text-emerald-600 font-bold uppercase">Copied!</span>
+                                      ) : (
+                                        <>
+                                          <Copy className="w-3.5 h-3.5" />
+                                          <span>Copy</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Account Number */}
+                              <div className="space-y-1">
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 font-heading">
+                                  Account / Mobile Number
+                                </label>
+                                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 p-2.5 rounded-lg">
+                                  <span className="font-mono font-black text-sm sm:text-base text-gray-900 tracking-wider flex-1 truncate select-all">
+                                    {selectedPaymentMethod.accountNumber || "—"}
+                                  </span>
+                                  {selectedPaymentMethod.accountNumber && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(selectedPaymentMethod.accountNumber || "");
+                                        setCopiedField("number");
+                                        setTimeout(() => setCopiedField(null), 2000);
+                                      }}
+                                      className="px-2.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-md transition-colors cursor-pointer shrink-0 flex items-center gap-1 text-[10px] font-mono font-bold"
+                                      title="Copy Account Number"
+                                    >
+                                      {copiedField === "number" ? (
+                                        <span className="text-emerald-400 font-bold uppercase">Copied!</span>
+                                      ) : (
+                                        <>
+                                          <Copy className="w-3.5 h-3.5" />
+                                          <span>Copy</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
                           {/* Crypto Block */}
                           {isCrypto && (

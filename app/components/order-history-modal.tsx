@@ -906,6 +906,53 @@ export default function OrderHistoryModal({
                             </div>
                           )}
 
+                          {/* Selected Method Details if Manual Transfer */}
+                          {selectedPaymentMethod && selectedPaymentMethod.paymentType === "manual_transfer" && (
+                            <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl space-y-2 text-left">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-900 font-heading block">
+                                Transfer Account Details
+                              </span>
+                              
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                <div className="p-2 bg-white rounded-lg border border-amber-200/50 flex items-center justify-between">
+                                  <div className="min-w-0 flex-1 mr-2">
+                                    <span className="text-[9px] uppercase text-gray-400 font-bold block">Account Name</span>
+                                    <span className="font-heading font-bold text-gray-900 truncate block text-xs">
+                                      {selectedPaymentMethod.accountName || "Official Account"}
+                                    </span>
+                                  </div>
+                                  {selectedPaymentMethod.accountName && (
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(selectedPaymentMethod.accountName, "acc_name")}
+                                      className="px-2 py-1 bg-amber-100/70 hover:bg-amber-200/70 text-amber-900 rounded text-[10px] font-mono font-bold shrink-0 transition-colors"
+                                    >
+                                      {copiedKey === "acc_name" ? "Copied!" : "Copy"}
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="p-2 bg-white rounded-lg border border-amber-200/50 flex items-center justify-between">
+                                  <div className="min-w-0 flex-1 mr-2">
+                                    <span className="text-[9px] uppercase text-gray-400 font-bold block">Account / Mobile Number</span>
+                                    <span className="font-mono font-bold text-gray-900 truncate block text-xs">
+                                      {selectedPaymentMethod.accountNumber || "—"}
+                                    </span>
+                                  </div>
+                                  {selectedPaymentMethod.accountNumber && (
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(selectedPaymentMethod.accountNumber, "acc_num")}
+                                      className="px-2 py-1 bg-amber-100/70 hover:bg-amber-200/70 text-amber-900 rounded text-[10px] font-mono font-bold shrink-0 transition-colors"
+                                    >
+                                      {copiedKey === "acc_num" ? "Copied!" : "Copy"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
                           {/* File input for proof */}
                           <div className="space-y-2">
                             <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 font-heading">

@@ -90,12 +90,14 @@
       "properties": {
         "name": { "type": "string" },
         "logo": { "type": "string" },
-        "paymentType": { "type": "string", "enum": ["qr_code", "api", "crypto"] },
+        "paymentType": { "type": "string", "enum": ["qr_code", "api", "crypto", "manual_transfer"] },
         "qrCodeImage": { "type": "string" },
         "webhookUrl": { "type": "string" },
         "publicKey": { "type": "string" },
         "secretKey": { "type": "string" },
         "walletAddress": { "type": "string" },
+        "accountName": { "type": "string" },
+        "accountNumber": { "type": "string" },
         "isActive": { "type": "boolean" }
       },
       "required": ["name", "paymentType", "isActive"]

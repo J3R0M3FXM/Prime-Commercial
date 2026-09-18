@@ -36,6 +36,8 @@ export async function POST(request: Request) {
       publicKey,
       secretKey,
       walletAddress,
+      accountName,
+      accountNumber,
       isActive
     } = data;
 
@@ -52,6 +54,8 @@ export async function POST(request: Request) {
       publicKey: String(publicKey || ''),
       secretKey: String(secretKey || ''),
       walletAddress: String(walletAddress || ''),
+      accountName: String(accountName || ''),
+      accountNumber: String(accountNumber || ''),
       isActive: isActive !== false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -76,6 +80,8 @@ export async function PUT(request: Request) {
       publicKey,
       secretKey,
       walletAddress,
+      accountName,
+      accountNumber,
       isActive
     } = data;
 
@@ -93,6 +99,8 @@ export async function PUT(request: Request) {
       publicKey: String(publicKey || ''),
       secretKey: String(secretKey || ''),
       walletAddress: String(walletAddress || ''),
+      accountName: String(accountName || ''),
+      accountNumber: String(accountNumber || ''),
       isActive: isActive !== false,
       updatedAt: serverTimestamp()
     });
