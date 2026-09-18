@@ -14,7 +14,10 @@ import {
   Landmark,
   Eye, 
   EyeOff,
-  Image as ImageIcon
+  Image as ImageIcon,
+  GripVertical,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 
 interface PaymentMethod {
@@ -29,6 +32,7 @@ interface PaymentMethod {
   walletAddress?: string;
   accountName?: string;
   accountNumber?: string;
+  sortOrder?: number;
   isActive: boolean;
 }
 
@@ -151,6 +155,9 @@ export default function PaymentsModule() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [isReordering, setIsReordering] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Editor/Add State
   const [isOpen, setIsOpen] = useState(false);
@@ -189,6 +196,82 @@ export default function PaymentsModule() {
   useEffect(() => {
     fetchMethods();
   }, []);
+
+  const handleDragStart = (index: number, e: React.DragEvent) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    // Set transparent drag image or standard payload
+    e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleDragOver = (index: number, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (targetIndex: number, e: React.DragEvent) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const updated = [...methods];
+    const [movedItem] = updated.splice(draggedIndex, 1);
+    updated.splice(targetIndex, 0, movedItem);
+
+    setMethods(updated);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+
+    try {
+      setIsReordering(true);
+      const reorderPayload = updated.map((m, idx) => ({ id: m.id, sortOrder: idx }));
+      await fetch("/api/admin/payments", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reorder: reorderPayload })
+      });
+    } catch (e) {
+      console.error("Failed to persist reorder", e);
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
+  const handleMove = async (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= methods.length) return;
+
+    const updated = [...methods];
+    const [movedItem] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, movedItem);
+
+    setMethods(updated);
+
+    try {
+      setIsReordering(true);
+      const reorderPayload = updated.map((m, idx) => ({ id: m.id, sortOrder: idx }));
+      await fetch("/api/admin/payments", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reorder: reorderPayload })
+      });
+    } catch (e) {
+      console.error("Failed to persist reorder", e);
+    } finally {
+      setIsReordering(false);
+    }
+  };
 
   const resetForm = () => {
     setName("");
@@ -333,6 +416,21 @@ export default function PaymentsModule() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* List Section (Left 2/3) */}
           <div className="md:col-span-2 space-y-3">
+            {methods.length > 1 && (
+              <div className="flex items-center justify-between px-1 py-1 text-[11px] font-mono text-slate-500">
+                <span className="flex items-center gap-1">
+                  <GripVertical className="w-3.5 h-3.5 text-slate-400" />
+                  Drag cards or use arrows to rearrange customer display order
+                </span>
+                {isReordering && (
+                  <span className="text-[10px] font-bold text-amber-600 flex items-center gap-1 animate-pulse">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Saving arrangement...
+                  </span>
+                )}
+              </div>
+            )}
+
             {methods.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-2">
                 <CreditCard className="w-10 h-10 text-slate-300 mx-auto" />
@@ -344,100 +442,146 @@ export default function PaymentsModule() {
                 </p>
               </div>
             ) : (
-              methods.map((method) => (
-                <div
-                  key={method.id}
-                  className={`bg-white border rounded-2xl p-4 flex items-center justify-between gap-4 shadow-sm hover:shadow-md transition-all ${
-                    method.isActive ? "border-slate-200" : "border-slate-200 bg-slate-50 opacity-75"
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    {method.logo ? (
-                      <img
-                        src={method.logo}
-                        alt={method.name}
-                        className="w-12 h-12 object-contain p-1 rounded-xl bg-white border border-slate-100 shrink-0"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-slate-100 text-slate-700 flex items-center justify-center rounded-xl shrink-0 border border-slate-200">
-                        <CreditCard className="w-6 h-6" />
-                      </div>
-                    )}
+              methods.map((method, index) => {
+                const isDragging = draggedIndex === index;
+                const isDragOver = dragOverIndex === index;
 
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-heading font-black text-sm text-slate-900 truncate">
-                          {method.name}
-                        </span>
-                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${
-                          method.isActive 
-                            ? "bg-emerald-100 text-emerald-800" 
-                            : "bg-slate-200 text-slate-600"
-                        }`}>
-                          {method.isActive ? "Active" : "Inactive"}
+                return (
+                  <div
+                    key={method.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(index, e)}
+                    onDragOver={(e) => handleDragOver(index, e)}
+                    onDragEnd={handleDragEnd}
+                    onDrop={(e) => handleDrop(index, e)}
+                    className={`bg-white border rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-xs hover:shadow-md transition-all cursor-move select-none ${
+                      isDragging
+                        ? "opacity-40 border-dashed border-black bg-slate-100 scale-[0.99]"
+                        : isDragOver
+                        ? "border-black ring-2 ring-black/10 bg-slate-50"
+                        : method.isActive
+                        ? "border-slate-200"
+                        : "border-slate-200 bg-slate-50/70 opacity-80"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+                      {/* Drag Handle & Order Indicator */}
+                      <div className="flex items-center gap-1 text-slate-400 hover:text-slate-900 cursor-grab active:cursor-grabbing shrink-0">
+                        <GripVertical className="w-4 h-4" />
+                        <span className="text-[10px] font-mono font-bold text-slate-400 w-4 text-center">
+                          #{index + 1}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 font-mono text-[10px] text-slate-400 mt-1">
-                        <span className="font-bold text-slate-600 uppercase flex items-center gap-1">
-                          {method.paymentType === "qr_code" && (
-                            <>
-                              <QrCode className="w-3 h-3 text-slate-500" />
-                              Static QR Code
-                            </>
-                          )}
-                          {method.paymentType === "manual_transfer" && (
-                            <>
-                              <Landmark className="w-3 h-3 text-slate-500" />
-                              Manual Bank / E-Wallet
-                            </>
-                          )}
-                          {method.paymentType === "api" && (
-                            <>
-                              <Webhook className="w-3 h-3 text-slate-500" />
-                              Online API
-                            </>
-                          )}
-                          {method.paymentType === "crypto" && (
-                            <>
-                              <Coins className="w-3 h-3 text-slate-500" />
-                              Cryptocurrency
-                            </>
-                          )}
-                        </span>
-                        <span>&bull;</span>
-                        <span className="truncate max-w-[220px]">
-                          {method.paymentType === "qr_code" && (method.qrCodeImage ? "QR Uploaded" : "No QR Uploaded")}
-                          {method.paymentType === "manual_transfer" && (
-                            method.accountName || method.accountNumber 
-                              ? `${method.accountName || 'No Name'} • ${method.accountNumber || 'No Acc'}`
-                              : "No details configured"
-                          )}
-                          {method.paymentType === "crypto" && (method.walletAddress ? method.walletAddress : "No wallet address")}
-                          {method.paymentType === "api" && (method.webhookUrl ? method.webhookUrl : "No webhook")}
-                        </span>
+                      {method.logo ? (
+                        <img
+                          src={method.logo}
+                          alt={method.name}
+                          className="w-11 h-11 object-contain p-1 rounded-xl bg-white border border-slate-100 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-11 h-11 bg-slate-100 text-slate-700 flex items-center justify-center rounded-xl shrink-0 border border-slate-200">
+                          <CreditCard className="w-5 h-5" />
+                        </div>
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-heading font-black text-sm text-slate-900 truncate">
+                            {method.name}
+                          </span>
+                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${
+                            method.isActive 
+                              ? "bg-emerald-100 text-emerald-800" 
+                              : "bg-red-100 text-red-700 border border-red-200"
+                          }`}>
+                            {method.isActive ? "Active" : "Offline"}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 font-mono text-[10px] text-slate-400 mt-1">
+                          <span className="font-bold text-slate-600 uppercase flex items-center gap-1 shrink-0">
+                            {method.paymentType === "qr_code" && (
+                              <>
+                                <QrCode className="w-3 h-3 text-slate-500" />
+                                Static QR
+                              </>
+                            )}
+                            {method.paymentType === "manual_transfer" && (
+                              <>
+                                <Landmark className="w-3 h-3 text-slate-500" />
+                                Manual Transfer
+                              </>
+                            )}
+                            {method.paymentType === "api" && (
+                              <>
+                                <Webhook className="w-3 h-3 text-slate-500" />
+                                Online API
+                              </>
+                            )}
+                            {method.paymentType === "crypto" && (
+                              <>
+                                <Coins className="w-3 h-3 text-slate-500" />
+                                Crypto
+                              </>
+                            )}
+                          </span>
+                          <span>&bull;</span>
+                          <span className="truncate max-w-[180px] sm:max-w-[260px]">
+                            {method.paymentType === "qr_code" && (method.qrCodeImage ? "QR Uploaded" : "No QR Uploaded")}
+                            {method.paymentType === "manual_transfer" && (
+                              method.accountName || method.accountNumber 
+                                ? `${method.accountName || 'No Name'} • ${method.accountNumber || 'No Acc'}`
+                                : "No details configured"
+                            )}
+                            {method.paymentType === "crypto" && (method.walletAddress ? method.walletAddress : "No wallet address")}
+                            {method.paymentType === "api" && (method.webhookUrl ? method.webhookUrl : "No webhook")}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => handleEdit(method)}
-                      className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg transition-colors cursor-pointer"
-                      title="Edit payment method"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(method.id)}
-                      className="p-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-colors cursor-pointer"
-                      title="Delete payment method"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Quick Move and Actions */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex flex-col gap-0.5 border-r border-slate-200 pr-1.5 mr-0.5">
+                        <button
+                          type="button"
+                          disabled={index === 0}
+                          onClick={() => handleMove(index, "up")}
+                          className="p-1 bg-slate-50 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 rounded transition-colors"
+                          title="Move up"
+                        >
+                          <ChevronUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === methods.length - 1}
+                          onClick={() => handleMove(index, "down")}
+                          className="p-1 bg-slate-50 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 rounded transition-colors"
+                          title="Move down"
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => handleEdit(method)}
+                        className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                        title="Edit payment method"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(method.id)}
+                        className="p-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-colors cursor-pointer"
+                        title="Delete payment method"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 

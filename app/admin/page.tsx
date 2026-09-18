@@ -1099,7 +1099,8 @@ export default function AdminPage() {
       "Items Count",
       "Items Breakdown",
       "Applied Charges Breakdown",
-      "GPS Address / Delivery Address",
+      "Precise GPS Address (Device Telemetry)",
+      "Delivery Address (Destination)",
       "Has Payment Proof"
     ];
 
@@ -1111,7 +1112,16 @@ export default function AdminPage() {
         .map((ch: any) => `${ch.name} (₱${ch.amount}${ch.isFree ? ' [FREE]' : ''})`)
         .join("; ");
       const dateStr = ord.createdAt ? new Date(ord.createdAt).toISOString() : "";
-      const address = ord.gpsStreetAddress || ord.deviceSnapshot?.location?.address || "N/A";
+      
+      const gpsAddress = resolveOrderGpsStreetAddress(ord, resolvedGpsAddresses, null);
+      const deliveryAddress = (() => {
+        const raw = ord.deliveryAddress;
+        if (!raw) return ord.address || ord.shippingAddress || ord.fullAddress || "N/A";
+        if (typeof raw === "string") return raw;
+        const parts = [raw.formatted || raw.address || ""];
+        if (raw.unitDetails) parts.push(`(${raw.unitDetails})`);
+        return parts.filter(Boolean).join(" ").trim() || "N/A";
+      })();
       const hasProof = ord.paymentProofImage ? "YES" : "NO";
 
       return [
@@ -1129,7 +1139,8 @@ export default function AdminPage() {
         ord.items?.length || 0,
         `"${itemsList.replace(/"/g, '""')}"`,
         `"${chargesList.replace(/"/g, '""')}"`,
-        `"${String(address).replace(/"/g, '""')}"`,
+        `"${String(gpsAddress).replace(/"/g, '""')}"`,
+        `"${String(deliveryAddress).replace(/"/g, '""')}"`,
         `"${hasProof}"`
       ].join(",");
     });
@@ -1335,8 +1346,11 @@ export default function AdminPage() {
   const [loadingGpsOrderId, setLoadingGpsOrderId] = useState<string | null>(null);
 
   /**
-   * Strict resolution of the customer's actual device GPS location captured at order placement.
-   * CRITICAL RULE: NEVER hydrates or falls back to user-entered delivery addresses.
+   * Strict authoritative resolution of the customer's actual device GPS location captured at order placement.
+   * CRITICAL PRODUCTION RULE: 
+   * - Telemetry GPS Address is strictly isolated from user-entered shipping/delivery addresses.
+   * - If physical device coordinates were NOT captured at order placement time, this function
+   *   MUST return "Not captured". It is strictly prohibited from falling back to any shipping/delivery fields.
    */
   const resolveOrderGpsStreetAddress = (
     order: any, 
@@ -1345,7 +1359,27 @@ export default function AdminPage() {
   ): string => {
     if (!order) return "Not captured";
 
-    // Derive delivery address text for strict contamination detection
+    // 1. Extract genuine hardware coordinates of customer device at order time
+    const loc = order.deviceSnapshot?.location;
+    let devLat = Number(loc?.lat ?? loc?.latitude);
+    let devLon = Number(loc?.lon ?? loc?.longitude);
+
+    if ((!Number.isFinite(devLat) || !Number.isFinite(devLon) || (devLat === 0 && devLon === 0)) && typeof order.coordinates === 'string') {
+      const parts = order.coordinates.split(',').map((s: string) => Number(s.trim()));
+      if (parts.length === 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1]) && (parts[0] !== 0 || parts[1] !== 0)) {
+        devLat = parts[0];
+        devLon = parts[1];
+      }
+    }
+
+    const hasGenuineDeviceCoords = Number.isFinite(devLat) && Number.isFinite(devLon) && (devLat !== 0 || devLon !== 0);
+
+    // CRITICAL: If no genuine hardware coordinates exist, PRECISE GPS ADDRESS is strictly "Not captured".
+    if (!hasGenuineDeviceCoords) {
+      return "Not captured";
+    }
+
+    // 2. Derive delivery address text and delivery coordinates for strict contamination detection
     const rawDeliv = order.deliveryAddress;
     const deliveryText = (() => {
       if (!rawDeliv) return (order.address || order.shippingAddress || order.fullAddress || "");
@@ -1358,24 +1392,20 @@ export default function AdminPage() {
     })();
 
     const cleanDeliv = (deliveryText || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-
-    // Coordinates of delivery destination
     const delivLat = Number(rawDeliv?.lat);
     const delivLon = Number(rawDeliv?.lon);
     const hasDelivCoords = Number.isFinite(delivLat) && Number.isFinite(delivLon) && (delivLat !== 0 || delivLon !== 0);
 
-    // Coordinates of actual customer device at order time
-    const loc = order.deviceSnapshot?.location;
-    const devLat = Number(loc?.lat ?? loc?.latitude);
-    const devLon = Number(loc?.lon ?? loc?.longitude);
-    const hasGenuineDeviceCoords = Number.isFinite(devLat) && Number.isFinite(devLon) && (devLat !== 0 || devLon !== 0);
-
-    // Detect if location is an unverified replica of the user delivery destination
-    const isDuplicateOfDeliveryCoords = hasGenuineDeviceCoords && hasDelivCoords &&
+    // Detect if location coordinates are an unverified replica of the user delivery destination
+    const isDuplicateOfDeliveryCoords = hasDelivCoords &&
       Math.abs(devLat - delivLat) < 0.0001 && Math.abs(devLon - delivLon) < 0.0001 &&
       loc?.source !== "Actual Device Hardware GPS";
 
-    // 1. Check resolved cache (only if not polluted with delivery address)
+    if (isDuplicateOfDeliveryCoords) {
+      return "Not captured";
+    }
+
+    // 3. Check reverse geocoding cache (from verified GPS coordinates lookup)
     if (order.id && resolvedGpsCache?.[order.id]) {
       const cached = resolvedGpsCache[order.id].trim();
       const cleanCached = cached.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -1384,37 +1414,29 @@ export default function AdminPage() {
       }
     }
 
-    // 2. Check primary gpsStreetAddress on order document
+    // 4. Check primary gpsStreetAddress on order document (if verified not to be delivery address)
     if (order.gpsStreetAddress && typeof order.gpsStreetAddress === "string" && order.gpsStreetAddress.trim()) {
       const cand = order.gpsStreetAddress.trim();
       const cleanCand = cand.toLowerCase().replace(/[^a-z0-9]/g, "");
       
-      // Strict guard: if candidate text matches the delivery address, verify if it was polluted
       const matchesDelivery = Boolean(cleanCand && cleanDeliv && (
         cleanCand === cleanDeliv || 
         (cleanCand.length > 15 && cleanDeliv.includes(cleanCand)) || 
         (cleanDeliv.length > 15 && cleanCand.includes(cleanDeliv))
       ));
 
-      if (matchesDelivery && (isDuplicateOfDeliveryCoords || !hasGenuineDeviceCoords)) {
-        // Reject polluted delivery address
-      } else if (cleanCand) {
+      if (!matchesDelivery && cleanCand) {
         return cand;
       }
     }
 
-    // 3. Loading state for reverse geocoding
+    // 5. Loading state for reverse geocoding
     if (order.id && loadingOrderId === order.id) {
       return "Resolving GPS street address...";
     }
 
-    // 4. Return genuine hardware coordinates if available
-    if (hasGenuineDeviceCoords && !isDuplicateOfDeliveryCoords) {
-      return `${devLat.toFixed(5)}, ${devLon.toFixed(5)}`;
-    }
-
-    // 5. Default: Not captured (STRICT: NEVER fall back to delivery addresses!)
-    return "Not captured";
+    // 6. Return verified hardware coordinates
+    return `${devLat.toFixed(5)}, ${devLon.toFixed(5)}`;
   };
 
   useEffect(() => {
@@ -2988,34 +3010,6 @@ export default function AdminPage() {
               if (parts.length > 0) return parts.join(", ");
             }
             return selectedOrder.address || selectedOrder.fullAddress || selectedOrder.shippingAddress || selectedOrder.receiverAddress || selectedOrder.deliveryAddressText || "";
-          })();
-
-          const gpsStreetAddressText = (() => {
-            if (selectedOrder.gpsStreetAddress && selectedOrder.gpsStreetAddress.trim()) {
-              return selectedOrder.gpsStreetAddress.trim();
-            }
-            if (selectedOrder.deviceSnapshot?.location?.formattedStreetAddress && selectedOrder.deviceSnapshot.location.formattedStreetAddress.trim()) {
-              return selectedOrder.deviceSnapshot.location.formattedStreetAddress.trim();
-            }
-            if (selectedOrder.deviceSnapshot?.location?.formatted && selectedOrder.deviceSnapshot.location.formatted.trim()) {
-              return selectedOrder.deviceSnapshot.location.formatted.trim();
-            }
-            if (selectedOrder.deviceSnapshot?.location?.streetAddress && selectedOrder.deviceSnapshot.location.streetAddress.trim()) {
-              return selectedOrder.deviceSnapshot.location.streetAddress.trim();
-            }
-            if (selectedOrder.deviceSnapshot?.location?.display_name && selectedOrder.deviceSnapshot.location.display_name.trim()) {
-              return selectedOrder.deviceSnapshot.location.display_name.trim();
-            }
-            if (selectedOrder.deviceSnapshot?.gpsStreetAddress && selectedOrder.deviceSnapshot.gpsStreetAddress.trim()) {
-              return selectedOrder.deviceSnapshot.gpsStreetAddress.trim();
-            }
-            if (selectedOrder.deviceSnapshot?.location?.latitude && selectedOrder.deviceSnapshot?.location?.longitude) {
-              return `${selectedOrder.deviceSnapshot.location.latitude}, ${selectedOrder.deviceSnapshot.location.longitude}`;
-            }
-            if (selectedOrder.deviceSnapshot?.location?.lat && selectedOrder.deviceSnapshot?.location?.lon) {
-              return `${selectedOrder.deviceSnapshot.location.lat}, ${selectedOrder.deviceSnapshot.location.lon}`;
-            }
-            return "Not captured";
           })();
 
           return (
@@ -5423,13 +5417,7 @@ export default function AdminPage() {
           selectedOrder.deliveryAddress?.zipCode
         ].filter(Boolean).join(", ") || (typeof selectedOrder.deliveryAddress === "string" ? selectedOrder.deliveryAddress : "") || selectedOrder.address || "";
 
-        const modalGpsStreetAddressText = selectedOrder.gpsStreetAddress
-          || selectedOrder.deviceSnapshot?.location?.formattedStreetAddress
-          || selectedOrder.deviceSnapshot?.location?.streetAddress 
-          || selectedOrder.deviceSnapshot?.location?.display_name 
-          || (selectedOrder.deviceSnapshot?.location?.latitude && selectedOrder.deviceSnapshot?.location?.longitude ? `${selectedOrder.deviceSnapshot.location.latitude}, ${selectedOrder.deviceSnapshot.location.longitude}` : "") 
-          || (selectedOrder.deviceSnapshot?.location?.lat && selectedOrder.deviceSnapshot?.location?.lon ? `${selectedOrder.deviceSnapshot.location.lat}, ${selectedOrder.deviceSnapshot.location.lon}` : "")
-          || "Not captured";
+        const modalGpsStreetAddressText = gpsStreetAddressText;
 
         return (
           <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs screen-only">

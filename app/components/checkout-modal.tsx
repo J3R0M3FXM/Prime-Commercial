@@ -334,8 +334,8 @@ export default function CheckoutModal({
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
-            // Only show active payment methods
-            setPaymentMethods(data.filter((m: any) => m.isActive !== false));
+            // Keep all payment methods (active and offline for customer visibility)
+            setPaymentMethods(data);
           }
         }
       } catch (e) {
@@ -1472,7 +1472,8 @@ export default function CheckoutModal({
                           >
                             <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                               {slicedMethods.map((method) => {
-                                const isSelected = selectedPaymentMethod?.id === method.id;
+                                const isOffline = method.isActive === false;
+                                const isSelected = !isOffline && selectedPaymentMethod?.id === method.id;
                                 const pType = (method.paymentType || method.type || "").toLowerCase();
                                 const isQr = pType === "qr_code" || pType === "qr" || pType.includes("qr");
                                 const qrImg = method.qrCodeImage || method.qrCode || method.qrImage || method.qr_code_image || "";
@@ -1481,7 +1482,9 @@ export default function CheckoutModal({
                                   <div key={method.id} className="flex flex-col items-center gap-1.5">
                                     <button
                                       type="button"
+                                      disabled={isOffline}
                                       onClick={() => {
+                                        if (isOffline) return;
                                         setSelectedPaymentMethod(method);
                                         setProofSubmitSuccess(false);
                                         setUploadedProofImage("");
@@ -1491,24 +1494,40 @@ export default function CheckoutModal({
                                           setIsPaymentQrModalOpen(true);
                                         }
                                       }}
-                                      className={`w-full h-[48px] sm:h-[56px] rounded-xl border-2 transition-all flex items-center justify-center p-1 cursor-pointer relative overflow-hidden ${
-                                        isSelected
-                                          ? "border-slate-900 shadow-sm ring-1 ring-slate-900"
-                                          : "border-gray-200 bg-white hover:border-gray-300"
+                                      className={`w-full h-[48px] sm:h-[56px] rounded-xl border-2 transition-all flex items-center justify-center p-1 relative overflow-hidden select-none ${
+                                        isOffline
+                                          ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90"
+                                          : isSelected
+                                          ? "border-slate-900 shadow-sm ring-1 ring-slate-900 cursor-pointer"
+                                          : "border-gray-200 bg-white hover:border-gray-300 cursor-pointer"
                                       }`}
+                                      title={isOffline ? `${method.name} is currently offline` : method.name}
                                     >
                                       {method.logo ? (
                                         <img
                                           src={method.logo}
                                           alt={method.name}
-                                          className="w-full h-full object-contain rounded-[8px]"
+                                          className={`w-full h-full object-contain rounded-[8px] transition-all ${
+                                            isOffline ? "filter blur-[1.5px] opacity-40 grayscale-[30%]" : ""
+                                          }`}
                                           referrerPolicy="no-referrer"
                                         />
                                       ) : (
-                                        <CreditCard className="w-5 h-5 text-gray-400" />
+                                        <CreditCard className={`w-5 h-5 text-gray-400 ${isOffline ? "filter blur-[1px] opacity-40" : ""}`} />
+                                      )}
+
+                                      {/* Offline Overlay */}
+                                      {isOffline && (
+                                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-[0.5px]">
+                                          <span className="font-heading font-black text-[9px] sm:text-[11px] text-red-500 uppercase tracking-widest bg-red-950/90 border border-red-500/70 px-1 sm:px-1.5 py-0.5 rounded shadow-xs leading-none">
+                                            OFFLINE
+                                          </span>
+                                        </div>
                                       )}
                                     </button>
-                                    <span className="text-xs sm:text-[13px] font-heading font-bold text-gray-900 truncate w-full text-center leading-tight">
+                                    <span className={`text-xs sm:text-[13px] font-heading font-bold truncate w-full text-center leading-tight ${
+                                      isOffline ? "text-gray-400" : "text-gray-900"
+                                    }`}>
                                       {method.name}
                                     </span>
                                   </div>

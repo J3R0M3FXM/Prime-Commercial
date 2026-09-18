@@ -131,10 +131,13 @@ export default function OrderHistoryModal({
       const res = await fetch(`/api/admin/payment-methods?_t=${Date.now()}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
-        const active = (Array.isArray(data) ? data : []).filter((m: any) => m.isActive !== false);
-        setPaymentMethods(active);
-        if (active.length > 0) {
-          setSelectedPaymentMethod(active[0]);
+        const list = Array.isArray(data) ? data : [];
+        setPaymentMethods(list);
+        const firstActive = list.find((m: any) => m.isActive !== false);
+        if (firstActive) {
+          setSelectedPaymentMethod(firstActive);
+        } else if (list.length > 0) {
+          setSelectedPaymentMethod(list[0]);
         }
       }
     } catch (e) {
@@ -898,8 +901,8 @@ export default function OrderHistoryModal({
                                 className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
                               >
                                 {paymentMethods.map(m => (
-                                  <option key={m.id} value={m.id}>
-                                    {m.name}
+                                  <option key={m.id} value={m.id} disabled={m.isActive === false}>
+                                    {m.name} {m.isActive === false ? "(OFFLINE)" : ""}
                                   </option>
                                 ))}
                               </select>
