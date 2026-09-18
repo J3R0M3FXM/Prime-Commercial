@@ -449,7 +449,7 @@ export default function CheckoutModal({
       } catch (err) {
         // silent background sync error
       }
-    }, 3500);
+    }, 15000);
 
     return () => clearInterval(syncInterval);
   }, [currentStep, completedOrder?.id, completedOrder?.orderNumber]);

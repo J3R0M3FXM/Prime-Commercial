@@ -93,8 +93,22 @@ function cleanForFirestore<T>(data: T): T {
   return result as T;
 }
 
+let cachedOrders: any[] | null = null;
+let lastOrdersFetchTime = 0;
+const CACHE_TTL_MS = 20000; // 20 seconds
+
+function invalidateOrdersCache() {
+  cachedOrders = null;
+  lastOrdersFetchTime = 0;
+}
+
 export async function GET() {
   try {
+    const now = Date.now();
+    if (cachedOrders && (now - lastOrdersFetchTime < CACHE_TTL_MS)) {
+      return NextResponse.json(cachedOrders);
+    }
+
     const ordersCol = collection(db, 'orders');
     const snap = await getDocs(ordersCol);
     const orders = snap.docs.map(d => ({
@@ -104,8 +118,14 @@ export async function GET() {
 
     orders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
+    cachedOrders = orders;
+    lastOrdersFetchTime = now;
+
     return NextResponse.json(orders);
   } catch (error: any) {
+    if (cachedOrders) {
+      return NextResponse.json(cachedOrders);
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -136,6 +156,7 @@ export async function PUT(request: Request) {
           console.warn(`Failed to update order ${orderId}:`, err);
         }
       }
+      invalidateOrdersCache();
       return NextResponse.json({ success: true, updatedCount: results.length, ids: results });
     }
 
@@ -369,6 +390,7 @@ export async function PUT(request: Request) {
 
     const cleanedData = cleanForFirestore(updateData);
     await updateDoc(orderRef, cleanedData);
+    invalidateOrdersCache();
 
     return NextResponse.json({ 
       success: true, 
@@ -387,6 +409,7 @@ export async function DELETE(request: Request) {
 
     const orderRef = doc(db, 'orders', id);
     await deleteDoc(orderRef);
+    invalidateOrdersCache();
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

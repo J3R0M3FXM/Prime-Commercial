@@ -20,6 +20,15 @@ function cleanTimestamps(obj: any): any {
   return copy;
 }
 
+let cachedAllCustomers: any[] | null = null;
+let lastAllCustomersFetchTime = 0;
+const CUSTOMERS_CACHE_TTL_MS = 25000; // 25 seconds
+
+function invalidateCustomersCache() {
+  cachedAllCustomers = null;
+  lastAllCustomersFetchTime = 0;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -155,6 +164,11 @@ export async function GET(request: Request) {
     }
 
     // 2. All Customers Compact List
+    const now = Date.now();
+    if (cachedAllCustomers && (now - lastAllCustomersFetchTime < CUSTOMERS_CACHE_TTL_MS)) {
+      return NextResponse.json(cachedAllCustomers);
+    }
+
     const usersCol = collection(db, 'users');
     const userSnap = await getDocs(usersCol);
 
@@ -188,28 +202,10 @@ export async function GET(request: Request) {
       }
     });
     
-    const users = await Promise.all(userSnap.docs.map(async (userDoc) => {
+    const users = userSnap.docs.map((userDoc) => {
       const userData = cleanTimestamps(userDoc.data());
       
-      let latestFingerprint = userData.latestFingerprint || null;
-      let snapshotCount = 0;
-
-      try {
-        const fpCol = collection(db, 'users', userDoc.id, 'fingerprints');
-        const fpSnap = await getDocs(fpCol);
-        snapshotCount = fpSnap.size;
-        if (!latestFingerprint && !fpSnap.empty) {
-          const fps = fpSnap.docs.map(d => ({ id: d.id, ...cleanTimestamps(d.data()) }));
-          fps.sort((a, b) => {
-            const tA = new Date(a.createdAt || a.lastSeen || 0).getTime();
-            const tB = new Date(b.createdAt || b.lastSeen || 0).getTime();
-            return tB - tA;
-          });
-          latestFingerprint = fps[0];
-        }
-      } catch (err) {
-        console.warn(`Session lookup for ${userDoc.id}:`, err);
-      }
+      const latestFingerprint = userData.latestFingerprint || null;
 
       // Check device sharing for promo fraud detection
       const userDevId = userData.deviceId || latestFingerprint?.deviceId;
@@ -242,16 +238,22 @@ export async function GET(request: Request) {
         hardwareId: userHwId || "",
         appId: userData.appId || latestFingerprint?.appId || "PRIME_SHOP_APP",
         latestFingerprint,
-        snapshotCount: Math.max(snapshotCount, latestFingerprint ? 1 : 0),
+        snapshotCount: latestFingerprint ? 1 : 0,
         orderCount: customerOrders.length,
         totalSpent,
         isPromoFraudRisk: totalSharedOthers > 0,
         sharedAccountCount: totalSharedOthers
       };
-    }));
-    
+    });
+
+    cachedAllCustomers = users;
+    lastAllCustomersFetchTime = now;
+
     return NextResponse.json(users);
   } catch (error: any) {
+    if (cachedAllCustomers) {
+      return NextResponse.json(cachedAllCustomers);
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

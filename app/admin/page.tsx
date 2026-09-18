@@ -752,8 +752,8 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authorized || !silentSyncEnabled) return;
 
-    // Fast 3.5s refresh on Orders Management and Order Details views, 6s on other modules
-    const pollInterval = (view === "orders" || view === "order-detail") ? 3500 : 6000;
+    // 30s background sync on Orders Management, 45s on other modules to conserve Firestore daily read quota
+    const pollInterval = (view === "orders" || view === "order-detail") ? 30000 : 45000;
 
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;

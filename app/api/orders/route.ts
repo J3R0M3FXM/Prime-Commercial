@@ -579,14 +579,26 @@ export async function POST(request: Request) {
   }
 }
 
+let cachedPublicOrders: any[] | null = null;
+let lastPublicOrdersFetchTime = 0;
+const PUBLIC_ORDERS_CACHE_TTL_MS = 15000; // 15 seconds
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customerId');
 
-    const ordersCol = collection(db, 'orders');
-    const snap = await getDocs(ordersCol);
-    let orders = snap.docs.map(d => ({ id: d.id, ...cleanTimestamps(d.data()) }));
+    const now = Date.now();
+    let allOrders = cachedPublicOrders;
+    if (!allOrders || (now - lastPublicOrdersFetchTime > PUBLIC_ORDERS_CACHE_TTL_MS)) {
+      const ordersCol = collection(db, 'orders');
+      const snap = await getDocs(ordersCol);
+      allOrders = snap.docs.map(d => ({ id: d.id, ...cleanTimestamps(d.data()) }));
+      cachedPublicOrders = allOrders;
+      lastPublicOrdersFetchTime = now;
+    }
+
+    let orders = [...allOrders];
 
     if (customerId) {
       orders = orders.filter((o: any) => o.customerId === customerId || o.tgUserId === customerId);
@@ -596,6 +608,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json(orders);
   } catch (error: any) {
+    if (cachedPublicOrders) {
+      return NextResponse.json(cachedPublicOrders);
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -623,6 +638,8 @@ export async function PUT(request: Request) {
       updatedAt: new Date().toISOString()
     });
 
+    cachedPublicOrders = null;
+    lastPublicOrdersFetchTime = 0;
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error updating order payment proof:', error);
