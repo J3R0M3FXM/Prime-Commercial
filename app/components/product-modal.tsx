@@ -7,55 +7,47 @@ import { formatPHP } from "@/lib/currency";
 export default function ProductModal({ product, onClose }: { product: any, onClose: () => void }) {
   const { cart, addToCart, updateQuantity } = useCart();
   
-  // Extract variants (support fallback for backward compatibility)
+  // Extract variants
   const variants = product?.variants && product.variants.length > 0
     ? product.variants
     : [{
         id: "default",
         name: "Standard",
         imageUrl: product?.imageUrl || "https://picsum.photos/seed/prime/600",
-        rating: product?.rating || 4.5,
         stock: product?.stock ?? 10,
         price: product?.price || 0,
         tag: "NONE"
       }];
 
-  const [selectedVariant, setSelectedVariant] = useState(variants[0]);
+  // Do NOT pre-select an option by default — require customer choice first
+  const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [localQuantity, setLocalQuantity] = useState(1);
 
-  // Re-sync when product changes
+  // Reset selection when product changes
   useEffect(() => {
-    if (product) {
-      const vars = product.variants && product.variants.length > 0
-        ? product.variants
-        : [{
-            id: "default",
-            name: "Standard",
-            imageUrl: product.imageUrl || "https://picsum.photos/seed/prime/600",
-            rating: product.rating || 4.5,
-            stock: product.stock ?? 10,
-            price: product.price || 0,
-            tag: "NONE"
-          }];
-      setSelectedVariant(vars[0]);
-      setLocalQuantity(1);
-    }
+    setSelectedVariant(null);
+    setLocalQuantity(1);
   }, [product]);
 
   if (!product) return null;
 
-  // Find unique cart item corresponding to this variant
-  const cartItemId = selectedVariant.id === "default" ? product.id : `${product.id}_${selectedVariant.id}`;
-  const cartItem = cart.find((item: any) => item.id === cartItemId);
+  // Find unique cart item corresponding to this variant (if selected)
+  const cartItemId = selectedVariant 
+    ? (selectedVariant.id === "default" ? product.id : `${product.id}_${selectedVariant.id}`)
+    : null;
+  const cartItem = cartItemId ? cart.find((item: any) => item.id === cartItemId) : null;
   const isInCart = !!cartItem;
   const quantityInCart = isInCart ? cartItem.quantity : 0;
 
   const lowStockThreshold = Number(product.lowStockThreshold) ?? 10;
-  const isOutOfStock = (selectedVariant.stock ?? 0) <= 0;
+  const isOutOfStock = selectedVariant ? (selectedVariant.stock ?? 0) <= 0 : false;
   const hasBundle = product.bundleConfig?.enabled;
   
-  // Apply final price calculations (e.g. bundles)
-  const basePrice = Number(selectedVariant.price) || 0;
+  // Base price
+  const basePrice = selectedVariant 
+    ? (Number(selectedVariant.price) || 0)
+    : (variants.length > 0 ? Math.min(...variants.map((v: any) => Number(v.price) || 0)) : (Number(product.price) || 0));
+
   const currentQuantity = isInCart ? quantityInCart : localQuantity;
   const finalPrice = hasBundle && currentQuantity > 1 
     ? basePrice * (1 - (product.bundleConfig.discount / 100))
@@ -63,6 +55,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
   // Glossy chip rendering
   const renderGlossyChip = () => {
+    if (!selectedVariant) return null;
     const stock = selectedVariant.stock ?? 0;
     let tag = "NONE";
     
@@ -91,6 +84,8 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
   };
 
   const handleAddToCart = () => {
+    if (!selectedVariant || !cartItemId) return;
+
     const itemToCart = {
       id: cartItemId,
       productId: product.id,
@@ -123,12 +118,12 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
         </button>
 
         <div className="sm:grid sm:grid-cols-2 flex-1 overflow-y-auto">
-          {/* Left panel: Variant Image with Glossy Chip */}
+          {/* Left panel: Image */}
           <div className="relative aspect-square sm:aspect-auto sm:h-full bg-gray-50 min-h-[250px] sm:min-h-[400px]">
             {renderGlossyChip()}
             <img 
-              src={selectedVariant.imageUrl || product.imageUrl || "https://picsum.photos/seed/prime/600"} 
-              alt={`${product.name} - ${selectedVariant.name}`} 
+              src={selectedVariant?.imageUrl || product.imageUrl || "https://picsum.photos/seed/prime/600"} 
+              alt={product.name} 
               className={`w-full h-full object-cover absolute inset-0 ${isOutOfStock ? 'opacity-60 grayscale' : ''}`} 
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).src = "https://picsum.photos/seed/prime/600";
@@ -136,7 +131,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
             />
           </div>
 
-          {/* Right panel: Details & Variants selection */}
+          {/* Right panel: Details & Option selection */}
           <div className="p-6 flex flex-col justify-between space-y-6">
             <div className="space-y-4">
               {/* Category */}
@@ -149,9 +144,9 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
                 <h2 className="text-xl sm:text-2xl font-heading font-bold text-gray-900 leading-tight">
                   {product.name}
                 </h2>
-                {selectedVariant.id !== "default" && (
-                  <p className="text-sm font-semibold text-gray-500 mt-1 uppercase tracking-wide">
-                    Variant: {selectedVariant.name}
+                {selectedVariant && selectedVariant.id !== "default" && (
+                  <p className="text-sm font-semibold text-gray-500 mt-1 uppercase tracking-wide font-mono">
+                    Selected Option: <span className="text-gray-900 font-bold">{selectedVariant.name}</span>
                   </p>
                 )}
                 
@@ -160,7 +155,12 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
                   <span className="text-2xl font-mono font-bold text-gray-900">
                     {formatPHP(finalPrice)}
                   </span>
-                  {hasBundle && currentQuantity > 1 && (
+                  {!selectedVariant && variants.length > 1 && (
+                    <span className="text-[11px] font-mono font-medium text-slate-400">
+                      (Starting Price)
+                    </span>
+                  )}
+                  {hasBundle && currentQuantity > 1 && selectedVariant && (
                     <span className="text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider">
                       Bundle Savings Applied
                     </span>
@@ -169,68 +169,70 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
               </div>
 
               {/* Stocks Status */}
-              <div className="flex items-center py-2 border-y border-gray-100">
-                <div className="text-xs font-mono font-bold uppercase tracking-wider">
-                  {isOutOfStock ? (
-                    <span className="text-red-500">Unavailable</span>
-                  ) : (
-                    <span className="text-gray-500">Stock: <span className="text-gray-900">{selectedVariant.stock}</span></span>
-                  )}
+              {selectedVariant && (
+                <div className="flex items-center py-2 border-y border-gray-100">
+                  <div className="text-xs font-mono font-bold uppercase tracking-wider">
+                    {isOutOfStock ? (
+                      <span className="text-red-500">Unavailable</span>
+                    ) : (
+                      <span className="text-gray-500">Stock: <span className="text-gray-900">{selectedVariant.stock}</span></span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Selection Note for Customers */}
-              <div className="bg-amber-50 border border-amber-200/90 rounded-xl p-2.5 flex items-center gap-2 text-amber-900 text-xs font-mono">
-                <Info className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Note: Please select an option or variant before adding to cart.</span>
-              </div>
+              {/* Selection Note for Customers - automatically hidden once option is selected */}
+              {!selectedVariant && (
+                <div className="bg-amber-50 border border-amber-200/90 rounded-xl p-3 flex items-center gap-2 text-amber-900 text-xs font-mono animate-in fade-in duration-150">
+                  <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Note: Please select an option or variant before adding to cart.</span>
+                </div>
+              )}
 
               {/* Description */}
               <p className="text-xs text-gray-500 leading-relaxed max-h-[100px] overflow-y-auto">
                 {product.description || "No description provided for this product. Premium quality guaranteed."}
               </p>
 
-              {/* Variant selector */}
-              {variants.length > 1 && (
-                <div className="space-y-2 pt-2">
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 font-mono">
-                    Select Option
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {variants.map((v: any) => {
-                      const isSelected = selectedVariant.id === v.id;
-                      return (
-                        <button
-                          key={v.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedVariant(v);
-                            setLocalQuantity(1);
-                          }}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                            isSelected 
-                              ? "border-black bg-black text-white shadow-xs" 
-                              : "border-gray-200 bg-white hover:border-gray-400 text-gray-700"
-                          }`}
-                        >
-                          {v.imageUrl && (
-                            <img 
-                              src={v.imageUrl} 
-                              alt={v.name} 
-                              className="w-4 h-4 rounded-md object-cover border border-gray-100" 
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
-                          )}
-                          <span>{v.name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+              {/* Option / Variant selector */}
+              <div className="space-y-2 pt-2">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 font-mono">
+                  Select Option
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {variants.map((v: any) => {
+                    const isSelected = selectedVariant?.id === v.id;
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedVariant(v);
+                          setLocalQuantity(1);
+                        }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                          isSelected 
+                            ? "border-black bg-black text-white shadow-xs" 
+                            : "border-gray-200 bg-white hover:border-gray-300 text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {v.imageUrl && (
+                          <img 
+                            src={v.imageUrl} 
+                            alt={v.name} 
+                            className="w-4 h-4 rounded-md object-cover border border-gray-100" 
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        )}
+                        <span>{v.name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
 
-              {/* Bundle discount config banner */}
-              {hasBundle && !isOutOfStock && (
+              {/* Bundle discount banner */}
+              {hasBundle && selectedVariant && !isOutOfStock && (
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-start gap-2.5">
                   <div className="mt-0.5 bg-emerald-500 text-white rounded-full p-0.5">
                     <Check className="w-2.5 h-2.5" />
@@ -247,7 +249,14 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
             {/* Bottom: Cart Control Actions */}
             <div className="pt-4 border-t border-gray-100">
-              {isOutOfStock ? (
+              {!selectedVariant ? (
+                <button 
+                  disabled
+                  className="w-full bg-gray-100 text-gray-400 py-3.5 rounded-xl font-heading font-bold uppercase tracking-widest text-xs cursor-not-allowed text-center"
+                >
+                  Please Select an Option First
+                </button>
+              ) : isOutOfStock ? (
                 <button 
                   disabled
                   className="w-full bg-gray-100 text-gray-400 py-3.5 rounded-xl font-heading font-bold uppercase tracking-widest text-xs"
@@ -304,7 +313,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
                   <button 
                     onClick={handleAddToCart} 
-                    className="w-full px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center"
+                    className="w-full px-3.5 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center"
                   >
                     <span>Add to Cart — {formatPHP(finalPrice * localQuantity)}</span>
                   </button>

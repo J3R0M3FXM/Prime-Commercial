@@ -355,6 +355,13 @@ export default function Shopfront() {
                   </div>
                   
                   <div className="p-3 sm:p-4 flex flex-col flex-1 justify-between gap-2">
+                    {/* Category */}
+                    {p.category && (
+                      <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400">
+                        {p.category}
+                      </p>
+                    )}
+
                     {/* Product Name */}
                     <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-tight text-sm sm:text-base">
                       {p.name}
