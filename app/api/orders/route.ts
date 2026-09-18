@@ -114,6 +114,17 @@ export async function POST(request: Request) {
             gpsStreetAddress = gData.results?.[0]?.formatted || '';
           }
         }
+        if (!gpsStreetAddress) {
+          const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${rawDevLat}&lon=${rawDevLon}&zoom=18&addressdetails=1`;
+          const nomRes = await fetch(nomUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) PrimeStoreFront/1.0' },
+            signal: AbortSignal.timeout(3000)
+          });
+          if (nomRes.ok) {
+            const nomData = await nomRes.json();
+            gpsStreetAddress = nomData.display_name || '';
+          }
+        }
       } catch (e) {
         console.warn("Could not reverse geocode order GPS:", e);
       }

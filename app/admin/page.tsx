@@ -1735,8 +1735,8 @@ export default function AdminPage() {
    *   MUST return "Not captured". It is strictly prohibited from falling back to any shipping/delivery fields.
    */
   const resolveOrderGpsStreetAddress = (
-    order: any, 
-    resolvedGpsCache?: Record<string, string>, 
+    order: any,
+    resolvedGpsCache?: Record<string, string>,
     loadingOrderId?: string | null
   ): string => {
     if (!order) return "Not captured";
@@ -1756,68 +1756,39 @@ export default function AdminPage() {
 
     const hasGenuineDeviceCoords = Number.isFinite(devLat) && Number.isFinite(devLon) && (devLat !== 0 || devLon !== 0);
 
-    // CRITICAL: If no genuine hardware coordinates exist, PRECISE GPS ADDRESS is strictly "Not captured".
+    // If no genuine hardware coordinates exist, PRECISE GPS ADDRESS is strictly "Not captured".
     if (!hasGenuineDeviceCoords) {
       return "Not captured";
     }
 
-    // 2. Derive delivery address text and delivery coordinates for strict contamination detection
-    const rawDeliv = order.deliveryAddress;
-    const deliveryText = (() => {
-      if (!rawDeliv) return (order.address || order.shippingAddress || order.fullAddress || "");
-      if (typeof rawDeliv === "string") return rawDeliv;
-      const parts = [
-        rawDeliv.formatted || rawDeliv.address || "",
-        rawDeliv.unitDetails ? `(${rawDeliv.unitDetails})` : ""
-      ].filter(Boolean);
-      return parts.join(" ").trim();
-    })();
+    const isRawCoordStr = (str: string) => {
+      if (!str) return true;
+      const s = str.trim();
+      return /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(s);
+    };
 
-    const cleanDeliv = (deliveryText || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-    const delivLat = Number(rawDeliv?.lat);
-    const delivLon = Number(rawDeliv?.lon);
-    const hasDelivCoords = Number.isFinite(delivLat) && Number.isFinite(delivLon) && (delivLat !== 0 || delivLon !== 0);
-
-    // Detect if location coordinates are an unverified replica of the user delivery destination
-    const isDuplicateOfDeliveryCoords = hasDelivCoords &&
-      Math.abs(devLat - delivLat) < 0.0001 && Math.abs(devLon - delivLon) < 0.0001 &&
-      loc?.source !== "Actual Device Hardware GPS";
-
-    if (isDuplicateOfDeliveryCoords) {
-      return "Not captured";
-    }
-
-    // 3. Check reverse geocoding cache (from verified GPS coordinates lookup)
+    // 2. Check reverse geocoding cache (from verified GPS coordinates lookup)
     if (order.id && resolvedGpsCache?.[order.id]) {
       const cached = resolvedGpsCache[order.id].trim();
-      const cleanCached = cached.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (cleanCached && (!cleanDeliv || cleanCached !== cleanDeliv)) {
+      if (cached && !isRawCoordStr(cached)) {
         return cached;
       }
     }
 
-    // 4. Check primary gpsStreetAddress on order document (if verified not to be delivery address)
+    // 3. Check primary gpsStreetAddress on order document
     if (order.gpsStreetAddress && typeof order.gpsStreetAddress === "string" && order.gpsStreetAddress.trim()) {
       const cand = order.gpsStreetAddress.trim();
-      const cleanCand = cand.toLowerCase().replace(/[^a-z0-9]/g, "");
-      
-      const matchesDelivery = Boolean(cleanCand && cleanDeliv && (
-        cleanCand === cleanDeliv || 
-        (cleanCand.length > 15 && cleanDeliv.includes(cleanCand)) || 
-        (cleanDeliv.length > 15 && cleanCand.includes(cleanDeliv))
-      ));
-
-      if (!matchesDelivery && cleanCand) {
+      if (!isRawCoordStr(cand)) {
         return cand;
       }
     }
 
-    // 5. Loading state for reverse geocoding
+    // 4. Loading state for reverse geocoding
     if (order.id && loadingOrderId === order.id) {
       return "Resolving GPS street address...";
     }
 
-    // 6. Return verified hardware coordinates
+    // 5. Fallback to coordinates format until reverse geocode completes
     return `${devLat.toFixed(5)}, ${devLon.toFixed(5)}`;
   };
 
@@ -1825,40 +1796,49 @@ export default function AdminPage() {
     if (!selectedOrder) return;
     const orderId = selectedOrder.id;
 
-    // Check if GPS is already resolved cleanly
-    const currentResolved = resolveOrderGpsStreetAddress(selectedOrder, resolvedGpsAddresses, null);
-    if (currentResolved && currentResolved !== "Not captured" && !currentResolved.includes("Resolving")) {
-      return;
-    }
-
+    // Extract device lat/lon
     const loc = selectedOrder.deviceSnapshot?.location;
-    const devLat = Number(loc?.lat ?? loc?.latitude);
-    const devLon = Number(loc?.lon ?? loc?.longitude);
-    const delivLat = Number(selectedOrder.deliveryAddress?.lat);
-    const delivLon = Number(selectedOrder.deliveryAddress?.lon);
+    let devLat = Number(loc?.lat ?? loc?.latitude);
+    let devLon = Number(loc?.lon ?? loc?.longitude);
+
+    if ((!Number.isFinite(devLat) || !Number.isFinite(devLon) || (devLat === 0 && devLon === 0)) && typeof selectedOrder.coordinates === 'string') {
+      const parts = selectedOrder.coordinates.split(',').map((s: string) => Number(s.trim()));
+      if (parts.length === 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1]) && (parts[0] !== 0 || parts[1] !== 0)) {
+        devLat = parts[0];
+        devLon = parts[1];
+      }
+    }
 
     const hasRealCoords = Number.isFinite(devLat) && Number.isFinite(devLon) && (devLat !== 0 || devLon !== 0);
-    const isDeliveryClone = hasRealCoords && Number.isFinite(delivLat) && Number.isFinite(delivLon) &&
-      Math.abs(devLat - delivLat) < 0.0001 && Math.abs(devLon - delivLon) < 0.0001 &&
-      loc?.source !== "Actual Device Hardware GPS";
+    if (!hasRealCoords) return;
 
-    if (hasRealCoords && !isDeliveryClone && !resolvedGpsAddresses[orderId]) {
-      setLoadingGpsOrderId(orderId);
-      fetch(`/api/geoapify/reverse?lat=${devLat}&lon=${devLon}`)
-        .then(res => res.json())
-        .then(data => {
-          const formatted = data.results?.[0]?.formatted;
-          if (formatted) {
-            setResolvedGpsAddresses(prev => ({ ...prev, [orderId]: formatted }));
-          }
-        })
-        .catch(err => {
-          console.warn("Could not reverse geocode order GPS:", err);
-        })
-        .finally(() => {
-          setLoadingGpsOrderId(null);
-        });
-    }
+    const currentGpsStr = selectedOrder.gpsStreetAddress;
+    const isRawCoordStr = (str: string | undefined | null) => {
+      if (!str) return true;
+      const s = str.trim();
+      return /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(s);
+    };
+
+    const hasValidAddress = (resolvedGpsAddresses[orderId] && !isRawCoordStr(resolvedGpsAddresses[orderId])) ||
+                            (currentGpsStr && !isRawCoordStr(currentGpsStr));
+
+    if (hasValidAddress) return;
+
+    setLoadingGpsOrderId(orderId);
+    fetch(`/api/geoapify/reverse?lat=${devLat}&lon=${devLon}`)
+      .then(res => res.json())
+      .then(data => {
+        const formatted = data.results?.[0]?.formatted;
+        if (formatted && !isRawCoordStr(formatted)) {
+          setResolvedGpsAddresses(prev => ({ ...prev, [orderId]: formatted }));
+        }
+      })
+      .catch(err => {
+        console.warn("Could not reverse geocode order GPS:", err);
+      })
+      .finally(() => {
+        setLoadingGpsOrderId(null);
+      });
   }, [selectedOrder, resolvedGpsAddresses]);
 
   const deliveryAddressText = useMemo(() => {
