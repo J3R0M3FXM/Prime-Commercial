@@ -28,7 +28,11 @@ import {
   ExternalLink,
   CheckCircle2,
   AlertTriangle,
-  XCircle
+  XCircle,
+  Tag,
+  Gift,
+  Coins,
+  Percent
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
@@ -202,6 +206,40 @@ export default function CheckoutModal({
   const [submitError, setSubmitError] = useState<string>("");
   const [completedOrder, setCompletedOrder] = useState<any>(null);
 
+  // Promo / Voucher State
+  const [promoCodeInput, setPromoCodeInput] = useState<string>("");
+  const [appliedPromo, setAppliedPromo] = useState<{
+    code: string;
+    title: string;
+    promoId: string;
+    discountAmount: number;
+    discountType: "fixed" | "percentage" | "free_shipping";
+    discountValue?: number;
+    maxDiscountAmount?: number | null;
+    isFreeShipping: boolean;
+  } | null>(null);
+  const [isCheckingPromo, setIsCheckingPromo] = useState<boolean>(false);
+  const [promoError, setPromoError] = useState<string>("");
+
+  // Store Credits State
+  const [availableStoreCredits, setAvailableStoreCredits] = useState<number>(0);
+  const [useStoreCredits, setUseStoreCredits] = useState<boolean>(false);
+
+  // Referral Code State
+  const [referralCodeInput, setReferralCodeInput] = useState<string>("");
+  const [appliedReferral, setAppliedReferral] = useState<{
+    code: string;
+    referrerName: string;
+    referrerMemberId: string;
+  } | null>(null);
+  const [existingReferrer, setExistingReferrer] = useState<{
+    memberId: string;
+    name?: string;
+  } | null>(null);
+  const [isCheckingReferral, setIsCheckingReferral] = useState<boolean>(false);
+  const [referralError, setReferralError] = useState<string>("");
+  const [referralSuccess, setReferralSuccess] = useState<string>("");
+
   // Hydrate Telegram info on open
   useEffect(() => {
     if (!isOpen) return;
@@ -273,6 +311,17 @@ export default function CheckoutModal({
                 primeMemberId: realMemberId || prev.primeMemberId,
               }));
 
+              if (customer.storeCredits !== undefined) {
+                setAvailableStoreCredits(Number(customer.storeCredits) || 0);
+              }
+
+              if (customer.referredByMemberId) {
+                setExistingReferrer({
+                  memberId: customer.referredByMemberId,
+                  name: customer.referredByName || "Member"
+                });
+              }
+
               if (!receiverName && realName) {
                 setReceiverName(realName.toUpperCase());
               }
@@ -285,6 +334,17 @@ export default function CheckoutModal({
             setIsLoadingProfile(false);
           });
       }
+
+      // Check URL search params or local storage for referral code
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlRef = urlParams.get("ref") || urlParams.get("referral") || urlParams.get("startapp");
+        const storedRef = localStorage.getItem("prime_referred_by");
+        const initialRef = (urlRef || storedRef || "").trim().toUpperCase();
+        if (initialRef && !referralCodeInput) {
+          setReferralCodeInput(initialRef);
+        }
+      } catch (e) {}
 
       // Pre-fill receiver if empty
       if (!receiverName && resolvedName && resolvedName !== "Customer") {
@@ -590,27 +650,166 @@ export default function CheckoutModal({
     return selectedCourier?.calculatedFee || 0;
   }, [selectedCourier]);
 
-  // Payable calculations based on user's choice: upon_checkout vs upon_delivery
-  const payableNow = useMemo(() => {
-    const base = itemsSubtotal + totalChargesAmount;
+  // Effective courier delivery fee considering free shipping promo
+  const effectiveCourierDeliveryFee = useMemo(() => {
+    if (appliedPromo?.isFreeShipping) return 0;
+    return courierDeliveryFee;
+  }, [appliedPromo, courierDeliveryFee]);
+
+  // Recalculate promo discount if cart items subtotal changes
+  const promoDiscountAmount = useMemo(() => {
+    if (!appliedPromo) return 0;
+    if (appliedPromo.isFreeShipping) return 0; // Handled via effectiveCourierDeliveryFee
+    if (appliedPromo.discountType === "percentage" && appliedPromo.discountValue) {
+      const pct = Number(appliedPromo.discountValue) || 0;
+      let calc = (itemsSubtotal * pct) / 100;
+      if (appliedPromo.maxDiscountAmount) {
+        calc = Math.min(calc, appliedPromo.maxDiscountAmount);
+      }
+      return Math.min(itemsSubtotal, Math.round(calc));
+    }
+    return Math.min(itemsSubtotal, appliedPromo.discountAmount || 0);
+  }, [appliedPromo, itemsSubtotal]);
+
+  const subtotalAfterPromo = useMemo(() => {
+    return Math.max(0, itemsSubtotal - promoDiscountAmount);
+  }, [itemsSubtotal, promoDiscountAmount]);
+
+  // Base payable amount before store credits
+  const payableBeforeCredits = useMemo(() => {
+    const base = subtotalAfterPromo + totalChargesAmount;
     if (deliveryPaymentMethod === "upon_checkout") {
-      return base + courierDeliveryFee;
+      return base + effectiveCourierDeliveryFee;
     }
     return base;
-  }, [itemsSubtotal, totalChargesAmount, courierDeliveryFee, deliveryPaymentMethod]);
+  }, [subtotalAfterPromo, totalChargesAmount, effectiveCourierDeliveryFee, deliveryPaymentMethod]);
 
+  // Store credits to deduct
+  const creditsDeducted = useMemo(() => {
+    if (!useStoreCredits || availableStoreCredits <= 0) return 0;
+    return Math.min(availableStoreCredits, payableBeforeCredits);
+  }, [useStoreCredits, availableStoreCredits, payableBeforeCredits]);
+
+  // Final payable now
+  const payableNow = useMemo(() => {
+    return Math.max(0, payableBeforeCredits - creditsDeducted);
+  }, [payableBeforeCredits, creditsDeducted]);
+
+  // Final payable on delivery
   const payableOnDelivery = useMemo(() => {
     if (deliveryPaymentMethod === "upon_delivery") {
-      return courierDeliveryFee;
+      return effectiveCourierDeliveryFee;
     }
     return 0;
-  }, [deliveryPaymentMethod, courierDeliveryFee]);
+  }, [deliveryPaymentMethod, effectiveCourierDeliveryFee]);
 
+  // Total order value
   const overallOrderValue = useMemo(() => {
-    return deliveryPaymentMethod === "upon_checkout"
-      ? itemsSubtotal + totalChargesAmount + courierDeliveryFee
-      : itemsSubtotal + totalChargesAmount;
-  }, [itemsSubtotal, totalChargesAmount, courierDeliveryFee, deliveryPaymentMethod]);
+    return payableNow + payableOnDelivery;
+  }, [payableNow, payableOnDelivery]);
+
+  // Promo Code Validation Handler
+  const handleApplyPromo = async () => {
+    const cleanCode = promoCodeInput.trim().toUpperCase();
+    if (!cleanCode) {
+      setPromoError("Please enter a promo code.");
+      return;
+    }
+    setIsCheckingPromo(true);
+    setPromoError("");
+    try {
+      const fpData = await getClientFingerprint();
+      const res = await fetch("/api/promos/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: cleanCode,
+          itemsSubtotal,
+          deliveryFee: courierDeliveryFee,
+          customerId: tgCustomer.id,
+          primeMemberId: tgCustomer.primeMemberId,
+          deviceId: fpData.deviceId,
+          hardwareId: fpData.hardwareId
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setPromoError(data.error || "Invalid promo code.");
+        return;
+      }
+      setAppliedPromo({
+        code: data.code,
+        title: data.title || data.code,
+        promoId: data.promoId,
+        discountAmount: Number(data.discountAmount) || 0,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        maxDiscountAmount: data.maxDiscountAmount,
+        isFreeShipping: Boolean(data.isFreeShipping)
+      });
+      setPromoCodeInput("");
+    } catch (err: any) {
+      setPromoError(err.message || "Failed to validate promo code.");
+    } finally {
+      setIsCheckingPromo(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoError("");
+  };
+
+  // Referral Code Validation Handler
+  const handleApplyReferral = async () => {
+    const cleanCode = referralCodeInput.trim().toUpperCase();
+    if (!cleanCode) {
+      setReferralError("Please enter a referral code.");
+      return;
+    }
+    setIsCheckingReferral(true);
+    setReferralError("");
+    setReferralSuccess("");
+    try {
+      const res = await fetch("/api/referral/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          referralCode: cleanCode,
+          customerId: tgCustomer.id,
+          customerMemberId: tgCustomer.primeMemberId
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setReferralError(data.error || "Invalid referral code.");
+        return;
+      }
+      setAppliedReferral({
+        code: data.referrerMemberId,
+        referrerName: data.referrerName || "Valued Member",
+        referrerMemberId: data.referrerMemberId
+      });
+      setReferralSuccess(`Referred by ${data.referrerName} (${data.referrerMemberId})`);
+      try {
+        localStorage.setItem("prime_referred_by", data.referrerMemberId);
+      } catch (e) {}
+    } catch (err: any) {
+      setReferralError(err.message || "Failed to validate referral code.");
+    } finally {
+      setIsCheckingReferral(false);
+    }
+  };
+
+  const handleRemoveReferral = () => {
+    setAppliedReferral(null);
+    setReferralError("");
+    setReferralSuccess("");
+    setReferralCodeInput("");
+    try {
+      localStorage.removeItem("prime_referred_by");
+    } catch (e) {}
+  };
 
   // Step Navigations & Validations
   const handleNextFromStep1 = () => {
@@ -734,6 +933,14 @@ export default function CheckoutModal({
         totalAmount: overallOrderValue,
         payableNow,
         payableOnDelivery,
+        promoCode: appliedPromo ? appliedPromo.code : null,
+        promoDiscount: promoDiscountAmount,
+        promoTitle: appliedPromo?.title || null,
+        promoId: appliedPromo?.promoId || null,
+        isFreeShipping: Boolean(appliedPromo?.isFreeShipping),
+        appliedStoreCredits: creditsDeducted,
+        storeCreditsUsed: creditsDeducted,
+        referralCode: appliedReferral?.code || (existingReferrer?.memberId || null),
         notes: customerNotes.trim() || "Non",
         deviceId: fpData.deviceId,
         sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
@@ -915,6 +1122,23 @@ export default function CheckoutModal({
                     />
                   </div>
                 </div>
+
+                {(availableStoreCredits > 0 || existingReferrer) && (
+                  <div className="mt-3 pt-2.5 border-t border-gray-200/80 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                    {availableStoreCredits > 0 ? (
+                      <span className="text-amber-800 font-bold flex items-center gap-1.5 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                        <Coins className="w-3.5 h-3.5 text-amber-600" />
+                        Available Store Credits: {formatPHP(availableStoreCredits)}
+                      </span>
+                    ) : <span />}
+                    {existingReferrer && (
+                      <span className="text-gray-600 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                        <Gift className="w-3 h-3 text-blue-600" />
+                        Referred by: <strong className="text-gray-800 font-bold">{existingReferrer.memberId}</strong>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Receiver Information (Editable) */}
@@ -1275,6 +1499,231 @@ export default function CheckoutModal({
                 </div>
               </div>
 
+              {/* Promo & Voucher Code Section */}
+              <div className="border border-gray-200 rounded-xl p-3.5 sm:p-4 bg-white space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-900">
+                    <Tag className="w-3.5 h-3.5 text-slate-700" />
+                    <span>Promotions &amp; Vouchers</span>
+                  </div>
+                  {appliedPromo && (
+                    <span className="text-[10px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
+                      Applied
+                    </span>
+                  )}
+                </div>
+
+                {appliedPromo ? (
+                  <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                        <Tag className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-xs text-emerald-950 uppercase tracking-wide">
+                            {appliedPromo.code}
+                          </span>
+                          <span className="text-[11px] font-mono text-emerald-700 font-semibold">
+                            {appliedPromo.isFreeShipping
+                              ? "Free Shipping"
+                              : appliedPromo.discountType === "percentage"
+                              ? `${appliedPromo.discountValue}% OFF`
+                              : `₱${appliedPromo.discountAmount.toLocaleString()} OFF`}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-mono text-emerald-800 truncate">
+                          {appliedPromo.title || appliedPromo.code}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemovePromo}
+                      className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100 rounded-md transition-colors cursor-pointer"
+                      title="Remove promo code"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={promoCodeInput}
+                        onChange={(e) => {
+                          setPromoCodeInput(e.target.value.toUpperCase());
+                          if (promoError) setPromoError("");
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleApplyPromo();
+                          }
+                        }}
+                        placeholder="ENTER PROMO / VOUCHER CODE"
+                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyPromo}
+                        disabled={isCheckingPromo || !promoCodeInput.trim()}
+                        className="px-3.5 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shrink-0"
+                      >
+                        {isCheckingPromo ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Checking...</span>
+                          </>
+                        ) : (
+                          <span>Apply</span>
+                        )}
+                      </button>
+                    </div>
+
+                    {promoError && (
+                      <div className="text-[11px] font-mono text-red-600 flex items-center gap-1.5 bg-red-50 p-2 rounded border border-red-200">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{promoError}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* PRIME Store Credits Section */}
+              {availableStoreCredits > 0 && (
+                <div className="border border-amber-200/80 rounded-xl p-3.5 sm:p-4 bg-amber-50/30 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-amber-950">
+                      <Coins className="w-3.5 h-3.5 text-amber-700" />
+                      <span>PRIME Store Credits</span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-amber-900">
+                      ₱{availableStoreCredits.toLocaleString()} Available
+                    </span>
+                  </div>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none bg-white p-2.5 rounded-lg border border-amber-200">
+                    <input
+                      type="checkbox"
+                      checked={useStoreCredits}
+                      onChange={(e) => setUseStoreCredits(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <div className="text-xs font-mono flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-gray-900">
+                          Apply Store Credits to this order
+                        </span>
+                        {useStoreCredits && creditsDeducted > 0 && (
+                          <span className="font-bold text-emerald-700 font-mono">
+                            -{formatPHP(creditsDeducted)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {useStoreCredits
+                          ? (payableBeforeCredits <= availableStoreCredits
+                              ? "Full payable amount covered by your store credits."
+                              : `Deducting ₱${creditsDeducted.toLocaleString()} from your payable total.`)
+                          : "Use your accumulated PRIME Store Credits for instant order deduction."}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Referral Code (Optional for new customers) */}
+              <div className="border border-gray-200 rounded-xl p-3.5 sm:p-4 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-900">
+                    <Gift className="w-3.5 h-3.5 text-slate-700" />
+                    <span>Referral Rewards</span>
+                  </div>
+                  {(existingReferrer || appliedReferral) && (
+                    <span className="text-[10px] font-mono font-bold uppercase bg-blue-50 text-blue-800 px-2 py-0.5 rounded border border-blue-200">
+                      Linked
+                    </span>
+                  )}
+                </div>
+
+                {existingReferrer ? (
+                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono flex items-center justify-between">
+                    <div>
+                      <span className="text-gray-500 text-[10px] uppercase block">Referred By</span>
+                      <span className="font-bold text-gray-900">{existingReferrer.name || "Member"} ({existingReferrer.memberId})</span>
+                    </div>
+                    <span className="text-[10px] text-gray-400 font-mono uppercase">Permanent</span>
+                  </div>
+                ) : appliedReferral ? (
+                  <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg flex items-center justify-between text-xs font-mono">
+                    <div>
+                      <span className="text-blue-600 text-[10px] uppercase font-bold block">Referral Applied</span>
+                      <span className="font-bold text-blue-950">{appliedReferral.referrerName} ({appliedReferral.code})</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveReferral}
+                      className="p-1 text-blue-600 hover:text-blue-900 rounded transition-colors cursor-pointer"
+                      title="Remove referral code"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={referralCodeInput}
+                        onChange={(e) => {
+                          setReferralCodeInput(e.target.value.toUpperCase());
+                          if (referralError) setReferralError("");
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleApplyReferral();
+                          }
+                        }}
+                        placeholder="ENTER FRIEND'S PRIME ID (OPTIONAL)"
+                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyReferral}
+                        disabled={isCheckingReferral || !referralCodeInput.trim()}
+                        className="px-3.5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shrink-0"
+                      >
+                        {isCheckingReferral ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Verifying...</span>
+                          </>
+                        ) : (
+                          <span>Apply</span>
+                        )}
+                      </button>
+                    </div>
+
+                    {referralError && (
+                      <div className="text-[11px] font-mono text-red-600 flex items-center gap-1.5 bg-red-50 p-2 rounded border border-red-200">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{referralError}</span>
+                      </div>
+                    )}
+                    {referralSuccess && (
+                      <div className="text-[11px] font-mono text-blue-700 flex items-center gap-1.5 bg-blue-50 p-2 rounded border border-blue-200">
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        <span>{referralSuccess}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Comprehensive Charges Breakdown */}
               <div className="border border-gray-200 rounded-xl p-4 bg-white space-y-1.5">
                 <h4 className="text-xs font-bold tracking-wider text-gray-900 font-heading border-b border-gray-100 pb-2">
@@ -1284,7 +1733,7 @@ export default function CheckoutModal({
                 {/* Subtotal */}
                 <div className="flex justify-between items-center text-xs font-mono">
                   <span className="text-gray-600 font-medium">Items Subtotal:</span>
-                  <span className="font-semibold text-gray-900 font-ibm-condensed">{formatPHP(itemsSubtotal)}</span>
+                  <span className="font-semibold text-gray-900">{formatPHP(itemsSubtotal)}</span>
                 </div>
 
                 {/* Active Admin Charges */}
@@ -1296,7 +1745,7 @@ export default function CheckoutModal({
                         <span className="text-[10px] text-gray-400">({charge.rate || (charge as any).amount}%)</span>
                       )}
                     </span>
-                    <span className="font-semibold text-gray-900 font-ibm-condensed">{formatPHP(charge.computedAmount)}</span>
+                    <span className="font-semibold text-gray-900">{formatPHP(charge.computedAmount)}</span>
                   </div>
                 ))}
 
@@ -1312,10 +1761,41 @@ export default function CheckoutModal({
                       </span>
                     )}
                   </div>
-                  <span className="font-semibold text-gray-900 font-ibm-condensed">
-                    {formatPHP(courierDeliveryFee)}
-                  </span>
+                  <div className="text-right">
+                    {appliedPromo?.isFreeShipping ? (
+                      <div>
+                        <span className="line-through text-gray-400 text-[11px] mr-1.5 font-mono">{formatPHP(courierDeliveryFee)}</span>
+                        <span className="font-bold text-emerald-600 font-mono">FREE</span>
+                      </div>
+                    ) : (
+                      <span className="font-semibold text-gray-900 font-mono">
+                        {formatPHP(courierDeliveryFee)}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Promo Code Discount */}
+                {appliedPromo && promoDiscountAmount > 0 && (
+                  <div className="flex justify-between items-center text-xs font-mono text-emerald-700 pt-1 border-t border-gray-100">
+                    <span className="font-medium flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-emerald-600" />
+                      Promo Discount ({appliedPromo.code}):
+                    </span>
+                    <span className="font-bold font-mono">-{formatPHP(promoDiscountAmount)}</span>
+                  </div>
+                )}
+
+                {/* Store Credits Deduction */}
+                {useStoreCredits && creditsDeducted > 0 && (
+                  <div className="flex justify-between items-center text-xs font-mono text-emerald-700 pt-1 border-t border-gray-100">
+                    <span className="font-medium flex items-center gap-1">
+                      <Coins className="w-3 h-3 text-emerald-600" />
+                      Store Credits Applied:
+                    </span>
+                    <span className="font-bold font-mono">-{formatPHP(creditsDeducted)}</span>
+                  </div>
+                )}
 
                 {/* Total Amounts Section */}
                 <div className="pt-3 border-t border-gray-200 space-y-1.5">
@@ -1323,7 +1803,7 @@ export default function CheckoutModal({
                     <span className="font-heading font-bold uppercase tracking-wide text-gray-900 text-sm">
                       Total Payable Now:
                     </span>
-                    <span className="font-heading font-bold text-2xl text-black font-ibm-condensed">
+                    <span className="font-heading font-bold text-2xl text-black font-mono">
                       {formatPHP(payableNow)}
                     </span>
                   </div>
@@ -1331,7 +1811,9 @@ export default function CheckoutModal({
                   {deliveryPaymentMethod === "upon_delivery" && (
                     <div className="flex justify-between items-center text-xs font-mono text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
                       <span className="font-medium">To be paid to Courier upon delivery:</span>
-                      <span className="font-bold font-ibm-condensed">{formatPHP(courierDeliveryFee)}</span>
+                      <span className="font-bold font-mono">
+                        {appliedPromo?.isFreeShipping ? "FREE" : formatPHP(courierDeliveryFee)}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -1381,6 +1863,18 @@ export default function CheckoutModal({
                   <span className="text-gray-400 uppercase text-[9px] font-bold">Receiver Name</span>
                   <span className="font-medium text-gray-900 uppercase">{completedOrder.receiverName}</span>
                 </div>
+                {completedOrder.promoDiscount > 0 && (
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-2 text-emerald-700">
+                    <span className="text-gray-400 uppercase text-[9px] font-bold">Promo Discount ({completedOrder.promoCode})</span>
+                    <span className="font-bold">-{formatPHP(completedOrder.promoDiscount)}</span>
+                  </div>
+                )}
+                {completedOrder.storeCreditsUsed > 0 && (
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-2 text-emerald-700">
+                    <span className="text-gray-400 uppercase text-[9px] font-bold">Store Credits Used</span>
+                    <span className="font-bold">-{formatPHP(completedOrder.storeCreditsUsed)}</span>
+                  </div>
+                )}
                 <div className="border-b border-gray-200 pb-2 space-y-1">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400 uppercase text-[9px] font-bold">Payable amount</span>
@@ -1435,15 +1929,30 @@ export default function CheckoutModal({
               )}
 
               {/* Settle Payment Section */}
-              <div className="border-t border-gray-200 pt-6 space-y-4">
-                <div className="text-center">
-                  <h4 className="text-sm font-heading font-bold uppercase tracking-wider text-gray-900">
-                    Settle Your Payment
-                  </h4>
-                  <p className="text-xs text-gray-500 font-mono mt-1">
-                    Select a payment method from the configured options below:
-                  </p>
+              {Number(completedOrder.payableNow || 0) === 0 && Number(completedOrder.storeCreditsUsed || 0) > 0 ? (
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1.5 max-w-md mx-auto">
+                    <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-sm font-heading font-bold uppercase tracking-wider text-emerald-950">
+                      Fully Settled via Store Credits
+                    </h4>
+                    <p className="text-xs font-mono text-emerald-800 leading-relaxed">
+                      Your order total was completely covered by your PRIME Store Credits. No bank or e-wallet transfer is required. Your order is queued for fulfillment!
+                    </p>
+                  </div>
                 </div>
+              ) : (
+                <div className="border-t border-gray-200 pt-6 space-y-4">
+                  <div className="text-center">
+                    <h4 className="text-sm font-heading font-bold uppercase tracking-wider text-gray-900">
+                      Settle Your Payment
+                    </h4>
+                    <p className="text-xs text-gray-500 font-mono mt-1">
+                      Select a payment method from the configured options below:
+                    </p>
+                  </div>
 
                 {isLoadingPaymentMethods ? (
                   <div className="p-8 text-center bg-gray-50 border border-gray-200 rounded-xl flex flex-col items-center justify-center gap-2 text-xs font-mono text-gray-500">
@@ -1803,6 +2312,7 @@ export default function CheckoutModal({
                   </div>
                 )}
               </div>
+            )}
 
             </div>
           )}

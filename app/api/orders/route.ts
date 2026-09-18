@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, getDoc, doc, runTransaction, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, runTransaction, updateDoc, query, where, setDoc } from 'firebase/firestore';
+import { calculatePromoDiscount, type PromoConfig } from '@/lib/promos';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,9 @@ export async function POST(request: Request) {
       payableNow,
       payableOnDelivery,
       deviceSnapshot,
+      promoCode,
+      referralCode,
+      appliedStoreCredits,
       notes 
     } = body;
 
@@ -250,10 +254,166 @@ export async function POST(request: Request) {
             return entry;
           }) : [];
           const chargesTotal = sanitizedCharges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
-          const safeDeliveryFee = Number(deliveryFee) || 0;
+          let safeDeliveryFee = Number(deliveryFee) || 0;
           const isDeliveryUponDelivery = String(deliveryFeePaymentMethod || '').toLowerCase() === 'upon_delivery';
-          // If paid upon delivery, the total amount payable to the shop excludes the courier fee
-          const calculatedTotal = itemsSubtotal + chargesTotal + (isDeliveryUponDelivery ? 0 : safeDeliveryFee);
+
+          // 4a. Process Promo Code (Server-side validation and device anti-fraud check)
+          let promoDiscount = 0;
+          let promoTitle = '';
+          let promoIdApplied = '';
+          let isFreeShipping = false;
+
+          const rawPromo = String(promoCode || '').trim().toUpperCase();
+          const cleanDevId = String(deviceSnapshot?.deviceId || deviceSnapshot?.device_id || body.deviceId || '').trim();
+          const cleanHwId = String(deviceSnapshot?.hardwareId || '').trim();
+
+          if (rawPromo) {
+            try {
+              const promoQ = query(collection(db, 'promos'), where('code', '==', rawPromo));
+              const promoSnap = await getDocs(promoQ);
+              if (!promoSnap.empty) {
+                const promoDoc = promoSnap.docs[0];
+                const pData = promoDoc.data() as PromoConfig;
+                const nowIso = new Date().toISOString();
+
+                const isDateValid = (!pData.startDate || pData.startDate <= nowIso) && (!pData.endDate || pData.endDate >= nowIso);
+                const isMinSpendValid = !pData.minSpend || itemsSubtotal >= pData.minSpend;
+                const isQuotaValid = !pData.totalUsageLimit || (pData.usageCount || 0) < pData.totalUsageLimit;
+                const isActive = pData.isActive !== false;
+
+                // Device Fingerprinting Check
+                let isFraud = false;
+                if (cleanDevId || cleanHwId) {
+                  const redQ = query(collection(db, 'promo_redemptions'), where('promoCode', '==', rawPromo));
+                  const redSnap = await getDocs(redQ);
+                  const devMatches = redSnap.docs.filter(rd => {
+                    const r = rd.data();
+                    const dMatch = cleanDevId && r.deviceId && String(r.deviceId).trim() === cleanDevId;
+                    const hMatch = cleanHwId && r.hardwareId && String(r.hardwareId).trim() === cleanHwId;
+                    const isOther = (customerId && r.customerId !== customerId) || (finalMemberId && r.primeMemberId !== finalMemberId);
+                    return (dMatch || hMatch) && isOther;
+                  });
+                  if (devMatches.length > 0) {
+                    isFraud = true;
+                  }
+                }
+
+                if (isActive && isDateValid && isMinSpendValid && isQuotaValid && !isFraud) {
+                  const discResult = calculatePromoDiscount(pData, itemsSubtotal, safeDeliveryFee);
+                  promoDiscount = discResult.discount;
+                  isFreeShipping = discResult.isFreeShipping;
+                  promoTitle = pData.title || pData.code;
+                  promoIdApplied = promoDoc.id;
+
+                  // Update usage count
+                  transaction.update(promoDoc.ref, {
+                    usageCount: (pData.usageCount || 0) + 1,
+                    updatedAt: nowIso
+                  });
+
+                  // Log redemption for fraud tracking
+                  const redId = `red_${orderNumber}_${Date.now()}`;
+                  const redRef = doc(db, 'promo_redemptions', redId);
+                  transaction.set(redRef, {
+                    promoCode: rawPromo,
+                    promoId: promoDoc.id,
+                    customerId: customerId || '',
+                    primeMemberId: finalMemberId || '',
+                    orderId: orderNumber,
+                    deviceId: cleanDevId,
+                    hardwareId: cleanHwId,
+                    discountAmount: promoDiscount,
+                    usedAt: nowIso
+                  });
+                }
+              }
+            } catch (pErr) {
+              console.warn("Promo evaluation failed:", pErr);
+            }
+          }
+
+          if (isFreeShipping) {
+            safeDeliveryFee = 0;
+          }
+
+          // 4b. Process Referral Code
+          let orderReferredByMemberId = '';
+          let orderReferredByName = '';
+          let orderReferredByUserId = '';
+          let orderReferralPointsStatus: string | null = null;
+
+          const rawReferral = String(referralCode || '').trim().toUpperCase();
+          if (rawReferral && rawReferral !== finalMemberId) {
+            try {
+              const refQ = query(collection(db, 'users'), where('primeMemberId', '==', rawReferral));
+              const refSnap = await getDocs(refQ);
+              if (!refSnap.empty) {
+                const refUserDoc = refSnap.docs[0];
+                if (refUserDoc.id !== customerId) {
+                  const refUserData = refUserDoc.data();
+                  orderReferredByMemberId = rawReferral;
+                  orderReferredByName = refUserData.tgName || 'Member';
+                  orderReferredByUserId = refUserDoc.id;
+                  orderReferralPointsStatus = 'pending';
+
+                  // Tag customer user doc with referrer if not already tagged
+                  if (customerId) {
+                    const custUserRef = doc(db, 'users', customerId);
+                    transaction.set(custUserRef, {
+                      referredByMemberId: rawReferral,
+                      referredByName: refUserData.tgName || 'Member',
+                      referredByUserId: refUserDoc.id,
+                      referredAt: new Date().toISOString()
+                    }, { merge: true });
+                  }
+                }
+              }
+            } catch (rErr) {
+              console.warn("Referral evaluation failed:", rErr);
+            }
+          }
+
+          // 4c. Process Store Credits
+          let safeStoreCreditsUsed = 0;
+          const requestedCredits = Math.max(0, Math.floor(Number(appliedStoreCredits) || 0));
+          const intermediateSubtotal = Math.max(0, itemsSubtotal - promoDiscount);
+          const maxPayableBeforeCredits = intermediateSubtotal + chargesTotal + (isDeliveryUponDelivery ? 0 : safeDeliveryFee);
+
+          if (requestedCredits > 0 && customerId) {
+            const custUserRef = doc(db, 'users', customerId);
+            const custUserSnap = await transaction.get(custUserRef);
+            if (custUserSnap.exists()) {
+              const custData = custUserSnap.data();
+              const availableCredits = Number(custData.storeCredits || 0);
+              safeStoreCreditsUsed = Math.min(requestedCredits, availableCredits, maxPayableBeforeCredits);
+
+              if (safeStoreCreditsUsed > 0) {
+                // Deduct store credits atomically
+                transaction.update(custUserRef, {
+                  storeCredits: availableCredits - safeStoreCreditsUsed,
+                  updatedAt: new Date().toISOString()
+                });
+
+                // Record point transaction
+                const creditTxId = `tx-use-${orderNumber}-${Date.now()}`;
+                const creditTxRef = doc(db, 'point_transactions', creditTxId);
+                transaction.set(creditTxRef, {
+                  userId: customerId,
+                  type: 'store_credit_usage',
+                  amount: -safeStoreCreditsUsed,
+                  orderId: orderNumber,
+                  description: `Applied ₱${safeStoreCreditsUsed.toLocaleString()} Store Credits to Order #${orderNumber}`,
+                  createdAt: new Date().toISOString()
+                });
+              }
+            }
+          }
+
+          // 4d. Final recalculation of Total Amount payable on server level
+          const calculatedTotal = Math.max(
+            0,
+            intermediateSubtotal + chargesTotal + (isDeliveryUponDelivery ? 0 : safeDeliveryFee) - safeStoreCreditsUsed
+          );
           
           finalOrderData = {
             orderNumber,
@@ -286,6 +446,17 @@ export async function POST(request: Request) {
             receiverPhone: receiverPhone || '',
             deliveryAddress: deliveryAddress || null,
             courier: courier || null,
+            promoCode: promoDiscount > 0 ? rawPromo : null,
+            promoDiscount,
+            promoTitle: promoTitle || null,
+            promoId: promoIdApplied || null,
+            isFreeShipping,
+            storeCreditsUsed: safeStoreCreditsUsed,
+            referralCode: orderReferredByMemberId || null,
+            referredByMemberId: orderReferredByMemberId || null,
+            referredByName: orderReferredByName || null,
+            referredByUserId: orderReferredByUserId || null,
+            referralPointsStatus: orderReferralPointsStatus || null,
             totalAmount: calculatedTotal,
             payableNow: calculatedTotal,
             payableOnDelivery: isDeliveryUponDelivery ? safeDeliveryFee : 0,

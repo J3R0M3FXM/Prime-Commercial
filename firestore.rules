@@ -41,6 +41,18 @@ service cloud.firestore {
       allow write: if true;
     }
     
+    match /promos/{promoId} {
+      allow read, write: if true;
+    }
+
+    match /promo_redemptions/{redemptionId} {
+      allow read, write: if true;
+    }
+
+    match /point_transactions/{txId} {
+      allow read, write: if true;
+    }
+
     match /admins/{adminId} {
       allow read: if false; // Admin code check should be server-side
       allow write: if false;

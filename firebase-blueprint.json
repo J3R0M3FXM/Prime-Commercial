@@ -102,6 +102,59 @@
         "isActive": { "type": "boolean" }
       },
       "required": ["name", "paymentType", "isActive"]
+    },
+    "Promo": {
+      "title": "Promo",
+      "description": "Voucher or Promo Code configuration",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "discountType": { "type": "string", "enum": ["fixed", "percentage", "free_shipping"] },
+        "discountValue": { "type": "number" },
+        "maxDiscountAmount": { "type": "number" },
+        "minSpend": { "type": "number" },
+        "totalUsageLimit": { "type": "number" },
+        "usageCount": { "type": "number" },
+        "usageLimitPerCustomer": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["code", "discountType", "discountValue", "isActive"]
+    },
+    "PromoRedemption": {
+      "title": "PromoRedemption",
+      "description": "Redemption log for fraud detection",
+      "type": "object",
+      "properties": {
+        "promoCode": { "type": "string" },
+        "promoId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "primeMemberId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "hardwareId": { "type": "string" },
+        "discountAmount": { "type": "number" },
+        "usedAt": { "type": "string" }
+      },
+      "required": ["promoCode", "orderId", "usedAt"]
+    },
+    "PointTransaction": {
+      "title": "PointTransaction",
+      "description": "Audit record of points and store credits activity",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "orderId": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "type", "amount", "createdAt"]
     }
   },
   "firestore": {
@@ -128,6 +181,18 @@
     "/payment_methods/{methodId}": {
       "schema": "PaymentMethod",
       "description": "Configured payment methods"
+    },
+    "/promos/{promoId}": {
+      "schema": "Promo",
+      "description": "Store promo codes and vouchers"
+    },
+    "/promo_redemptions/{redemptionId}": {
+      "schema": "PromoRedemption",
+      "description": "Promo redemptions and device fraud log"
+    },
+    "/point_transactions/{txId}": {
+      "schema": "PointTransaction",
+      "description": "Points and store credits transactions"
     }
   }
 }

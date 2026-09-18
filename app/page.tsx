@@ -6,8 +6,9 @@ import { getClientFingerprint, getClientLocation } from "./components/fingerprin
 import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
+import AccountModal from "./components/account-modal";
 import { useCart } from "./components/cart-context";
-import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Menu, X, Home } from "lucide-react";
+import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Menu, X, Home, User } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 
 export default function Shopfront() {
@@ -23,6 +24,7 @@ export default function Shopfront() {
   const [errorMsg, setErrorMsg] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBackToShopfrontModalOpen, setIsBackToShopfrontModalOpen] = useState(false);
 
@@ -38,6 +40,28 @@ export default function Shopfront() {
 
         // 1. Read directly from URL hash or query params
         if (typeof window !== 'undefined') {
+          // Capture referral code if provided via link (?ref=..., ?referral=..., ?startapp=...)
+          try {
+            const searchParams = new URLSearchParams(window.location.search);
+            const hashStr = window.location.hash.substring(1);
+            const hashParams = new URLSearchParams(hashStr);
+            const tgStartParam = (window as any).Telegram?.WebApp?.initDataUnsafe?.start_param;
+            const refCandidate = (
+              searchParams.get('ref') ||
+              searchParams.get('referral') ||
+              searchParams.get('startapp') ||
+              hashParams.get('tgWebAppStartParam') ||
+              hashParams.get('startapp') ||
+              tgStartParam ||
+              ''
+            ).trim().toUpperCase();
+            if (refCandidate) {
+              localStorage.setItem('prime_referred_by', refCandidate);
+            }
+          } catch (refErr) {
+            console.warn('Could not parse referral param:', refErr);
+          }
+
           if (window.location.hash) {
             const hashStr = window.location.hash.substring(1);
             const params = new URLSearchParams(hashStr);
@@ -288,6 +312,19 @@ export default function Shopfront() {
                     <span>Your Orders</span>
                   </button>
 
+                  {/* Account Option */}
+                  <button
+                    id="menu-your-account-btn"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsAccountOpen(true);
+                    }}
+                    className="w-full text-left px-3.5 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-700 hover:text-black hover:bg-slate-50 transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <User className="w-4 h-4 text-slate-700" />
+                    <span>Your Account</span>
+                  </button>
+
                   {/* Back to Shopfront Option */}
                   <button
                     onClick={() => {
@@ -401,7 +438,7 @@ export default function Shopfront() {
                   <div className="p-3 sm:p-5 flex flex-col flex-1 justify-between">
                     <div>
                       {/* Category - Enlarged font size */}
-                      <p className="text-xs sm:text-[13px] font-mono font-bold text-gray-500 uppercase tracking-wider mb-1">
+                      <p className="text-xs sm:text-sm font-mono font-bold text-gray-500 uppercase tracking-wider mb-1">
                         {p.category || "General"}
                       </p>
                       
@@ -437,8 +474,8 @@ export default function Shopfront() {
                       </div>
 
                       {/* Price Range right below ratings, enlarged & aligned to the right */}
-                      <div className="text-right mt-1 mb-3">
-                        <span className="font-mono font-bold text-sm sm:text-lg text-gray-950">
+                      <div className="text-right mt-1 mb-2.5">
+                        <span className="font-mono font-bold text-base sm:text-xl text-gray-950">
                           {priceDisplay}
                         </span>
                       </div>
@@ -510,6 +547,16 @@ export default function Shopfront() {
           </div>
         </div>
       )}
+
+      {/* Customer Account & Points Modal */}
+      <AccountModal
+        isOpen={isAccountOpen}
+        onClose={() => setIsAccountOpen(false)}
+        onSelectOrder={(ord) => {
+          setIsAccountOpen(false);
+          setIsOrderHistoryOpen(true);
+        }}
+      />
     </div>
   );
 }

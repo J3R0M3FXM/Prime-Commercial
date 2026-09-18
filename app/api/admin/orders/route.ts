@@ -1,8 +1,69 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, setDoc, query, where } from 'firebase/firestore';
+import { processMaturedReferrals } from '@/lib/points-system';
 
 export const dynamic = 'force-dynamic';
+
+async function creditPointsForCompletedOrder(orderId: string, orderData: any) {
+  const updates: any = {};
+  const nowIso = new Date().toISOString();
+  updates.deliveredAt = orderData.deliveredAt || nowIso;
+
+  // 1. Purchasing Points: 10 points for each ₱100 spending on purchased items
+  if (!orderData.purchasingPointsCredited) {
+    const itemsSubtotal = Number(orderData.subTotal || 0);
+    const earnedPoints = Math.floor(itemsSubtotal / 100) * 10;
+    if (earnedPoints > 0) {
+      const custId = orderData.customerId || orderData.tgUserId;
+      let userDocRef: any = null;
+      if (custId) {
+        const uSnap = await getDoc(doc(db, 'users', custId));
+        if (uSnap.exists()) {
+          userDocRef = uSnap.ref;
+          const uData = uSnap.data();
+          const currentPts = Number(uData.purchasingPoints || 0);
+          const lifetimePts = Number(uData.lifetimePurchasingPoints || 0);
+          await updateDoc(userDocRef, {
+            purchasingPoints: currentPts + earnedPoints,
+            lifetimePurchasingPoints: lifetimePts + earnedPoints,
+            firstCompletedOrderDate: uData.firstCompletedOrderDate || updates.deliveredAt,
+            updatedAt: nowIso
+          });
+        }
+      }
+
+      if (userDocRef) {
+        const txId = `tx-pts-${orderId}-${Date.now()}`;
+        await setDoc(doc(db, 'point_transactions', txId), {
+          userId: custId,
+          type: 'purchasing',
+          amount: earnedPoints,
+          orderId,
+          orderNumber: orderData.orderNumber || orderId,
+          description: `Earned ${earnedPoints} Purchasing Points for Order #${orderData.orderNumber || orderId} (₱${itemsSubtotal.toLocaleString()} item spend)`,
+          createdAt: nowIso
+        });
+
+        updates.purchasingPointsCredited = true;
+        updates.purchasingPointsAmount = earnedPoints;
+      }
+    }
+  }
+
+  // 2. Referral Points: 50 Referral Points credited 30 minutes after order Delivered/Completed
+  const hasReferrer = orderData.referredByMemberId || orderData.referredByUserId;
+  if (hasReferrer && orderData.referralPointsStatus === 'pending') {
+    const creditAfter = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    updates.referralPointsCreditAfter = creditAfter;
+    updates.referralPointsStatus = 'pending_30m';
+  }
+
+  // Also trigger check for matured referrals
+  processMaturedReferrals().catch(() => {});
+
+  return updates;
+}
 
 function cleanTimestamps(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
@@ -60,8 +121,14 @@ export async function PUT(request: Request) {
       for (const orderId of ids) {
         try {
           const oRef = doc(db, 'orders', orderId);
+          const oSnap = await getDoc(oRef);
+          let extraUpdates = {};
+          if (oSnap.exists() && (status === 'Delivered' || status === 'Completed')) {
+            extraUpdates = await creditPointsForCompletedOrder(orderId, { ...oSnap.data(), status });
+          }
           await updateDoc(oRef, {
             status,
+            ...extraUpdates,
             updatedAt: new Date().toISOString()
           });
           results.push(orderId);
@@ -292,6 +359,12 @@ export async function PUT(request: Request) {
       } catch (stockErr) {
         console.warn("Stock adjustment warning during order modification:", stockErr);
       }
+    }
+
+    const finalStatus = updateData.status !== undefined ? updateData.status : oldOrder.status;
+    if (finalStatus === 'Delivered' || finalStatus === 'Completed') {
+      const ptUpdates = await creditPointsForCompletedOrder(id, { ...oldOrder, ...updateData, status: finalStatus });
+      Object.assign(updateData, ptUpdates);
     }
 
     const cleanedData = cleanForFirestore(updateData);

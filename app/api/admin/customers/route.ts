@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
+import { calculateCustomerTier } from '@/lib/points-system';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,10 +125,23 @@ export async function GET(request: Request) {
         console.warn(`Failed to fetch orders for customer ${customerId}:`, ordErr);
       }
 
+      // Compute dynamic 30-day tier information
+      const completedOrders = orders.filter((o: any) => {
+        const st = String(o.status || '').toLowerCase();
+        return st === 'delivered' || st === 'completed';
+      });
+      const tierInfo = calculateCustomerTier(completedOrders);
+
       return NextResponse.json({
         customer: {
           id: userSnap.id,
           ...userData,
+          tier: tierInfo.tier,
+          tierInfo,
+          purchasingPoints: Number(userData.purchasingPoints || 0),
+          referralPoints: Number(userData.referralPoints || 0),
+          pendingReferralPoints: Number(userData.pendingReferralPoints || 0),
+          storeCredits: Number(userData.storeCredits || 0),
           deviceId: currentDeviceId,
           hardwareId: currentHardwareId,
           appId: userData.appId || fingerprints[0]?.appId || "PRIME_SHOP_APP",
@@ -211,10 +225,19 @@ export async function GET(request: Request) {
         (userData.primeMemberId && ord.primeMemberId === userData.primeMemberId)
       );
       const totalSpent = customerOrders.reduce((sum: number, o: any) => sum + (Number(o.totalAmount) || 0), 0);
+      const completedCustOrders = customerOrders.filter((o: any) => {
+        const st = String(o.status || '').toLowerCase();
+        return st === 'delivered' || st === 'completed';
+      });
+      const compactTier = calculateCustomerTier(completedCustOrders).tier;
 
       return { 
         id: userDoc.id, 
         ...userData,
+        tier: compactTier,
+        storeCredits: Number(userData.storeCredits || 0),
+        purchasingPoints: Number(userData.purchasingPoints || 0),
+        referralPoints: Number(userData.referralPoints || 0),
         deviceId: userDevId || "",
         hardwareId: userHwId || "",
         appId: userData.appId || latestFingerprint?.appId || "PRIME_SHOP_APP",

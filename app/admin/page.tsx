@@ -65,7 +65,10 @@ import {
   Hash,
   Compass,
   Phone,
-  QrCode
+  QrCode,
+  Tag,
+  Award,
+  Gift
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { motion, AnimatePresence } from "motion/react";
@@ -89,6 +92,11 @@ const PaymentsModule = dynamic(() => import('@/app/components/admin/payments-mod
   loading: () => <div className="p-8 text-center text-slate-500 font-mono text-sm">Loading Payments...</div>
 });
 
+const PromosModule = dynamic(() => import('@/app/components/admin/promos-module'), { 
+  ssr: false,
+  loading: () => <div className="p-8 text-center text-slate-500 font-mono text-sm">Loading Promos...</div>
+});
+
 type AdminView = 
   | "dashboard" 
   | "customers" 
@@ -103,7 +111,8 @@ type AdminView =
   | "diagnostics"
   | "logistics"
   | "charges"
-  | "payments";
+  | "payments"
+  | "promos";
 
 const ImageUploadField = ({
   label,
@@ -1747,7 +1756,8 @@ export default function AdminPage() {
                   { id: "diagnostics", name: "Diagnostics", icon: Activity, desc: "Health, APIs & Font Audit", count: "9 Systems + DOM" },
                   { id: "logistics", name: "Logistics", icon: Truck, desc: "Warehouses & Couriers", count: "Routes" },
                   { id: "charges", name: "Charges", icon: Receipt, desc: "Global Additional Fees", count: "Config" },
-                  { id: "payments", name: "Payments", icon: CreditCard, desc: "Config Payment Methods", count: "Active Methods" }
+                  { id: "payments", name: "Payments", icon: CreditCard, desc: "Config Payment Methods", count: "Active Methods" },
+                  { id: "promos", name: "Promos", icon: Tag, desc: "Discounts & Anti-Fraud", count: "Vouchers" }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -1920,6 +1930,16 @@ export default function AdminPage() {
                             {customer.isPromoFraudRisk && (
                               <span className="text-[9px] font-mono bg-red-600 text-white px-1.5 py-0.5 rounded font-bold uppercase flex items-center gap-1 shadow-sm">
                                 ⚠️ Shared Device ({customer.sharedAccountCount + 1} Accounts)
+                              </span>
+                            )}
+                            {customer.tier && (
+                              <span className="text-[9px] font-mono bg-slate-900 text-amber-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                {customer.tier}
+                              </span>
+                            )}
+                            {Number(customer.storeCredits || 0) > 0 && (
+                              <span className="text-[9px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                                {formatPHP(customer.storeCredits)} Credits
                               </span>
                             )}
                           </div>
@@ -2112,6 +2132,118 @@ export default function AdminPage() {
                       <p className="font-mono text-slate-900 font-bold">
                         {customerDetail.customer.lastSeen ? new Date(customerDetail.customer.lastSeen).toLocaleTimeString() : "Live Now"}
                       </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 1.5: PRIME LOYALTY, TIER STATUS & POINTS DOSSIER */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-amber-500 text-black flex items-center justify-center font-bold">
+                        <Award className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
+                          PRIME Loyalty & Points Dossier
+                        </h3>
+                        <p className="text-[11px] font-mono text-slate-500">
+                          Tier tiering, points balances, store credits, and referral lineage
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono bg-slate-900 text-amber-300 px-3 py-1 rounded-lg font-bold uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+                        <Award className="w-3.5 h-3.5 text-amber-400" />
+                        {customerDetail.customer.tier || "MEMBER"} TIER
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Loyalty Balances Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                    <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl">
+                      <p className="text-emerald-800 uppercase text-[10px] tracking-widest font-bold mb-1">Store Credits</p>
+                      <p className="text-lg font-bold text-emerald-950 font-mono">
+                        {formatPHP(customerDetail.customer.storeCredits || 0)}
+                      </p>
+                      <p className="text-[10px] text-emerald-700 mt-0.5">Usable at checkout</p>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
+                      <p className="text-slate-500 uppercase text-[10px] tracking-widest font-bold mb-1">Purchasing Points</p>
+                      <p className="text-lg font-bold text-slate-900 font-mono">
+                        {Number(customerDetail.customer.purchasingPoints || 0).toLocaleString()} PTS
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Convertible to credits</p>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
+                      <p className="text-slate-500 uppercase text-[10px] tracking-widest font-bold mb-1">Referral Points</p>
+                      <p className="text-lg font-bold text-slate-900 font-mono">
+                        {Number(customerDetail.customer.referralPoints || 0).toLocaleString()} PTS
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Matured & convertible</p>
+                    </div>
+
+                    <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl">
+                      <p className="text-amber-800 uppercase text-[10px] tracking-widest font-bold mb-1">Pending Referrals</p>
+                      <p className="text-lg font-bold text-amber-950 font-mono">
+                        {Number(customerDetail.customer.pendingReferralPoints || 0).toLocaleString()} PTS
+                      </p>
+                      <p className="text-[10px] text-amber-700 mt-0.5">Maturing in 30 mins</p>
+                    </div>
+                  </div>
+
+                  {/* Tier Cycle & Referrer Details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs font-mono">
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex flex-col justify-between">
+                      <div>
+                        <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">30-Day Tier Cycle Progress</p>
+                        <p className="text-slate-800 font-bold text-xs">
+                          {customerDetail.customer.tierInfo ? (
+                            <>
+                              Spent {formatPHP(customerDetail.customer.tierInfo.cycleSpend || 0)} in active cycle
+                              {customerDetail.customer.tierInfo.nextTier && (
+                                <span className="text-slate-500 font-normal"> &bull; Needs {formatPHP(customerDetail.customer.tierInfo.amountNeededForNextTier || 0)} for {customerDetail.customer.tierInfo.nextTier}</span>
+                              )}
+                            </>
+                          ) : (
+                            "Calculated from delivered orders within 30-day window"
+                          )}
+                        </p>
+                      </div>
+                      {customerDetail.customer.tierInfo?.daysRemainingInCycle !== undefined && (
+                        <p className="text-[11px] text-slate-500 mt-2">
+                          Cycle reset in: <strong className="text-slate-800">{customerDetail.customer.tierInfo.daysRemainingInCycle} days</strong>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex flex-col justify-between">
+                      <div>
+                        <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Referred By</p>
+                        {customerDetail.customer.referredByMemberId ? (
+                          <div className="space-y-0.5">
+                            <p className="text-slate-900 font-bold text-xs">
+                              {customerDetail.customer.referredByName || "Prime Member"}
+                            </p>
+                            <p className="text-slate-500 text-[11px]">
+                              Member ID: <strong className="text-slate-800">{customerDetail.customer.referredByMemberId}</strong>
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-slate-500 text-xs italic">
+                            Direct / Organic (No referrer recorded)
+                          </p>
+                        )}
+                      </div>
+                      {customerDetail.customer.referredAt && (
+                        <p className="text-[10px] text-slate-400 mt-2">
+                          Linked on: {new Date(customerDetail.customer.referredAt).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -5280,6 +5412,38 @@ export default function AdminPage() {
 
             <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
               <PaymentsModule />
+            </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 13. PROMOS SECTION: PROMOTIONAL DISCOUNTS & ANTI-FRAUD                    */}
+        {/* ========================================================================= */}
+        {view === "promos" && (
+          <motion.div
+            key="promos"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <button
+                  onClick={() => setView("dashboard")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                </button>
+                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">
+                  Promotions & Vouchers
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+              <PromosModule />
             </div>
           </motion.div>
         )}
