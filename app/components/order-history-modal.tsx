@@ -133,12 +133,7 @@ export default function OrderHistoryModal({
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
         setPaymentMethods(list);
-        const firstActive = list.find((m: any) => m.isActive !== false);
-        if (firstActive) {
-          setSelectedPaymentMethod(firstActive);
-        } else if (list.length > 0) {
-          setSelectedPaymentMethod(list[0]);
-        }
+        // Do not pre-select any payment method
       }
     } catch (e) {
       console.warn("Could not fetch payment methods", e);
@@ -900,6 +895,7 @@ export default function OrderHistoryModal({
                                 }}
                                 className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
                               >
+                                <option value="" disabled>-- Select Payment Method --</option>
                                 {paymentMethods.map(m => (
                                   <option key={m.id} value={m.id} disabled={m.isActive === false}>
                                     {m.name} {m.isActive === false ? "(OFFLINE)" : ""}

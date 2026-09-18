@@ -192,7 +192,7 @@ export default function CheckoutModal({
   const [calculatedDistance, setCalculatedDistance] = useState<number>(0);
   const [isLoadingCouriers, setIsLoadingCouriers] = useState<boolean>(false);
   const [courierFetchError, setCourierFetchError] = useState<string>("");
-  const [deliveryPaymentMethod, setDeliveryPaymentMethod] = useState<"upon_checkout" | "upon_delivery">("upon_checkout");
+  const [deliveryPaymentMethod, setDeliveryPaymentMethod] = useState<"upon_checkout" | "upon_delivery" | "">("");
 
   // Step 4: Admin Charges State
   const [activeCharges, setActiveCharges] = useState<any[]>([]);
@@ -351,6 +351,9 @@ export default function CheckoutModal({
   useEffect(() => {
     if (!isOpen) {
       setSelectedPaymentMethod(null);
+      setSelectedCourierId("");
+      setDeliveryPaymentMethod("");
+      setCourierFetchError("");
       setUploadedProofImage("");
       setProofSubmitSuccess(false);
       setIsSubmittingProof(false);
@@ -558,11 +561,7 @@ export default function CheckoutModal({
         : data.courier ? [data.courier] : [];
 
       setAvailableCouriers(couriersList);
-
-      // Default select first courier if none selected
-      if (couriersList.length > 0 && !selectedCourierId) {
-        setSelectedCourierId(couriersList[0].id);
-      }
+      // Do not pre-select any courier
     } catch (err: any) {
       console.error("Courier pricing error:", err);
       setCourierFetchError(err.message || "Failed to calculate delivery fee.");
@@ -647,8 +646,13 @@ export default function CheckoutModal({
   };
 
   const handleNextFromStep3 = () => {
+    setCourierFetchError("");
     if (!selectedCourier) {
       setCourierFetchError("Please select a courier to continue.");
+      return;
+    }
+    if (!deliveryPaymentMethod) {
+      setCourierFetchError("Please select how you would like to pay for the delivery fee (Upon Checkout or Upon Delivery).");
       return;
     }
     setCurrentStep(4);

@@ -219,17 +219,22 @@ export default function Shopfront() {
             />
           </div>
           
-          <div className="relative">
-            {/* Hamburger Menu Button */}
+          <div className="relative flex items-center">
+            {/* Plain Hamburger Menu Icon matching Prime logo height */}
             <button 
+              type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2.5 text-gray-900 hover:bg-gray-100 rounded-xl transition-all cursor-pointer border border-gray-200/80 shadow-2xs flex items-center gap-1.5 font-heading font-bold uppercase text-xs"
+              className="p-0 text-gray-900 hover:text-black transition-colors cursor-pointer flex items-center justify-center relative bg-transparent border-0"
               title="Menu"
+              aria-label="Toggle navigation menu"
             >
-              {isMenuOpen ? <X className="w-4.5 h-4.5" /> : <Menu className="w-4.5 h-4.5" />}
-              <span>Menu</span>
+              {isMenuOpen ? (
+                <X className="h-7 w-7 sm:h-[28px] sm:w-[28px]" />
+              ) : (
+                <Menu className="h-7 w-7 sm:h-[28px] sm:w-[28px]" />
+              )}
               {cartCount > 0 && (
-                <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full font-mono">
+                <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full font-mono shadow-xs">
                   {cartCount}
                 </span>
               )}
@@ -395,33 +400,59 @@ export default function Shopfront() {
                   
                   <div className="p-3 sm:p-5 flex flex-col flex-1 justify-between">
                     <div>
-                      <p className="text-[10px] sm:text-xs font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">
+                      {/* Category - Enlarged font size */}
+                      <p className="text-xs sm:text-[13px] font-mono font-bold text-gray-500 uppercase tracking-wider mb-1">
                         {p.category || "General"}
                       </p>
-                      <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-tight mb-2 text-sm sm:text-lg">
+                      
+                      {/* Product Name */}
+                      <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-tight mb-1 text-sm sm:text-lg">
                         {p.name}
                       </h3>
-                    </div>
-                    
-                    <div className="mt-4">
-                      <div className="pt-2 flex flex-row items-center justify-between gap-1 border-t border-gray-100 mb-3">
-                        <div className="flex items-center gap-1 text-amber-500 font-mono text-xs sm:text-sm">
-                          <span>★</span>
-                          <span className="text-gray-700 font-bold">{Number(rating).toFixed(1)}</span>
+
+                      {/* 5 Stars Rating placed right below product name */}
+                      <div className="flex items-center gap-1.5 my-1.5">
+                        <div className="flex items-center text-amber-400">
+                          {[1, 2, 3, 4, 5].map((starIndex) => {
+                            const ratingNum = Math.min(5, Math.max(0, Number(rating) || 4.5));
+                            const fillPercent = Math.max(0, Math.min(100, (ratingNum - (starIndex - 1)) * 100));
+                            return (
+                              <span key={starIndex} className="relative inline-block text-xs sm:text-sm leading-none">
+                                <span className="text-gray-200">★</span>
+                                {fillPercent > 0 && (
+                                  <span 
+                                    className="absolute top-0 left-0 overflow-hidden text-amber-400 select-none"
+                                    style={{ width: `${fillPercent}%` }}
+                                  >
+                                    ★
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })}
                         </div>
-                        <span className="font-mono font-bold text-xs sm:text-base text-gray-900">
-                          {priceDisplay}
+                        <span className="text-[11px] sm:text-xs font-mono font-bold text-gray-600">
+                          {Number(rating).toFixed(1)}
                         </span>
                       </div>
 
-                      {/* Explicit Interactive Button Fallback */}
+                      {/* Price Range right below ratings, enlarged & aligned to the right */}
+                      <div className="text-right mt-1 mb-3">
+                        <span className="font-mono font-bold text-sm sm:text-lg text-gray-950">
+                          {priceDisplay}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Repositioned button replacing the previous line separator position */}
+                    <div className="pt-0">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedProduct(p);
                         }}
-                        className="w-full px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center"
+                        className="w-full px-3.5 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center"
                       >
                         {isOutOfStock ? "SOLD OUT" : "VIEW OPTIONS"}
                       </button>
