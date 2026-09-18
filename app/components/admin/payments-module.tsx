@@ -48,20 +48,33 @@ const Base64ImageUploader = ({
   required?: boolean;
 }) => {
   const [dragActive, setDragActive] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
   const handleFile = (file: File) => {
-    if (file && file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          onChange(e.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
-    } else {
-      alert("Please upload an image file only.");
+    setErrorMessage("");
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMessage("Please upload an image file only.");
+      return;
     }
+
+    if (file.size > MAX_SIZE_BYTES) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      setErrorMessage(`File size (${fileSizeMB}MB) exceeds the maximum 10MB limit per image.`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        onChange(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -85,9 +98,12 @@ const Base64ImageUploader = ({
 
   return (
     <div className="space-y-1">
-      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 font-heading">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 font-heading">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        <span className="text-[9px] font-mono text-slate-400">Max 10MB</span>
+      </div>
       {value ? (
         <div className="relative border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center gap-3">
           <img
@@ -105,7 +121,10 @@ const Base64ImageUploader = ({
           </div>
           <button
             type="button"
-            onClick={() => onChange("")}
+            onClick={() => {
+              setErrorMessage("");
+              onChange("");
+            }}
             className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-[9px] font-bold uppercase tracking-wider font-mono cursor-pointer transition-colors"
           >
             Remove
@@ -119,7 +138,9 @@ const Base64ImageUploader = ({
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
           className={`border-2 border-dashed rounded-xl p-5 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all ${
-            dragActive
+            errorMessage
+              ? "border-red-300 bg-red-50/50"
+              : dragActive
               ? "border-black bg-slate-50"
               : "border-slate-200 hover:border-slate-400 hover:bg-slate-50/50"
           }`}
@@ -135,16 +156,21 @@ const Base64ImageUploader = ({
             accept="image/*"
             className="hidden"
           />
-          <ImageIcon className="w-5 h-5 text-slate-400" />
+          <ImageIcon className={`w-5 h-5 ${errorMessage ? "text-red-400" : "text-slate-400"}`} />
           <div className="text-center">
             <span className="font-bold text-slate-900 text-[10px] uppercase tracking-wider block">
               Choose File
             </span>
             <p className="text-[9px] text-slate-400 mt-0.5 font-mono">
-              Drag image here or click to browse
+              Drag image here or click to browse (up to 10MB per image)
             </p>
           </div>
         </div>
+      )}
+      {errorMessage && (
+        <p className="text-[10px] font-mono text-red-600 font-bold mt-1">
+          {errorMessage}
+        </p>
       )}
     </div>
   );

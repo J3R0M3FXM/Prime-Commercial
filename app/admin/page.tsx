@@ -130,18 +130,33 @@ const ImageUploadField = ({
   className?: string;
 }) => {
   const [dragActive, setDragActive] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
   const handleFile = (file: File) => {
-    if (file && file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          onChange(e.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+    setErrorMessage("");
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMessage("Invalid file type. Please select an image.");
+      return;
     }
+
+    if (file.size > MAX_SIZE_BYTES) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      setErrorMessage(`File size (${fileSizeMB}MB) exceeds the maximum 10MB limit per image.`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        onChange(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,9 +186,12 @@ const ImageUploadField = ({
 
   return (
     <div className={`space-y-1 ${className}`}>
-      <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
-        {label}
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest">
+          {label}
+        </label>
+        <span className="text-[9px] font-mono text-slate-400">Max 10MB</span>
+      </div>
       
       {value ? (
         <div className="relative border border-slate-200 rounded-xl p-2 bg-slate-50 flex items-center gap-3">
@@ -191,7 +209,10 @@ const ImageUploadField = ({
           </div>
           <button
             type="button"
-            onClick={() => onChange("")}
+            onClick={() => {
+              setErrorMessage("");
+              onChange("");
+            }}
             className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-[9px] font-bold uppercase tracking-wider font-mono cursor-pointer"
           >
             Remove
@@ -205,7 +226,9 @@ const ImageUploadField = ({
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
           className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all ${
-            dragActive
+            errorMessage
+              ? "border-red-300 bg-red-50/50"
+              : dragActive
               ? "border-slate-900 bg-slate-50"
               : "border-slate-200 hover:border-slate-400 hover:bg-slate-50/50"
           }`}
@@ -218,7 +241,7 @@ const ImageUploadField = ({
             className="hidden"
           />
           <svg
-            className="w-6 h-6 text-slate-400"
+            className={`w-6 h-6 ${errorMessage ? "text-red-400" : "text-slate-400"}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -235,9 +258,15 @@ const ImageUploadField = ({
             <span className="font-bold text-slate-900 text-[10px] uppercase tracking-wider">
               Upload File
             </span>
-            <p className="text-[9px] text-slate-400 mt-0.5">Drag & drop or click to browse</p>
+            <p className="text-[9px] text-slate-400 mt-0.5">Drag & drop or click to browse (up to 10MB per image)</p>
           </div>
         </div>
+      )}
+
+      {errorMessage && (
+        <p className="text-[10px] font-mono text-red-600 font-bold mt-1">
+          {errorMessage}
+        </p>
       )}
     </div>
   );

@@ -2261,6 +2261,10 @@ export default function CheckoutModal({
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
+                                  if (file.size > 10 * 1024 * 1024) {
+                                    alert(`File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds the 10MB limit per image.`);
+                                    return;
+                                  }
                                   const reader = new FileReader();
                                   reader.onloadend = () => {
                                     setUploadedProofImage(reader.result as string);
