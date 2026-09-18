@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -21,7 +21,22 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const { id, ...data } = await request.json();
+    const body = await request.json();
+
+    // Handle batch reordering
+    if (Array.isArray(body.reorder)) {
+      const batch = writeBatch(db);
+      for (const item of body.reorder) {
+        if (item.id) {
+          const ref = doc(db, 'products', item.id);
+          batch.update(ref, { sortOrder: Number(item.sortOrder) || 0 });
+        }
+      }
+      await batch.commit();
+      return NextResponse.json({ success: true, count: body.reorder.length });
+    }
+
+    const { id, ...data } = body;
     const productRef = doc(db, 'products', id);
     await updateDoc(productRef, data);
     return NextResponse.json({ success: true });

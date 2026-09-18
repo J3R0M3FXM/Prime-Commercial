@@ -68,7 +68,11 @@ import {
   QrCode,
   Tag,
   Award,
-  Gift
+  Gift,
+  ArrowUp,
+  ArrowDown,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { motion, AnimatePresence } from "motion/react";
@@ -944,7 +948,82 @@ export default function AdminPage() {
     }
   };
 
-  // Inventory Stock Adjustment
+  // Product Reordering / Sort Positioning
+  const handleMoveProductOrder = async (productId: string, direction: "up" | "down") => {
+    // Current sorted list
+    const sorted = [...products].sort((a: any, b: any) => {
+      const orderA = typeof a.sortOrder === "number" ? a.sortOrder : 999999;
+      const orderB = typeof b.sortOrder === "number" ? b.sortOrder : 999999;
+      return orderA - orderB;
+    });
+
+    const currentIndex = sorted.findIndex(p => p.id === productId);
+    if (currentIndex === -1) return;
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= sorted.length) return;
+
+    // Swap positions
+    const temp = sorted[currentIndex];
+    sorted[currentIndex] = sorted[targetIndex];
+    sorted[targetIndex] = temp;
+
+    // Reassign normalized sequential sortOrders (1, 2, 3...)
+    const updates = sorted.map((p, idx) => ({
+      id: p.id,
+      sortOrder: idx + 1
+    }));
+
+    // Optimistic update
+    const orderMap = new Map(updates.map(u => [u.id, u.sortOrder]));
+    setProducts(prev => prev.map(p => ({
+      ...p,
+      sortOrder: orderMap.get(p.id) ?? p.sortOrder ?? 999999
+    })).sort((a: any, b: any) => (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999)));
+
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reorder: updates })
+      });
+      if (!res.ok) {
+        throw new Error("Failed to persist product sort order");
+      }
+      setLiveToast({
+        id: `sort-${Date.now()}`,
+        title: "Sort Order Updated",
+        message: `Product display ranking successfully rearranged.`,
+        type: "info"
+      });
+    } catch (err: any) {
+      console.error("Sort order persist error:", err);
+      fetchAllData();
+    }
+  };
+
+  const handleSetProductSortOrder = async (productId: string, newSortOrder: number) => {
+    const safeOrder = Math.max(1, newSortOrder);
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: productId, sortOrder: safeOrder })
+      });
+      if (!res.ok) throw new Error("Failed to update sort order");
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, sortOrder: safeOrder } : p).sort((a: any, b: any) => (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999)));
+      setLiveToast({
+        id: `sort-${Date.now()}`,
+        title: "Sort Priority Saved",
+        message: `Product set to sort position #${safeOrder}.`,
+        type: "info"
+      });
+    } catch (err: any) {
+      console.error(err);
+      showAlert("Failed to update sort order.", "Error", "error");
+    }
+  };
+
+  // Inventory Stock Adjustments (Main Product)
   const handleAdjustStock = async (productId: string, currentStock: number, delta: number) => {
     const newStock = Math.max(0, currentStock + delta);
     try {
@@ -961,6 +1040,86 @@ export default function AdminPage() {
     } catch (e: any) {
       console.error(e);
       showAlert(`Failed to adjust stock: ${e.message || String(e)}`, "Error", "error");
+    }
+  };
+
+  const handleSetProductStockDirect = async (productId: string, newStockValue: number) => {
+    const safeStock = Math.max(0, newStockValue);
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: productId, stock: safeStock })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: safeStock } : p));
+    } catch (e: any) {
+      console.error(e);
+      showAlert(`Failed to update stock: ${e.message || String(e)}`, "Error", "error");
+    }
+  };
+
+  // Inventory Stock Adjustments (Per Variant)
+  const handleAdjustVariantStock = async (productId: string, variantId: string, currentStock: number, delta: number) => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+    const currentVariants = prod.variants || [];
+    const newStock = Math.max(0, currentStock + delta);
+    const updatedVariants = currentVariants.map((v: any) => {
+      if (v.id === variantId) {
+        return { ...v, stock: newStock };
+      }
+      return v;
+    });
+    const totalStock = updatedVariants.reduce((sum: number, v: any) => sum + (Number(v.stock) || 0), 0);
+
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: productId, variants: updatedVariants, stock: totalStock })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, variants: updatedVariants, stock: totalStock } : p));
+    } catch (e: any) {
+      console.error(e);
+      showAlert(`Failed to adjust variant stock: ${e.message || String(e)}`, "Error", "error");
+    }
+  };
+
+  const handleSetVariantStockDirect = async (productId: string, variantId: string, newStockValue: number) => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+    const currentVariants = prod.variants || [];
+    const safeStock = Math.max(0, newStockValue);
+    const updatedVariants = currentVariants.map((v: any) => {
+      if (v.id === variantId) {
+        return { ...v, stock: safeStock };
+      }
+      return v;
+    });
+    const totalStock = updatedVariants.reduce((sum: number, v: any) => sum + (Number(v.stock) || 0), 0);
+
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: productId, variants: updatedVariants, stock: totalStock })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, variants: updatedVariants, stock: totalStock } : p));
+    } catch (e: any) {
+      console.error(e);
+      showAlert(`Failed to set variant stock: ${e.message || String(e)}`, "Error", "error");
     }
   };
 
@@ -1209,28 +1368,66 @@ export default function AdminPage() {
   }, [orders, orderSearch, orderFilter]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => 
-      (p.name || "").toLowerCase().includes(productSearch.toLowerCase()) ||
-      (p.category || "").toLowerCase().includes(productSearch.toLowerCase())
-    );
+    return products
+      .filter(p => 
+        (p.name || "").toLowerCase().includes(productSearch.toLowerCase()) ||
+        (p.category || "").toLowerCase().includes(productSearch.toLowerCase()) ||
+        (Array.isArray(p.variants) && p.variants.some((v: any) => (v.name || "").toLowerCase().includes(productSearch.toLowerCase())))
+      )
+      .sort((a: any, b: any) => {
+        const orderA = typeof a.sortOrder === "number" ? a.sortOrder : 999999;
+        const orderB = typeof b.sortOrder === "number" ? b.sortOrder : 999999;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.name || "").localeCompare(b.name || "");
+      });
   }, [products, productSearch]);
 
   const filteredInventory = useMemo(() => {
-    return products.filter(p => {
-      const matchSearch = 
-        (p.name || "").toLowerCase().includes(inventorySearch.toLowerCase()) ||
-        (p.category || "").toLowerCase().includes(inventorySearch.toLowerCase());
-      if (!matchSearch) return false;
-      if (inventoryFilter === "low") return (p.stock ?? 0) > 0 && (p.stock ?? 0) <= (p.lowStockThreshold ?? 10);
-      if (inventoryFilter === "out") return (p.stock ?? 0) === 0;
-      return true;
-    });
+    return products
+      .filter(p => {
+        const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+        const matchSearch = 
+          (p.name || "").toLowerCase().includes(inventorySearch.toLowerCase()) ||
+          (p.category || "").toLowerCase().includes(inventorySearch.toLowerCase()) ||
+          (hasVariants && p.variants.some((v: any) => (v.name || "").toLowerCase().includes(inventorySearch.toLowerCase())));
+        if (!matchSearch) return false;
+
+        const effectiveStock = hasVariants
+          ? p.variants.reduce((sum: number, v: any) => sum + (Number(v.stock) || 0), 0)
+          : (Number(p.stock) || 0);
+
+        const threshold = Number(p.lowStockThreshold) || 10;
+
+        if (inventoryFilter === "low") {
+          if (hasVariants) {
+            return p.variants.some((v: any) => (Number(v.stock) || 0) > 0 && (Number(v.stock) || 0) <= threshold);
+          }
+          return effectiveStock > 0 && effectiveStock <= threshold;
+        }
+        if (inventoryFilter === "out") {
+          if (hasVariants) {
+            return p.variants.some((v: any) => (Number(v.stock) || 0) === 0);
+          }
+          return effectiveStock === 0;
+        }
+        return true;
+      })
+      .sort((a: any, b: any) => {
+        const orderA = typeof a.sortOrder === "number" ? a.sortOrder : 999999;
+        const orderB = typeof b.sortOrder === "number" ? b.sortOrder : 999999;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.name || "").localeCompare(b.name || "");
+      });
   }, [products, inventorySearch, inventoryFilter]);
 
   // Products with stock <= their defined lowStockThreshold
   const lowStockProducts = useMemo(() => {
     return products.filter(p => {
       const threshold = p.lowStockThreshold !== undefined ? Number(p.lowStockThreshold) : 10;
+      const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+      if (hasVariants) {
+        return p.variants.some((v: any) => (Number(v.stock) || 0) <= threshold);
+      }
       const stock = Number(p.stock) || 0;
       return stock <= threshold;
     });
@@ -1504,14 +1701,13 @@ export default function AdminPage() {
   // Auth checking screen
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center sm:py-6 font-sans antialiased">
-        <div className="w-full max-w-[430px] h-screen sm:h-[880px] sm:rounded-[40px] bg-gray-950 text-gray-100 flex flex-col items-center justify-center p-6 overflow-hidden relative shadow-2xl border-0 sm:border-[10px] border-slate-900">
-          <div className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-slate-900 rounded-b-2xl z-50"></div>
-          <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-2xl backdrop-blur-xl">
-            <Loader2 className="w-8 h-8 animate-spin text-white" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans antialiased">
+        <div className="w-full max-w-md bg-white border border-slate-200 text-slate-900 rounded-3xl flex flex-col items-center justify-center p-8 shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center mb-6 shadow-xs">
+            <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
           </div>
-          <h2 className="text-xl font-heading font-black tracking-widest uppercase mb-1">Authenticating</h2>
-          <p className="font-mono text-xs text-gray-400">Verifying Telegram Security Credentials (ID: 1085949511)...</p>
+          <h2 className="text-xl font-heading font-black tracking-widest uppercase mb-1 text-slate-900">Authenticating</h2>
+          <p className="font-mono text-xs text-slate-500 text-center">Verifying Telegram Security Credentials (ID: 1085949511)...</p>
         </div>
       </div>
     );
@@ -1520,55 +1716,45 @@ export default function AdminPage() {
   // Login Gate
   if (!authorized) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center sm:py-6 font-sans antialiased">
-        <div className="w-full max-w-[430px] h-screen sm:h-[880px] sm:rounded-[40px] bg-gray-950 text-gray-100 flex flex-col items-center justify-center p-6 overflow-hidden relative shadow-2xl border-0 sm:border-[10px] border-slate-900">
-          <div className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-slate-900 rounded-b-2xl z-50"></div>
-          <div className="w-full max-w-sm bg-gray-900/80 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-xl">
-            <div className="flex justify-center mb-6">
-              <img 
-                src="/prime-logo-metallic.png" 
-                alt="PRIME" 
-                className="h-7 sm:h-[28px] w-auto object-contain drop-shadow-xs" 
-              />
-            </div>
-            <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase text-white">Admin</h1>
-            <p className="text-[11px] text-gray-400 text-center mb-6 font-mono">
-              Authorized Account: ID 1085949511
-            </p>
-            <form onSubmit={handleManualLogin} className="space-y-4">
-              <input
-                type="password"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="ENTER ADMIN ACCESS CODE"
-                className="w-full p-4 bg-gray-950 border border-gray-800 rounded-xl text-center font-mono focus:border-white focus:outline-none transition-colors text-white text-sm"
-              />
-              {errorMsg && <p className="text-red-400 text-xs text-center font-mono">{errorMsg}</p>}
-              <button 
-                type="submit" 
-                disabled={loading} 
-                className="w-full p-4 bg-white text-black font-bold uppercase tracking-widest rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center text-xs cursor-pointer shadow-lg"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Access Dashboard"}
-              </button>
-            </form>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6 font-sans antialiased">
+        <div className="w-full max-w-md bg-white border border-slate-200 text-slate-900 p-8 rounded-3xl shadow-xl">
+          <div className="flex justify-center mb-6">
+            <img 
+              src="/prime-logo-metallic.png" 
+              alt="PRIME" 
+              className="h-8 sm:h-9 w-auto object-contain drop-shadow-xs" 
+            />
           </div>
+          <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase text-slate-900">Admin</h1>
+          <p className="text-[11px] text-slate-500 text-center mb-6 font-mono">
+            Authorized Account: ID 1085949511
+          </p>
+          <form onSubmit={handleManualLogin} className="space-y-4">
+            <input
+              type="password"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="ENTER ADMIN ACCESS CODE"
+              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-center font-mono focus:border-slate-900 focus:bg-white focus:outline-none transition-colors text-slate-900 text-sm"
+            />
+            {errorMsg && <p className="text-red-500 text-xs text-center font-mono">{errorMsg}</p>}
+            <button 
+              type="submit" 
+              disabled={loading} 
+              className="w-full p-4 bg-slate-900 text-white font-bold uppercase tracking-widest rounded-xl hover:bg-black transition-colors flex items-center justify-center text-xs cursor-pointer shadow-md"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Access Dashboard"}
+            </button>
+          </form>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center sm:py-6 font-sans antialiased">
-      {/* Mobile Device Mockup Wrap */}
-      <div className="w-full max-w-[430px] h-screen sm:h-[880px] sm:rounded-[40px] bg-slate-50 text-slate-900 flex flex-col overflow-hidden relative shadow-2xl border-0 sm:border-[10px] border-slate-900">
-        
-        {/* Device Notch */}
-        <div className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-slate-900 rounded-b-2xl z-50"></div>
-        
-        {/* Scrollable Container Inside Phone Mockup */}
-        <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden pt-0 sm:pt-4">
-          <AnimatePresence mode="wait">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased w-full">
+      <div className="flex-1 flex flex-col w-full">
+        <AnimatePresence mode="wait">
         
         {/* ========================================================================= */}
         {/* 1. DASHBOARD HUB VIEW (Glossy Tiles, Stats, Header)                       */}
@@ -1584,7 +1770,7 @@ export default function AdminPage() {
           >
             {/* Harmonized Sticky Header matching Shopfront */}
             <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
-              <div className="px-4 py-3 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
                 <div className="flex items-center">
                   <img 
                     src="/prime-logo-metallic.png" 
@@ -1644,7 +1830,7 @@ export default function AdminPage() {
             </header>
 
             {/* Dashboard Content Area */}
-            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
 
             {/* PWA Installation Card Banner */}
             {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (
@@ -1743,9 +1929,9 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Management Section Tiles (3 per row) */}
+            {/* Management Section Tiles */}
             <div className="mb-4">
-              <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                 {[
                   { id: "customers", name: "Customers", icon: Users, desc: "Profiles & Device Info", count: customers.length },
                   { id: "orders", name: "Orders", icon: ClipboardList, desc: "Order History & Status", count: orders.length },
@@ -1801,7 +1987,7 @@ export default function AdminPage() {
           >
             {/* STICKY & FIXED NON-SCROLLING TOP SEARCH & HEADER BAR */}
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
                 {/* Navigation Row */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
@@ -1873,7 +2059,7 @@ export default function AdminPage() {
             </div>
 
             {/* COMPACT CUSTOMERS LIST (SCROLLABLE AREA) */}
-            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
               {filteredCustomers.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
                   <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -2013,7 +2199,7 @@ export default function AdminPage() {
           >
             {/* Sticky Navigation Top Bar */}
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
@@ -2051,7 +2237,7 @@ export default function AdminPage() {
                 <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
               </div>
             ) : (
-              <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+              <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
                 
                 {/* SECTION 1: CUSTOMER IDENTITY CARD */}
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm overflow-hidden relative">
@@ -2650,7 +2836,7 @@ export default function AdminPage() {
           >
             {/* Sticky Header */}
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setView(selectedOrderId ? "order-detail" : "orders")}
@@ -2682,7 +2868,7 @@ export default function AdminPage() {
               const isRisk = linkedAccounts.length >= 2;
 
               return (
-                <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+                <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
                   
                   {/* Hardware Header Card */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
@@ -2847,7 +3033,7 @@ export default function AdminPage() {
           >
             {/* Sticky non-scrolling search & header */}
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
                     <button
@@ -2996,7 +3182,7 @@ export default function AdminPage() {
             </div>
 
             {/* Compact Orders List */}
-            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
               {filteredOrders.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
                   <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -3155,7 +3341,7 @@ export default function AdminPage() {
             >
             {/* Screen-Only Sticky Navigation & Quick Actions Bar */}
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm screen-only">
-              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
                 <button
                   onClick={() => {
                     setSelectedOrderId(null);
@@ -3210,7 +3396,7 @@ export default function AdminPage() {
             </div>
 
             {/* Screen-Only Order Management Container */}
-            <div className="flex-1 max-w-4xl w-full mx-auto p-3 sm:p-5 lg:p-6 space-y-4 screen-only">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 lg:p-6 space-y-4 screen-only">
               <div className="bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
                   <div className="flex items-start gap-3">
@@ -4567,7 +4753,7 @@ export default function AdminPage() {
           >
             {/* Sticky non-scrolling search & header */}
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
                     <button
@@ -4618,7 +4804,7 @@ export default function AdminPage() {
             </div>
 
             {/* Compact Products List */}
-            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
               {filteredProducts.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
                   <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -4630,71 +4816,131 @@ export default function AdminPage() {
                   </p>
                 </div>
               ) : (
-                filteredProducts.map((prod) => (
-                  <div
-                    key={prod.id}
-                    className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={prod.imageUrl || "https://picsum.photos/seed/prime/100"}
-                        alt={prod.name}
-                        className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-200 shrink-0"
-                      />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-heading font-black text-sm text-slate-900">
-                            {prod.name}
-                          </h4>
-                          <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                            {prod.category || "General"}
-                          </span>
-                          {prod.active === false && (
-                            <span className="text-[9px] font-mono bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold uppercase">
-                              Hidden
-                            </span>
-                          )}
+                filteredProducts.map((prod, index) => {
+                  const hasVariants = Array.isArray(prod.variants) && prod.variants.length > 0;
+                  const totalStock = hasVariants
+                    ? prod.variants.reduce((sum: number, v: any) => sum + (Number(v.stock) || 0), 0)
+                    : (Number(prod.stock) || 0);
+                  const isFirst = index === 0;
+                  const isLast = index === filteredProducts.length - 1;
+
+                  return (
+                    <div
+                      key={prod.id}
+                      className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 group hover:border-slate-300 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {/* Sort Ordering Controls */}
+                        <div className="flex items-center gap-1 shrink-0 bg-slate-50 border border-slate-200 p-1 rounded-lg">
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveProductOrder(prod.id, "up")}
+                              disabled={isFirst}
+                              title="Move Up (Display earlier on shopfront)"
+                              className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-20 disabled:hover:bg-transparent transition-all cursor-pointer"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveProductOrder(prod.id, "down")}
+                              disabled={isLast}
+                              title="Move Down (Display later on shopfront)"
+                              className="p-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-20 disabled:hover:bg-transparent transition-all cursor-pointer"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <div className="flex flex-col items-center justify-center px-1">
+                            <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-slate-400">Order</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={prod.sortOrder ?? index + 1}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                if (!isNaN(val)) {
+                                  handleSetProductSortOrder(prod.id, val);
+                                }
+                              }}
+                              title="Direct Display Priority Rank"
+                              className="w-10 text-center font-mono font-black text-xs bg-white border border-slate-200 rounded py-0.5 text-slate-900 focus:outline-none focus:border-slate-900"
+                            />
+                          </div>
                         </div>
-                        <p className="text-xs font-mono text-slate-500 mt-0.5">
-                          Price: <span className="font-bold text-slate-900">{formatPHP(prod.price)}</span> &bull; Stock: {prod.stock ?? 0}
-                        </p>
+
+                        <img
+                          src={prod.imageUrl || "https://picsum.photos/seed/prime/100"}
+                          alt={prod.name}
+                          className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-200 shrink-0"
+                        />
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-heading font-black text-sm text-slate-900 truncate">
+                              {prod.name}
+                            </h4>
+                            <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded shrink-0">
+                              {prod.category || "General"}
+                            </span>
+                            {hasVariants ? (
+                              <span className="text-[9px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">
+                                {prod.variants.length} Variants
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded shrink-0">
+                                Single Variant
+                              </span>
+                            )}
+                            {prod.active === false && (
+                              <span className="text-[9px] font-mono bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">
+                                Hidden
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-mono text-slate-500 mt-0.5">
+                            Price: <span className="font-bold text-slate-900">{formatPHP(prod.price)}</span> &bull; Total Stock: <span className="font-bold text-slate-800">{totalStock}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 w-full sm:w-auto justify-end">
+                        <button
+                          onClick={() => handleToggleProductActive(prod)}
+                          className={`p-2 rounded-lg border text-xs transition-colors cursor-pointer ${
+                            prod.active === false
+                              ? "bg-red-50 border-red-200 text-red-600"
+                              : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
+                          title={prod.active === false ? "Show in Store" : "Hide from Store"}
+                        >
+                          {prod.active === false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setEditingProduct(prod);
+                            setProductModalOpen(true);
+                          }}
+                          className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Product"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteProduct(prod.id)}
+                          className="p-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Product"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => handleToggleProductActive(prod)}
-                        className={`p-2 rounded-lg border text-xs transition-colors cursor-pointer ${
-                          prod.active === false
-                            ? "bg-red-50 border-red-200 text-red-600"
-                            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
-                        title={prod.active === false ? "Show in Store" : "Hide from Store"}
-                      >
-                        {prod.active === false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setEditingProduct(prod);
-                          setProductModalOpen(true);
-                        }}
-                        className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
-                        title="Edit Product"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => handleDeleteProduct(prod.id)}
-                        className="p-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg transition-colors cursor-pointer"
-                        title="Delete Product"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -4774,7 +5020,22 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
+                          Sort Priority
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={editingProduct?.sortOrder ?? 1}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, sortOrder: parseInt(e.target.value) || 1 })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 font-mono"
+                          title="Display order ranking (1 appears first)"
+                        />
+                      </div>
+
                       <div>
                         <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
                           Low Stock Threshold
@@ -4790,7 +5051,7 @@ export default function AdminPage() {
 
                       <div>
                         <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest mb-1">
-                          Product Rating (1-5)
+                          Rating (1-5)
                         </label>
                         <input
                           type="number"
@@ -5024,7 +5285,7 @@ export default function AdminPage() {
           >
             {/* Sticky non-scrolling search & header */}
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
                     <button
@@ -5079,76 +5340,304 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Compact Stock Adjustment Rows */}
-            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-2.5">
-              {filteredInventory.map((item) => {
-                const stock = item.stock ?? 0;
-                return (
-                  <div
-                    key={item.id}
-                    className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-heading font-black text-sm text-slate-900">
-                          {item.name}
-                        </h4>
-                        <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                          {item.category || "General"}
-                        </span>
-                      </div>
-                      <p className="text-xs font-mono text-slate-500 mt-0.5">
-                        Unit Price: {formatPHP(item.price)}
-                      </p>
-                    </div>
+            {/* Compact Stock Adjustment Rows with Variant-Level Management */}
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-4">
+              {filteredInventory.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
+                  <Boxes className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="font-heading font-black text-slate-800 uppercase tracking-wide text-sm mb-1">
+                    No matching inventory items
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Try changing your search term or inventory filter above.
+                  </p>
+                </div>
+              ) : (
+                filteredInventory.map((item) => {
+                  const hasVariants = Array.isArray(item.variants) && item.variants.length > 0;
+                  const threshold = Number(item.lowStockThreshold) || 10;
+                  const totalStock = hasVariants
+                    ? item.variants.reduce((sum: number, v: any) => sum + (Number(v.stock) || 0), 0)
+                    : (Number(item.stock) || 0);
 
-                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                      {/* Stock Badge */}
-                      <div className="text-right font-mono pr-2">
-                        <span className={`text-sm font-black px-2.5 py-1 rounded-lg ${
-                          stock === 0
-                            ? "bg-red-100 text-red-700"
-                            : stock <= 10
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-emerald-100 text-emerald-800"
-                        }`}>
-                          {stock} in stock
-                        </span>
+                  if (hasVariants) {
+                    return (
+                      <div
+                        key={item.id}
+                        className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5 hover:border-slate-300 transition-colors"
+                      >
+                        {/* Parent Product Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={item.imageUrl || "https://picsum.photos/seed/prime/100"}
+                              alt={item.name}
+                              className="w-11 h-11 rounded-xl object-cover bg-slate-100 border border-slate-200 shrink-0"
+                            />
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-heading font-black text-sm sm:text-base text-slate-900">
+                                  {item.name}
+                                </h4>
+                                <span className="text-[10px] font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-bold">
+                                  {item.category || "General"}
+                                </span>
+                                <span className="text-[10px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-bold uppercase">
+                                  {item.variants.length} Variants
+                                </span>
+                              </div>
+                              <p className="text-xs font-mono text-slate-500 mt-0.5">
+                                Base Price: {formatPHP(item.price)} &bull; Low Threshold: ≤{threshold} units
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Total Stock Summary Badge */}
+                          <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                            <span className="text-[11px] font-mono uppercase text-slate-500 font-bold">Total Stock:</span>
+                            <span className={`text-xs font-mono font-black px-2.5 py-1 rounded-lg ${
+                              totalStock === 0
+                                ? "bg-red-100 text-red-700 border border-red-200"
+                                : totalStock <= threshold
+                                ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                            }`}>
+                              {totalStock} units
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Variants List for Granular Stock Management */}
+                        <div className="space-y-2 pt-1">
+                          <div className="hidden sm:grid grid-cols-12 gap-2 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold px-2">
+                            <span className="col-span-5">Variant Description</span>
+                            <span className="col-span-2 text-right">Price</span>
+                            <span className="col-span-2 text-center">Status</span>
+                            <span className="col-span-3 text-right">Stock Controls</span>
+                          </div>
+
+                          {item.variants.map((v: any, vIdx: number) => {
+                            const vStock = Number(v.stock) || 0;
+                            const variantKey = v.id || `var-${vIdx}`;
+
+                            return (
+                              <div
+                                key={variantKey}
+                                className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col sm:grid sm:grid-cols-12 gap-3 items-start sm:items-center hover:bg-slate-100/70 transition-colors"
+                              >
+                                {/* Variant Info */}
+                                <div className="sm:col-span-5 flex items-center gap-2.5 w-full">
+                                  <img
+                                    src={v.imageUrl || item.imageUrl || "https://picsum.photos/seed/prime/100"}
+                                    alt={v.name || `Variant ${vIdx + 1}`}
+                                    className="w-8 h-8 rounded-lg object-cover bg-white border border-slate-200 shrink-0"
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-heading font-black text-xs text-slate-900 truncate">
+                                        {v.name || `Variant #${vIdx + 1}`}
+                                      </span>
+                                      {v.tag && v.tag !== "NONE" && (
+                                        <span className="text-[9px] font-mono bg-slate-900 text-white px-1.5 py-0.2 rounded font-bold uppercase">
+                                          {v.tag}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Price */}
+                                <div className="sm:col-span-2 font-mono text-xs font-bold text-slate-800 sm:text-right">
+                                  {formatPHP(v.price ?? item.price)}
+                                </div>
+
+                                {/* Status Badge */}
+                                <div className="sm:col-span-2 sm:text-center">
+                                  <span className={`text-[11px] font-mono font-black px-2 py-0.5 rounded-md inline-block ${
+                                    vStock === 0
+                                      ? "bg-red-100 text-red-700"
+                                      : vStock <= threshold
+                                      ? "bg-amber-100 text-amber-800"
+                                      : "bg-emerald-100 text-emerald-800"
+                                  }`}>
+                                    {vStock === 0 ? "Out of Stock" : vStock <= threshold ? `${vStock} (Low)` : `${vStock} in stock`}
+                                  </span>
+                                </div>
+
+                                {/* Controls */}
+                                <div className="sm:col-span-3 flex items-center justify-between sm:justify-end gap-1.5 w-full font-mono text-xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdjustVariantStock(item.id, v.id, vStock, -10)}
+                                    disabled={vStock < 10}
+                                    className="px-2 py-1 bg-white hover:bg-slate-200 disabled:opacity-30 border border-slate-200 rounded-lg text-slate-700 font-bold transition-colors cursor-pointer"
+                                    title="Decrease variant stock by 10"
+                                  >
+                                    -10
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdjustVariantStock(item.id, v.id, vStock, -1)}
+                                    disabled={vStock <= 0}
+                                    className="px-2 py-1 bg-white hover:bg-slate-200 disabled:opacity-30 border border-slate-200 rounded-lg text-slate-700 font-bold transition-colors cursor-pointer"
+                                    title="Decrease variant stock by 1"
+                                  >
+                                    -1
+                                  </button>
+                                  
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    key={`input-${item.id}-${variantKey}-${vStock}`}
+                                    defaultValue={vStock}
+                                    onBlur={(e) => {
+                                      const n = parseInt(e.target.value);
+                                      if (!isNaN(n) && n !== vStock) {
+                                        handleSetVariantStockDirect(item.id, v.id, n);
+                                      }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                    title="Direct stock input (Press Enter or blur to save)"
+                                    className="w-12 text-center font-mono font-black text-xs bg-white border border-slate-300 rounded-lg py-1 text-slate-900 focus:outline-none focus:border-slate-900"
+                                  />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdjustVariantStock(item.id, v.id, vStock, +1)}
+                                    className="px-2 py-1 bg-slate-900 hover:bg-black text-white rounded-lg font-bold transition-colors cursor-pointer"
+                                    title="Increase variant stock by 1"
+                                  >
+                                    +1
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdjustVariantStock(item.id, v.id, vStock, +10)}
+                                    className="px-2 py-1 bg-slate-900 hover:bg-black text-white rounded-lg font-bold transition-colors cursor-pointer"
+                                    title="Increase variant stock by 10"
+                                  >
+                                    +10
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Single-Variant Product Row
+                  const stock = item.stock ?? 0;
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={item.imageUrl || "https://picsum.photos/seed/prime/100"}
+                          alt={item.name}
+                          className="w-11 h-11 rounded-xl object-cover bg-slate-100 border border-slate-200 shrink-0"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-heading font-black text-sm sm:text-base text-slate-900">
+                              {item.name}
+                            </h4>
+                            <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                              {item.category || "General"}
+                            </span>
+                            <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                              Single Variant
+                            </span>
+                          </div>
+                          <p className="text-xs font-mono text-slate-500 mt-0.5">
+                            Unit Price: {formatPHP(item.price)} &bull; Threshold: ≤{threshold}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Stock Adjustment Controls */}
-                      <div className="flex items-center gap-1 font-mono text-xs">
-                        <button
-                          onClick={() => handleAdjustStock(item.id, stock, -10)}
-                          disabled={stock < 10}
-                          className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded-lg text-slate-700 font-bold transition-colors cursor-pointer"
-                        >
-                          -10
-                        </button>
-                        <button
-                          onClick={() => handleAdjustStock(item.id, stock, -1)}
-                          disabled={stock <= 0}
-                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded-lg text-slate-700 font-bold transition-colors cursor-pointer"
-                        >
-                          -1
-                        </button>
-                        <button
-                          onClick={() => handleAdjustStock(item.id, stock, +1)}
-                          className="px-2.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg font-bold transition-colors cursor-pointer"
-                        >
-                          +1
-                        </button>
-                        <button
-                          onClick={() => handleAdjustStock(item.id, stock, +10)}
-                          className="px-2 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg font-bold transition-colors cursor-pointer"
-                        >
-                          +10
-                        </button>
+                      <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                        {/* Stock Badge */}
+                        <div className="text-right font-mono pr-1">
+                          <span className={`text-xs font-mono font-black px-2.5 py-1 rounded-lg ${
+                            stock === 0
+                              ? "bg-red-100 text-red-700"
+                              : stock <= threshold
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-emerald-100 text-emerald-800"
+                          }`}>
+                            {stock === 0 ? "Out of Stock" : `${stock} in stock`}
+                          </span>
+                        </div>
+
+                        {/* Stock Adjustment Controls */}
+                        <div className="flex items-center gap-1.5 font-mono text-xs">
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustStock(item.id, stock, -10)}
+                            disabled={stock < 10}
+                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded-lg text-slate-700 font-bold transition-colors cursor-pointer"
+                            title="Decrease stock by 10"
+                          >
+                            -10
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustStock(item.id, stock, -1)}
+                            disabled={stock <= 0}
+                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded-lg text-slate-700 font-bold transition-colors cursor-pointer"
+                            title="Decrease stock by 1"
+                          >
+                            -1
+                          </button>
+
+                          <input
+                            type="number"
+                            min="0"
+                            key={`input-single-${item.id}-${stock}`}
+                            defaultValue={stock}
+                            onBlur={(e) => {
+                              const n = parseInt(e.target.value);
+                              if (!isNaN(n) && n !== stock) {
+                                handleSetProductStockDirect(item.id, n);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
+                            title="Direct stock input (Press Enter or blur to save)"
+                            className="w-12 text-center font-mono font-black text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 text-slate-900 focus:outline-none focus:border-slate-900 focus:bg-white"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustStock(item.id, stock, +1)}
+                            className="px-2 py-1 bg-slate-900 hover:bg-black text-white rounded-lg font-bold transition-colors cursor-pointer"
+                            title="Increase stock by 1"
+                          >
+                            +1
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustStock(item.id, stock, +10)}
+                            className="px-2 py-1 bg-slate-900 hover:bg-black text-white rounded-lg font-bold transition-colors cursor-pointer"
+                            title="Increase stock by 10"
+                          >
+                            +10
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </motion.div>
         )}
@@ -5166,7 +5655,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -5179,7 +5668,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
                 <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
                   Telegram Authentication Gateway
@@ -5229,7 +5718,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -5242,7 +5731,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Total Users</p>
@@ -5301,7 +5790,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -5314,7 +5803,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
               <DiagnosticsModule />
             </div>
           </motion.div>
@@ -5333,7 +5822,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -5346,7 +5835,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
               <LogisticsModule />
             </div>
           </motion.div>
@@ -5365,7 +5854,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -5378,7 +5867,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
               <ChargesModule />
             </div>
           </motion.div>
@@ -5397,7 +5886,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -5410,7 +5899,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
               <PaymentsModule />
             </div>
           </motion.div>
@@ -5429,7 +5918,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -5442,7 +5931,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
               <PromosModule />
             </div>
           </motion.div>
@@ -5973,8 +6462,6 @@ export default function AdminPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-        </div>
       </div>
     </div>
   );
