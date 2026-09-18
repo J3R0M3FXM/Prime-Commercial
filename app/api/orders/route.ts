@@ -257,11 +257,12 @@ export async function POST(request: Request) {
           let safeDeliveryFee = Number(deliveryFee) || 0;
           const isDeliveryUponDelivery = String(deliveryFeePaymentMethod || '').toLowerCase() === 'upon_delivery';
 
-          // 4a. Process Promo Code (Server-side validation and device anti-fraud check)
+          // 4a. Process Promo Code (Marketplace Rules Enforced)
           let promoDiscount = 0;
           let promoTitle = '';
           let promoIdApplied = '';
           let isFreeShipping = false;
+          let promoCashbackPoints = 0;
 
           const rawPromo = String(promoCode || '').trim().toUpperCase();
           const cleanDevId = String(deviceSnapshot?.deviceId || deviceSnapshot?.device_id || body.deviceId || '').trim();
@@ -278,8 +279,46 @@ export async function POST(request: Request) {
 
                 const isDateValid = (!pData.startDate || pData.startDate <= nowIso) && (!pData.endDate || pData.endDate >= nowIso);
                 const isMinSpendValid = !pData.minSpend || itemsSubtotal >= pData.minSpend;
+                const totalItemQty = items.reduce((sum: number, it: any) => sum + (Number(it.quantity) || 1), 0);
+                const isMinQtyValid = !pData.minItemQuantity || totalItemQty >= pData.minItemQuantity;
                 const isQuotaValid = !pData.totalUsageLimit || (pData.usageCount || 0) < pData.totalUsageLimit;
                 const isActive = pData.isActive !== false;
+
+                // Philippine Schedule check
+                const now = new Date();
+                const phtDateObj = new Date(now.getTime() + (8 * 60 + now.getTimezoneOffset()) * 60000);
+                const phtDay = phtDateObj.getDay();
+                const phtDate = phtDateObj.getDate();
+                const phtHour = phtDateObj.getHours();
+
+                let isScheduleValid = true;
+                if (Array.isArray(pData.activeDaysOfWeek) && pData.activeDaysOfWeek.length > 0 && pData.activeDaysOfWeek.length < 7) {
+                  if (!pData.activeDaysOfWeek.includes(phtDay)) isScheduleValid = false;
+                }
+                if (pData.isPaydayOnly) {
+                  const isPayday = (phtDate >= 14 && phtDate <= 16) || phtDate >= 28;
+                  if (!isPayday) isScheduleValid = false;
+                }
+                if (pData.flashHourStart !== undefined && pData.flashHourStart !== null && 
+                    pData.flashHourEnd !== undefined && pData.flashHourEnd !== null) {
+                  if (phtHour < Number(pData.flashHourStart) || phtHour >= Number(pData.flashHourEnd)) {
+                    isScheduleValid = false;
+                  }
+                }
+
+                // Payment and courier restrictions
+                let isChannelValid = true;
+                const currentPm = isDeliveryUponDelivery ? 'upon_delivery' : (deliveryFeePaymentMethod || 'upon_checkout');
+                if (Array.isArray(pData.allowedPaymentMethods) && pData.allowedPaymentMethods.length > 0 && !pData.allowedPaymentMethods.includes('all')) {
+                  if (!pData.allowedPaymentMethods.includes(currentPm.toLowerCase())) {
+                    isChannelValid = false;
+                  }
+                }
+                if (courier?.id && Array.isArray(pData.allowedCourierIds) && pData.allowedCourierIds.length > 0 && !pData.allowedCourierIds.includes('all')) {
+                  if (!pData.allowedCourierIds.includes(courier.id)) {
+                    isChannelValid = false;
+                  }
+                }
 
                 // Device Fingerprinting Check
                 let isFraud = false;
@@ -298,12 +337,17 @@ export async function POST(request: Request) {
                   }
                 }
 
-                if (isActive && isDateValid && isMinSpendValid && isQuotaValid && !isFraud) {
+                if (isActive && isDateValid && isMinSpendValid && isMinQtyValid && isQuotaValid && isScheduleValid && isChannelValid && !isFraud) {
                   const discResult = calculatePromoDiscount(pData, itemsSubtotal, safeDeliveryFee);
                   promoDiscount = discResult.discount;
                   isFreeShipping = discResult.isFreeShipping;
+                  promoCashbackPoints = discResult.cashbackPoints;
                   promoTitle = pData.title || pData.code;
                   promoIdApplied = promoDoc.id;
+
+                  if (discResult.shippingSubsidy > 0) {
+                    safeDeliveryFee = Math.max(0, safeDeliveryFee - discResult.shippingSubsidy);
+                  }
 
                   // Update usage count
                   transaction.update(promoDoc.ref, {
@@ -323,6 +367,8 @@ export async function POST(request: Request) {
                     deviceId: cleanDevId,
                     hardwareId: cleanHwId,
                     discountAmount: promoDiscount,
+                    shippingSubsidy: discResult.shippingSubsidy,
+                    cashbackPoints: discResult.cashbackPoints,
                     usedAt: nowIso
                   });
                 }
@@ -446,11 +492,12 @@ export async function POST(request: Request) {
             receiverPhone: receiverPhone || '',
             deliveryAddress: deliveryAddress || null,
             courier: courier || null,
-            promoCode: promoDiscount > 0 ? rawPromo : null,
+            promoCode: (promoDiscount > 0 || isFreeShipping || promoCashbackPoints > 0) ? rawPromo : null,
             promoDiscount,
-            promoTitle: promoTitle || null,
-            promoId: promoIdApplied || null,
+            promoTitle: (promoDiscount > 0 || isFreeShipping || promoCashbackPoints > 0) ? promoTitle : null,
+            promoId: (promoDiscount > 0 || isFreeShipping || promoCashbackPoints > 0) ? promoIdApplied : null,
             isFreeShipping,
+            promoCashbackPoints: promoCashbackPoints || 0,
             storeCreditsUsed: safeStoreCreditsUsed,
             referralCode: orderReferredByMemberId || null,
             referredByMemberId: orderReferredByMemberId || null,

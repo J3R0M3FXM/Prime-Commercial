@@ -116,12 +116,14 @@ export default function CheckoutModal({
     username: string;
     primeMemberId: string;
     contactNumber: string;
+    tier?: string;
   }>({
     id: "",
     name: "",
     username: "",
     primeMemberId: "",
     contactNumber: "",
+    tier: "MEMBER",
   });
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
@@ -212,11 +214,14 @@ export default function CheckoutModal({
     code: string;
     title: string;
     promoId: string;
+    voucherType?: string;
     discountAmount: number;
-    discountType: "fixed" | "percentage" | "free_shipping";
+    discountType: "fixed" | "percentage" | "free_shipping" | "shipping_discount" | "coins_cashback" | string;
     discountValue?: number;
     maxDiscountAmount?: number | null;
     isFreeShipping: boolean;
+    shippingSubsidy?: number;
+    cashbackPoints?: number;
   } | null>(null);
   const [isCheckingPromo, setIsCheckingPromo] = useState<boolean>(false);
   const [promoError, setPromoError] = useState<string>("");
@@ -650,9 +655,12 @@ export default function CheckoutModal({
     return selectedCourier?.calculatedFee || 0;
   }, [selectedCourier]);
 
-  // Effective courier delivery fee considering free shipping promo
+  // Effective courier delivery fee considering free shipping or capped shipping subsidy promo
   const effectiveCourierDeliveryFee = useMemo(() => {
     if (appliedPromo?.isFreeShipping) return 0;
+    if (appliedPromo?.shippingSubsidy && appliedPromo.shippingSubsidy > 0) {
+      return Math.max(0, courierDeliveryFee - appliedPromo.shippingSubsidy);
+    }
     return courierDeliveryFee;
   }, [appliedPromo, courierDeliveryFee]);
 
@@ -719,15 +727,21 @@ export default function CheckoutModal({
     setPromoError("");
     try {
       const fpData = await getClientFingerprint();
+      const totalItemCount = selectedItems.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
       const res = await fetch("/api/promos/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: cleanCode,
           itemsSubtotal,
+          itemQuantity: totalItemCount,
+          totalItems: totalItemCount,
           deliveryFee: courierDeliveryFee,
           customerId: tgCustomer.id,
           primeMemberId: tgCustomer.primeMemberId,
+          customerTier: tgCustomer.tier || 'MEMBER',
+          paymentMethod: deliveryPaymentMethod === 'upon_delivery' ? 'upon_delivery' : 'upon_checkout',
+          courierId: selectedCourier?.id || selectedCourierId,
           deviceId: fpData.deviceId,
           hardwareId: fpData.hardwareId
         })
@@ -741,11 +755,14 @@ export default function CheckoutModal({
         code: data.code,
         title: data.title || data.code,
         promoId: data.promoId,
+        voucherType: data.voucherType,
         discountAmount: Number(data.discountAmount) || 0,
         discountType: data.discountType,
         discountValue: data.discountValue,
         maxDiscountAmount: data.maxDiscountAmount,
-        isFreeShipping: Boolean(data.isFreeShipping)
+        isFreeShipping: Boolean(data.isFreeShipping),
+        shippingSubsidy: Number(data.shippingSubsidy) || 0,
+        cashbackPoints: Number(data.cashbackPoints) || 0
       });
       setPromoCodeInput("");
     } catch (err: any) {
@@ -1767,6 +1784,12 @@ export default function CheckoutModal({
                         <span className="line-through text-gray-400 text-[11px] mr-1.5 font-mono">{formatPHP(courierDeliveryFee)}</span>
                         <span className="font-bold text-emerald-600 font-mono">FREE</span>
                       </div>
+                    ) : appliedPromo?.shippingSubsidy && appliedPromo.shippingSubsidy > 0 ? (
+                      <div>
+                        <span className="line-through text-gray-400 text-[11px] mr-1.5 font-mono">{formatPHP(courierDeliveryFee)}</span>
+                        <span className="font-semibold text-gray-900 font-mono">{formatPHP(effectiveCourierDeliveryFee)}</span>
+                        <span className="text-[10px] text-emerald-600 block font-mono">(-{formatPHP(appliedPromo.shippingSubsidy)} subsidy)</span>
+                      </div>
                     ) : (
                       <span className="font-semibold text-gray-900 font-mono">
                         {formatPHP(courierDeliveryFee)}
@@ -1783,6 +1806,17 @@ export default function CheckoutModal({
                       Promo Discount ({appliedPromo.code}):
                     </span>
                     <span className="font-bold font-mono">-{formatPHP(promoDiscountAmount)}</span>
+                  </div>
+                )}
+
+                {/* Points Cashback Voucher Reward */}
+                {appliedPromo && (appliedPromo as any).cashbackPoints > 0 && (
+                  <div className="flex justify-between items-center text-xs font-mono text-amber-800 pt-1 border-t border-gray-100 bg-amber-50/50 p-1.5 rounded">
+                    <span className="font-medium flex items-center gap-1">
+                      <Coins className="w-3 h-3 text-amber-600" />
+                      Cashback Points to Earn ({appliedPromo.code}):
+                    </span>
+                    <span className="font-bold font-mono text-amber-900">+{(appliedPromo as any).cashbackPoints.toLocaleString()} PTS</span>
                   </div>
                 )}
 

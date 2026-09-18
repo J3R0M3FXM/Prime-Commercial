@@ -98,10 +98,23 @@ export async function POST(request: Request) {
       code, 
       title, 
       description = '', 
+      voucherType = 'shop_voucher',
       discountType = 'fixed', 
       discountValue = 0, 
       maxDiscountAmount = null, 
+      cappedShippingDiscount = null,
+      cashbackPercentage = null,
       minSpend = 0, 
+      minItemQuantity = 0,
+      customerEligibility = 'all',
+      minPreviousOrders = 0,
+      eligibleTiers = [],
+      allowedPaymentMethods = ['all'],
+      allowedCourierIds = ['all'],
+      activeDaysOfWeek = [0, 1, 2, 3, 4, 5, 6],
+      isPaydayOnly = false,
+      flashHourStart = null,
+      flashHourEnd = null,
       totalUsageLimit = null, 
       usageLimitPerCustomer = 1, 
       isActive = true,
@@ -127,10 +140,23 @@ export async function POST(request: Request) {
       code: cleanCode,
       title: title || `${cleanCode} Promo`,
       description: description || '',
+      voucherType: voucherType as any,
       discountType: discountType as any,
       discountValue: Number(discountValue) || 0,
       maxDiscountAmount: maxDiscountAmount ? Number(maxDiscountAmount) : undefined,
+      cappedShippingDiscount: cappedShippingDiscount ? Number(cappedShippingDiscount) : undefined,
+      cashbackPercentage: cashbackPercentage ? Number(cashbackPercentage) : undefined,
       minSpend: minSpend ? Number(minSpend) : 0,
+      minItemQuantity: minItemQuantity ? Number(minItemQuantity) : undefined,
+      customerEligibility: customerEligibility as any,
+      minPreviousOrders: minPreviousOrders ? Number(minPreviousOrders) : undefined,
+      eligibleTiers: Array.isArray(eligibleTiers) ? eligibleTiers : [],
+      allowedPaymentMethods: Array.isArray(allowedPaymentMethods) ? allowedPaymentMethods : ['all'],
+      allowedCourierIds: Array.isArray(allowedCourierIds) ? allowedCourierIds : ['all'],
+      activeDaysOfWeek: Array.isArray(activeDaysOfWeek) ? activeDaysOfWeek : [0, 1, 2, 3, 4, 5, 6],
+      isPaydayOnly: Boolean(isPaydayOnly),
+      flashHourStart: flashHourStart !== null && flashHourStart !== undefined && flashHourStart !== '' ? Number(flashHourStart) : undefined,
+      flashHourEnd: flashHourEnd !== null && flashHourEnd !== undefined && flashHourEnd !== '' ? Number(flashHourEnd) : undefined,
       totalUsageLimit: totalUsageLimit ? Number(totalUsageLimit) : undefined,
       usageCount: 0,
       usageLimitPerCustomer: usageLimitPerCustomer ? Number(usageLimitPerCustomer) : 1,
@@ -161,12 +187,39 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Promo not found' }, { status: 404 });
     }
 
-    if (updates.code) {
-      updates.code = String(updates.code).trim().toUpperCase();
-    }
+    const sanitizedUpdates: Record<string, any> = {
+      updatedAt: new Date().toISOString()
+    };
 
-    updates.updatedAt = new Date().toISOString();
-    await updateDoc(promoRef, updates);
+    if (updates.code !== undefined) {
+      sanitizedUpdates.code = String(updates.code).trim().toUpperCase();
+    }
+    if (updates.title !== undefined) sanitizedUpdates.title = String(updates.title);
+    if (updates.description !== undefined) sanitizedUpdates.description = String(updates.description);
+    if (updates.voucherType !== undefined) sanitizedUpdates.voucherType = updates.voucherType;
+    if (updates.discountType !== undefined) sanitizedUpdates.discountType = updates.discountType;
+    if (updates.discountValue !== undefined) sanitizedUpdates.discountValue = Number(updates.discountValue) || 0;
+    if (updates.maxDiscountAmount !== undefined) sanitizedUpdates.maxDiscountAmount = updates.maxDiscountAmount ? Number(updates.maxDiscountAmount) : null;
+    if (updates.cappedShippingDiscount !== undefined) sanitizedUpdates.cappedShippingDiscount = updates.cappedShippingDiscount ? Number(updates.cappedShippingDiscount) : null;
+    if (updates.cashbackPercentage !== undefined) sanitizedUpdates.cashbackPercentage = updates.cashbackPercentage ? Number(updates.cashbackPercentage) : null;
+    if (updates.minSpend !== undefined) sanitizedUpdates.minSpend = Number(updates.minSpend) || 0;
+    if (updates.minItemQuantity !== undefined) sanitizedUpdates.minItemQuantity = updates.minItemQuantity ? Number(updates.minItemQuantity) : null;
+    if (updates.customerEligibility !== undefined) sanitizedUpdates.customerEligibility = updates.customerEligibility;
+    if (updates.minPreviousOrders !== undefined) sanitizedUpdates.minPreviousOrders = updates.minPreviousOrders ? Number(updates.minPreviousOrders) : null;
+    if (updates.eligibleTiers !== undefined) sanitizedUpdates.eligibleTiers = Array.isArray(updates.eligibleTiers) ? updates.eligibleTiers : [];
+    if (updates.allowedPaymentMethods !== undefined) sanitizedUpdates.allowedPaymentMethods = Array.isArray(updates.allowedPaymentMethods) ? updates.allowedPaymentMethods : ['all'];
+    if (updates.allowedCourierIds !== undefined) sanitizedUpdates.allowedCourierIds = Array.isArray(updates.allowedCourierIds) ? updates.allowedCourierIds : ['all'];
+    if (updates.activeDaysOfWeek !== undefined) sanitizedUpdates.activeDaysOfWeek = Array.isArray(updates.activeDaysOfWeek) ? updates.activeDaysOfWeek : [0, 1, 2, 3, 4, 5, 6];
+    if (updates.isPaydayOnly !== undefined) sanitizedUpdates.isPaydayOnly = Boolean(updates.isPaydayOnly);
+    if (updates.flashHourStart !== undefined) sanitizedUpdates.flashHourStart = updates.flashHourStart !== null && updates.flashHourStart !== '' ? Number(updates.flashHourStart) : null;
+    if (updates.flashHourEnd !== undefined) sanitizedUpdates.flashHourEnd = updates.flashHourEnd !== null && updates.flashHourEnd !== '' ? Number(updates.flashHourEnd) : null;
+    if (updates.totalUsageLimit !== undefined) sanitizedUpdates.totalUsageLimit = updates.totalUsageLimit ? Number(updates.totalUsageLimit) : null;
+    if (updates.usageLimitPerCustomer !== undefined) sanitizedUpdates.usageLimitPerCustomer = Number(updates.usageLimitPerCustomer) || 1;
+    if (updates.isActive !== undefined) sanitizedUpdates.isActive = Boolean(updates.isActive);
+    if (updates.startDate !== undefined) sanitizedUpdates.startDate = updates.startDate || null;
+    if (updates.endDate !== undefined) sanitizedUpdates.endDate = updates.endDate || null;
+
+    await updateDoc(promoRef, sanitizedUpdates);
 
     const updatedSnap = await getDoc(promoRef);
     return NextResponse.json({ id, ...cleanTimestamps(updatedSnap.data()) });
