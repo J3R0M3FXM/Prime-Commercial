@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { calculateCustomerTier } from '@/lib/points-system';
+import { cacheStore } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,14 +21,7 @@ function cleanTimestamps(obj: any): any {
   return copy;
 }
 
-let cachedAllCustomers: any[] | null = null;
-let lastAllCustomersFetchTime = 0;
-const CUSTOMERS_CACHE_TTL_MS = 25000; // 25 seconds
-
-function invalidateCustomersCache() {
-  cachedAllCustomers = null;
-  lastAllCustomersFetchTime = 0;
-}
+const CUSTOMERS_CACHE_TTL_MS = 60000; // 60 seconds
 
 export async function GET(request: Request) {
   try {
@@ -63,16 +57,16 @@ export async function GET(request: Request) {
 
       const userData = cleanTimestamps(userSnap.data());
 
-      // Fetch all recorded sessions for this customer
+      // Fetch recorded sessions for this customer
       let fingerprints: any[] = [];
       try {
         const fpCol = collection(db, 'users', targetId, 'fingerprints');
-        const fpSnap = await getDocs(fpCol);
+        const fpQ = query(fpCol, limit(15));
+        const fpSnap = await getDocs(fpQ);
         fingerprints = fpSnap.docs.map(d => ({
           id: d.id,
           ...cleanTimestamps(d.data())
         }));
-        // Sort by lastSeen or createdAt descending
         fingerprints.sort((a, b) => {
           const tA = new Date(a.createdAt || a.lastSeen || 0).getTime();
           const tB = new Date(b.createdAt || b.lastSeen || 0).getTime();
@@ -85,20 +79,15 @@ export async function GET(request: Request) {
       const currentDeviceId = userData.deviceId || userData.latestFingerprint?.deviceId || fingerprints[0]?.deviceId || "";
       const currentHardwareId = userData.hardwareId || userData.latestFingerprint?.hardwareId || fingerprints[0]?.hardwareId || "";
 
-      // Promo Fraud Detection: Check if other accounts share this Device ID or Hardware Signature
+      // Promo Fraud Detection: Check if other accounts share this Device ID with targeted limit query
       let sharedAccounts: any[] = [];
       try {
-        const allUsersSnap = await getDocs(collection(db, 'users'));
-        allUsersSnap.docs.forEach(uDoc => {
-          if (uDoc.id !== customerId) {
-            const uData = uDoc.data();
-            const uDevId = uData.deviceId || uData.latestFingerprint?.deviceId || "";
-            const uHwId = uData.hardwareId || uData.latestFingerprint?.hardwareId || "";
-            
-            const isMatch = (currentDeviceId && uDevId && currentDeviceId === uDevId) ||
-                            (currentHardwareId && uHwId && currentHardwareId === uHwId);
-            
-            if (isMatch) {
+        if (currentDeviceId) {
+          const qDev = query(collection(db, 'users'), where('deviceId', '==', currentDeviceId), limit(10));
+          const devSnap = await getDocs(qDev);
+          devSnap.docs.forEach(uDoc => {
+            if (uDoc.id !== customerId && uDoc.id !== targetId) {
+              const uData = uDoc.data();
               sharedAccounts.push({
                 id: uDoc.id,
                 name: uData.tgName || `User ${uDoc.id}`,
@@ -107,24 +96,32 @@ export async function GET(request: Request) {
                 lastSeen: uData.lastSeen || uData.createdAt || ""
               });
             }
-          }
-        });
+          });
+        }
       } catch (err) {
         console.warn("Fraud check error:", err);
       }
 
-      // Fetch order history for this customer
+      // Fetch order history for this customer with targeted queries (NOT unbounded getDocs)
       let orders: any[] = [];
       try {
         const ordersCol = collection(db, 'orders');
-        const ordersSnap = await getDocs(ordersCol);
-        orders = ordersSnap.docs
-          .map(d => ({ id: d.id, ...cleanTimestamps(d.data()) }))
-          .filter((ord: any) => 
-            ord.customerId === customerId || 
-            ord.tgUserId === customerId || 
-            (userData.primeMemberId && ord.primeMemberId === userData.primeMemberId)
-          );
+        const qOrders = query(ordersCol, where('customerId', '==', targetId), limit(50));
+        const ordersSnap = await getDocs(qOrders);
+        const map = new Map<string, any>();
+        ordersSnap.docs.forEach(d => {
+          map.set(d.id, { id: d.id, ...cleanTimestamps(d.data()) });
+        });
+
+        if (userData.primeMemberId) {
+          const qMem = query(ordersCol, where('primeMemberId', '==', userData.primeMemberId), limit(50));
+          const memSnap = await getDocs(qMem);
+          memSnap.docs.forEach(d => {
+            map.set(d.id, { id: d.id, ...cleanTimestamps(d.data()) });
+          });
+        }
+
+        orders = Array.from(map.values());
         orders.sort((a, b) => {
           const tA = new Date(a.createdAt || 0).getTime();
           const tB = new Date(b.createdAt || 0).getTime();
@@ -165,18 +162,19 @@ export async function GET(request: Request) {
 
     // 2. All Customers Compact List
     const now = Date.now();
-    if (cachedAllCustomers && (now - lastAllCustomersFetchTime < CUSTOMERS_CACHE_TTL_MS)) {
-      return NextResponse.json(cachedAllCustomers);
+    if (cacheStore.customers && (now - cacheStore.lastCustomersFetchTime < CUSTOMERS_CACHE_TTL_MS)) {
+      return NextResponse.json(cacheStore.customers);
     }
 
     const usersCol = collection(db, 'users');
     const userSnap = await getDocs(usersCol);
 
-    // Also fetch orders count/totals for all customers
+    // Also fetch recent orders count/totals for all customers
     let allOrders: any[] = [];
     try {
       const ordersCol = collection(db, 'orders');
-      const ordersSnap = await getDocs(ordersCol);
+      const qOrders = query(ordersCol, limit(200));
+      const ordersSnap = await getDocs(qOrders);
       allOrders = ordersSnap.docs.map(d => ({ id: d.id, ...cleanTimestamps(d.data()) }));
     } catch {
       allOrders = [];
@@ -246,13 +244,13 @@ export async function GET(request: Request) {
       };
     });
 
-    cachedAllCustomers = users;
-    lastAllCustomersFetchTime = now;
+    cacheStore.customers = users;
+    cacheStore.lastCustomersFetchTime = now;
 
     return NextResponse.json(users);
   } catch (error: any) {
-    if (cachedAllCustomers) {
-      return NextResponse.json(cachedAllCustomers);
+    if (cacheStore.customers) {
+      return NextResponse.json(cacheStore.customers);
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

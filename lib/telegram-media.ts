@@ -23,13 +23,22 @@ export interface TelegramVideoUploadResult {
 }
 
 export function getTelegramBotToken(): string {
-  return (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  return (
+    process.env.TELEGRAM_BOT_TOKEN ||
+    process.env.BOT_TOKEN ||
+    process.env.TELEGRAM_TOKEN ||
+    ''
+  ).trim();
 }
 
 export function getTelegramStorageChatId(): string {
   return (
     process.env.TELEGRAM_STORAGE_CHAT_ID ||
+    process.env.TELEGRAM_CHAT_ID ||
+    process.env.CHAT_ID ||
+    process.env.TELEGRAM_CHANNEL_ID ||
     process.env.ADMIN_TELEGRAM_USER_ID ||
+    process.env.STORAGE_CHAT_ID ||
     ''
   ).trim();
 }

@@ -5,14 +5,17 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const NO_CACHE_HEADERS = {
-  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-  'Pragma': 'no-cache',
-  'Expires': '0',
-};
+let cachedPayments: any[] | null = null;
+let lastPaymentsFetchTime = 0;
+const PAYMENTS_CACHE_TTL_MS = 60000; // 60 seconds
 
 export async function GET() {
   try {
+    const now = Date.now();
+    if (cachedPayments && (now - lastPaymentsFetchTime < PAYMENTS_CACHE_TTL_MS)) {
+      return NextResponse.json(cachedPayments);
+    }
+
     const snap = await getDocs(collection(db, 'payment_methods'));
     const paymentMethods = snap.docs.map(d => ({
       id: d.id,
@@ -26,14 +29,19 @@ export async function GET() {
       return orderA - orderB;
     });
 
-    return NextResponse.json(paymentMethods, { headers: NO_CACHE_HEADERS });
+    cachedPayments = paymentMethods;
+    lastPaymentsFetchTime = now;
+
+    return NextResponse.json(paymentMethods);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_CACHE_HEADERS });
+    if (cachedPayments) return NextResponse.json(cachedPayments);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
+    cachedPayments = null;
     const data = await request.json();
     const {
       name,
@@ -51,7 +59,7 @@ export async function POST(request: Request) {
     } = data;
 
     if (!name || !paymentType) {
-      return NextResponse.json({ error: "Missing required fields (name, paymentType)" }, { status: 400, headers: NO_CACHE_HEADERS });
+      return NextResponse.json({ error: "Missing required fields (name, paymentType)" }, { status: 400 });
     }
 
     // Determine sort order
@@ -78,14 +86,15 @@ export async function POST(request: Request) {
       updatedAt: serverTimestamp()
     });
 
-    return NextResponse.json({ success: true, id: docRef.id }, { headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ success: true, id: docRef.id });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
   try {
+    cachedPayments = null;
     const data = await request.json();
 
     // Check for bulk reorder request: { reorder: [{ id: "...", sortOrder: 0 }, ...] }
@@ -101,7 +110,7 @@ export async function PUT(request: Request) {
         }
       }
       await batch.commit();
-      return NextResponse.json({ success: true, message: "Order updated" }, { headers: NO_CACHE_HEADERS });
+      return NextResponse.json({ success: true, message: "Order updated" });
     }
 
     const {
@@ -121,7 +130,7 @@ export async function PUT(request: Request) {
     } = data;
 
     if (!id || !name || !paymentType) {
-      return NextResponse.json({ error: "Missing required fields (id, name, paymentType)" }, { status: 400, headers: NO_CACHE_HEADERS });
+      return NextResponse.json({ error: "Missing required fields (id, name, paymentType)" }, { status: 400 });
     }
 
     const updatePayload: any = {
@@ -146,22 +155,23 @@ export async function PUT(request: Request) {
     const docRef = doc(db, 'payment_methods', id);
     await updateDoc(docRef, updatePayload);
 
-    return NextResponse.json({ success: true }, { headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
   try {
+    cachedPayments = null;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: "Missing payment method ID" }, { status: 400, headers: NO_CACHE_HEADERS });
+    if (!id) return NextResponse.json({ error: "Missing payment method ID" }, { status: 400 });
 
     const docRef = doc(db, 'payment_methods', id);
     await deleteDoc(docRef);
-    return NextResponse.json({ success: true }, { headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

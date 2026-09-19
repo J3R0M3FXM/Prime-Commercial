@@ -78,6 +78,7 @@ export default function MediaModule() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [previewVideo, setPreviewVideo] = useState<VideoItem | null>(null);
+  const [previewVideoError, setPreviewVideoError] = useState<string | null>(null);
   const [editingVideo, setEditingVideo] = useState<VideoItem | null>(null);
 
   // Telegram bot status
@@ -687,7 +688,13 @@ export default function MediaModule() {
               }`}
             >
               {/* Thumbnail / Video Preview Frame */}
-              <div className="relative aspect-video bg-slate-900 overflow-hidden group cursor-pointer" onClick={() => setPreviewVideo(video)}>
+              <div
+                className="relative aspect-video bg-slate-900 overflow-hidden group cursor-pointer"
+                onClick={() => {
+                  setPreviewVideoError(null);
+                  setPreviewVideo(video);
+                }}
+              >
                 {video.thumbnailUrl ? (
                   <img
                     src={video.thumbnailUrl}
@@ -1366,19 +1373,52 @@ export default function MediaModule() {
             </div>
 
             {/* Video Player */}
-            <div className="relative aspect-video bg-black flex items-center justify-center">
-              <video
-                controls
-                autoPlay
-                playsInline
-                className="w-full h-full object-contain"
-                src={
-                  previewVideo.directUrl ||
-                  `/api/media/stream/${previewVideo.telegramFileId || previewVideo.id}`
-                }
-              >
-                Your browser does not support HTML5 video playback.
-              </video>
+            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
+              {previewVideoError ? (
+                <div className="p-6 text-center space-y-2 max-w-sm">
+                  <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">
+                    <Film className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-mono font-bold text-red-400">Stream Connection Notice</p>
+                  <p className="text-[11px] font-sans text-slate-300 leading-normal">
+                    {previewVideoError}
+                  </p>
+                  <button
+                    onClick={() => setPreviewVideoError(null)}
+                    className="mt-2 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-mono text-emerald-400 rounded-lg cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Retry
+                  </button>
+                </div>
+              ) : (
+                <video
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-full object-contain"
+                  src={
+                    previewVideo.directUrl ||
+                    `/api/media/stream/${previewVideo.telegramFileId || previewVideo.id}`
+                  }
+                  onError={async () => {
+                    try {
+                      const checkRes = await fetch(
+                        `/api/media/stream/${previewVideo.telegramFileId || previewVideo.id}`
+                      );
+                      if (!checkRes.ok) {
+                        const errMsg = await checkRes.text();
+                        setPreviewVideoError(errMsg || "Video stream unavailable from Telegram.");
+                      } else {
+                        setPreviewVideoError("Unable to decode video format in this browser.");
+                      }
+                    } catch {
+                      setPreviewVideoError("Network error while connecting to media stream.");
+                    }
+                  }}
+                >
+                  Your browser does not support HTML5 video playback.
+                </video>
+              )}
             </div>
 
             {/* Player Details Footer */}

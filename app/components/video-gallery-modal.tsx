@@ -61,6 +61,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -87,6 +88,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
 
   // When active video changes, increment view count
   useEffect(() => {
+    setVideoError(null);
     if (activeVideo) {
       setIsPlaying(true);
       // Fire view counter increment
@@ -389,20 +391,60 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
             </div>
 
             {/* Video Frame */}
-            <div className="relative aspect-video bg-black flex items-center justify-center">
-              <video
-                ref={videoRef}
-                controls
-                autoPlay
-                playsInline
-                className="w-full h-full object-contain"
-                src={
-                  activeVideo.directUrl ||
-                  `/api/media/stream/${activeVideo.telegramFileId || activeVideo.id}`
-                }
-              >
-                Your browser does not support HTML5 video streaming.
-              </video>
+            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
+              {videoError ? (
+                <div className="p-6 text-center space-y-2 max-w-sm">
+                  <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">
+                    <Film className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-mono font-bold text-red-400">Stream Connection Notice</p>
+                  <p className="text-[11px] font-sans text-slate-300 leading-normal">
+                    {videoError}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setVideoError(null);
+                      if (videoRef.current) {
+                        videoRef.current.load();
+                        videoRef.current.play().catch(() => {});
+                      }
+                    }}
+                    className="mt-2 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-mono text-emerald-400 rounded-lg cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Retry Stream
+                  </button>
+                </div>
+              ) : (
+                <video
+                  ref={videoRef}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-full object-contain"
+                  src={
+                    activeVideo.directUrl ||
+                    `/api/media/stream/${activeVideo.telegramFileId || activeVideo.id}`
+                  }
+                  onError={async () => {
+                    // Test stream API directly to get detailed error message
+                    try {
+                      const checkRes = await fetch(
+                        `/api/media/stream/${activeVideo.telegramFileId || activeVideo.id}`
+                      );
+                      if (!checkRes.ok) {
+                        const errMsg = await checkRes.text();
+                        setVideoError(errMsg || "Video stream unavailable from Telegram.");
+                      } else {
+                        setVideoError("Unable to decode video format in this browser.");
+                      }
+                    } catch {
+                      setVideoError("Network error while connecting to media stream.");
+                    }
+                  }}
+                >
+                  Your browser does not support HTML5 video streaming.
+                </video>
+              )}
             </div>
 
             {/* Video Info & Controls Panel */}

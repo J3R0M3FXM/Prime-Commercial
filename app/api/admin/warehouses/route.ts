@@ -4,19 +4,31 @@ import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, writeBatc
 
 export const dynamic = 'force-dynamic';
 
+let cachedWarehouses: any[] | null = null;
+let lastWarehousesFetchTime = 0;
+const WAREHOUSES_CACHE_TTL_MS = 60000; // 60 seconds
+
 export async function GET() {
   try {
+    const now = Date.now();
+    if (cachedWarehouses && (now - lastWarehousesFetchTime < WAREHOUSES_CACHE_TTL_MS)) {
+      return NextResponse.json(cachedWarehouses);
+    }
+
     const snap = await getDocs(collection(db, 'warehouses'));
     const warehouses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // sorting by name or createdAt could be done here
+    cachedWarehouses = warehouses;
+    lastWarehousesFetchTime = now;
     return NextResponse.json(warehouses);
   } catch (error: any) {
+    if (cachedWarehouses) return NextResponse.json(cachedWarehouses);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
+    cachedWarehouses = null;
     const data = await request.json();
     const newDocRef = doc(collection(db, 'warehouses'));
     const isDefault = data.isDefault === true;
@@ -49,6 +61,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    cachedWarehouses = null;
     const { id, ...data } = await request.json();
     if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
 
@@ -81,6 +94,7 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    cachedWarehouses = null;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });

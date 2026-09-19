@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, getDoc, doc, runTransaction, updateDoc, query, where, setDoc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, runTransaction, updateDoc, query, where, setDoc, limit, orderBy } from 'firebase/firestore';
 import { calculatePromoDiscount, type PromoConfig } from '@/lib/promos';
+import { cacheStore } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -568,6 +569,8 @@ export async function POST(request: Request) {
        throw new Error("System is processing high volume of transactions. Please try again.");
     }
 
+    cacheStore.invalidateOrders();
+
     return NextResponse.json({ 
       success: true, 
       id: orderNumber, 
@@ -579,37 +582,73 @@ export async function POST(request: Request) {
   }
 }
 
-let cachedPublicOrders: any[] | null = null;
-let lastPublicOrdersFetchTime = 0;
-const PUBLIC_ORDERS_CACHE_TTL_MS = 15000; // 15 seconds
+const PUBLIC_ORDERS_CACHE_TTL_MS = 60000; // 60 seconds
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    const orderId = searchParams.get('orderId') || searchParams.get('id');
+    const orderNumber = searchParams.get('orderNumber');
     const customerId = searchParams.get('customerId');
 
-    const now = Date.now();
-    let allOrders = cachedPublicOrders;
-    if (!allOrders || (now - lastPublicOrdersFetchTime > PUBLIC_ORDERS_CACHE_TTL_MS)) {
-      const ordersCol = collection(db, 'orders');
-      const snap = await getDocs(ordersCol);
-      allOrders = snap.docs.map(d => ({ id: d.id, ...cleanTimestamps(d.data()) }));
-      cachedPublicOrders = allOrders;
-      lastPublicOrdersFetchTime = now;
+    // 1. High-Efficiency Single Order Lookup by ID (1 Read only!)
+    if (orderId) {
+      const orderRef = doc(db, 'orders', orderId);
+      const snap = await getDoc(orderRef);
+      if (snap.exists()) {
+        return NextResponse.json({ id: snap.id, ...cleanTimestamps(snap.data()) });
+      }
+      // If not found by doc id, try querying by orderNumber
+      const qNum = query(collection(db, 'orders'), where('orderNumber', '==', orderId), limit(1));
+      const snapNum = await getDocs(qNum);
+      if (!snapNum.empty) {
+        const foundDoc = snapNum.docs[0];
+        return NextResponse.json({ id: foundDoc.id, ...cleanTimestamps(foundDoc.data()) });
+      }
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    let orders = [...allOrders];
+    // 2. High-Efficiency Single Order Lookup by Order Number (1 Read only!)
+    if (orderNumber) {
+      const q = query(collection(db, 'orders'), where('orderNumber', '==', orderNumber), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const foundDoc = snap.docs[0];
+        return NextResponse.json({ id: foundDoc.id, ...cleanTimestamps(foundDoc.data()) });
+      }
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
 
+    // 3. Customer-Targeted Orders Query (bounded to 50 items max)
     if (customerId) {
-      orders = orders.filter((o: any) => o.customerId === customerId || o.tgUserId === customerId);
+      const qCust = query(
+        collection(db, 'orders'),
+        where('customerId', '==', customerId),
+        limit(50)
+      );
+      const snapCust = await getDocs(qCust);
+      const orders = snapCust.docs.map(d => ({ id: d.id, ...cleanTimestamps(d.data()) }));
+      orders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      return NextResponse.json(orders);
     }
 
-    orders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    // 4. Cached General Order List (strictly capped & cached for 60s)
+    const now = Date.now();
+    let allOrders = cacheStore.orders;
+    if (!allOrders || (now - cacheStore.lastOrdersFetchTime > PUBLIC_ORDERS_CACHE_TTL_MS)) {
+      const ordersCol = collection(db, 'orders');
+      const qRecent = query(ordersCol, limit(100));
+      const snap = await getDocs(qRecent);
+      allOrders = snap.docs.map(d => ({ id: d.id, ...cleanTimestamps(d.data()) }));
+      allOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      cacheStore.orders = allOrders;
+      cacheStore.lastOrdersFetchTime = now;
+    }
 
-    return NextResponse.json(orders);
+    return NextResponse.json(allOrders);
   } catch (error: any) {
-    if (cachedPublicOrders) {
-      return NextResponse.json(cachedPublicOrders);
+    if (cacheStore.orders) {
+      return NextResponse.json(cacheStore.orders);
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -638,8 +677,7 @@ export async function PUT(request: Request) {
       updatedAt: new Date().toISOString()
     });
 
-    cachedPublicOrders = null;
-    lastPublicOrdersFetchTime = 0;
+    cacheStore.invalidateOrders();
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error updating order payment proof:', error);

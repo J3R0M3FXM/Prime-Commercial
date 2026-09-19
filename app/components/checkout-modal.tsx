@@ -428,28 +428,35 @@ export default function CheckoutModal({
     }
   }, [isOpen]);
 
-  // Live real-time sync for order updates & courier tracking button when on Step 5
+  // Live sync for order updates & courier tracking button when on Step 5 (Targeted Single Order Query)
   useEffect(() => {
     if (currentStep !== 5 || !completedOrder) return;
     const orderId = completedOrder.id || completedOrder.orderNumber;
     if (!orderId) return;
 
+    let pollCount = 0;
+    const maxPolls = 8; // Max 8 polls (approx 8 minutes) to preserve Firestore quota
+
     const syncInterval = setInterval(async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      pollCount++;
+      if (pollCount > maxPolls) {
+        clearInterval(syncInterval);
+        return;
+      }
+
       try {
-        const res = await fetch(`/api/orders?_t=${Date.now()}`, { cache: "no-store" });
+        const res = await fetch(`/api/orders?orderId=${encodeURIComponent(orderId)}`);
         if (res.ok) {
-          const orders = await res.json();
-          if (Array.isArray(orders)) {
-            const found = orders.find((o: any) => o.id === orderId || o.orderNumber === orderId);
-            if (found) {
-              setCompletedOrder((prev: any) => ({ ...prev, ...found }));
-            }
+          const orderData = await res.json();
+          if (orderData && (orderData.id || orderData.orderNumber)) {
+            setCompletedOrder((prev: any) => ({ ...prev, ...orderData }));
           }
         }
       } catch (err) {
         // silent background sync error
       }
-    }, 15000);
+    }, 60000);
 
     return () => clearInterval(syncInterval);
   }, [currentStep, completedOrder?.id, completedOrder?.orderNumber]);

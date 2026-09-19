@@ -6,27 +6,36 @@ import { normalizeCharge } from '@/lib/charges';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const NO_CACHE_HEADERS = {
-  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-  'Pragma': 'no-cache',
-  'Expires': '0',
-};
+let cachedCharges: any[] | null = null;
+let lastChargesFetchTime = 0;
+const CHARGES_CACHE_TTL_MS = 60000; // 60 seconds
 
 export async function GET() {
   try {
+    const now = Date.now();
+    if (cachedCharges && (now - lastChargesFetchTime < CHARGES_CACHE_TTL_MS)) {
+      return NextResponse.json(cachedCharges);
+    }
+
     const chargesSnap = await getDocs(collection(db, 'charges'));
     const charges = chargesSnap.docs.map(d => {
       const data = d.data();
       return normalizeCharge({ id: d.id, ...data }, d.id);
     });
-    return NextResponse.json(charges, { headers: NO_CACHE_HEADERS });
+
+    cachedCharges = charges;
+    lastChargesFetchTime = now;
+
+    return NextResponse.json(charges);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_CACHE_HEADERS });
+    if (cachedCharges) return NextResponse.json(cachedCharges);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
+    cachedCharges = null;
     const data = await request.json();
     const normalized = normalizeCharge(data);
     
@@ -49,17 +58,18 @@ export async function POST(request: Request) {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
-    return NextResponse.json({ success: true, id: docRef.id }, { headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ success: true, id: docRef.id });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
   try {
+    cachedCharges = null;
     const data = await request.json();
     const { id, ...updateData } = data;
-    if (!id) return NextResponse.json({ error: "Missing charge ID" }, { status: 400, headers: NO_CACHE_HEADERS });
+    if (!id) return NextResponse.json({ error: "Missing charge ID" }, { status: 400 });
 
     const normalized = normalizeCharge({ id, ...updateData }, id);
 
@@ -82,23 +92,24 @@ export async function PUT(request: Request) {
       },
       updatedAt: serverTimestamp()
     });
-    return NextResponse.json({ success: true }, { headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
   try {
+    cachedCharges = null;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: "Missing charge ID" }, { status: 400, headers: NO_CACHE_HEADERS });
+    if (!id) return NextResponse.json({ error: "Missing charge ID" }, { status: 400 });
 
     const docRef = doc(db, 'charges', id);
     await deleteDoc(docRef);
-    return NextResponse.json({ success: true }, { headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 

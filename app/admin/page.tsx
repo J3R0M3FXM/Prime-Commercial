@@ -502,8 +502,8 @@ export default function AdminPage() {
     }, 50);
   };
 
-  // Silent Real-Time Background Sync states & refs
-  const [silentSyncEnabled, setSilentSyncEnabled] = useState(true);
+  // Silent Real-Time Background Sync states & refs (Default false to preserve Firestore quota)
+  const [silentSyncEnabled, setSilentSyncEnabled] = useState(false);
 
   // Sound preferences persisted in localStorage per event type
   const [soundSettings, setSoundSettings] = useState<{
@@ -641,19 +641,15 @@ export default function AdminPage() {
     }
   };
 
-  // Dedicated Silent Refresh across the entire Admin Panel
+  // Dedicated Silent Refresh across the entire Admin Panel (Throttled & Orders only to preserve Firestore reads)
   const fetchSilentData = useCallback(async () => {
     if (isSilentSyncingRef.current) return;
     isSilentSyncingRef.current = true;
     setIsSilentSyncing(true);
 
     try {
-      const t = Date.now();
-      const [ordRes, custRes, prodRes] = await Promise.all([
-        fetch(`/api/admin/orders?_t=${t}`, { cache: "no-store" }),
-        fetch(`/api/admin/customers?_t=${t}`, { cache: "no-store" }),
-        fetch(`/api/products?_t=${t}`, { cache: "no-store" }),
-      ]);
+      // Only silently poll orders to detect new orders and proof changes
+      const ordRes = await fetch('/api/admin/orders');
 
       if (ordRes.ok) {
         const newOrders: any[] = await ordRes.json();
@@ -711,13 +707,6 @@ export default function AdminPage() {
         ordersRef.current = newOrders;
       }
 
-      if (custRes.ok) {
-        setCustomers(await custRes.json());
-      }
-      if (prodRes.ok) {
-        setProducts(await prodRes.json());
-      }
-
       setLastSilentSync(new Date());
     } catch (err) {
       console.warn("Silent sync error:", err);
@@ -730,11 +719,10 @@ export default function AdminPage() {
   const fetchAllData = async () => {
     setRefreshing(true);
     try {
-      const t = Date.now();
       const [custRes, prodRes, ordRes] = await Promise.all([
-        fetch(`/api/admin/customers?_t=${t}`, { cache: "no-store" }),
-        fetch(`/api/products?_t=${t}`, { cache: "no-store" }),
-        fetch(`/api/admin/orders?_t=${t}`, { cache: "no-store" })
+        fetch('/api/admin/customers'),
+        fetch('/api/products'),
+        fetch('/api/admin/orders')
       ]);
       if (custRes.ok) setCustomers(await custRes.json());
       if (prodRes.ok) setProducts(await prodRes.json());
@@ -755,33 +743,22 @@ export default function AdminPage() {
     }
   };
 
-  // Silent Real-Time Background Polling Effect
+  // Silent Real-Time Background Polling Effect (Gentle 2m interval when enabled)
   useEffect(() => {
     if (!authorized || !silentSyncEnabled) return;
 
-    // 30s background sync on Orders Management, 45s on other modules to conserve Firestore daily read quota
-    const pollInterval = (view === "orders" || view === "order-detail") ? 30000 : 45000;
+    // 2 minutes gentle background poll interval when user explicitly enables live sync
+    const pollInterval = 120000;
 
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       fetchSilentData();
     }, pollInterval);
 
-    const handleVisibilityOrFocus = () => {
-      if (typeof document !== "undefined" && !document.hidden) {
-        fetchSilentData();
-      }
-    };
-
-    window.addEventListener("focus", handleVisibilityOrFocus);
-    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
-
     return () => {
       clearInterval(timer);
-      window.removeEventListener("focus", handleVisibilityOrFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
     };
-  }, [authorized, silentSyncEnabled, view, fetchSilentData]);
+  }, [authorized, silentSyncEnabled, fetchSilentData]);
 
   // Auto-dismiss live toast after 7s
   useEffect(() => {

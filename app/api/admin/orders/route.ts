@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, setDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, setDoc, query, where, limit } from 'firebase/firestore';
 import { processMaturedReferrals } from '@/lib/points-system';
+import { cacheStore } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,24 +94,18 @@ function cleanForFirestore<T>(data: T): T {
   return result as T;
 }
 
-let cachedOrders: any[] | null = null;
-let lastOrdersFetchTime = 0;
-const CACHE_TTL_MS = 20000; // 20 seconds
-
-function invalidateOrdersCache() {
-  cachedOrders = null;
-  lastOrdersFetchTime = 0;
-}
+const CACHE_TTL_MS = 60000; // 60 seconds
 
 export async function GET() {
   try {
     const now = Date.now();
-    if (cachedOrders && (now - lastOrdersFetchTime < CACHE_TTL_MS)) {
-      return NextResponse.json(cachedOrders);
+    if (cacheStore.adminOrders && (now - cacheStore.lastAdminOrdersFetchTime < CACHE_TTL_MS)) {
+      return NextResponse.json(cacheStore.adminOrders);
     }
 
     const ordersCol = collection(db, 'orders');
-    const snap = await getDocs(ordersCol);
+    const qOrders = query(ordersCol, limit(150));
+    const snap = await getDocs(qOrders);
     const orders = snap.docs.map(d => ({
       id: d.id,
       ...cleanTimestamps(d.data())
@@ -118,13 +113,13 @@ export async function GET() {
 
     orders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
-    cachedOrders = orders;
-    lastOrdersFetchTime = now;
+    cacheStore.adminOrders = orders;
+    cacheStore.lastAdminOrdersFetchTime = now;
 
     return NextResponse.json(orders);
   } catch (error: any) {
-    if (cachedOrders) {
-      return NextResponse.json(cachedOrders);
+    if (cacheStore.adminOrders) {
+      return NextResponse.json(cacheStore.adminOrders);
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -156,7 +151,7 @@ export async function PUT(request: Request) {
           console.warn(`Failed to update order ${orderId}:`, err);
         }
       }
-      invalidateOrdersCache();
+      cacheStore.invalidateOrders();
       return NextResponse.json({ success: true, updatedCount: results.length, ids: results });
     }
 
@@ -390,7 +385,7 @@ export async function PUT(request: Request) {
 
     const cleanedData = cleanForFirestore(updateData);
     await updateDoc(orderRef, cleanedData);
-    invalidateOrdersCache();
+    cacheStore.invalidateOrders();
 
     return NextResponse.json({ 
       success: true, 
@@ -409,7 +404,7 @@ export async function DELETE(request: Request) {
 
     const orderRef = doc(db, 'orders', id);
     await deleteDoc(orderRef);
-    invalidateOrdersCache();
+    cacheStore.invalidateOrders();
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -30,6 +30,9 @@ function cleanTimestamps(obj: any): any {
   return copy;
 }
 
+let lastMaturedReferralsProcessTime = 0;
+const MATURED_REFERRALS_INTERVAL_MS = 5 * 60 * 1000; // Run at most once every 5 minutes
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -40,8 +43,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Customer identifier is required.' }, { status: 400 });
     }
 
-    // Run background check for matured referrals (30 min after delivery)
-    await processMaturedReferrals().catch(() => {});
+    // Run background check for matured referrals (throttled to once every 5m)
+    const now = Date.now();
+    if (now - lastMaturedReferralsProcessTime > MATURED_REFERRALS_INTERVAL_MS) {
+      lastMaturedReferralsProcessTime = now;
+      processMaturedReferrals().catch(() => {});
+    }
 
     // 1. Find User Document
     let userDoc: any = null;
@@ -80,24 +87,40 @@ export async function GET(request: Request) {
     const finalMemberId = userData.primeMemberId || primeMemberId || '';
     const userId = userDoc.id;
 
-    // 2. Fetch all orders for this customer
-    const ordersCol = collection(db, 'orders');
-    const allOrdersSnap = await getDocs(ordersCol);
-    const userOrders: any[] = [];
+    // 2. Fetch orders for this customer using targeted queries (NOT unbounded getDocs)
+    const orderMap = new Map<string, any>();
+    try {
+      const ordersCol = collection(db, 'orders');
+      
+      // Query by customerId
+      const qCust = query(ordersCol, where('customerId', '==', userId), limit(100));
+      const snapCust = await getDocs(qCust);
+      snapCust.docs.forEach((doc) => {
+        orderMap.set(doc.id, { id: doc.id, ...cleanTimestamps(doc.data()) });
+      });
 
-    allOrdersSnap.docs.forEach((ordDoc) => {
-      const o = cleanTimestamps(ordDoc.data());
-      const oId = ordDoc.id;
-      const matches = 
-        o.customerId === userId || 
-        o.tgUserId === userId || 
-        (finalMemberId && o.primeMemberId === finalMemberId) ||
-        (customerId && (o.customerId === customerId || o.tgUserId === customerId));
-      if (matches) {
-        userOrders.push({ id: oId, ...o });
+      // Query by primeMemberId if distinct
+      if (finalMemberId) {
+        const qMem = query(ordersCol, where('primeMemberId', '==', finalMemberId), limit(100));
+        const snapMem = await getDocs(qMem);
+        snapMem.docs.forEach((doc) => {
+          orderMap.set(doc.id, { id: doc.id, ...cleanTimestamps(doc.data()) });
+        });
       }
-    });
 
+      // Query by tgUserId if distinct
+      if (userData.tgUserId && userData.tgUserId !== userId) {
+        const qTg = query(ordersCol, where('tgUserId', '==', userData.tgUserId), limit(100));
+        const snapTg = await getDocs(qTg);
+        snapTg.docs.forEach((doc) => {
+          orderMap.set(doc.id, { id: doc.id, ...cleanTimestamps(doc.data()) });
+        });
+      }
+    } catch (ordErr) {
+      console.warn('Error fetching customer orders:', ordErr);
+    }
+
+    const userOrders = Array.from(orderMap.values());
     userOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
     // Completed/Delivered orders for tier calculation & points
@@ -158,19 +181,18 @@ export async function GET(request: Request) {
       refUsersSnap.docs.forEach((d) => {
         if (d.id !== userId) {
           const rData = cleanTimestamps(d.data());
-          // Check if this referred customer has placed a completed order
-          const hasCompleted = allOrdersSnap.docs.some((od) => {
-            const odData = od.data();
-            const st = String(odData.status || '').toLowerCase();
-            const isComp = st === 'delivered' || st === 'completed';
-            const isCustomer = odData.customerId === d.id || odData.tgUserId === d.id || odData.primeMemberId === rData.primeMemberId;
-            return isComp && isCustomer;
-          });
+          // Check if this referred customer has placed a completed order (using customer's record to avoid unbounded reads)
+          const hasCompleted = Boolean(
+            rData.firstCompletedOrderDate || 
+            (typeof rData.lifetimePurchasingPoints === 'number' && rData.lifetimePurchasingPoints > 0) || 
+            (typeof rData.totalSpent === 'number' && rData.totalSpent > 0) ||
+            (typeof rData.ordersCount === 'number' && rData.ordersCount > 0)
+          );
 
           referralsList.push({
             id: d.id,
-            name: rData.tgName || 'Member',
-            username: rData.tgUsername || '',
+            name: rData.tgName || rData.name || 'Member',
+            username: rData.tgUsername || rData.telegramUsername || '',
             primeMemberId: rData.primeMemberId || '',
             enrolledAt: rData.createdAt || '',
             hasDeliveredOrder: hasCompleted,
@@ -193,14 +215,20 @@ export async function GET(request: Request) {
 
     // 6. Calculate Pending Referral Points
     // (Orders by referrals that are completed but still within 30 min window, or pending delivery)
-    let pendingReferralPoints = 0;
-    if (finalMemberId) {
-      allOrdersSnap.docs.forEach((od) => {
-        const odData = od.data();
-        if (odData.referredByMemberId === finalMemberId && odData.referralPointsStatus === 'pending_30m') {
-          pendingReferralPoints += 50;
-        }
-      });
+    let pendingReferralPoints = Number(userData.pendingReferralPoints || 0);
+    if (finalMemberId && pendingReferralPoints === 0) {
+      try {
+        const pendingRefQ = query(
+          collection(db, 'orders'),
+          where('referredByMemberId', '==', finalMemberId),
+          where('referralPointsStatus', '==', 'pending_30m'),
+          limit(20)
+        );
+        const pendingSnap = await getDocs(pendingRefQ);
+        pendingReferralPoints = pendingSnap.size * 50;
+      } catch {
+        pendingReferralPoints = 0;
+      }
     }
 
     // Current Points Balances

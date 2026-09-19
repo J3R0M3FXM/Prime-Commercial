@@ -9,9 +9,11 @@ import {
   updateDoc, 
   deleteDoc, 
   query, 
-  where 
+  where,
+  limit
 } from 'firebase/firestore';
 import { type PromoConfig, generatePromoCode } from '@/lib/promos';
+import { cacheStore } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,15 +32,24 @@ function cleanTimestamps(obj: any): any {
   return copy;
 }
 
+const PROMOS_CACHE_TTL_MS = 60000; // 60 seconds
+
 export async function GET() {
   try {
+    const now = Date.now();
+    if (cacheStore.promos && (now - cacheStore.lastPromosFetchTime < PROMOS_CACHE_TTL_MS)) {
+      return NextResponse.json(cacheStore.promos);
+    }
+
     const promosCol = collection(db, 'promos');
     const snap = await getDocs(promosCol);
 
-    // Also fetch redemptions to audit device sharing & fraud
+    // Also fetch redemptions to audit device sharing & fraud (limit to recent 200)
     let allRedemptions: any[] = [];
     try {
-      const redSnap = await getDocs(collection(db, 'promo_redemptions'));
+      const redCol = collection(db, 'promo_redemptions');
+      const qRed = query(redCol, limit(200));
+      const redSnap = await getDocs(qRed);
       allRedemptions = redSnap.docs.map(d => ({ id: d.id, ...cleanTimestamps(d.data()) }));
     } catch {
       allRedemptions = [];
@@ -84,8 +95,12 @@ export async function GET() {
       return tB - tA;
     });
 
+    cacheStore.promos = promos;
+    cacheStore.lastPromosFetchTime = now;
+
     return NextResponse.json(promos);
   } catch (err: any) {
+    if (cacheStore.promos) return NextResponse.json(cacheStore.promos);
     console.error('Error fetching promos:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -168,6 +183,7 @@ export async function POST(request: Request) {
     };
 
     await setDoc(doc(db, 'promos', promoId), newPromo);
+    cacheStore.invalidatePromos();
     return NextResponse.json(newPromo);
   } catch (err: any) {
     console.error('Error creating promo:', err);
@@ -177,6 +193,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    cacheStore.invalidatePromos();
     const body = await request.json();
     const { id, ...updates } = body;
     if (!id) return NextResponse.json({ error: 'Promo ID is required' }, { status: 400 });
@@ -231,6 +248,7 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    cacheStore.invalidatePromos();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Promo ID is required' }, { status: 400 });
