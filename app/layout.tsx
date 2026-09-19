@@ -44,11 +44,13 @@ export default function RootLayout({
         />
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
       </head>
-      <body className="font-sans bg-gray-50 text-gray-900 antialiased min-h-screen pb-8">
-        <CartProvider>
-          {children}
-        </CartProvider>
-        <SystemFooter />
+      <body className="font-sans bg-slate-950 text-gray-900 antialiased min-h-screen flex justify-center selection:bg-slate-900 selection:text-white">
+        <div id="mobile-portrait-viewport" className="w-full max-w-[430px] min-h-screen bg-gray-50 flex flex-col relative shadow-2xl sm:border-x sm:border-slate-800/80">
+          <CartProvider>
+            {children}
+          </CartProvider>
+          <SystemFooter />
+        </div>
       </body>
     </html>
   );

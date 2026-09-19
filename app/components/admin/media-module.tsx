@@ -832,7 +832,7 @@ export default function MediaModule() {
       {/* ========================================================================= */}
       {isUploadModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-[430px] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Upload className="w-5 h-5 text-emerald-400" />
@@ -1067,7 +1067,7 @@ export default function MediaModule() {
       {/* ========================================================================= */}
       {isImportModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-[430px] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <LinkIcon className="w-5 h-5 text-sky-400" />
@@ -1209,7 +1209,7 @@ export default function MediaModule() {
       {/* ========================================================================= */}
       {isEditModalOpen && editingVideo && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-[430px] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Edit2 className="w-4 h-4 text-emerald-400" />
@@ -1347,7 +1347,7 @@ export default function MediaModule() {
       {/* ========================================================================= */}
       {previewVideo && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-[430px] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             {/* Player Header */}
             <div className="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 text-white flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">

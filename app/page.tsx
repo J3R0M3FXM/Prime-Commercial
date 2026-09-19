@@ -333,7 +333,7 @@ export default function Shopfront() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 max-w-5xl mx-auto w-full">
+      <main className="flex-1 p-3 sm:p-3.5 w-full">
         
         {/* Product Grid */}
         {products.length === 0 ? (
@@ -349,7 +349,7 @@ export default function Shopfront() {
             <p className="text-gray-500">Try adjusting your search or filters.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6">
+          <div className="grid grid-cols-3 gap-2">
             {filteredProducts.map(p => {
               const variants = p.variants && p.variants.length > 0 ? p.variants : [];
               const isOutOfStock = variants.length > 0 
@@ -508,7 +508,7 @@ export default function Shopfront() {
       )}
 
       {/* Fixed Non-Scrolling Bottom Navigation Bar (sitting right above system footer) */}
-      <nav className="fixed bottom-[20px] left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/90 shadow-lg px-0.5 py-1.5 flex items-center justify-between font-['Roboto_Condensed'] select-none">
+      <nav className="fixed bottom-[20px] left-0 right-0 max-w-[430px] mx-auto z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/90 shadow-lg px-0.5 py-1.5 flex items-center justify-between font-['Roboto_Condensed'] select-none">
         {/* 1. SHOP */}
         <button
           type="button"

@@ -135,8 +135,9 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col overflow-hidden text-slate-100">
-      {/* 1. TOP NAVIGATION HEADER */}
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center">
+      <div className="w-full max-w-[430px] h-full bg-slate-950 flex flex-col overflow-hidden text-slate-100 shadow-2xl relative sm:border-x sm:border-slate-800">
+        {/* 1. TOP NAVIGATION HEADER */}
       <header className="sticky top-0 z-20 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 py-3 sm:px-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
@@ -358,7 +359,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
       {/* ========================================================================= */}
       {activeVideo && (
         <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh]">
+          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-[430px] overflow-hidden shadow-2xl flex flex-col max-h-[95vh]">
             {/* Top Bar */}
             <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-3 text-white">
               <div className="flex items-center gap-2 min-w-0">
@@ -499,6 +500,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

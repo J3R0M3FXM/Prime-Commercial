@@ -643,8 +643,8 @@ export default function PaymentsModule() {
 
       {/* Add/Edit Side Sheet Modal */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-end p-4 backdrop-blur-xs">
-          <div className="bg-white border border-slate-200 w-full max-w-md h-full rounded-2xl overflow-y-auto shadow-2xl p-5 flex flex-col justify-between">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 w-full max-w-[430px] h-full rounded-2xl overflow-y-auto shadow-2xl p-5 flex flex-col justify-between">
             <div className="space-y-5">
               <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
                 <h4 className="font-heading font-black uppercase text-slate-900 text-sm tracking-wide">

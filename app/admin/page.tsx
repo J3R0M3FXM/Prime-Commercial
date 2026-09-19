@@ -1933,7 +1933,7 @@ export default function AdminPage() {
           >
             {/* Harmonized Sticky Header matching Shopfront */}
             <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+              <div className="w-full mx-auto px-3.5 sm:px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center">
                   <img 
                     src="/primefinal.png" 
@@ -1993,7 +1993,7 @@ export default function AdminPage() {
             </header>
 
             {/* Dashboard Content Area */}
-            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <div className="flex-1 w-full mx-auto p-3.5 sm:p-4">
 
             {/* PWA Installation Card Banner */}
             {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (
@@ -2030,7 +2030,7 @@ export default function AdminPage() {
 
             {/* Management Section Tiles */}
             <div className="mb-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 {[
                   { id: "customers", name: "Customers", icon: Users, desc: "Profiles & Device Info", count: customers.length },
                   { id: "orders", name: "Orders", icon: ClipboardList, desc: "Order History & Status", count: orders.length },
@@ -2391,7 +2391,7 @@ export default function AdminPage() {
                   </div>
 
                   {/* Identity Breakdown Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 text-xs">
+                  <div className="grid grid-cols-2 gap-2.5 pt-6 text-xs">
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                       <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">First / Last Name</p>
                       <p className="font-mono text-slate-900 font-bold">
@@ -2448,7 +2448,7 @@ export default function AdminPage() {
                   </div>
 
                   {/* Loyalty Balances Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                  <div className="grid grid-cols-2 gap-2.5 text-xs font-mono">
                     <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl">
                       <p className="text-emerald-800 uppercase text-[10px] tracking-widest font-bold mb-1">Store Credits</p>
                       <p className="text-lg font-bold text-emerald-950 font-mono">
@@ -5190,7 +5190,7 @@ export default function AdminPage() {
             {/* PRODUCT CONFIGURATION MODAL (Only opened via button, not shown right away) */}
             {productModalOpen && (
               <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] flex flex-col p-6 shadow-2xl border border-slate-200">
+                <div className="bg-white rounded-2xl max-w-[430px] w-full max-h-[90vh] flex flex-col p-6 shadow-2xl border border-slate-200">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
                     <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
                       {editingProduct?.id ? "Edit Product" : "Add New Product"}
@@ -5942,8 +5942,8 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="flex-1 w-full mx-auto p-3.5 sm:p-4 space-y-5">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Total Users</p>
                   <p className="text-2xl font-heading font-black text-slate-900 mt-1">{customers.length}</p>
@@ -6187,7 +6187,7 @@ export default function AdminPage() {
           onClick={() => setZoomedProofImage(null)}
           className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4 cursor-zoom-out backdrop-blur-xs"
         >
-          <div className="relative max-w-2xl w-full max-h-[85vh] flex flex-col items-center gap-4 bg-transparent">
+          <div className="relative max-w-[430px] w-full max-h-[85vh] flex flex-col items-center gap-4 bg-transparent">
             <button 
               onClick={() => setZoomedProofImage(null)}
               className="absolute -top-10 right-0 text-white hover:text-gray-300 font-bold uppercase text-xs tracking-widest font-mono flex items-center gap-1 cursor-pointer"
@@ -6317,7 +6317,7 @@ export default function AdminPage() {
 
         return (
           <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs screen-only">
-            <div className="bg-slate-50 rounded-2xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="bg-slate-50 rounded-2xl max-w-[430px] w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                 <div className="flex items-center gap-2">
                   <Printer className="w-5 h-5 text-slate-800" />
