@@ -9,6 +9,7 @@ import OrderHistoryModal from "./components/order-history-modal";
 import AccountModal from "./components/account-modal";
 import VideoGalleryModal from "./components/video-gallery-modal";
 import { useCart } from "./components/cart-context";
+import LiveHeaderClock from "./components/live-header-clock";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Bell, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 
@@ -289,22 +290,25 @@ export default function Shopfront() {
               className="h-7 sm:h-[28px] w-auto object-contain shrink-0 drop-shadow-xs" 
             />
           </div>
-          {isAdmin && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    localStorage.removeItem("skip_admin_redirect");
-                    sessionStorage.removeItem("skip_admin_redirect");
-                  }
-                  router.push("/admin");
-                }}
-                className="bg-slate-900 hover:bg-black text-white px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
-              >
-                Admin Panel
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <LiveHeaderClock />
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      localStorage.removeItem("skip_admin_redirect");
+                      sessionStorage.removeItem("skip_admin_redirect");
+                    }
+                    router.push("/admin");
+                  }}
+                  className="bg-slate-900 hover:bg-black text-white px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  Admin Panel
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -378,7 +382,7 @@ export default function Shopfront() {
                     }
                   }}
                 >
-                  <div className="relative aspect-[2/1] overflow-hidden bg-gray-50 border-b border-gray-100">
+                  <div className="relative aspect-[8/7] overflow-hidden bg-gray-50 border-b border-gray-100">
                     <img 
                       src={p.imageUrl || "https://picsum.photos/seed/prime/400"} 
                       alt={p.name} 

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { 
+  getPromoByCodeFromDb, 
+  getPromoRedemptionsForCodeFromDb, 
+  getCustomerOrdersFromDb 
+} from '@/lib/db-adapter';
 import { calculatePromoDiscount, type PromoConfig } from '@/lib/promos';
 import { calculateCustomerTier } from '@/lib/points-system';
 
@@ -29,17 +32,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ valid: false, error: 'Promo code is required.' }, { status: 400 });
     }
 
-    // 1. Look up promo in Firestore
-    const promosCol = collection(db, 'promos');
-    const q = query(promosCol, where('code', '==', cleanCode));
-    const snap = await getDocs(q);
+    // 1. Look up promo in unified database adapter
+    const promo = await getPromoByCodeFromDb(cleanCode) as PromoConfig | null;
 
-    if (snap.empty) {
+    if (!promo) {
       return NextResponse.json({ valid: false, error: 'Promo code does not exist or is invalid.' });
     }
-
-    const promoDoc = snap.docs[0];
-    const promo = { id: promoDoc.id, ...promoDoc.data() } as PromoConfig;
 
     // 2. Active Toggle Switch
     if (promo.isActive === false) {
@@ -128,19 +126,14 @@ export async function POST(request: Request) {
 
     if (customerId || primeMemberId) {
       try {
-        const ordersCol = collection(db, 'orders');
-        const qCust = query(
-          ordersCol, 
-          where(customerId ? 'customerId' : 'primeMemberId', '==', customerId || primeMemberId)
-        );
-        const ordSnap = await getDocs(qCust);
-        const completedDocs = ordSnap.docs.filter(d => {
-          const st = String(d.data().status || '').toLowerCase();
+        const ordDocs = await getCustomerOrdersFromDb(customerId, primeMemberId);
+        const completedDocs = ordDocs.filter(o => {
+          const st = String(o.status || '').toLowerCase();
           return st === 'delivered' || st === 'completed';
         });
         completedOrdersCount = completedDocs.length;
         if (!customerTier) {
-          computedTier = calculateCustomerTier(completedDocs.map(d => d.data())).tier;
+          computedTier = calculateCustomerTier(completedDocs).tier;
         }
       } catch (err) {
         console.warn('Customer order lookup error in promo validation:', err);
@@ -218,28 +211,24 @@ export async function POST(request: Request) {
     }
 
     // 10. Device Fingerprinting Anti-Fraud & Per-Customer Usage Limit:
-    const redemptionsCol = collection(db, 'promo_redemptions');
     const cleanDevId = String(deviceId || '').trim();
     const cleanHwId = String(hardwareId || '').trim();
 
     if (cleanDevId || cleanHwId || customerId || primeMemberId) {
-      // Query redemptions for this promo code
-      const redQ = query(redemptionsCol, where('promoCode', '==', cleanCode));
-      const redSnap = await getDocs(redQ);
+      // Query redemptions for this promo code using unified database adapter
+      const redemptions = await getPromoRedemptionsForCodeFromDb(cleanCode);
 
       // Check device fraud
       if (cleanDevId || cleanHwId) {
-        const deviceRedemptions = redSnap.docs.filter(d => {
-          const data = d.data();
-          const matchesDev = cleanDevId && data.deviceId && String(data.deviceId).trim() === cleanDevId;
-          const matchesHw = cleanHwId && data.hardwareId && String(data.hardwareId).trim() === cleanHwId;
+        const deviceRedemptions = redemptions.filter(r => {
+          const matchesDev = cleanDevId && r.deviceId && String(r.deviceId).trim() === cleanDevId;
+          const matchesHw = cleanHwId && r.deviceId && String(r.deviceId).trim() === cleanHwId;
           return matchesDev || matchesHw;
         });
 
-        const otherAccountRedemptions = deviceRedemptions.filter(d => {
-          const data = d.data();
-          const isSameCust = customerId && data.customerId === customerId;
-          const isSamePrime = primeMemberId && data.primeMemberId === primeMemberId;
+        const otherAccountRedemptions = deviceRedemptions.filter(r => {
+          const isSameCust = customerId && r.customerId === customerId;
+          const isSamePrime = primeMemberId && r.customerId === primeMemberId;
           return !isSameCust && !isSamePrime;
         });
 
@@ -253,11 +242,10 @@ export async function POST(request: Request) {
 
       // Check per-customer usage limit
       const perCustomerLimit = Number(promo.usageLimitPerCustomer) || 1;
-      const customerRedemptions = redSnap.docs.filter(d => {
-        const data = d.data();
-        return (customerId && data.customerId === customerId) || 
-               (primeMemberId && data.primeMemberId === primeMemberId) ||
-               (cleanDevId && data.deviceId === cleanDevId);
+      const customerRedemptions = redemptions.filter(r => {
+        return (customerId && r.customerId === customerId) || 
+               (primeMemberId && r.customerId === primeMemberId) ||
+               (cleanDevId && r.deviceId === cleanDevId);
       });
 
       if (customerRedemptions.length >= perCustomerLimit) {
