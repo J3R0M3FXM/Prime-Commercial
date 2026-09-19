@@ -279,8 +279,8 @@ export default function Shopfront() {
         </div>
       )}
       
-      {/* Sticky Header & Search */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-45 bg-white border-b border-gray-100 shadow-sm">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center">
             <img 
@@ -306,31 +306,31 @@ export default function Shopfront() {
             </div>
           )}
         </div>
-
-        {/* Search & Filter Controls */}
-        <div className="px-4 pb-3 flex flex-row gap-2 max-w-5xl mx-auto w-full">
-          <div className="relative flex-[5]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="SEARCH PRODUCTS..." 
-              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all font-heading font-normal uppercase text-sm"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
-            />
-          </div>
-          <div className="relative flex-[3]">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-            <select 
-              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-black appearance-none cursor-pointer font-heading font-normal uppercase text-sm" 
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-            >
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-        </div>
       </header>
+
+      {/* Search & Filter Controls (Below Header, matching the thin footer style/height) */}
+      <div className="px-4 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[53px]">
+        <div className="relative flex-[5] flex items-center">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <input 
+            type="text" 
+            placeholder="SEARCH PRODUCTS..." 
+            className="w-full h-[26px] pl-8 pr-2 py-0 bg-white border border-gray-200 rounded shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all font-heading font-normal uppercase text-[10px]"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
+          />
+        </div>
+        <div className="relative flex-[3] flex items-center">
+          <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <select 
+            className="w-full h-[26px] pl-8 pr-2 py-0 bg-white border border-gray-200 rounded shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black appearance-none cursor-pointer font-heading font-normal uppercase text-[10px]" 
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
 
       {/* Main Content */}
       <main className="flex-1 p-3 sm:p-3.5 w-full">
@@ -378,7 +378,7 @@ export default function Shopfront() {
                     }
                   }}
                 >
-                  <div className="relative aspect-square overflow-hidden bg-gray-50 border-b border-gray-100">
+                  <div className="relative aspect-[2/1] overflow-hidden bg-gray-50 border-b border-gray-100">
                     <img 
                       src={p.imageUrl || "https://picsum.photos/seed/prime/400"} 
                       alt={p.name} 

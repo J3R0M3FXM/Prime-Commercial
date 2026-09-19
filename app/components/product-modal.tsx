@@ -119,7 +119,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
         <div className="sm:grid sm:grid-cols-2 flex-1 overflow-y-auto">
           {/* Left panel: Image */}
-          <div className="relative aspect-square sm:aspect-auto sm:h-full bg-gray-50 min-h-[250px] sm:min-h-[400px]">
+          <div className="relative aspect-[2/1] bg-gray-50 w-full">
             {renderGlossyChip()}
             <img 
               src={selectedVariant?.imageUrl || product.imageUrl || "https://picsum.photos/seed/prime/600"} 
