@@ -3,6 +3,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, getDoc, doc, runTransaction, updateDoc, query, where, setDoc, limit, orderBy } from 'firebase/firestore';
 import { calculatePromoDiscount, type PromoConfig } from '@/lib/promos';
 import { cacheStore } from '@/lib/cache';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -541,6 +542,13 @@ export async function POST(request: Request) {
                 streetAddress: gpsStreetAddress || ''
               } : null
             } : (clientIp ? { ip: clientIp, deviceId: body.deviceId || '', sessionToken: body.sessionToken || '' } : null),
+            paymentMethodId: body.paymentMethodId || '',
+            paymentMethodName: body.paymentMethodName || '',
+            paymentProofImage: body.paymentProofImage || '',
+            ocrAnalysis: body.ocrAnalysis ? cleanForFirestore(body.ocrAnalysis) : null,
+            paymentStatus: body.paymentProofImage ? 'Pending Review' : 'Unpaid',
+            reviewStatus: 'Pending Manual Review',
+            requiresManualReview: true,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };
@@ -567,6 +575,46 @@ export async function POST(request: Request) {
 
     if (!orderCreated) {
        throw new Error("System is processing high volume of transactions. Please try again.");
+    }
+
+    // Mirror to Supabase if configured
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseAdmin()!;
+        await supabase.from('orders').upsert({
+          id: orderNumber,
+          order_number: orderNumber,
+          customer_id: customerId || null,
+          customer_name: finalOrderData.customerName || receiverName || '',
+          customer_phone: finalOrderData.customerPhone || receiverPhone || '',
+          tg_user_id: String(body.tgUserId || ''),
+          prime_member_id: finalMemberId || '',
+          items: finalOrderData.items || [],
+          subtotal: Number(finalOrderData.subTotal) || 0,
+          delivery_fee: Number(finalOrderData.deliveryFee) || 0,
+          discount_amount: Number(finalOrderData.promoDiscount) || 0,
+          applied_promo_code: promoCode || '',
+          points_discount: Number(finalOrderData.pointsDiscount) || 0,
+          charges_breakdown: finalOrderData.appliedCharges || [],
+          total_amount: Number(finalOrderData.totalAmount) || 0,
+          payable_now: Number(finalOrderData.payableNow) || 0,
+          payable_on_delivery: Number(finalOrderData.payableOnDelivery) || 0,
+          status: 'Pending',
+          payment_status: finalOrderData.paymentStatus || 'Unpaid',
+          payment_method_id: finalOrderData.paymentMethodId || '',
+          payment_method_name: finalOrderData.paymentMethodName || '',
+          payment_proof_image: finalOrderData.paymentProofImage || '',
+          ocr_analysis: finalOrderData.ocrAnalysis || null,
+          review_status: 'Pending Manual Review',
+          requires_manual_review: true,
+          delivery_address: finalOrderData.deliveryAddress || {},
+          courier_id: finalOrderData.courier || '',
+          courier_name: finalOrderData.courierName || '',
+          notes: notes || '',
+        });
+      } catch (sbErr) {
+        console.warn('Supabase order mirror error:', sbErr);
+      }
     }
 
     cacheStore.invalidateOrders();
@@ -661,7 +709,8 @@ export async function PUT(request: Request) {
       orderId,
       paymentMethodId,
       paymentMethodName,
-      paymentProofImage
+      paymentProofImage,
+      ocrAnalysis,
     } = data;
 
     if (!orderId) {
@@ -669,13 +718,39 @@ export async function PUT(request: Request) {
     }
 
     const orderDocRef = doc(db, 'orders', orderId);
-    await updateDoc(orderDocRef, {
+    const updatePayload: Record<string, any> = {
       paymentMethodId: paymentMethodId || '',
       paymentMethodName: paymentMethodName || '',
       paymentProofImage: paymentProofImage || '',
       paymentStatus: 'Pending Review',
+      reviewStatus: 'Pending Manual Review',
+      requiresManualReview: true,
       updatedAt: new Date().toISOString()
-    });
+    };
+
+    if (ocrAnalysis) {
+      updatePayload.ocrAnalysis = cleanForFirestore(ocrAnalysis);
+    }
+
+    await updateDoc(orderDocRef, updatePayload);
+
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseAdmin()!;
+        await supabase.from('orders').update({
+          payment_method_id: paymentMethodId || '',
+          payment_method_name: paymentMethodName || '',
+          payment_proof_image: paymentProofImage || '',
+          payment_status: 'Pending Review',
+          review_status: 'Pending Manual Review',
+          requires_manual_review: true,
+          ocr_analysis: ocrAnalysis || null,
+          updated_at: new Date().toISOString(),
+        }).or(`id.eq.${orderId},order_number.eq.${orderId}`);
+      } catch (sbErr) {
+        console.warn('Supabase order update mirror error:', sbErr);
+      }
+    }
 
     cacheStore.invalidateOrders();
     return NextResponse.json({ success: true });

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,6 +15,35 @@ export async function GET() {
     const now = Date.now();
     if (cachedPayments && (now - lastPaymentsFetchTime < PAYMENTS_CACHE_TTL_MS)) {
       return NextResponse.json(cachedPayments);
+    }
+
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseAdmin()!;
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (!error && data) {
+        const paymentMethods = data.map(p => ({
+          id: p.id,
+          name: p.name,
+          logo: p.logo,
+          paymentType: p.payment_type,
+          qrCodeImage: p.qr_code_image,
+          webhookUrl: p.webhook_url,
+          publicKey: p.public_key,
+          secretKey: p.secret_key,
+          walletAddress: p.wallet_address,
+          accountName: p.account_name,
+          accountNumber: p.account_number,
+          sortOrder: p.sort_order,
+          isActive: p.is_active,
+        }));
+        cachedPayments = paymentMethods;
+        lastPaymentsFetchTime = now;
+        return NextResponse.json(paymentMethods);
+      }
     }
 
     const snap = await getDocs(collection(db, 'payment_methods'));
@@ -86,6 +116,29 @@ export async function POST(request: Request) {
       updatedAt: serverTimestamp()
     });
 
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseAdmin()!;
+        await supabase.from('payment_methods').insert([{
+          id: docRef.id,
+          name: String(name),
+          logo: String(logo || ''),
+          payment_type: String(paymentType),
+          qr_code_image: String(qrCodeImage || ''),
+          webhook_url: String(webhookUrl || ''),
+          public_key: String(publicKey || ''),
+          secret_key: String(secretKey || ''),
+          wallet_address: String(walletAddress || ''),
+          account_name: String(accountName || ''),
+          account_number: String(accountNumber || ''),
+          sort_order: resolvedSortOrder,
+          is_active: isActive !== false,
+        }]);
+      } catch (sbErr) {
+        console.warn('Supabase payment method insert error:', sbErr);
+      }
+    }
+
     return NextResponse.json({ success: true, id: docRef.id });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -110,6 +163,20 @@ export async function PUT(request: Request) {
         }
       }
       await batch.commit();
+
+      if (isSupabaseConfigured()) {
+        try {
+          const supabase = getSupabaseAdmin()!;
+          for (const item of data.reorder) {
+            if (item.id) {
+              await supabase.from('payment_methods').update({ sort_order: item.sortOrder }).eq('id', item.id);
+            }
+          }
+        } catch (sbErr) {
+          console.warn('Supabase payment reorder error:', sbErr);
+        }
+      }
+
       return NextResponse.json({ success: true, message: "Order updated" });
     }
 
@@ -155,6 +222,28 @@ export async function PUT(request: Request) {
     const docRef = doc(db, 'payment_methods', id);
     await updateDoc(docRef, updatePayload);
 
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseAdmin()!;
+        await supabase.from('payment_methods').update({
+          name: String(name),
+          logo: String(logo || ''),
+          payment_type: String(paymentType),
+          qr_code_image: String(qrCodeImage || ''),
+          webhook_url: String(webhookUrl || ''),
+          public_key: String(publicKey || ''),
+          secret_key: String(secretKey || ''),
+          wallet_address: String(walletAddress || ''),
+          account_name: String(accountName || ''),
+          account_number: String(accountNumber || ''),
+          sort_order: typeof sortOrder === 'number' ? sortOrder : 0,
+          is_active: isActive !== false,
+        }).eq('id', id);
+      } catch (sbErr) {
+        console.warn('Supabase payment update error:', sbErr);
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -170,6 +259,16 @@ export async function DELETE(request: Request) {
 
     const docRef = doc(db, 'payment_methods', id);
     await deleteDoc(docRef);
+
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseAdmin()!;
+        await supabase.from('payment_methods').delete().eq('id', id);
+      } catch (sbErr) {
+        console.warn('Supabase payment delete error:', sbErr);
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

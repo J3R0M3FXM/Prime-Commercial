@@ -3,6 +3,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, setDoc, query, where, limit } from 'firebase/firestore';
 import { processMaturedReferrals } from '@/lib/points-system';
 import { cacheStore } from '@/lib/cache';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -385,6 +386,30 @@ export async function PUT(request: Request) {
 
     const cleanedData = cleanForFirestore(updateData);
     await updateDoc(orderRef, cleanedData);
+
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseAdmin()!;
+        const sbPayload: Record<string, any> = { updated_at: new Date().toISOString() };
+        if (updateData.status !== undefined) sbPayload.status = updateData.status;
+        if (updateData.paymentStatus !== undefined) sbPayload.payment_status = updateData.paymentStatus;
+        if (updateData.notes !== undefined) sbPayload.notes = updateData.notes;
+        if (updateData.items !== undefined) sbPayload.items = updateData.items;
+        if (updateData.subTotal !== undefined) sbPayload.subtotal = Number(updateData.subTotal);
+        if (updateData.deliveryFee !== undefined) sbPayload.delivery_fee = Number(updateData.deliveryFee);
+        if (updateData.totalAmount !== undefined) sbPayload.total_amount = Number(updateData.totalAmount);
+        if (updateData.payableNow !== undefined) sbPayload.payable_now = Number(updateData.payableNow);
+        if (updateData.payableOnDelivery !== undefined) sbPayload.payable_on_delivery = Number(updateData.payableOnDelivery);
+        if (updateData.courierId !== undefined) sbPayload.courier_id = updateData.courierId;
+        if (updateData.trackingNumber !== undefined) sbPayload.tracking_number = updateData.trackingNumber;
+        if (updateData.ocrAnalysis !== undefined) sbPayload.ocr_analysis = updateData.ocrAnalysis;
+        
+        await supabase.from('orders').update(sbPayload).or(`id.eq.${id},order_number.eq.${id}`);
+      } catch (sbErr) {
+        console.warn('Supabase admin order update mirror error:', sbErr);
+      }
+    }
+
     cacheStore.invalidateOrders();
 
     return NextResponse.json({ 
@@ -404,6 +429,16 @@ export async function DELETE(request: Request) {
 
     const orderRef = doc(db, 'orders', id);
     await deleteDoc(orderRef);
+
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseAdmin()!;
+        await supabase.from('orders').delete().or(`id.eq.${id},order_number.eq.${id}`);
+      } catch (sbErr) {
+        console.warn('Supabase admin order delete mirror error:', sbErr);
+      }
+    }
+
     cacheStore.invalidateOrders();
     return NextResponse.json({ success: true });
   } catch (error: any) {

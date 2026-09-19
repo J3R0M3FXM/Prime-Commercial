@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { cacheStore } from '@/lib/cache';
+import { 
+  createProductInDb, 
+  updateProductInDb, 
+  deleteProductInDb, 
+  updateProductInDb as reorderProductInDb 
+} from '@/lib/db-adapter';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -9,13 +13,9 @@ export const revalidate = 0;
 export async function POST(request: Request) {
   try {
     const product = await request.json();
-    const productsCol = collection(db, 'products');
-    const docRef = await addDoc(productsCol, {
-      ...product,
-      createdAt: new Date()
-    });
+    const result = await createProductInDb(product);
     cacheStore.invalidateProducts();
-    return NextResponse.json({ id: docRef.id, ...product });
+    return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -27,21 +27,17 @@ export async function PUT(request: Request) {
 
     // Handle batch reordering
     if (Array.isArray(body.reorder)) {
-      const batch = writeBatch(db);
       for (const item of body.reorder) {
         if (item.id) {
-          const ref = doc(db, 'products', item.id);
-          batch.update(ref, { sortOrder: Number(item.sortOrder) || 0 });
+          await reorderProductInDb(item.id, { sortOrder: Number(item.sortOrder) || 0 });
         }
       }
-      await batch.commit();
       cacheStore.invalidateProducts();
       return NextResponse.json({ success: true, count: body.reorder.length });
     }
 
     const { id, ...data } = body;
-    const productRef = doc(db, 'products', id);
-    await updateDoc(productRef, data);
+    await updateProductInDb(id, data);
     cacheStore.invalidateProducts();
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -52,8 +48,7 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { id } = await request.json();
-    const productRef = doc(db, 'products', id);
-    await deleteDoc(productRef);
+    await deleteProductInDb(id);
     cacheStore.invalidateProducts();
     return NextResponse.json({ success: true });
   } catch (error: any) {
