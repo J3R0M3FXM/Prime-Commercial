@@ -1876,7 +1876,7 @@ export default function AdminPage() {
         <div className="w-full max-w-md bg-white border border-slate-200 text-slate-900 p-8 rounded-3xl shadow-xl">
           <div className="flex justify-center mb-6">
             <img 
-              src="/prime-logo-metallic.png" 
+              src="/primefinal.png" 
               alt="PRIME" 
               className="h-8 sm:h-9 w-auto object-contain drop-shadow-xs" 
             />
@@ -1929,7 +1929,7 @@ export default function AdminPage() {
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
                 <div className="flex items-center">
                   <img 
-                    src="/prime-logo-metallic.png" 
+                    src="/primefinal.png" 
                     alt="PRIME" 
                     className="h-7 sm:h-[28px] w-auto object-contain shrink-0 drop-shadow-xs" 
                   />

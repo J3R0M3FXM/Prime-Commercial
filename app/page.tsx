@@ -134,7 +134,7 @@ export default function Shopfront() {
               setIsAdmin(true);
               const productsRes = await fetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
               const pData = await productsRes.json();
-              setProducts(pData);
+              setProducts(Array.isArray(pData) ? pData : []);
               return;
             }
 
@@ -173,7 +173,7 @@ export default function Shopfront() {
           setAuthorized(true);
           const productsRes = await fetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
           const pData = await productsRes.json();
-          setProducts(pData);
+          setProducts(Array.isArray(pData) ? pData : []);
         } else {
           const errData = await response.json().catch(() => ({}));
           throw new Error(errData.error || `Server responded with ${response.status}`);
@@ -253,7 +253,7 @@ export default function Shopfront() {
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center">
             <img 
-              src="/prime-logo-metallic.png" 
+              src="/primefinal.png" 
               alt="PRIME" 
               className="h-7 sm:h-[28px] w-auto object-contain shrink-0 drop-shadow-xs" 
             />

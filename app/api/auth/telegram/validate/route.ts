@@ -51,10 +51,17 @@ export async function POST(request: NextRequest) {
     // Check if Telegram user is authorized Admin
     const isAdmin = tgUserId === '1085949511' || tgUserId === ADMIN_TELEGRAM_USER_ID;
 
-    // Handle Firestore storage
+    // Handle Firestore storage gracefully
     const userRef = doc(db, 'users', tgUserId);
-    const userSnap = await getDoc(userRef);
-    const existingData = userSnap.exists() ? userSnap.data() : null;
+    let existingData: any = null;
+    try {
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        existingData = userSnap.data();
+      }
+    } catch (err) {
+      console.warn("Firestore lookup warning during auth (possible quota limit):", err);
+    }
 
     const primeMemberId = existingData?.primeMemberId || generateMemberId();
     const role = isAdmin ? 'admin' : (existingData?.role || 'customer');
@@ -78,7 +85,11 @@ export async function POST(request: NextRequest) {
       createdAt: existingData?.createdAt || new Date().toISOString()
     };
 
-    await setDoc(userRef, userProfileData, { merge: true });
+    try {
+      await setDoc(userRef, userProfileData, { merge: true });
+    } catch (err) {
+      console.warn("Firestore setDoc warning during auth (possible quota limit):", err);
+    }
 
     // Generate session cryptotoken
     const cryptoToken = crypto.randomBytes(32).toString('hex');
