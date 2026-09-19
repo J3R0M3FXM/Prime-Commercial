@@ -8,6 +8,8 @@ export async function GET() {
   try {
     const snap = await getDocs(collection(db, 'couriers'));
     const couriers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Sort stably by createdAt or name
+    couriers.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
     return NextResponse.json(couriers);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -16,11 +18,28 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
+    const data = await request.json().catch(() => ({}));
+    const name = typeof data.name === 'string' ? data.name.trim() : '';
+    if (!name) {
+      return NextResponse.json({ error: "Courier name is required" }, { status: 400 });
+    }
+
+    if (data.logo && typeof data.logo === 'string' && data.logo.length > 600000) {
+      return NextResponse.json({ error: "Courier logo image is too large. Please use an image under 500KB." }, { status: 400 });
+    }
+
     const newDocRef = doc(collection(db, 'couriers'));
 
     const requestData = {
-      ...data,
+      name,
+      logo: typeof data.logo === 'string' ? data.logo : '',
+      type: data.type || "Standard",
+      baseFare: Number(data.baseFare) || 0,
+      firstMile: Number(data.firstMile) || 0,
+      firstMileFee: Number(data.firstMileFee) || 0,
+      exceedingKmFee: Number(data.exceedingKmFee) || 0,
+      surcharge: Number(data.surcharge) || 0,
+      nightDifferential: Number(data.nightDifferential) || 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -28,24 +47,46 @@ export async function POST(request: Request) {
     await setDoc(newDocRef, requestData);
     return NextResponse.json({ id: newDocRef.id, ...requestData });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Failed to create courier:", error);
+    return NextResponse.json({ error: error.message || "Failed to create courier" }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
   try {
-    const { id, ...data } = await request.json();
-    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+    const body = await request.json().catch(() => ({}));
+    const { id, ...data } = body;
+    if (!id) return NextResponse.json({ error: "Missing courier ID" }, { status: 400 });
 
-    const requestData = {
+    if (data.name !== undefined) {
+      const name = typeof data.name === 'string' ? data.name.trim() : '';
+      if (!name) {
+        return NextResponse.json({ error: "Courier name cannot be empty" }, { status: 400 });
+      }
+      data.name = name;
+    }
+
+    if (data.logo && typeof data.logo === 'string' && data.logo.length > 600000) {
+      return NextResponse.json({ error: "Courier logo image is too large. Please use an image under 500KB." }, { status: 400 });
+    }
+
+    const requestData: any = {
       ...data,
       updatedAt: new Date().toISOString(),
     };
+
+    if (data.baseFare !== undefined) requestData.baseFare = Number(data.baseFare) || 0;
+    if (data.firstMile !== undefined) requestData.firstMile = Number(data.firstMile) || 0;
+    if (data.firstMileFee !== undefined) requestData.firstMileFee = Number(data.firstMileFee) || 0;
+    if (data.exceedingKmFee !== undefined) requestData.exceedingKmFee = Number(data.exceedingKmFee) || 0;
+    if (data.surcharge !== undefined) requestData.surcharge = Number(data.surcharge) || 0;
+    if (data.nightDifferential !== undefined) requestData.nightDifferential = Number(data.nightDifferential) || 0;
     
     await setDoc(doc(db, 'couriers', id), requestData, { merge: true });
     return NextResponse.json({ success: true, id, ...requestData });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Failed to update courier:", error);
+    return NextResponse.json({ error: error.message || "Failed to update courier" }, { status: 500 });
   }
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, MapPin, Building2, Truck, Check, Search, X, Loader2, Star, Settings } from "lucide-react";
+import { Plus, MapPin, Building2, Truck, Check, Search, X, Loader2, Star, Settings, AlertCircle, Trash2, Sparkles } from "lucide-react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -75,18 +75,87 @@ export default function LogisticsModule() {
   const [surcharge, setSurcharge] = useState<number>(0);
   const [nightDifferential, setNightDifferential] = useState<number>(0);
   const [isSavingCourier, setIsSavingCourier] = useState(false);
+  const [isCompressingLogo, setIsCompressingLogo] = useState(false);
+  const [courierError, setCourierError] = useState<string | null>(null);
   
   const courierFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleCourierLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressCourierLogo = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxSize = 256;
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxSize) {
+              height = Math.round((height * maxSize) / width);
+              width = maxSize;
+            }
+          } else {
+            if (height > maxSize) {
+              width = Math.round((width * maxSize) / height);
+              height = maxSize;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const isPng = file.type === 'image/png';
+            resolve(canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', 0.85));
+          } else {
+            resolve(e.target?.result as string || "");
+          }
+        };
+        img.onerror = () => resolve(e.target?.result as string || "");
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleCourierLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCourierLogo(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setCourierError(null);
+      setIsCompressingLogo(true);
+      try {
+        const compressed = await compressCourierLogo(file);
+        setCourierLogo(compressed);
+      } catch (err) {
+        console.error("Failed to process courier logo", err);
+        setCourierError("Failed to process logo image. Please try another file.");
+      } finally {
+        setIsCompressingLogo(false);
+      }
     }
+  };
+
+  const applyCourierPreset = (preset: {
+    name: string;
+    type: string;
+    baseFare: number;
+    firstMile: number;
+    firstMileFee: number;
+    exceedingKmFee: number;
+    surcharge: number;
+    nightDifferential: number;
+  }) => {
+    setCourierName(preset.name);
+    setCourierType(preset.type);
+    setBaseFare(preset.baseFare);
+    setFirstMile(preset.firstMile);
+    setFirstMileFee(preset.firstMileFee);
+    setExceedingKmFee(preset.exceedingKmFee);
+    setSurcharge(preset.surcharge);
+    setNightDifferential(preset.nightDifferential);
+    setCourierError(null);
   };
 
   const resetCourierForm = () => {
@@ -100,21 +169,24 @@ export default function LogisticsModule() {
     setSurcharge(0);
     setNightDifferential(0);
     setEditingCourier(null);
+    setCourierError(null);
     if (courierFileInputRef.current) courierFileInputRef.current.value = "";
   };
 
   const saveCourier = async () => {
-    if (!courierName || !courierLogo) {
-      alert("Name and Logo are required.");
+    const trimmedName = courierName.trim();
+    if (!trimmedName) {
+      setCourierError("Courier Name is required.");
       return;
     }
     
     setIsSavingCourier(true);
+    setCourierError(null);
     try {
-      const formData = {
-        name: courierName,
-        logo: courierLogo,
-        type: courierType,
+      const formData: any = {
+        name: trimmedName,
+        logo: courierLogo || "",
+        type: courierType || "Standard",
         baseFare: Number(baseFare) || 0,
         firstMile: Number(firstMile) || 0,
         firstMileFee: Number(firstMileFee) || 0,
@@ -124,19 +196,25 @@ export default function LogisticsModule() {
       };
 
       const method = editingCourier ? "PUT" : "POST";
-      if (editingCourier) (formData as any).id = editingCourier.id;
+      if (editingCourier) formData.id = editingCourier.id;
 
-      await fetch("/api/admin/couriers", {
+      const res = await fetch("/api/admin/couriers", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
+
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(resData.error || `Server responded with status ${res.status}`);
+      }
       
       await fetchCouriers();
       setShowCourierModal(false);
       resetCourierForm();
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("Save courier error:", e);
+      setCourierError(e.message || "Failed to save courier. Please check connection and try again.");
     } finally {
       setIsSavingCourier(false);
     }
@@ -145,10 +223,16 @@ export default function LogisticsModule() {
   const deleteCourier = async (id: string) => {
     if (!confirm("Delete this courier?")) return;
     try {
-      await fetch(`/api/admin/couriers?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/couriers?id=${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to delete courier");
+        return;
+      }
       fetchCouriers();
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("Delete courier error:", e);
+      alert(e.message || "Failed to delete courier");
     }
   };
 
@@ -642,16 +726,59 @@ export default function LogisticsModule() {
             </div>
             
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
-              
+              {courierError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs flex items-center gap-2.5">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                  <span>{courierError}</span>
+                </div>
+              )}
+
+              {/* Quick Presets */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Quick Rate Presets (Philippines)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { name: "Grab Express", type: "Express", baseFare: 60, firstMile: 3, firstMileFee: 10, exceedingKmFee: 12, surcharge: 0, nightDifferential: 0 },
+                    { name: "Lalamove", type: "Express", baseFare: 50, firstMile: 3, firstMileFee: 10, exceedingKmFee: 10, surcharge: 0, nightDifferential: 0 },
+                    { name: "Borzo", type: "Express", baseFare: 49, firstMile: 3, firstMileFee: 8, exceedingKmFee: 9, surcharge: 0, nightDifferential: 0 },
+                    { name: "J&T Express", type: "Standard", baseFare: 80, firstMile: 5, firstMileFee: 15, exceedingKmFee: 15, surcharge: 0, nightDifferential: 0 },
+                    { name: "Standard In-House", type: "Standard", baseFare: 45, firstMile: 2, firstMileFee: 5, exceedingKmFee: 8, surcharge: 0, nightDifferential: 0 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => applyCourierPreset(preset)}
+                      className="text-[11px] font-medium bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-slate-700 px-2.5 py-1.5 rounded-lg transition-colors"
+                    >
+                      + {preset.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex items-start gap-6">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Courier Logo</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                    Logo <span className="text-[10px] font-normal text-slate-400 lowercase">(optional)</span>
+                  </label>
                   <div 
-                    className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center cursor-pointer hover:bg-slate-50 overflow-hidden relative"
+                    className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center cursor-pointer hover:bg-slate-50 overflow-hidden relative group"
                     onClick={() => courierFileInputRef.current?.click()}
                   >
-                    {courierLogo ? (
-                      <img src={courierLogo} alt="Logo" className="w-full h-full object-contain p-2" />
+                    {isCompressingLogo ? (
+                      <div className="text-center p-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-emerald-600 mx-auto" />
+                        <span className="text-[9px] text-slate-500 font-bold uppercase block mt-1">Optimizing</span>
+                      </div>
+                    ) : courierLogo ? (
+                      <>
+                        <img src={courierLogo} alt="Logo" className="w-full h-full object-contain p-2" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold uppercase">
+                          Change
+                        </div>
+                      </>
                     ) : (
                       <div className="text-center">
                         <Plus className="w-6 h-6 text-slate-300 mx-auto" />
@@ -659,17 +786,35 @@ export default function LogisticsModule() {
                       </div>
                     )}
                   </div>
+                  {courierLogo && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCourierLogo("");
+                        if (courierFileInputRef.current) courierFileInputRef.current.value = "";
+                      }}
+                      className="mt-1.5 text-[10px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors mx-auto"
+                    >
+                      <Trash2 className="w-3 h-3" /> Remove
+                    </button>
+                  )}
                   <input type="file" accept="image/*" ref={courierFileInputRef} onChange={handleCourierLogoUpload} className="hidden" />
                 </div>
                 
                 <div className="flex-1 space-y-4">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Courier Name</label>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                      Courier Name <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
                       value={courierName}
-                      onChange={e => setCourierName(e.target.value)}
-                      placeholder="e.g. Lalamove, Grab"
+                      onChange={e => {
+                        setCourierName(e.target.value);
+                        if (courierError) setCourierError(null);
+                      }}
+                      placeholder="e.g. Lalamove, Grab Express"
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                     />
                   </div>
@@ -690,7 +835,7 @@ export default function LogisticsModule() {
 
               <div className="pt-6 border-t border-slate-100">
                 <h4 className="font-heading font-black text-sm uppercase tracking-wider text-slate-800 mb-4 flex items-center gap-2">
-                  <Settings className="w-4 h-4" /> Delivery Fee Engine
+                  <Settings className="w-4 h-4 text-emerald-600" /> Delivery Fee Engine
                 </h4>
                 
                 <div className="grid grid-cols-2 gap-4">
@@ -699,7 +844,7 @@ export default function LogisticsModule() {
                     <input
                       type="number"
                       value={baseFare}
-                      onChange={e => setBaseFare(e.target.valueAsNumber || 0)}
+                      onChange={e => setBaseFare(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -708,7 +853,7 @@ export default function LogisticsModule() {
                     <input
                       type="number"
                       value={firstMile}
-                      onChange={e => setFirstMile(e.target.valueAsNumber || 0)}
+                      onChange={e => setFirstMile(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -717,7 +862,7 @@ export default function LogisticsModule() {
                     <input
                       type="number"
                       value={firstMileFee}
-                      onChange={e => setFirstMileFee(e.target.valueAsNumber || 0)}
+                      onChange={e => setFirstMileFee(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -726,7 +871,7 @@ export default function LogisticsModule() {
                     <input
                       type="number"
                       value={exceedingKmFee}
-                      onChange={e => setExceedingKmFee(e.target.valueAsNumber || 0)}
+                      onChange={e => setExceedingKmFee(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -735,7 +880,7 @@ export default function LogisticsModule() {
                     <input
                       type="number"
                       value={surcharge}
-                      onChange={e => setSurcharge(e.target.valueAsNumber || 0)}
+                      onChange={e => setSurcharge(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -744,7 +889,7 @@ export default function LogisticsModule() {
                     <input
                       type="number"
                       value={nightDifferential}
-                      onChange={e => setNightDifferential(e.target.valueAsNumber || 0)}
+                      onChange={e => setNightDifferential(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -754,18 +899,20 @@ export default function LogisticsModule() {
 
             <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
               <button
+                type="button"
                 onClick={() => setShowCourierModal(false)}
                 className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={saveCourier}
-                disabled={isSavingCourier || !courierName || !courierLogo}
+                disabled={isSavingCourier || isCompressingLogo || !courierName.trim()}
                 className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {isSavingCourier ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                Save Configuration
+                {isSavingCourier ? "Saving..." : "Save Configuration"}
               </button>
             </div>
           </div>
