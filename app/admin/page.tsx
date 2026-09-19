@@ -72,7 +72,8 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Film
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { motion, AnimatePresence } from "motion/react";
@@ -101,6 +102,11 @@ const PromosModule = dynamic(() => import('@/app/components/admin/promos-module'
   loading: () => <div className="p-8 text-center text-slate-500 font-mono text-sm">Loading Promos...</div>
 });
 
+const MediaModule = dynamic(() => import('@/app/components/admin/media-module'), { 
+  ssr: false,
+  loading: () => <div className="p-8 text-center text-slate-500 font-mono text-sm">Loading Media Manager...</div>
+});
+
 type AdminView = 
   | "dashboard" 
   | "customers" 
@@ -116,7 +122,8 @@ type AdminView =
   | "logistics"
   | "charges"
   | "payments"
-  | "promos";
+  | "promos"
+  | "media";
 
 const ImageUploadField = ({
   label,
@@ -2035,7 +2042,8 @@ export default function AdminPage() {
                   { id: "logistics", name: "Logistics", icon: Truck, desc: "Warehouses & Couriers", count: "Routes" },
                   { id: "charges", name: "Charges", icon: Receipt, desc: "Global Additional Fees", count: "Config" },
                   { id: "payments", name: "Payments", icon: CreditCard, desc: "Config Payment Methods", count: "Active Methods" },
-                  { id: "promos", name: "Promos", icon: Tag, desc: "Discounts & Anti-Fraud", count: "Vouchers" }
+                  { id: "promos", name: "Promos", icon: Tag, desc: "Discounts & Anti-Fraud", count: "Vouchers" },
+                  { id: "media", name: "Media", icon: Film, desc: "Telegram Video Gallery", count: "Videos" }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -6136,6 +6144,38 @@ export default function AdminPage() {
 
             <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
               <PromosModule />
+            </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 13. MEDIA MANAGER: TELEGRAM VIDEO GALLERY                                   */}
+        {/* ========================================================================= */}
+        {view === "media" && (
+          <motion.div
+            key="media"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <button
+                  onClick={() => setView("dashboard")}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                </button>
+                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">
+                  Media Manager & Telegram Video Gallery
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+              <MediaModule />
             </div>
           </motion.div>
         )}

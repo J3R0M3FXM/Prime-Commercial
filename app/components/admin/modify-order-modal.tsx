@@ -58,11 +58,9 @@ export default function ModifyOrderModal({
   onClose,
   onOrderUpdated,
 }: ModifyOrderModalProps) {
-  if (!isOpen || !order) return null;
-
   // Initial items clone
   const initialItems: OrderItem[] = useMemo(() => {
-    if (!Array.isArray(order.items)) return [];
+    if (!order || !Array.isArray(order.items)) return [];
     return order.items.map((it: any) => {
       const price = Number(it.price) || 0;
       const originalPrice = it.originalPrice !== undefined ? Number(it.originalPrice) : price;
@@ -83,7 +81,7 @@ export default function ModifyOrderModal({
 
   // Initial charges clone
   const initialCharges: AppliedChargeItem[] = useMemo(() => {
-    if (!Array.isArray(order.appliedCharges)) return [];
+    if (!order || !Array.isArray(order.appliedCharges)) return [];
     return order.appliedCharges.map((ch: any, idx: number) => {
       const amount = Number(ch.amount) || 0;
       const originalAmount = ch.originalAmount !== undefined ? Number(ch.originalAmount) : amount;
@@ -105,10 +103,10 @@ export default function ModifyOrderModal({
   const [charges, setCharges] = useState<AppliedChargeItem[]>(initialCharges);
   
   // Delivery Fee
-  const initialDeliveryFee = Number(order.deliveryFee) || 0;
-  const [deliveryFee, setDeliveryFee] = useState<number>(order.isDeliveryFeeFree ? 0 : initialDeliveryFee);
+  const initialDeliveryFee = Number(order?.deliveryFee) || 0;
+  const [deliveryFee, setDeliveryFee] = useState<number>(order?.isDeliveryFeeFree ? 0 : initialDeliveryFee);
   const [originalDeliveryFee] = useState<number>(initialDeliveryFee);
-  const [isDeliveryFree, setIsDeliveryFree] = useState<boolean>(Boolean(order.isDeliveryFeeFree || initialDeliveryFee === 0));
+  const [isDeliveryFree, setIsDeliveryFree] = useState<boolean>(Boolean(order?.isDeliveryFeeFree || initialDeliveryFee === 0));
 
   // Add Product Form State
   const [selectedProductToAdd, setSelectedProductToAdd] = useState<string>("");
@@ -434,6 +432,8 @@ export default function ModifyOrderModal({
       setIsSaving(false);
     }
   };
+
+  if (!isOpen || !order) return null;
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm overflow-y-auto">

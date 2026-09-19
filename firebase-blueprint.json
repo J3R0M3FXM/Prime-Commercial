@@ -155,6 +155,30 @@
         "createdAt": { "type": "string" }
       },
       "required": ["userId", "type", "amount", "createdAt"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "Video gallery record hosted on Telegram",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the video" },
+        "description": { "type": "string", "description": "Video description" },
+        "category": { "type": "string", "description": "Category for filtering" },
+        "tags": { "type": "array", "description": "List of search tags" },
+        "telegramFileId": { "type": "string", "description": "Telegram file_id" },
+        "telegramMessageId": { "type": "string", "description": "Telegram message ID or post link" },
+        "storageType": { "type": "string", "description": "Storage backend, e.g. telegram" },
+        "directUrl": { "type": "string", "description": "Direct fallback URL if provided" },
+        "thumbnailUrl": { "type": "string", "description": "Thumbnail preview image" },
+        "duration": { "type": "number", "description": "Duration in seconds" },
+        "fileSize": { "type": "number", "description": "File size in bytes" },
+        "views": { "type": "number", "description": "Free view counter" },
+        "isPublished": { "type": "boolean", "description": "Public visibility" },
+        "featured": { "type": "boolean", "description": "Featured video badge" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "category"]
     }
   },
   "firestore": {
@@ -193,6 +217,10 @@
     "/point_transactions/{txId}": {
       "schema": "PointTransaction",
       "description": "Points and store credits transactions"
+    },
+    "/videos/{videoId}": {
+      "schema": "Video",
+      "description": "Video gallery entries hosted on Telegram"
     }
   }
 }

@@ -7,6 +7,7 @@ import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
 import AccountModal from "./components/account-modal";
+import VideoGalleryModal from "./components/video-gallery-modal";
 import { useCart } from "./components/cart-context";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Bell, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
@@ -25,6 +26,7 @@ export default function Shopfront() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [isVideoGalleryOpen, setIsVideoGalleryOpen] = useState(false);
   const [isBackToShopfrontModalOpen, setIsBackToShopfrontModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("shop");
   const [noticeToast, setNoticeToast] = useState<string | null>(null);
@@ -65,6 +67,10 @@ export default function Shopfront() {
             ).trim().toUpperCase();
             if (refCandidate) {
               localStorage.setItem('prime_referred_by', refCandidate);
+            }
+            if (searchParams.get('tab') === 'media' || searchParams.get('media') === '1') {
+              setIsVideoGalleryOpen(true);
+              setActiveTab('media');
             }
           } catch (refErr) {
             console.warn('Could not parse referral param:', refErr);
@@ -484,6 +490,15 @@ export default function Shopfront() {
         }}
       />
 
+      {/* Free Video Gallery Modal (Telegram Cloud) */}
+      <VideoGalleryModal
+        isOpen={isVideoGalleryOpen}
+        onClose={() => {
+          setIsVideoGalleryOpen(false);
+          setActiveTab("shop");
+        }}
+      />
+
       {/* Feature Notification Toast */}
       {noticeToast && (
         <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-4 py-2 rounded-xl shadow-xl border border-slate-800 text-xs font-mono flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
@@ -562,9 +577,14 @@ export default function Shopfront() {
         <button
           type="button"
           onClick={() => {
-            showFeatureToast("MEDIA");
+            setActiveTab("media");
+            setIsVideoGalleryOpen(true);
           }}
-          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
+          className={`flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors cursor-pointer ${
+            activeTab === "media" || isVideoGalleryOpen
+              ? "text-emerald-700 font-normal"
+              : "text-gray-500 hover:text-gray-900 font-light"
+          }`}
         >
           <Film className="w-4 h-4 mb-0.5 shrink-0" />
           <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">MEDIA</span>

@@ -45,6 +45,10 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /videos/{videoId} {
+      allow read, write: if true;
+    }
+
     match /promo_redemptions/{redemptionId} {
       allow read, write: if true;
     }
