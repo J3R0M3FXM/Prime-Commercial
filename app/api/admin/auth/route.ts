@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
-const ADMIN_TELEGRAM_USER_ID = process.env.ADMIN_TELEGRAM_USER_ID || '1085949511';
+const ADMIN_TELEGRAM_USER_ID = process.env.ADMIN_TELEGRAM_USER_ID || '';
 
 export async function POST(request: Request) {
   try {
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
             const tgUser = JSON.parse(userStr);
             const tgUserId = tgUser.id ? tgUser.id.toString() : '';
 
-            if (tgUserId === '1085949511' || tgUserId === ADMIN_TELEGRAM_USER_ID) {
+            if (Boolean(ADMIN_TELEGRAM_USER_ID && tgUserId === ADMIN_TELEGRAM_USER_ID)) {
               return NextResponse.json({
                 success: true,
                 isAdmin: true,

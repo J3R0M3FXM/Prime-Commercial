@@ -855,15 +855,15 @@ export default function AdminPage() {
           if (data.success && data.isAdmin) {
             if (typeof window !== "undefined") {
               sessionStorage.setItem("prime_admin_authorized", "true");
-              sessionStorage.setItem("prime_admin_user_id", data.user?.id || "1085949511");
+              sessionStorage.setItem("prime_admin_user_id", data.user?.id || "admin");
               if (data.user?.photoUrl) sessionStorage.setItem("prime_admin_photo_url", data.user.photoUrl);
               
               localStorage.setItem("prime_admin_authorized", "true");
-              localStorage.setItem("prime_admin_user_id", data.user?.id || "1085949511");
+              localStorage.setItem("prime_admin_user_id", data.user?.id || "admin");
               if (data.user?.photoUrl) localStorage.setItem("prime_admin_photo_url", data.user.photoUrl);
             }
             setAuthorized(true);
-            setAdminUser(data.user || { id: "1085949511" });
+            setAdminUser(data.user || { id: "admin" });
             await fetchAllData();
             setCheckingAuth(false);
             return;
@@ -1863,7 +1863,7 @@ export default function AdminPage() {
             <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
           </div>
           <h2 className="text-xl font-heading font-black tracking-widest uppercase mb-1 text-slate-900">Authenticating</h2>
-          <p className="font-mono text-xs text-slate-500 text-center">Verifying Telegram Security Credentials (ID: 1085949511)...</p>
+          <p className="font-mono text-xs text-slate-500 text-center">Verifying Telegram Security Credentials...</p>
         </div>
       </div>
     );
@@ -1883,7 +1883,7 @@ export default function AdminPage() {
           </div>
           <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase text-slate-900">Admin</h1>
           <p className="text-[11px] text-slate-500 text-center mb-6 font-mono">
-            Authorized Account: ID 1085949511
+            Enter Administrator Access Code
           </p>
           <form onSubmit={handleManualLogin} className="space-y-4">
             <input
@@ -5877,7 +5877,9 @@ export default function AdminPage() {
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs font-mono space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500">Authorized Master Telegram ID:</span>
-                    <span className="font-black text-slate-900 bg-white px-2 py-1 rounded border border-slate-200">1085949511</span>
+                    <span className="font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200">
+                      {adminUser?.id && adminUser.id !== "admin" ? adminUser.id : "Access Code Only (Removed from allowlist)"}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500">Auto-Bypass Status:</span>

@@ -97,13 +97,39 @@ export default function Shopfront() {
         }
 
         if (!initDataRaw) {
+          // Clear legacy dummy account if stored
+          if (typeof window !== 'undefined') {
+            if (sessionStorage.getItem("prime_customer_id") === "1085949511") {
+              sessionStorage.removeItem("prime_customer_id");
+              sessionStorage.removeItem("prime_customer_name");
+              sessionStorage.removeItem("prime_customer_username");
+              sessionStorage.removeItem("prime_member_id");
+            }
+            if (localStorage.getItem("prime_customer_id") === "1085949511") {
+              localStorage.removeItem("prime_customer_id");
+              localStorage.removeItem("prime_customer_name");
+              localStorage.removeItem("prime_customer_username");
+              localStorage.removeItem("prime_member_id");
+            }
+          }
+
           const storedCustId = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_customer_id") || localStorage.getItem("prime_customer_id")) : null;
           const storedCustName = typeof window !== 'undefined' ? (sessionStorage.getItem("prime_customer_name") || localStorage.getItem("prime_customer_name")) : null;
+          
+          let effectiveId = storedCustId;
+          if (!effectiveId || effectiveId === "1085949511") {
+            effectiveId = "cust_" + Math.floor(100000 + Math.random() * 900000);
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem("prime_customer_id", effectiveId);
+              localStorage.setItem("prime_customer_id", effectiveId);
+            }
+          }
+
           const webUser = {
-            id: storedCustId || "1085949511",
-            first_name: storedCustName || "Jerome",
-            last_name: "Admin",
-            username: "jerome_admin",
+            id: effectiveId,
+            first_name: (storedCustName && storedCustName !== "Jerome") ? storedCustName : "Tester",
+            last_name: "Customer",
+            username: `tester_${effectiveId.replace(/[^a-zA-Z0-9]/g, '').slice(-4)}`,
             language_code: "en"
           };
           initDataRaw = `user=${encodeURIComponent(JSON.stringify(webUser))}&auth_date=${Math.floor(Date.now() / 1000)}`;
@@ -127,7 +153,7 @@ export default function Shopfront() {
         if (response.ok) {
           const authData = await response.json();
 
-          // If connection is from authorized Telegram Admin (ID: 1085949511)
+          // If connection is from authorized Telegram Admin
           if (authData.isAdmin) {
             if (typeof window !== 'undefined' && (localStorage.getItem("skip_admin_redirect") === "true" || sessionStorage.getItem("skip_admin_redirect") === "true")) {
               setAuthorized(true);
@@ -141,9 +167,9 @@ export default function Shopfront() {
             setRoutingToAdmin(true);
             if (typeof window !== 'undefined') {
               sessionStorage.setItem("prime_admin_authorized", "true");
-              sessionStorage.setItem("prime_admin_user_id", authData.tgUserId || "1085949511");
+              sessionStorage.setItem("prime_admin_user_id", authData.tgUserId || "admin");
               localStorage.setItem("prime_admin_authorized", "true");
-              localStorage.setItem("prime_admin_user_id", authData.tgUserId || "1085949511");
+              localStorage.setItem("prime_admin_user_id", authData.tgUserId || "admin");
               if (authData.token) {
                 sessionStorage.setItem("prime_admin_token", authData.token);
               }
@@ -202,7 +228,6 @@ export default function Shopfront() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-6 text-center font-sans">
         <Loader2 className="w-10 h-10 animate-spin mb-4 text-white" />
         <h1 className="text-xl font-heading font-black uppercase tracking-widest mb-1">Telegram Admin Verified</h1>
-        <p className="text-xs font-mono text-gray-400">Telegram ID: 1085949511</p>
         <p className="text-xs text-gray-400 mt-2">Routing directly to Admin Panel...</p>
       </div>
     );

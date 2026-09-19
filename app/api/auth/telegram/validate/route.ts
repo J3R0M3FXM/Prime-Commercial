@@ -8,7 +8,7 @@ function generateMemberId() {
   return crypto.randomBytes(6).toString('hex').toUpperCase();
 }
 
-const ADMIN_TELEGRAM_USER_ID = process.env.ADMIN_TELEGRAM_USER_ID || '1085949511';
+const ADMIN_TELEGRAM_USER_ID = process.env.ADMIN_TELEGRAM_USER_ID || '';
 
 export async function POST(request: NextRequest) {
   const { initData, fingerprint } = await request.json();
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const tgUserId = tgUser.id ? tgUser.id.toString() : '';
 
     // Check if Telegram user is authorized Admin
-    const isAdmin = tgUserId === '1085949511' || tgUserId === ADMIN_TELEGRAM_USER_ID;
+    const isAdmin = Boolean(ADMIN_TELEGRAM_USER_ID && tgUserId === ADMIN_TELEGRAM_USER_ID);
 
     // Handle Firestore storage gracefully
     const userRef = doc(db, 'users', tgUserId);
