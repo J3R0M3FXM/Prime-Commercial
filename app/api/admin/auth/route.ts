@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { createTelegramSessionCookie } from '@/lib/telegram-session';
+import { createTelegramSessionCookie, verifyTelegramSessionCookie } from '@/lib/telegram-session';
 
 const SESSION_COOKIE_NAME = 'prime_telegram_session';
 const ADMIN_TELEGRAM_USER_ID = process.env.ADMIN_TELEGRAM_USER_ID || '';
@@ -24,6 +24,19 @@ export async function POST(request: Request) {
   } catch(error:any){return NextResponse.json({success:false,error:error.message||'Authentication failed'},{status:500});}
 }
 
+
+
+export async function GET(request: Request) {
+  try {
+    const cookie = request.headers.get('cookie') || '';
+    const match = cookie.match(/(?:^|;\\s*)prime_telegram_session=([^;]+)/);
+    const session = verifyTelegramSessionCookie(match?.[1]);
+    if (!session) return NextResponse.json({ authenticated: false }, { status: 401 });
+    return NextResponse.json({ authenticated: true, isAdmin: session.isAdmin, tgUserId: session.tgUserId });
+  } catch {
+    return NextResponse.json({ authenticated: false }, { status: 401 });
+  }
+}
 
 export async function DELETE() {
   const response = NextResponse.json({ success: true });
