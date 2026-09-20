@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { createTelegramSessionCookie } from '@/lib/telegram-session';
-
 const SESSION_COOKIE_NAME = 'prime_telegram_session';
-const ADMIN_COOKIE_NAME = 'prime_admin_session';
 const ADMIN_COOKIE_NAME = 'prime_admin_session';
 const ADMIN_ACCESS_CODE = process.env.ADMIN_ACCESS_CODE || '';
 const MAX_AGE = 86400;
