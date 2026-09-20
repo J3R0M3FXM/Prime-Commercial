@@ -520,7 +520,10 @@ export async function getWarehousesFromDb() {
     name: w.name,
     code: w.code,
     address: w.address,
+    lat: w.latitude !== null && w.latitude !== undefined ? Number(w.latitude) : null,
+    lon: w.longitude !== null && w.longitude !== undefined ? Number(w.longitude) : null,
     isActive: w.is_active,
+    isDefault: Boolean(w.is_default),
     sortOrder: w.sort_order,
     createdAt: w.created_at,
     updatedAt: w.updated_at
