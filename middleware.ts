@@ -17,7 +17,7 @@ async function verifySession(value: string | undefined) {
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
   const bytes = new Uint8Array(sig);
   let expected = '';
-  for (const b of bytes) expected += String.fromCharCode(b);
+  for (let i = 0; i < bytes.length; i++) expected += String.fromCharCode(bytes[i]);
   expected = btoa(expected).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   if (expected !== signature) return null;
   return { tgUserId, isAdmin: adminRaw === '1' };
