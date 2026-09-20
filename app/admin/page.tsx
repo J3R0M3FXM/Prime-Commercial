@@ -128,6 +128,70 @@ type AdminView =
   | "promos"
   | "media";
 
+function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promise<void> }) {
+  const [accessCode, setAccessCode] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accessCode.trim()) {
+      setError("ADMIN_ACCESS_CODE is required.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      await onSubmit(accessCode);
+    } catch (err: any) {
+      setError(err?.message || "Invalid Admin Access Code.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="admin-shell min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans antialiased">
+      <form onSubmit={submit} className="w-full max-w-sm bg-white border border-slate-200 text-slate-900 p-6 rounded-2xl shadow-lg">
+        <div className="flex justify-center mb-5">
+          <img src="/primefinal.png" alt="PRIME" className="h-8 w-auto object-contain" />
+        </div>
+        <div className="w-11 h-11 mx-auto mb-3 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+          <Lock className="w-5 h-5" />
+        </div>
+        <h1 className="text-xl font-heading font-black text-center tracking-wide uppercase">Admin Panel Locked</h1>
+        <p className="text-xs text-slate-500 text-center mt-2 leading-relaxed">
+          Enter the Admin Access Code. Telegram authorization alone is not sufficient.
+        </p>
+        <label className="block mt-5 text-[10px] font-bold uppercase tracking-widest text-slate-600">ADMIN_ACCESS_CODE</label>
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={accessCode}
+          onChange={e => setAccessCode(e.target.value)}
+          className="mt-1.5 w-full h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-mono outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+          placeholder="Enter access code"
+          disabled={submitting}
+        />
+        {error && <p className="mt-2 text-xs font-mono font-bold text-red-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={submitting || !accessCode.trim()}
+          className="mt-4 w-full h-11 rounded-xl bg-slate-900 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+        >
+          {submitting ? "VERIFYING..." : "VERIFY ADMIN ACCESS"}
+        </button>
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
+          <div className="flex items-center gap-2 font-bold text-slate-800">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />Two-step admin authorization
+          </div>
+          <p className="mt-1">Authorized Telegram identity + server-side ADMIN_ACCESS_CODE are both required.</p>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 const ImageUploadField = ({
   label,
   value,
@@ -785,82 +849,54 @@ export default function AdminPage() {
     }
   };
 
-  // Auto-authentication check — only a server-verified Telegram initData can establish admin access.
+  // The Admin Panel always starts at the access-code gate.
+  // No existing admin cookie is allowed to bypass this screen.
   useEffect(() => {
-    async function verifyTelegramAdmin() {
-      const startTime = Date.now();
-      const ensure10Sec = async () => {
-        const elapsed = Date.now() - startTime;
-        const remaining = Math.max(0, 10000 - elapsed);
-        if (remaining > 0) {
-          await new Promise(r => setTimeout(r, remaining));
-        }
-      };
+    setCheckingAuth(false);
+  }, []);
 
-      try {
-        // Reuse an already server-verified admin session when available.
-        const existing = await fetch("/api/admin/auth", { cache: "no-store" });
-        if (existing.ok) {
-          const existingData = await existing.json().catch(() => ({}));
-          if (existingData.authenticated && existingData.isAdmin) {
-            setAuthorized(true);
-            setAdminUser({ id: existingData.tgUserId || "admin" });
-            await fetchAllData();
-            await ensure10Sec();
-            setCheckingAuth(false);
-            return;
-          }
-        }
+  const handleAdminAccessCodeSubmit = async (accessCode: string) => {
+    let initDataRaw = "";
 
-        let initDataRaw = "";
+    if (typeof window !== "undefined") {
+      if (window.location.hash) {
+        const hashStr = window.location.hash.substring(1);
+        const params = new URLSearchParams(hashStr);
+        const tgData = params.get("tgWebAppData");
+        if (tgData) initDataRaw = tgData;
+        else if (hashStr.includes("user=") || hashStr.includes("hash=")) initDataRaw = hashStr;
+      }
 
-        if (typeof window !== "undefined") {
-          if (window.location.hash) {
-            const hashStr = window.location.hash.substring(1);
-            const params = new URLSearchParams(hashStr);
-            const tgData = params.get("tgWebAppData");
-            if (tgData) initDataRaw = tgData;
-            else if (hashStr.includes("user=") || hashStr.includes("hash=")) initDataRaw = hashStr;
-          }
+      if (!initDataRaw && window.location.search) {
+        const searchParams = new URLSearchParams(window.location.search);
+        const tgData = searchParams.get("tgWebAppData") || searchParams.get("initData");
+        if (tgData) initDataRaw = tgData;
+      }
 
-          if (!initDataRaw && window.location.search) {
-            const searchParams = new URLSearchParams(window.location.search);
-            const tgData = searchParams.get("tgWebAppData") || searchParams.get("initData");
-            if (tgData) initDataRaw = tgData;
-          }
-
-          if (!initDataRaw && (window as any).Telegram?.WebApp?.initData) {
-            initDataRaw = (window as any).Telegram.WebApp.initData;
-          }
-        }
-
-        if (initDataRaw) {
-          const res = await fetch("/api/admin/auth", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ initData: initDataRaw }),
-          });
-          const data = await res.json();
-
-          if (data.success && data.isAdmin) {
-            setAuthorized(true);
-            setAdminUser(data.user || { id: "admin" });
-            await fetchAllData();
-            await ensure10Sec();
-            setCheckingAuth(false);
-            return;
-          }
-        }
-      } catch (err) {
-        console.error("Admin auto-auth failed:", err);
-      } finally {
-        await ensure10Sec();
-        setCheckingAuth(false);
+      if (!initDataRaw && (window as any).Telegram?.WebApp?.initData) {
+        initDataRaw = (window as any).Telegram.WebApp.initData;
       }
     }
 
-    verifyTelegramAdmin();
-  }, []);
+    if (!initDataRaw) {
+      throw new Error("Telegram authorization data is required. Open the Admin Panel from Telegram.");
+    }
+
+    const res = await fetch("/api/admin/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData: initDataRaw, accessCode }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.success || !data.isAdmin || !data.accessCodeVerified) {
+      throw new Error(data.error || "Admin authentication failed.");
+    }
+
+    setAuthorized(true);
+    setAdminUser(data.user || { id: "admin" });
+    await fetchAllData();
+  };
 
   // When selected customer changes, load detail dossier
   useEffect(() => {
@@ -1872,9 +1908,11 @@ export default function AdminPage() {
     return <SplashScreen title="ADMIN AUTHENTICATION" subtitle="VERIFYING TELEGRAM SECURITY CREDENTIALS..." />;
   }
 
-  // Login Gate — authorization is established only by the server-issued Telegram session cookie.
+  // ADMIN_ACCESS_CODE is required on every Admin Panel open.
   if (!authorized) {
-    return (
+    return <AdminAccessGate onSubmit={handleAdminAccessCodeSubmit} />;
+  }
+  return (
       <div className="admin-shell min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans antialiased">
         <div className="w-full max-w-sm bg-white border border-slate-200 text-slate-900 p-6 rounded-2xl shadow-lg">
           <div className="flex justify-center mb-5">
