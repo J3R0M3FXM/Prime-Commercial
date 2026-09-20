@@ -785,7 +785,7 @@ export default function AdminPage() {
     }
   };
 
-  // Auto-authentication check
+  // Auto-authentication check — only a server-verified Telegram initData can establish admin access.
   useEffect(() => {
     async function verifyTelegramAdmin() {
       const startTime = Date.now();
@@ -798,10 +798,8 @@ export default function AdminPage() {
       };
 
       try {
-        if (typeof window !== "undefined") {
-          // Browser-local flags are never an authorization mechanism.
-          // A fresh, server-validated Telegram initData payload is required.
         let initDataRaw = "";
+
         if (typeof window !== "undefined") {
           if (window.location.hash) {
             const hashStr = window.location.hash.substring(1);
@@ -810,11 +808,13 @@ export default function AdminPage() {
             if (tgData) initDataRaw = tgData;
             else if (hashStr.includes("user=") || hashStr.includes("hash=")) initDataRaw = hashStr;
           }
+
           if (!initDataRaw && window.location.search) {
             const searchParams = new URLSearchParams(window.location.search);
             const tgData = searchParams.get("tgWebAppData") || searchParams.get("initData");
             if (tgData) initDataRaw = tgData;
           }
+
           if (!initDataRaw && (window as any).Telegram?.WebApp?.initData) {
             initDataRaw = (window as any).Telegram.WebApp.initData;
           }
@@ -824,12 +824,11 @@ export default function AdminPage() {
           const res = await fetch("/api/admin/auth", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ initData: initDataRaw })
+            body: JSON.stringify({ initData: initDataRaw }),
           });
           const data = await res.json();
 
           if (data.success && data.isAdmin) {
-            if (typeof window !== "undefined") {
             setAuthorized(true);
             setAdminUser(data.user || { id: "admin" });
             await fetchAllData();
