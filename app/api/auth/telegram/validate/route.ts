@@ -34,10 +34,14 @@ export async function POST(request: NextRequest) {
     const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
     const calculatedHash = crypto.createHmac('sha256', secretKey).update(sortedParams).digest('hex');
 
-    if (hash && BOT_TOKEN) {
-      if (hash !== calculatedHash) {
-        console.warn(`Telegram initData hash mismatch. Sent: ${hash}, Calc: ${calculatedHash}`);
-      }
+    if (!hash || !crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(calculatedHash, 'hex'))) {
+      return NextResponse.json({ error: 'Invalid Telegram initData signature' }, { status: 401 });
+    }
+
+    const authDate = Number(params.get('auth_date') || 0);
+    const maxAgeSeconds = 24 * 60 * 60;
+    if (!authDate || !Number.isFinite(authDate) || Math.floor(Date.now() / 1000) - authDate > maxAgeSeconds) {
+      return NextResponse.json({ error: 'Telegram initData has expired' }, { status: 401 });
     }
 
     const userStr = params.get('user');

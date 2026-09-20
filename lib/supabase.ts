@@ -8,7 +8,7 @@ let supabaseAdminInstance: SupabaseClient | null = null;
  */
 export function isSupabaseConfigured(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   return Boolean(url && key && url.startsWith('http'));
 }
 
@@ -33,10 +33,10 @@ export function getSupabaseClient(): SupabaseClient | null {
  * Server-side / Admin Supabase Client with full privileges (Lazy Initialized)
  */
 export function getSupabaseAdmin(): SupabaseClient | null {
-  if (!isSupabaseConfigured()) return null;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey || !url.startsWith('http')) return null;
   if (!supabaseAdminInstance) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     supabaseAdminInstance = createClient(url, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,

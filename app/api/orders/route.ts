@@ -49,10 +49,29 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin()!;
 
     let finalMemberId = primeMemberId || '';
-    if (!finalMemberId && customerId) {
-      const { data: cust } = await supabase.from('customers').select('*').eq('id', customerId).single();
-      if (cust) {
-        finalMemberId = cust.prime_member_id || '';
+    let resolvedCustomerId: string | null = null;
+    const requestedCustomerId = customerId ? String(customerId) : '';
+    const requestedTgUserId = body.tgUserId ? String(body.tgUserId) : '';
+
+    if (requestedCustomerId) {
+      const { data: byId } = await supabase.from('customers').select('*').eq('id', requestedCustomerId).maybeSingle();
+      if (byId) {
+        resolvedCustomerId = byId.id;
+        if (!finalMemberId) finalMemberId = byId.prime_member_id || '';
+      } else {
+        const { data: byTelegramId } = await supabase.from('customers').select('*').eq('tg_user_id', requestedCustomerId).maybeSingle();
+        if (byTelegramId) {
+          resolvedCustomerId = byTelegramId.id;
+          if (!finalMemberId) finalMemberId = byTelegramId.prime_member_id || '';
+        }
+      }
+    }
+
+    if (!resolvedCustomerId && requestedTgUserId) {
+      const { data: byTelegramId } = await supabase.from('customers').select('*').eq('tg_user_id', requestedTgUserId).maybeSingle();
+      if (byTelegramId) {
+        resolvedCustomerId = byTelegramId.id;
+        if (!finalMemberId) finalMemberId = byTelegramId.prime_member_id || '';
       }
     }
 
@@ -60,7 +79,7 @@ export async function POST(request: Request) {
     const payload = {
       id: orderNumber,
       order_number: orderNumber,
-      customer_id: customerId || null,
+      customer_id: resolvedCustomerId,
       customer_name: customerName || receiverName || '',
       customer_phone: receiverPhone || '',
       tg_user_id: String(body.tgUserId || ''),

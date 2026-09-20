@@ -71,7 +71,20 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString()
     };
 
-    const { data: inserted, error } = await supabase.from('couriers').insert([payload]).select().single();
+    let { data: inserted, error } = await supabase.from('couriers').insert([payload]).select().single();
+    if (error?.code === 'PGRST204' && /base_fare|first_mile|first_mile_fee|exceeding_km_fee|surcharge|night_differential|logo|type/.test(error.message || '')) {
+      const fallbackPayload = {
+        name,
+        tracking_url_pattern: typeof data.trackingUrlPattern === 'string' ? data.trackingUrlPattern : '',
+        is_active: data.isActive !== false,
+        sort_order: Number(data.sortOrder) || 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const retry = await supabase.from('couriers').insert([fallbackPayload]).select().single();
+      inserted = retry.data;
+      error = retry.error;
+    }
     if (error) throw error;
     return NextResponse.json({ id: inserted.id, ...data });
   } catch (error: any) {
@@ -103,7 +116,16 @@ export async function PUT(request: Request) {
     if (data.surcharge !== undefined) payload.surcharge = Number(data.surcharge) || 0;
     if (data.nightDifferential !== undefined) payload.night_differential = Number(data.nightDifferential) || 0;
 
-    const { error } = await supabase.from('couriers').update(payload).eq('id', id);
+    let { error } = await supabase.from('couriers').update(payload).eq('id', id);
+    if (error?.code === 'PGRST204' && /base_fare|first_mile|first_mile_fee|exceeding_km_fee|surcharge|night_differential|logo|type/.test(error.message || '')) {
+      const fallbackPayload: any = { updated_at: new Date().toISOString() };
+      if (data.name !== undefined) fallbackPayload.name = String(data.name).trim();
+      if (data.trackingUrlPattern !== undefined) fallbackPayload.tracking_url_pattern = data.trackingUrlPattern;
+      if (data.isActive !== undefined) fallbackPayload.is_active = Boolean(data.isActive);
+      if (data.sortOrder !== undefined) fallbackPayload.sort_order = Number(data.sortOrder) || 0;
+      const retry = await supabase.from('couriers').update(fallbackPayload).eq('id', id);
+      error = retry.error;
+    }
     if (error) throw error;
     return NextResponse.json({ success: true, id, ...data });
   } catch (error: any) {

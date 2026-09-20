@@ -209,6 +209,37 @@ CREATE TABLE IF NOT EXISTS public.couriers (
   tracking_url_pattern TEXT,
   is_active BOOLEAN DEFAULT true,
   sort_order INTEGER DEFAULT 0,
+  logo TEXT,
+  type TEXT DEFAULT 'Standard',
+  base_fare NUMERIC(12, 2) DEFAULT 0,
+  first_mile NUMERIC(12, 2) DEFAULT 0,
+  first_mile_fee NUMERIC(12, 2) DEFAULT 0,
+  exceeding_km_fee NUMERIC(12, 2) DEFAULT 0,
+  surcharge NUMERIC(12, 2) DEFAULT 0,
+  night_differential NUMERIC(12, 2) DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Video metadata is stored here while binary media remains in Telegram.
+CREATE TABLE IF NOT EXISTS public.videos (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  category TEXT DEFAULT 'Product Demos',
+  tags JSONB DEFAULT '[]'::jsonb,
+  telegram_file_id TEXT DEFAULT '',
+  telegram_message_id TEXT DEFAULT '',
+  storage_type TEXT DEFAULT 'telegram',
+  direct_url TEXT DEFAULT '',
+  thumbnail_url TEXT DEFAULT '',
+  duration NUMERIC DEFAULT 0,
+  file_size BIGINT DEFAULT 0,
+  width INTEGER DEFAULT 1920,
+  height INTEGER DEFAULT 1080,
+  views INTEGER DEFAULT 0,
+  is_published BOOLEAN DEFAULT true,
+  featured BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -258,6 +289,7 @@ ALTER TABLE public.couriers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.charges ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.point_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.videos ENABLE ROW LEVEL SECURITY;
 
 -- Allow public read access to catalog, active payment methods, couriers, charges, promos
 CREATE POLICY "Public Read Products" ON public.products FOR SELECT USING (true);
@@ -266,6 +298,7 @@ CREATE POLICY "Public Read Couriers" ON public.couriers FOR SELECT USING (true);
 CREATE POLICY "Public Read Charges" ON public.charges FOR SELECT USING (true);
 CREATE POLICY "Public Read Promos" ON public.promos FOR SELECT USING (true);
 CREATE POLICY "Public Read Warehouses" ON public.warehouses FOR SELECT USING (true);
+CREATE POLICY "Public Read Videos" ON public.videos FOR SELECT USING (true);
 
 -- Allow inserting orders & customer profiles from public storefront checkout
 CREATE POLICY "Allow Public Orders Insert" ON public.orders FOR INSERT WITH CHECK (true);
