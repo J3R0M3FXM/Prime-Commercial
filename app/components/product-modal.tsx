@@ -132,36 +132,36 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
           </div>
 
           {/* Right panel: Details & Option selection */}
-          <div className="p-6 flex flex-col justify-between space-y-6">
-            <div className="space-y-4">
+          <div className="p-4 sm:p-5 flex flex-col justify-between space-y-4">
+            <div className="space-y-3">
               {/* Category */}
-              <p className="text-[10px] font-mono font-bold tracking-widest text-gray-400 uppercase">
+              <p className="text-[9px] font-mono font-bold tracking-widest text-gray-400 uppercase leading-none">
                 {product.category || "General"}
               </p>
 
               {/* Title & Price */}
               <div>
-                <h2 className="text-xl sm:text-2xl font-heading font-bold text-gray-900 leading-tight">
+                <h2 className="text-lg sm:text-xl font-heading font-bold text-gray-900 leading-[1.15] tracking-tight">
                   {product.name}
                 </h2>
                 {selectedVariant && selectedVariant.id !== "default" && (
-                  <p className="text-sm font-semibold text-gray-500 mt-1 uppercase tracking-wide font-mono">
+                  <p className="text-xs font-semibold text-gray-500 mt-1 uppercase tracking-wide font-mono">
                     Selected Option: <span className="text-gray-900 font-bold">{selectedVariant.name}</span>
                   </p>
                 )}
                 
                 {/* Price */}
-                <div className="mt-2 flex items-baseline gap-2">
-                  <span className="text-2xl font-mono font-bold text-gray-900">
+                <div className="mt-1.5 flex items-baseline gap-2">
+                  <span className="text-xl sm:text-2xl font-mono font-bold text-gray-900">
                     {formatPHP(finalPrice)}
                   </span>
                   {!selectedVariant && variants.length > 1 && (
-                    <span className="text-[11px] font-mono font-medium text-slate-400">
+                    <span className="text-[10px] font-mono font-medium text-slate-400">
                       (Starting Price)
                     </span>
                   )}
                   {hasBundle && currentQuantity > 1 && selectedVariant && (
-                    <span className="text-xs font-mono font-bold text-emerald-600 uppercase tracking-wider">
+                    <span className="text-[11px] font-mono font-bold text-emerald-600 uppercase tracking-wider">
                       Bundle Savings Applied
                     </span>
                   )}

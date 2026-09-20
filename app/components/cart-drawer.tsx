@@ -217,42 +217,42 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
       <div className="w-full max-w-[430px] bg-white h-full shadow-2xl flex flex-col transform transition-transform duration-300 relative border-x border-slate-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5 text-gray-900" />
-            <h2 className="text-xl font-heading font-bold uppercase tracking-wide">Your Cart</h2>
-            <span className="bg-black text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2">
+        <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
+          <div className="flex items-center gap-1.5">
+            <ShoppingCart className="w-4 h-4 text-gray-900" />
+            <h2 className="text-base font-heading font-bold uppercase tracking-wide">Your Cart</h2>
+            <span className="bg-black text-white text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full ml-1">
               {cartCount || 0}
             </span>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors cursor-pointer">
+            <X className="w-4 h-4 text-gray-600" />
           </button>
         </div>
 
         {/* Status Notification Banner (Replaces window.alert for sandboxed iframes) */}
         {checkoutStatus.type && (
-          <div className={`p-4 mx-4 mt-3 rounded-lg flex items-center gap-3 text-xs font-bold uppercase tracking-wider ${
+          <div className={`p-3 mx-3 mt-2.5 rounded-lg flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider ${
             checkoutStatus.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
           }`}>
             {checkoutStatus.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
             ) : (
-              <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
             )}
             <span>{checkoutStatus.message}</span>
           </div>
         )}
 
         {/* Cart Items */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
           {safeCart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
-              <ShoppingCart className="w-16 h-16 opacity-20" />
-              <p className="font-medium text-lg">Your cart is empty</p>
+            <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-3 py-12">
+              <ShoppingCart className="w-12 h-12 opacity-20" />
+              <p className="font-medium text-sm font-mono">Your cart is empty</p>
               <button 
                 onClick={onClose}
-                className="mt-4 px-6 py-2 bg-black text-white font-bold rounded hover:bg-gray-800 transition-colors uppercase text-sm tracking-wide"
+                className="mt-2 px-4 py-1.5 bg-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors uppercase text-xs tracking-wide"
               >
                 Start Shopping
               </button>
@@ -261,49 +261,50 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             safeCart.map((item: any) => {
               if (!item || !item.id) return null;
               return (
-                <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100 items-center">
+                <div key={item.id} className="flex gap-2.5 p-2 bg-gray-50 rounded-lg border border-gray-100 items-center">
                   <input 
                     type="checkbox" 
                     checked={item.selected !== false}
                     onChange={(e) => toggleSelection && toggleSelection(item.id, e.target.checked)}
-                    className="w-5 h-5 cursor-pointer accent-black shrink-0"
+                    className="w-4 h-4 cursor-pointer accent-black shrink-0"
                   />
                   <img 
                     src={item.imageUrl || "https://picsum.photos/seed/prime/100"} 
                     alt={item.name || "Item"} 
-                    className="w-16 h-16 object-cover rounded bg-white border border-gray-200"
+                    className="w-12 h-12 object-cover rounded-md bg-white border border-gray-200 shrink-0"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src = "https://picsum.photos/seed/prime/100";
                     }}
                   />
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-heading font-normal uppercase text-gray-900 line-clamp-1">{item.name || "Product"}</h3>
-                        <p className="text-sm font-medium text-gray-600 font-ibm-condensed">{formatPHP(item.price || 0)}</p>
+                  <div className="flex-1 min-w-0 flex flex-col justify-between">
+                    <div className="flex justify-between items-start gap-1">
+                      <div className="min-w-0">
+                        <h3 className="font-heading font-normal uppercase text-gray-900 line-clamp-1 text-xs">{item.name || "Product"}</h3>
+                        <p className="text-xs font-bold text-gray-800 font-mono mt-0.5">{formatPHP(item.price || 0)}</p>
                       </div>
                       <button 
                         onClick={() => removeFromCart && removeFromCart(item.id)}
-                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                        className="p-1 text-gray-400 hover:text-red-500 transition-colors cursor-pointer shrink-0"
+                        title="Remove item"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     
-                    <div className="flex items-center gap-3 mt-2">
+                    <div className="flex items-center gap-2 mt-1.5">
                       <div className="flex items-center border border-gray-200 rounded bg-white">
                         <button 
-                          className="px-2 py-1 text-gray-500 hover:text-black hover:bg-gray-50"
+                          className="px-1.5 py-0.5 text-gray-500 hover:text-black hover:bg-gray-50 cursor-pointer"
                           onClick={() => updateQuantity && updateQuantity(item.id, (item.quantity || 1) - 1)}
                         >
-                          <Minus className="w-3 h-3" />
+                          <Minus className="w-2.5 h-2.5" />
                         </button>
-                        <span className="text-sm font-bold w-8 text-center">{item.quantity || 1}</span>
+                        <span className="text-xs font-mono font-bold w-6 text-center">{item.quantity || 1}</span>
                         <button 
-                          className="px-2 py-1 text-gray-500 hover:text-black hover:bg-gray-50"
+                          className="px-1.5 py-0.5 text-gray-500 hover:text-black hover:bg-gray-50 cursor-pointer"
                           onClick={() => updateQuantity && updateQuantity(item.id, (item.quantity || 1) + 1)}
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-2.5 h-2.5" />
                         </button>
                       </div>
                     </div>
@@ -316,22 +317,22 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
         {/* Footer */}
         {safeCart.length > 0 && (
-          <div className="p-4 pb-12 border-t border-gray-100 bg-white space-y-4">
+          <div className="p-3 pb-8 border-t border-gray-100 bg-white space-y-2.5">
             
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-base">
-                <span className="font-heading font-bold uppercase tracking-wider text-gray-700">Subtotal:</span>
-                <span className="font-heading font-bold text-xl text-black font-ibm-condensed">{formatPHP(cartTotal || 0)}</span>
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-heading font-bold uppercase tracking-wider text-gray-700 text-xs">Subtotal:</span>
+                <span className="font-mono font-bold text-base text-black">{formatPHP(cartTotal || 0)}</span>
               </div>
-              <p className="text-[11px] text-gray-500 font-mono">
-                Delivery fees & applicable charges are calculated during checkout.
+              <p className="text-[10px] text-gray-400 font-mono">
+                Delivery & charges calculated at checkout.
               </p>
             </div>
 
             <button 
               disabled={selectedItems.length === 0}
               onClick={() => setIsCheckoutOpen(true)}
-              className="w-full px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-2xs text-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Proceed to Checkout ({selectedItems.length})
             </button>

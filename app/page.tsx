@@ -397,22 +397,22 @@ export default function Shopfront() {
                     )}
                   </div>
                   
-                  <div className="p-2 sm:p-4 flex flex-col flex-1 justify-between gap-1.5 sm:gap-2">
+                  <div className="p-2 sm:p-3 flex flex-col flex-1 justify-between gap-1 sm:gap-1.5">
                     {/* Category */}
                     {p.category && (
-                      <p className="text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 truncate">
+                      <p className="text-[8.5px] sm:text-[9.5px] font-mono font-bold uppercase tracking-widest text-slate-400 truncate leading-none">
                         {p.category}
                       </p>
                     )}
 
                     {/* Product Name */}
-                    <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-tight text-xs sm:text-base">
+                    <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-[1.12] text-[11.5px] sm:text-sm tracking-tight">
                       {p.name}
                     </h3>
 
                     {/* Horizontally Aligned Lowest Price (Left) & Cart Icon (Right) */}
-                    <div className="flex items-center justify-between pt-1.5 sm:pt-2 border-t border-gray-100 mt-auto gap-1">
-                      <div className="text-left font-mono font-bold text-xs sm:text-lg text-gray-950 truncate">
+                    <div className="flex items-center justify-between pt-1 sm:pt-1.5 border-t border-gray-100 mt-auto gap-1">
+                      <div className="text-left font-mono font-bold text-xs sm:text-base text-gray-950 truncate">
                         {formatPHP(lowestPrice)}
                       </div>
 
@@ -423,11 +423,11 @@ export default function Shopfront() {
                           setSelectedProduct(p);
                         }}
                         disabled={isOutOfStock}
-                        className="p-1.5 sm:p-2.5 bg-slate-900 hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
+                        className="p-1 sm:p-1.5 bg-slate-900 hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-md transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
                         title={isOutOfStock ? "Sold Out" : "Select Options / Add to Cart"}
                         aria-label="Select Options"
                       >
-                        <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                       </button>
                     </div>
                   </div>
