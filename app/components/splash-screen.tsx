@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
 import { Smartphone } from 'lucide-react';
+import { useEffect } from 'react';
 
 interface SplashScreenProps {
   title?: string;
@@ -11,6 +12,11 @@ export default function SplashScreen({
   title = "INITIALIZING SECURE SESSION", 
   subtitle = "ESTABLISHING ENCRYPTED TELEGRAM LINK..." 
 }: SplashScreenProps) {
+  useEffect(() => {
+    document.body.classList.add("splash-active");
+    return () => document.body.classList.remove("splash-active");
+  }, []);
+
   return (
     <div className="min-h-screen w-full bg-white flex flex-col items-center justify-between p-6 text-slate-950 font-sans antialiased select-none">
       <div className="w-full max-w-[430px] mx-auto flex flex-col items-center justify-between flex-1 py-8 relative">
@@ -77,11 +83,11 @@ export default function SplashScreen({
             <div className="w-full h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-sky-400 animate-[pulse_2s_ease-in-out_infinite]" />
           </div>
 
-          <div className="flex items-center justify-center py-2 px-4 bg-white rounded-xl shadow-sm border border-slate-100">
+          <div className="flex items-center justify-center">
             <img 
-              src="/primefinal.png" 
+              src="/prime-transparent.png" 
               alt="PRIME Logo" 
-              className="h-7 sm:h-8 w-auto object-contain"
+              className="h-9 sm:h-10 w-auto object-contain drop-shadow-sm"
             />
           </div>
         </div>
