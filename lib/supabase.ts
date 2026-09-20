@@ -57,7 +57,7 @@ export async function uploadToSupabaseStorage(params: {
   contentType?: string;
   upsert?: boolean;
 }): Promise<{ url: string; path: string; error?: string }> {
-  const supabase = getSupabaseAdmin() || getSupabaseClient();
+  const supabase = getSupabaseAdmin();
   if (!supabase) {
     return { url: '', path: '', error: 'Supabase is not configured' };
   }

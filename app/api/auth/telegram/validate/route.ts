@@ -34,13 +34,16 @@ export async function POST(request: NextRequest) {
     const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
     const calculatedHash = crypto.createHmac('sha256', secretKey).update(sortedParams).digest('hex');
 
-    if (!hash || !crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(calculatedHash, 'hex'))) {
+    const normalizedHash = typeof hash === 'string' ? hash.toLowerCase() : '';
+    const isValidHash = /^[0-9a-f]{64}$/.test(normalizedHash) && crypto.timingSafeEqual(Buffer.from(normalizedHash, 'hex'), Buffer.from(calculatedHash, 'hex'));
+    if (!isValidHash) {
       return NextResponse.json({ error: 'Invalid Telegram initData signature' }, { status: 401 });
     }
 
     const authDate = Number(params.get('auth_date') || 0);
     const maxAgeSeconds = 24 * 60 * 60;
-    if (!authDate || !Number.isFinite(authDate) || Math.floor(Date.now() / 1000) - authDate > maxAgeSeconds) {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (!authDate || !Number.isFinite(authDate) || authDate > nowSeconds + 300 || nowSeconds - authDate > maxAgeSeconds) {
       return NextResponse.json({ error: 'Telegram initData has expired' }, { status: 401 });
     }
 
@@ -66,16 +69,13 @@ export async function POST(request: NextRequest) {
       const supabase = getSupabaseAdmin()!;
       const now = new Date().toISOString();
       const customerPayload = {
-        id: tgUserId,
         tg_user_id: tgUserId,
         tg_name: fullName,
         tg_username: tgUser.username || '',
         prime_member_id: primeMemberId,
-        role,
-        photo_url: tgUser.photo_url || '',
         updated_at: now
       };
-      await supabase.from('customers').upsert(customerPayload, { onConflict: 'id' });
+      await supabase.from('customers').upsert(customerPayload, { onConflict: 'tg_user_id' });
     }
 
     const cryptoToken = crypto.randomBytes(32).toString('hex');
