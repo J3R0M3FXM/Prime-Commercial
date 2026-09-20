@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const cookie = request.headers.get('cookie') || '';
-    const match = cookie.match(/(?:^|;\\s*)prime_telegram_session=([^;]+)/);
+    const match = cookie.match(/(?:^|;\s*)prime_telegram_session=([^;]+)/);
     const session = verifyTelegramSessionCookie(match?.[1]);
     if (!session) return NextResponse.json({ authenticated: false }, { status: 401 });
     return NextResponse.json({ authenticated: true, isAdmin: session.isAdmin, tgUserId: session.tgUserId });
