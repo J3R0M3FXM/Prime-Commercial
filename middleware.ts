@@ -3,6 +3,26 @@ import { NextRequest, NextResponse } from 'next/server';
 const PUBLIC = new Set(['/api/auth/telegram/validate', '/api/admin/auth']);
 const MAX_AGE = 86400;
 
+async function verifyAdminSession(value: string | undefined) {
+  if (!value) return null;
+  const parts = value.split('|');
+  if (parts.length !== 2) return null;
+  const [issuedRaw, signature] = parts;
+  const issued = Number(issuedRaw);
+  const now = Math.floor(Date.now() / 1000);
+  const secret = process.env.SESSION_SECRET;
+  const accessCode = process.env.ADMIN_ACCESS_CODE;
+  if (!secret || secret.length < 32 || !accessCode || !Number.isFinite(issued) || issued > now || now - issued > MAX_AGE) return null;
+  const keyMaterial = new TextEncoder().encode(secret + '|' + accessCode);
+  const key = await crypto.subtle.importKey('raw', keyMaterial, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(issuedRaw));
+  const bytes = new Uint8Array(sig);
+  let expected = '';
+  for (let i = 0; i < bytes.length; i++) expected += String.fromCharCode(bytes[i]);
+  expected = btoa(expected).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return expected === signature ? { isAdmin: true } : null;
+}
+
 async function verifySession(value: string | undefined) {
   if (!value) return null;
   const parts = value.split('|');
@@ -30,18 +50,18 @@ export async function middleware(request: NextRequest) {
   // must remain reachable; sensitive API routes remain server-gated below.
   const pageProtected = false;
   const apiProtected = pathname.startsWith('/api/admin/') || pathname.startsWith('/api/account') || pathname.startsWith('/api/orders') || pathname.startsWith('/api/checkout/') || pathname.startsWith('/api/ocr/') || pathname.startsWith('/api/download') || pathname.startsWith('/api/media/stream/') || pathname.startsWith('/api/geoapify/');
-  if ((!pageProtected && !apiProtected) || PUBLIC.has(pathname)) return NextResponse.next();
+  // The Admin Panel is intentionally reachable from a native browser.
+  // Its sensitive APIs require a server-issued ADMIN_ACCESS_CODE session cookie.
+  if (pathname.startsWith('/admin')) return NextResponse.next();
+  if (PUBLIC.has(pathname)) return NextResponse.next();
+  if (pathname.startsWith('/api/admin/')) {
+    const adminSession = await verifyAdminSession(request.cookies.get('prime_admin_session')?.value);
+    if (!adminSession) return NextResponse.json({ error: 'Admin access code required' }, { status: 401 });
+    return NextResponse.next();
+  }
+  if (!apiProtected) return NextResponse.next();
   const session = await verifySession(request.cookies.get('prime_telegram_session')?.value);
-  if (!session) {
-    if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Telegram authentication required' }, { status: 401 });
-    return new NextResponse('<!doctype html><html><body><h1>Telegram authentication required</h1><p>Open PRIME from Telegram.</p></body></html>', { status: 403, headers: { 'content-type': 'text/html; charset=utf-8' } });
-  }
-  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin/')) {
-    if (!session.isAdmin) {
-      if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Admin authorization required' }, { status: 403 });
-      return new NextResponse('<!doctype html><html><body><h1>Admin authorization required</h1></body></html>', { status: 403, headers: { 'content-type': 'text/html; charset=utf-8' } });
-    }
-  }
+  if (!session) return NextResponse.json({ error: 'Telegram authentication required' }, { status: 401 });
   return NextResponse.next();
 }
 export const config = { matcher: ['/', '/admin/:path*', '/api/:path*'] };
