@@ -10,6 +10,7 @@ import AccountModal from "./components/account-modal";
 import VideoGalleryModal from "./components/video-gallery-modal";
 import { useCart } from "./components/cart-context";
 import LiveHeaderClock from "./components/live-header-clock";
+import SplashScreen from "./components/splash-screen";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Bell, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 
@@ -231,21 +232,10 @@ export default function Shopfront() {
   );
 
   if (routingToAdmin) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-6 text-center font-sans">
-        <Loader2 className="w-10 h-10 animate-spin mb-4 text-white" />
-        <h1 className="text-xl font-heading font-black uppercase tracking-widest mb-1">Telegram Admin Verified</h1>
-        <p className="text-xs text-gray-400 mt-2">Routing directly to Admin Panel...</p>
-      </div>
-    );
+    return <SplashScreen title="ADMIN CREDENTIALS VERIFIED" subtitle="ROUTING TO SECURE ADMIN CONSOLE..." />;
   }
 
-  if (checking) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-900">
-      <Loader2 className="w-10 h-10 animate-spin mb-4 text-black" />
-      <p className="font-heading font-bold uppercase tracking-widest text-sm text-gray-500">Verifying Secure Session</p>
-    </div>
-  );
+  if (checking) return <SplashScreen title="VERIFYING SECURE SESSION" subtitle="ESTABLISHING ENCRYPTED TELEGRAM LINK..." />;
 
   if (!authorized) {
     return (

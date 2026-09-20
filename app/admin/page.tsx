@@ -81,6 +81,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { motion, AnimatePresence } from "motion/react";
 import { formatPHP } from "@/lib/currency";
 import DiagnosticsModule from "@/app/components/admin/diagnostics-module";
+import SplashScreen from "@/app/components/splash-screen";
 import ModifyOrderModal from "@/app/components/admin/modify-order-modal";
 import OrderPrintView from "@/app/components/admin/order-print-view";
 import ShareOrderModal from "@/app/components/admin/share-order-modal";
@@ -1899,17 +1900,7 @@ export default function AdminPage() {
 
   // Auth checking screen
   if (checkingAuth) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans antialiased">
-        <div className="w-full max-w-md bg-white border border-slate-200 text-slate-900 rounded-3xl flex flex-col items-center justify-center p-8 shadow-xl">
-          <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center mb-6 shadow-xs">
-            <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
-          </div>
-          <h2 className="text-xl font-heading font-black tracking-widest uppercase mb-1 text-slate-900">Authenticating</h2>
-          <p className="font-mono text-xs text-slate-500 text-center">Verifying Telegram Security Credentials...</p>
-        </div>
-      </div>
-    );
+    return <SplashScreen title="ADMIN AUTHENTICATION" subtitle="VERIFYING TELEGRAM SECURITY CREDENTIALS..." />;
   }
 
   // Login Gate
