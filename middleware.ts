@@ -25,7 +25,10 @@ async function verifySession(value: string | undefined) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const pageProtected = pathname === '/' || pathname.startsWith('/admin');
+  // Telegram Mini Apps provide initData in the client-side WebApp object/hash.
+  // The initial document request cannot reliably contain that value, so page rendering
+  // must remain reachable; sensitive API routes remain server-gated below.
+  const pageProtected = false;
   const apiProtected = pathname.startsWith('/api/admin/') || pathname.startsWith('/api/account') || pathname.startsWith('/api/orders') || pathname.startsWith('/api/checkout/') || pathname.startsWith('/api/ocr/') || pathname.startsWith('/api/download') || pathname.startsWith('/api/media/stream/') || pathname.startsWith('/api/geoapify/');
   if ((!pageProtected && !apiProtected) || PUBLIC.has(pathname)) return NextResponse.next();
   const session = await verifySession(request.cookies.get('prime_telegram_session')?.value);
