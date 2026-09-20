@@ -18,7 +18,7 @@ export default function SplashScreen({
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-white flex flex-col items-center justify-between p-6 text-slate-950 font-sans antialiased select-none">
+    <div className="relative z-[9999] min-h-screen w-full bg-white flex flex-col items-center justify-between p-6 text-slate-950 font-sans antialiased select-none">
       <div className="w-full max-w-[430px] mx-auto flex flex-col items-center justify-between flex-1 py-8 relative">
         
         {/* Top Section: Animation + Title/Subtitle */}
