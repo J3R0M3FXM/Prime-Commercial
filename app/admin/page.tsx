@@ -161,7 +161,7 @@ function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promi
         </div>
         <h1 className="text-xl font-heading font-black text-center tracking-wide uppercase">Admin Panel Locked</h1>
         <p className="text-xs text-slate-500 text-center mt-2 leading-relaxed">
-          Enter the Admin Access Code. Telegram authorization alone is not sufficient.
+          Enter the Admin Access Code. The Admin Panel is available in native browsers. Enter the server-side access code to continue.
         </p>
         <label className="block mt-5 text-[10px] font-bold uppercase tracking-widest text-slate-600">ADMIN_ACCESS_CODE</label>
         <input
@@ -181,12 +181,7 @@ function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promi
         >
           {submitting ? "VERIFYING..." : "VERIFY ADMIN ACCESS"}
         </button>
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
-          <div className="flex items-center gap-2 font-bold text-slate-800">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />Two-step admin authorization
-          </div>
-          <p className="mt-1">Authorized Telegram identity + server-side ADMIN_ACCESS_CODE are both required.</p>
-        </div>
+        
       </form>
     </div>
   );
@@ -856,43 +851,15 @@ export default function AdminPage() {
   }, []);
 
   const handleAdminAccessCodeSubmit = async (accessCode: string) => {
-    let initDataRaw = "";
-
-    if (typeof window !== "undefined") {
-      if (window.location.hash) {
-        const hashStr = window.location.hash.substring(1);
-        const params = new URLSearchParams(hashStr);
-        const tgData = params.get("tgWebAppData");
-        if (tgData) initDataRaw = tgData;
-        else if (hashStr.includes("user=") || hashStr.includes("hash=")) initDataRaw = hashStr;
-      }
-
-      if (!initDataRaw && window.location.search) {
-        const searchParams = new URLSearchParams(window.location.search);
-        const tgData = searchParams.get("tgWebAppData") || searchParams.get("initData");
-        if (tgData) initDataRaw = tgData;
-      }
-
-      if (!initDataRaw && (window as any).Telegram?.WebApp?.initData) {
-        initDataRaw = (window as any).Telegram.WebApp.initData;
-      }
-    }
-
-    if (!initDataRaw) {
-      throw new Error("Telegram authorization data is required. Open the Admin Panel from Telegram.");
-    }
-
     const res = await fetch("/api/admin/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData: initDataRaw, accessCode }),
+      body: JSON.stringify({ accessCode }),
     });
     const data = await res.json().catch(() => ({}));
-
     if (!res.ok || !data.success || !data.isAdmin || !data.accessCodeVerified) {
       throw new Error(data.error || "Admin authentication failed.");
     }
-
     setAuthorized(true);
     setAdminUser(data.user || { id: "admin" });
     await fetchAllData();
@@ -1905,7 +1872,7 @@ export default function AdminPage() {
 
   // Auth checking screen
   if (checkingAuth) {
-    return <SplashScreen title="ADMIN AUTHENTICATION" subtitle="VERIFYING TELEGRAM SECURITY CREDENTIALS..." />;
+    return <SplashScreen title="ADMIN ACCESS" subtitle="ENTER SERVER-SIDE ADMIN ACCESS CODE..." />;
   }
 
   // ADMIN_ACCESS_CODE is required on every Admin Panel open.
