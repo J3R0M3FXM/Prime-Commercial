@@ -25,14 +25,20 @@ export async function POST(request: Request) {
     }
 
     const payload = {
-      name: data.name,
-      code: data.code || '',
-      address: data.address || '',
+      name: String(data.name || '').trim(),
+      code: String(data.code || '').trim(),
+      address: String(data.address || '').trim(),
+      latitude: data.lat !== undefined && data.lat !== null ? Number(data.lat) : null,
+      longitude: data.lon !== undefined && data.lon !== null ? Number(data.lon) : null,
       is_active: data.isActive !== false,
       is_default: isDefault,
       sort_order: Number(data.sortOrder) || 0,
+      updated_at: new Date().toISOString(),
     };
 
+    if (!payload.name || !payload.address) {
+      return NextResponse.json({ error: 'Warehouse name and address are required' }, { status: 400 });
+    }
     const { data: inserted, error } = await supabase.from('warehouses').insert([payload]).select().single();
     if (error) throw error;
     return NextResponse.json({ id: inserted.id, ...data });
@@ -54,12 +60,14 @@ export async function PUT(request: Request) {
     }
 
     const payload = {
-      name: data.name,
-      code: data.code,
-      address: data.address,
-      is_active: data.isActive,
+      name: String(data.name || '').trim(),
+      code: String(data.code || '').trim(),
+      address: String(data.address || '').trim(),
+      latitude: data.lat !== undefined && data.lat !== null ? Number(data.lat) : null,
+      longitude: data.lon !== undefined && data.lon !== null ? Number(data.lon) : null,
+      is_active: data.isActive !== false,
       is_default: isDefault,
-      sort_order: Number(data.sortOrder),
+      sort_order: Number(data.sortOrder) || 0,
       updated_at: new Date().toISOString(),
     };
 
