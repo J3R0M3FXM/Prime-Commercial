@@ -15,6 +15,15 @@ export default function SplashScreen({
     <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center p-6 text-white font-sans antialiased select-none">
       <div className="w-full max-w-[430px] mx-auto flex flex-col items-center justify-center relative min-h-[500px]">
         
+        {/* Clean White Background Logo at Upper Center */}
+        <div className="mb-6 px-4 py-2 bg-white rounded-2xl shadow-xl border border-white/20 flex items-center justify-center">
+          <img 
+            src="/primefinal.png" 
+            alt="PRIME Logo" 
+            className="h-7 sm:h-8 w-auto object-contain"
+          />
+        </div>
+
         {/* Moving / Pulsing Concentric Loading Circles */}
         <div className="relative w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center mb-8">
           {/* Outer Ring 1 - Rotating clockwise */}
