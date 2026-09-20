@@ -1,4 +1,5 @@
 "use client";
+import "./admin.css";
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { 
   Users, 
@@ -286,9 +287,6 @@ export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [adminUser, setAdminUser] = useState<any>(null);
-  const [code, setCode] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
 
   // PWA install state
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -833,14 +831,6 @@ export default function AdminPage() {
 
           if (data.success && data.isAdmin) {
             if (typeof window !== "undefined") {
-              sessionStorage.setItem("prime_admin_authorized", "true");
-              sessionStorage.setItem("prime_admin_user_id", data.user?.id || "admin");
-              if (data.user?.photoUrl) sessionStorage.setItem("prime_admin_photo_url", data.user.photoUrl);
-              
-              localStorage.setItem("prime_admin_authorized", "true");
-              localStorage.setItem("prime_admin_user_id", data.user?.id || "admin");
-              if (data.user?.photoUrl) localStorage.setItem("prime_admin_photo_url", data.user.photoUrl);
-            }
             setAuthorized(true);
             setAdminUser(data.user || { id: "admin" });
             await fetchAllData();
@@ -868,11 +858,6 @@ export default function AdminPage() {
       setCustomerDetail(null);
     }
   }, [selectedCustomerId]);
-
-  const handleManualLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg("Manual access codes are disabled. Open the Admin Panel from Telegram.");
-  };
 
   // Product Operations
   const handleToggleProductActive = async (product: any) => {
@@ -1875,46 +1860,34 @@ export default function AdminPage() {
     return <SplashScreen title="ADMIN AUTHENTICATION" subtitle="VERIFYING TELEGRAM SECURITY CREDENTIALS..." />;
   }
 
-  // Login Gate
+  // Login Gate — authorization is established only by the server-issued Telegram session cookie.
   if (!authorized) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6 font-sans antialiased">
-        <div className="w-full max-w-md bg-white border border-slate-200 text-slate-900 p-8 rounded-3xl shadow-xl">
-          <div className="flex justify-center mb-6">
-            <img 
-              src="/primefinal.png" 
-              alt="PRIME" 
-              className="h-8 sm:h-9 w-auto object-contain drop-shadow-xs" 
-            />
+      <div className="admin-shell min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans antialiased">
+        <div className="w-full max-w-sm bg-white border border-slate-200 text-slate-900 p-6 rounded-2xl shadow-lg">
+          <div className="flex justify-center mb-5">
+            <img src="/primefinal.png" alt="PRIME" className="h-8 w-auto object-contain" />
           </div>
-          <h1 className="text-2xl font-heading font-black text-center mb-1 tracking-widest uppercase text-slate-900">Admin</h1>
-          <p className="text-[11px] text-slate-500 text-center mb-6 font-mono">
-            Enter Administrator Access Code
+          <div className="w-11 h-11 mx-auto mb-3 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+            <Lock className="w-5 h-5" />
+          </div>
+          <h1 className="text-xl font-heading font-black text-center tracking-wide uppercase text-slate-900">Admin Panel Locked</h1>
+          <p className="text-xs text-slate-500 text-center mt-2 leading-relaxed">
+            Administrator access is restricted to the authorized Telegram account. Open this panel from the Telegram Web App to continue.
           </p>
-          <form onSubmit={handleManualLogin} className="space-y-4">
-            <input
-              type="password"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="ENTER ADMIN ACCESS CODE"
-              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-center font-mono focus:border-slate-900 focus:bg-white focus:outline-none transition-colors text-slate-900 text-sm"
-            />
-            {errorMsg && <p className="text-red-500 text-xs text-center font-mono">{errorMsg}</p>}
-            <button 
-              type="submit" 
-              disabled={loading} 
-              className="w-full p-4 bg-slate-900 text-white font-bold uppercase tracking-widest rounded-xl hover:bg-black transition-colors flex items-center justify-center text-xs cursor-pointer shadow-md"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Access Dashboard"}
-            </button>
-          </form>
+          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
+            <div className="flex items-center gap-2 font-bold text-slate-800">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              Server-verified session required
+            </div>
+            <p className="mt-1">Browser passwords, local storage flags and manual access codes are not accepted.</p>
+          </div>
         </div>
       </div>
     );
   }
-
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased w-full">
+    <div className="admin-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased w-full">
       <div className="flex-1 flex flex-col w-full">
         <AnimatePresence mode="wait">
         
@@ -1974,14 +1947,13 @@ export default function AdminPage() {
                     <span className="hidden sm:inline">Refresh</span>
                   </button>
                   <button
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                        sessionStorage.removeItem("prime_admin_authorized");
-                        localStorage.removeItem("prime_admin_authorized");
-                        sessionStorage.removeItem("prime_admin_photo_url");
-                        localStorage.removeItem("prime_admin_photo_url");
+                    onClick={async () => {
+                      try {
+                        await fetch("/api/admin/auth", { method: "DELETE" });
+                      } finally {
+                        setAuthorized(false);
+                        setAdminUser(null);
                       }
-                      setAuthorized(false);
                     }}
                     className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium text-red-600 hover:bg-red-50 transition-colors shadow-2xs cursor-pointer"
                   >
