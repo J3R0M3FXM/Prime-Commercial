@@ -798,6 +798,20 @@ export default function AdminPage() {
       };
 
       try {
+        // Reuse an already server-verified admin session when available.
+        const existing = await fetch("/api/admin/auth", { cache: "no-store" });
+        if (existing.ok) {
+          const existingData = await existing.json().catch(() => ({}));
+          if (existingData.authenticated && existingData.isAdmin) {
+            setAuthorized(true);
+            setAdminUser({ id: existingData.tgUserId || "admin" });
+            await fetchAllData();
+            await ensure10Sec();
+            setCheckingAuth(false);
+            return;
+          }
+        }
+
         let initDataRaw = "";
 
         if (typeof window !== "undefined") {
