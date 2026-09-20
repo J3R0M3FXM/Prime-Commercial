@@ -331,3 +331,9 @@ input.font-mono, textarea.font-mono, button.font-mono {
 .admin-shell label {
   overflow-wrap: anywhere;
 }
+
+
+/* Splash screen owns the full viewport; keep the global footer for every other app state. */
+body.splash-active #system-wide-proprietary-footer {
+  display: none !important;
+}
