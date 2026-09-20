@@ -338,11 +338,13 @@ export default function LogisticsModule() {
       const method = editingWarehouse ? "PUT" : "POST";
       if (editingWarehouse) (formData as any).id = editingWarehouse.id;
 
-      await fetch("/api/admin/warehouses", {
+      const res = await fetch("/api/admin/warehouses", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(resData.error || `Failed to save warehouse (HTTP ${res.status})`);
       
       await fetchWarehouses();
       setShowWarehouseModal(false);
