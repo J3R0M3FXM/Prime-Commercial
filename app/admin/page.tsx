@@ -791,6 +791,15 @@ export default function AdminPage() {
   // Auto-authentication check
   useEffect(() => {
     async function verifyTelegramAdmin() {
+      const startTime = Date.now();
+      const ensure10Sec = async () => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 10000 - elapsed);
+        if (remaining > 0) {
+          await new Promise(r => setTimeout(r, remaining));
+        }
+      };
+
       try {
         if (typeof window !== "undefined") {
           const isSessionAuth = 
@@ -807,6 +816,7 @@ export default function AdminPage() {
             setAuthorized(true);
             if (storedUserId) setAdminUser({ id: storedUserId, photoUrl: storedPhotoUrl || "" });
             await fetchAllData();
+            await ensure10Sec();
             setCheckingAuth(false);
             return;
           }
@@ -852,6 +862,7 @@ export default function AdminPage() {
             setAuthorized(true);
             setAdminUser(data.user || { id: "admin" });
             await fetchAllData();
+            await ensure10Sec();
             setCheckingAuth(false);
             return;
           }
@@ -859,6 +870,7 @@ export default function AdminPage() {
       } catch (err) {
         console.error("Admin auto-auth failed:", err);
       } finally {
+        await ensure10Sec();
         setCheckingAuth(false);
       }
     }

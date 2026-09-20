@@ -44,6 +44,15 @@ export default function Shopfront() {
 
   useEffect(() => {
     async function checkAuth() {
+      const startTime = Date.now();
+      const ensure10Sec = async () => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 10000 - elapsed);
+        if (remaining > 0) {
+          await new Promise(r => setTimeout(r, remaining));
+        }
+      };
+
       try {
         let initDataRaw = "";
         
@@ -169,6 +178,7 @@ export default function Shopfront() {
               const productsRes = await fetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
               const pData = await productsRes.json();
               setProducts(Array.isArray(pData) ? pData : []);
+              await ensure10Sec();
               return;
             }
 
@@ -182,6 +192,7 @@ export default function Shopfront() {
                 sessionStorage.setItem("prime_admin_token", authData.token);
               }
               const hash = window.location.hash;
+              await ensure10Sec();
               router.replace(`/admin${hash ? hash : ''}`);
             }
             return;
@@ -216,6 +227,7 @@ export default function Shopfront() {
         console.error("Auth check failed", e);
         setErrorMsg(e.message || String(e));
       } finally {
+        await ensure10Sec();
         setChecking(false);
       }
     }
