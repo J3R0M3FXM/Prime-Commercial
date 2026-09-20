@@ -79,13 +79,13 @@ export async function POST(request: Request) {
   } catch(error:any){return NextResponse.json({success:false,error:error.message||'Authentication failed'},{status:500});}
 }
 
-export async function GET() {
-  // Deliberately never auto-authenticate the Admin Panel.
-  // ADMIN_ACCESS_CODE must be entered through the Admin Panel gate on every open.
-  return NextResponse.json(
-    { authenticated:false, isAdmin:false, accessCodeVerified:false, requiresAccessCode:true },
-    { status:401 }
-  );
+export async function GET(request: Request) {
+  try {
+    const cookies = parseCookies(request);
+    const session = verifyAdminSessionCookie(cookies.admin);
+    if (!session) return NextResponse.json({ authenticated:false, isAdmin:false, accessCodeVerified:false }, { status:401 });
+    return NextResponse.json({ authenticated:true, isAdmin:true, accessCodeVerified:true, tgUserId:session.tgUserId });
+  } catch { return NextResponse.json({ authenticated:false, isAdmin:false, accessCodeVerified:false }, { status:401 }); }
 }
 
 export async function DELETE() {
