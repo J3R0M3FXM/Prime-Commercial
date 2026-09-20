@@ -857,9 +857,11 @@ export default function AdminPage() {
       body: JSON.stringify({ accessCode }),
     });
     const data = await res.json().catch(() => ({}));
+
     if (!res.ok || !data.success || !data.isAdmin || !data.accessCodeVerified) {
-      throw new Error(data.error || "Admin authentication failed.");
+      throw new Error(data.error || "Invalid Admin Access Code.");
     }
+
     setAuthorized(true);
     setAdminUser(data.user || { id: "admin" });
     await fetchAllData();
@@ -1878,30 +1880,6 @@ export default function AdminPage() {
   // ADMIN_ACCESS_CODE is required on every Admin Panel open.
   if (!authorized) {
     return <AdminAccessGate onSubmit={handleAdminAccessCodeSubmit} />;
-  }
-  return (
-      <div className="admin-shell min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans antialiased">
-        <div className="w-full max-w-sm bg-white border border-slate-200 text-slate-900 p-6 rounded-2xl shadow-lg">
-          <div className="flex justify-center mb-5">
-            <img src="/primefinal.png" alt="PRIME" className="h-8 w-auto object-contain" />
-          </div>
-          <div className="w-11 h-11 mx-auto mb-3 rounded-xl bg-slate-900 text-white flex items-center justify-center">
-            <Lock className="w-5 h-5" />
-          </div>
-          <h1 className="text-xl font-heading font-black text-center tracking-wide uppercase text-slate-900">Admin Panel Locked</h1>
-          <p className="text-xs text-slate-500 text-center mt-2 leading-relaxed">
-            Administrator access is restricted to the authorized Telegram account. Open this panel from the Telegram Web App to continue.
-          </p>
-          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
-            <div className="flex items-center gap-2 font-bold text-slate-800">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              Server-verified session required
-            </div>
-            <p className="mt-1">Browser passwords, local storage flags and manual access codes are not accepted.</p>
-          </div>
-        </div>
-      </div>
-    );
   }
   return (
     <div className="admin-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased w-full">
