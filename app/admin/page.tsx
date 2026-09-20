@@ -802,26 +802,8 @@ export default function AdminPage() {
 
       try {
         if (typeof window !== "undefined") {
-          const isSessionAuth = 
-            sessionStorage.getItem("prime_admin_authorized") === "true" || 
-            localStorage.getItem("prime_admin_authorized") === "true";
-          const storedUserId = 
-            sessionStorage.getItem("prime_admin_user_id") || 
-            localStorage.getItem("prime_admin_user_id");
-          const storedPhotoUrl = 
-            sessionStorage.getItem("prime_admin_photo_url") || 
-            localStorage.getItem("prime_admin_photo_url");
-
-          if (isSessionAuth) {
-            setAuthorized(true);
-            if (storedUserId) setAdminUser({ id: storedUserId, photoUrl: storedPhotoUrl || "" });
-            await fetchAllData();
-            await ensure10Sec();
-            setCheckingAuth(false);
-            return;
-          }
-        }
-
+          // Browser-local flags are never an authorization mechanism.
+          // A fresh, server-validated Telegram initData payload is required.
         let initDataRaw = "";
         if (typeof window !== "undefined") {
           if (window.location.hash) {
@@ -889,29 +871,7 @@ export default function AdminPage() {
 
   const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setErrorMsg("");
-    try {
-      const res = await fetch("/api/admin/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code })
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("prime_admin_authorized", "true");
-        }
-        setAuthorized(true);
-        fetchAllData();
-      } else {
-        setErrorMsg(data.error || "Invalid Access Code");
-      }
-    } catch {
-      setErrorMsg("Connection Error");
-    } finally {
-      setLoading(false);
-    }
+    setErrorMsg("Manual access codes are disabled. Open the Admin Panel from Telegram.");
   };
 
   // Product Operations

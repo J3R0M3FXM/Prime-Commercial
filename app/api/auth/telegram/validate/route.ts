@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { enrichFingerprintData, saveFingerprint } from '@/lib/fingerprint';
+import { createTelegramSessionCookie } from '@/lib/telegram-session';
 
 function generateMemberId() {
   return crypto.randomBytes(6).toString('hex').toUpperCase();
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ 
+    const response = NextResponse.json({ 
       success: true, 
       token: cryptoToken,
       isAdmin,
@@ -121,6 +122,8 @@ export async function POST(request: NextRequest) {
         latestFingerprint: savedFp
       }
     });
+    response.cookies.set(createTelegramSessionCookie(tgUserId, isAdmin));
+    return response;
   } catch (error: any) {
     console.error("Auth Route Crash:", error);
     return NextResponse.json({ error: `Internal Server Error: ${error.message || String(error)}` }, { status: 500 });
