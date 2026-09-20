@@ -59,62 +59,47 @@ export default function Shopfront() {
         // Wait for the next tick to ensure Telegram has injected the data
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        // 1. Read directly from URL hash or query params
-        if (typeof window !== 'undefined') {
-          // Capture referral code if provided via link (?ref=..., ?referral=..., ?startapp=...)
-          try {
-            const searchParams = new URLSearchParams(window.location.search);
-            const hashStr = window.location.hash.substring(1);
-            const hashParams = new URLSearchParams(hashStr);
-            const tgStartParam = (window as any).Telegram?.WebApp?.initDataUnsafe?.start_param;
-            const refCandidate = (
-              searchParams.get('ref') ||
-              searchParams.get('referral') ||
-              searchParams.get('startapp') ||
-              hashParams.get('tgWebAppStartParam') ||
-              hashParams.get('startapp') ||
-              tgStartParam ||
-              ''
-            ).trim().toUpperCase();
-            if (refCandidate) {
-              localStorage.setItem('prime_referred_by', refCandidate);
-            }
-            if (searchParams.get('tab') === 'media' || searchParams.get('media') === '1') {
-              setIsVideoGalleryOpen(true);
-              setActiveTab('media');
-            }
-          } catch (refErr) {
-            console.warn('Could not parse referral param:', refErr);
-          }
-
-          if (window.location.hash) {
-            const hashStr = window.location.hash.substring(1);
-            const params = new URLSearchParams(hashStr);
-            const tgData = params.get('tgWebAppData');
-            
-            if (tgData) {
-              initDataRaw = tgData;
-            } else if (hashStr.includes('user=') || hashStr.includes('hash=')) {
-              initDataRaw = hashStr;
-            }
-          }
-
-          if (!initDataRaw && window.location.search) {
-            const searchParams = new URLSearchParams(window.location.search);
-            const tgData = searchParams.get('tgWebAppData') || searchParams.get('initData');
-            if (tgData) {
-              initDataRaw = tgData;
-            }
-          }
+        // PRIME Shopfront is Telegram-only. Do not accept copied/pasted initData
+        // from URL hashes or query strings: a native browser must not authenticate
+        // as a shop session. The Telegram WebApp object is the required entry point.
+        if (typeof window === 'undefined') {
+          throw new Error("Telegram WebApp is required. Open PRIME from Telegram.");
         }
-        
-        // 2. Fallback to Telegram WebApp object
-        if (!initDataRaw && typeof window !== 'undefined' && (window as any).Telegram?.WebApp?.initData) {
-          initDataRaw = (window as any).Telegram.WebApp.initData;
+
+        const telegramWebApp = (window as any).Telegram?.WebApp;
+        if (!telegramWebApp) {
+          throw new Error("Telegram WebApp is required. Open PRIME from Telegram.");
         }
+
+        try {
+          telegramWebApp.ready?.();
+          telegramWebApp.expand?.();
+        } catch {}
+
+        // Wait briefly for Telegram's WebApp bridge to populate initData.
+        for (let attempt = 0; attempt < 20 && !telegramWebApp.initData; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        initDataRaw = typeof telegramWebApp.initData === "string"
+          ? telegramWebApp.initData.trim()
+          : "";
 
         if (!initDataRaw) {
-          throw new Error("Telegram WebApp initData is required. Open PRIME from Telegram.");
+          throw new Error("Valid Telegram WebApp session is required. Open PRIME from Telegram.");
+        }
+
+        // Referral/media parameters are read only from Telegram WebApp data.
+        try {
+          const startParam = telegramWebApp.initDataUnsafe?.start_param;
+          if (startParam) {
+            localStorage.setItem("prime_referred_by", String(startParam).trim().toUpperCase());
+          }
+        } catch {}
+
+        if (telegramWebApp.initDataUnsafe?.start_param === "media") {
+          setIsVideoGalleryOpen(true);
+          setActiveTab("media");
         }
 
         const fingerprintData = await getClientFingerprint();
