@@ -15,19 +15,6 @@ async function verifySession(value: string | undefined) {
   if (!secret || secret.length < 32 || !tgUserId || !Number.isFinite(issued) || issued > now || now - issued > MAX_AGE) return null;
 
   const payload = `${tgUserId}|${issued}|${adminRaw}`;
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['verify']
-  );
-  const sigBytes = new Uint8Array(
-    signature.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(signature.length / 4) * 4, '=')
-      .split('').map(c => c.charCodeAt(0))
-  );
-  void sigBytes;
-
   const expectedKey = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
