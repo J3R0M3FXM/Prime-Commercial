@@ -1,71 +1,123 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { createTelegramSessionCookie, verifyTelegramSessionCookie } from '@/lib/telegram-session';
 
-const SESSION_COOKIE_NAME = 'prime_telegram_session';
 const ADMIN_COOKIE_NAME = 'prime_admin_session';
 const ADMIN_ACCESS_CODE = process.env.ADMIN_ACCESS_CODE || '';
 const MAX_AGE = 86400;
 
-function createAdminSessionCookie(tgUserId: string) {
+function createAdminSessionCookie() {
   if (!ADMIN_ACCESS_CODE) throw new Error('ADMIN_ACCESS_CODE is not configured');
   const issued = Math.floor(Date.now() / 1000);
-  const payload = tgUserId + '|' + issued;
-  const key = crypto.createHash('sha256').update((process.env.SESSION_SECRET || '') + '|' + ADMIN_ACCESS_CODE).digest();
-  const signature = crypto.createHmac('sha256', key).update(payload).digest('base64url');
-  return { name: ADMIN_COOKIE_NAME, value: payload + '|' + signature, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge: MAX_AGE };
+  const payload = 'admin|' + issued;
+  const signature = crypto.createHmac('sha256', ADMIN_ACCESS_CODE).update(payload).digest('base64url');
+  return {
+    name: ADMIN_COOKIE_NAME,
+    value: payload + '|' + signature,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: MAX_AGE,
+  };
 }
 
 function verifyAdminSessionCookie(value: string | undefined) {
   if (!value || !ADMIN_ACCESS_CODE) return null;
   const parts = value.split('|');
-  if (parts.length !== 3) return null;
-  const tgUserId = parts[0], issued = Number(parts[1]), signature = parts[2], now = Math.floor(Date.now() / 1000);
-  if (!tgUserId || !Number.isFinite(issued) || issued > now || now - issued > MAX_AGE) return null;
-  const payload = tgUserId + '|' + issued;
-  const key = crypto.createHash('sha256').update((process.env.SESSION_SECRET || '') + '|' + ADMIN_ACCESS_CODE).digest();
-  const expected = crypto.createHmac('sha256', key).update(payload).digest('base64url');
-  const a=Buffer.from(expected), b=Buffer.from(signature || '');
-  if (a.length !== b.length || !crypto.timingSafeEqual(a,b)) return null;
-  return { tgUserId, isAdmin: true, accessCodeVerified: true };
+  if (parts.length !== 3 || parts[0] !== 'admin') return null;
+
+  const issuedRaw = parts[1];
+  const signature = parts[2];
+  const issued = Number(issuedRaw);
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(issued) || issued > now || now - issued > MAX_AGE) return null;
+
+  const payload = 'admin|' + issuedRaw;
+  const expected = crypto.createHmac('sha256', ADMIN_ACCESS_CODE).update(payload).digest('base64url');
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature || '');
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+
+  return { isAdmin: true, accessCodeVerified: true };
 }
 
-function parseCookies(request: Request) {
+function getAdminCookie(request: Request) {
   const raw = request.headers.get('cookie') || '';
-  const cookies: Record<string,string> = {};
-  raw.split(';').forEach(part => {
-    const idx = part.indexOf('=');
-    if (idx > 0) cookies[part.slice(0,idx).trim()] = part.slice(idx+1).trim();
-  });
-  return { session: cookies[SESSION_COOKIE_NAME], admin: cookies[ADMIN_COOKIE_NAME] };
+  const match = raw.split(';').map(part => part.trim()).find(part => part.startsWith(ADMIN_COOKIE_NAME + '='));
+  return match ? match.slice(ADMIN_COOKIE_NAME.length + 1) : undefined;
 }
 
 export async function POST(request: Request) {
   try {
     const { accessCode } = await request.json().catch(() => ({}));
-    if (!ADMIN_ACCESS_CODE) return NextResponse.json({ success:false,error:'ADMIN_ACCESS_CODE is not configured on the server.' }, { status:500 });
-    if (typeof accessCode !== 'string' || accessCode.length !== ADMIN_ACCESS_CODE.length || !crypto.timingSafeEqual(Buffer.from(accessCode), Buffer.from(ADMIN_ACCESS_CODE))) {
-      return NextResponse.json({ success:false,error:'Invalid Admin Access Code.' },{status:401});
+
+    if (!ADMIN_ACCESS_CODE) {
+      return NextResponse.json(
+        { success: false, error: 'ADMIN_ACCESS_CODE is not configured on the server.' },
+        { status: 500 }
+      );
     }
-    const response = NextResponse.json({ success:true,isAdmin:true,accessCodeVerified:true,user:{id:'admin'} });
-    response.cookies.set(createAdminSessionCookie('admin'));
+
+    if (
+      typeof accessCode !== 'string' ||
+      accessCode.length !== ADMIN_ACCESS_CODE.length ||
+      !crypto.timingSafeEqual(Buffer.from(accessCode), Buffer.from(ADMIN_ACCESS_CODE))
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid Admin Access Code.' },
+        { status: 401 }
+      );
+    }
+
+    const response = NextResponse.json({
+      success: true,
+      isAdmin: true,
+      accessCodeVerified: true,
+      user: { id: 'admin' },
+    });
+    response.cookies.set(createAdminSessionCookie());
     return response;
-  } catch(error:any) {
-    return NextResponse.json({success:false,error:error.message||'Authentication failed'},{status:500});
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, error: error.message || 'Authentication failed' },
+      { status: 500 }
+    );
   }
 }
+
 export async function GET(request: Request) {
   try {
-    const cookies = parseCookies(request);
-    const session = verifyAdminSessionCookie(cookies.admin);
-    if (!session) return NextResponse.json({ authenticated:false, isAdmin:false, accessCodeVerified:false }, { status:401 });
-    return NextResponse.json({ authenticated:true, isAdmin:true, accessCodeVerified:true, user:{id:'admin'} });
+    const session = verifyAdminSessionCookie(getAdminCookie(request));
+    if (!session) {
+      return NextResponse.json(
+        { authenticated: false, isAdmin: false, accessCodeVerified: false },
+        { status: 401 }
+      );
+    }
+    return NextResponse.json({
+      authenticated: true,
+      isAdmin: true,
+      accessCodeVerified: true,
+      user: { id: 'admin' },
+    });
   } catch {
-    return NextResponse.json({ authenticated:false, isAdmin:false, accessCodeVerified:false }, { status:401 });
+    return NextResponse.json(
+      { authenticated: false, isAdmin: false, accessCodeVerified: false },
+      { status: 401 }
+    );
   }
 }
+
 export async function DELETE() {
-  const response = NextResponse.json({ success:true });
-  for (const name of [SESSION_COOKIE_NAME, ADMIN_COOKIE_NAME]) response.cookies.set({name,value:'',httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:0});
+  const response = NextResponse.json({ success: true });
+  response.cookies.set({
+    name: ADMIN_COOKIE_NAME,
+    value: '',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
   return response;
 }
