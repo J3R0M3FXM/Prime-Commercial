@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
   // The initial document request cannot reliably contain that value, so page rendering
   // must remain reachable; sensitive API routes remain server-gated below.
   const pageProtected = false;
-  const apiProtected = pathname.startsWith('/api/admin/') || pathname.startsWith('/api/account') || pathname.startsWith('/api/orders') || pathname.startsWith('/api/checkout/') || pathname.startsWith('/api/ocr/') || pathname.startsWith('/api/download') || pathname.startsWith('/api/media/stream/') || pathname.startsWith('/api/geoapify/');
+  const apiProtected = pathname.startsWith('/api/admin/') || pathname.startsWith('/api/account') || pathname.startsWith('/api/orders') || pathname.startsWith('/api/checkout/') || pathname.startsWith('/api/ocr/') || pathname.startsWith('/api/download') || pathname.startsWith('/api/media/stream/') || pathname.startsWith('/api/geoapify/') || pathname === '/api/products' || pathname === '/api/media/videos';
   // The Admin Panel is intentionally reachable from a native browser.
   // Its sensitive APIs require a server-issued ADMIN_ACCESS_CODE session cookie.
   if (pathname.startsWith('/admin')) return NextResponse.next();
