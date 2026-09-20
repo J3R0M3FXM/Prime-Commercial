@@ -137,7 +137,10 @@ export default function Shopfront() {
 
           // If connection is from authorized Telegram Admin
           if (authData.isAdmin) {
-            if (typeof window !== 'undefined' && (localStorage.getItem("skip_admin_redirect") === "true" || sessionStorage.getItem("skip_admin_redirect") === "true")) {
+            const shopMode = typeof window !== "undefined"
+              && new URLSearchParams(window.location.search).get("mode") === "shop";
+
+            if (shopMode) {
               setAuthorized(true);
               setIsAdmin(true);
               const productsRes = await fetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
@@ -149,13 +152,6 @@ export default function Shopfront() {
 
             setRoutingToAdmin(true);
             if (typeof window !== 'undefined') {
-              sessionStorage.setItem("prime_admin_authorized", "true");
-              sessionStorage.setItem("prime_admin_user_id", authData.tgUserId || "admin");
-              localStorage.setItem("prime_admin_authorized", "true");
-              localStorage.setItem("prime_admin_user_id", authData.tgUserId || "admin");
-              if (authData.token) {
-                sessionStorage.setItem("prime_admin_token", authData.token);
-              }
               const hash = window.location.hash;
               await ensure10Sec();
               router.replace(`/admin${hash ? hash : ''}`);
@@ -234,10 +230,6 @@ export default function Shopfront() {
           </span>
           <button
             onClick={() => {
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("skip_admin_redirect");
-                sessionStorage.removeItem("skip_admin_redirect");
-              }
               router.push("/admin");
             }}
             className="bg-white hover:bg-slate-100 text-black px-2 py-1 rounded font-bold uppercase text-[9px] tracking-wider transition-all cursor-pointer font-sans"
@@ -263,10 +255,6 @@ export default function Shopfront() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    if (typeof window !== "undefined") {
-                      localStorage.removeItem("skip_admin_redirect");
-                      sessionStorage.removeItem("skip_admin_redirect");
-                    }
                     router.push("/admin");
                   }}
                   className="bg-slate-900 hover:bg-black text-white px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
