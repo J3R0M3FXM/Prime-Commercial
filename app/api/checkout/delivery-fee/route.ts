@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 function calculateCourierFee(courier: any, distanceKm: number) {
-  const baseFare = Number(courier?.baseFare) || 0;
-  const firstMile = Number(courier?.firstMile) || 0;
-  const firstMileFee = Number(courier?.firstMileFee) || 0;
-  const exceedingKmFee = Number(courier?.exceedingKmFee) || 0;
+  const baseFare = Number(courier?.baseFare || courier?.base_fare) || 0;
+  const firstMile = Number(courier?.firstMile || courier?.first_mile) || 0;
+  const firstMileFee = Number(courier?.firstMileFee || courier?.first_mile_fee) || 0;
+  const exceedingKmFee = Number(courier?.exceedingKmFee || courier?.exceeding_km_fee) || 0;
   const surcharge = Number(courier?.surcharge) || 0;
-  const nightDifferential = Number(courier?.nightDifferential) || 0;
+  const nightDifferential = Number(courier?.nightDifferential || courier?.night_differential) || 0;
 
   let fee = baseFare;
 
@@ -32,39 +31,51 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing destination coordinates" }, { status: 400 });
     }
 
-    // 1. Get the default warehouse (or first warehouse, or fallback coordinates)
     let originLat = 14.5995;
     let originLon = 120.9842;
 
-    try {
-      const whSnap = await getDocs(query(collection(db, 'warehouses'), where('isDefault', '==', true)));
-      if (!whSnap.empty) {
-        const defaultWh = whSnap.docs[0].data();
-        originLat = defaultWh.lat || originLat;
-        originLon = defaultWh.lon || originLon;
-      } else {
-        const allWh = await getDocs(collection(db, 'warehouses'));
-        if (!allWh.empty) {
-          const firstWh = allWh.docs[0].data();
-          originLat = firstWh.lat || originLat;
-          originLon = firstWh.lon || originLon;
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseAdmin()!;
+        const { data: whData } = await supabase.from('warehouses').select('*').order('sort_order', { ascending: true });
+        if (whData && whData.length > 0) {
+          const defaultWh = whData.find((w: any) => w.is_default) || whData[0];
+          originLat = defaultWh.lat || originLat;
+          originLon = defaultWh.lon || originLon;
         }
+      } catch (e) {
+        console.warn("Notice: Warehouse query fallback used", e);
       }
-    } catch (e) {
-      console.warn("Notice: Warehouse query fallback used", e);
     }
 
-    // 2. Fetch all couriers
-    const courierSnap = await getDocs(collection(db, 'couriers'));
-    let couriersList: any[] = courierSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let couriersList: any[] = [];
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseAdmin()!;
+        const { data: cData } = await supabase.from('couriers').select('*').order('sort_order', { ascending: true });
+        if (cData) {
+          couriersList = cData.map(c => ({
+            id: c.id,
+            name: c.name,
+            baseFare: c.base_fare || c.baseFare || 49,
+            firstMile: c.first_mile || c.firstMile || 3.5,
+            firstMileFee: c.first_mile_fee || c.firstMileFee || 9,
+            exceedingKmFee: c.exceeding_km_fee || c.exceedingKmFee || 10.5,
+            surcharge: c.surcharge || 0,
+            nightDifferential: c.night_differential || c.nightDifferential || 0,
+            logo: c.logo || ''
+          }));
+        }
+      } catch (e) {
+        console.warn("Couriers fetch error:", e);
+      }
+    }
 
     if (couriersList.length === 0) {
-      // Provide standard fallback couriers if none defined
       couriersList = [
         {
           id: "standard-lalamove",
           name: "Lalamove",
-          type: "Standard Motorcycle",
           baseFare: 49,
           firstMile: 3.5,
           firstMileFee: 9,
@@ -72,25 +83,12 @@ export async function POST(request: Request) {
           surcharge: 0,
           nightDifferential: 0,
           logo: ""
-        },
-        {
-          id: "standard-grab",
-          name: "Grab Express",
-          type: "Instant Delivery",
-          baseFare: 60,
-          firstMile: 3,
-          firstMileFee: 12,
-          exceedingKmFee: 14,
-          surcharge: 0,
-          nightDifferential: 0,
-          logo: ""
         }
       ];
     }
 
-    // 3. Calculate distance via Geoapify Routing API
     const apiKey = process.env.GEOAPIFY_API_KEY;
-    let distanceKm = 5; // Safe fallback
+    let distanceKm = 5;
 
     if (apiKey) {
       try {
@@ -104,9 +102,7 @@ export async function POST(request: Request) {
           }
         }
       } catch (err) {
-        console.warn("Routing API error, using haversine fallback", err);
-        // Fallback straight-line * road factor 1.3
-        const R = 6371; // Earth radius in km
+        const R = 6371;
         const dLat = (destinationLat - originLat) * Math.PI / 180;
         const dLon = (destinationLon - originLon) * Math.PI / 180;
         const a = 
@@ -120,7 +116,6 @@ export async function POST(request: Request) {
 
     const roundedDistance = Math.round(distanceKm * 100) / 100;
 
-    // 4. Calculate Delivery Fee for all couriers
     const computedCouriers = couriersList.map(c => {
       const fee = calculateCourierFee(c, roundedDistance);
       return {
@@ -130,7 +125,6 @@ export async function POST(request: Request) {
       };
     });
 
-    // Determine target/selected courier
     const targetCourier = (courierId ? computedCouriers.find(c => c.id === courierId) : null) || computedCouriers[0];
 
     return NextResponse.json({

@@ -1,8 +1,6 @@
-// app/api/admin/media/status/route.ts
 import { NextResponse } from 'next/server';
 import { getTelegramBotToken, getTelegramStorageChatId } from '@/lib/telegram-media';
-import { db } from '@/lib/firebase';
-import { collection, getCountFromServer } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +22,11 @@ export async function GET() {
 
     let totalVideos = 0;
     try {
-      const snap = await getCountFromServer(collection(db, 'videos'));
-      totalVideos = snap.data().count;
+      if (isSupabaseConfigured()) {
+        const supabase = getSupabaseAdmin()!;
+        const { count } = await supabase.from('videos').select('*', { count: 'exact', head: true });
+        totalVideos = count || 0;
+      }
     } catch {
       // ignore
     }

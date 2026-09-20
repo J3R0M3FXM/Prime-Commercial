@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { enrichFingerprintData, saveFingerprint } from '@/lib/fingerprint';
 
 function generateMemberId() {
@@ -23,7 +22,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Telegram validation logic (HMAC SHA256)
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
     params.delete('hash');
@@ -42,61 +40,44 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Parse user info
     const userStr = params.get('user');
     if (!userStr) return NextResponse.json({ error: 'No user data found in initData' }, { status: 400 });
     const tgUser = JSON.parse(userStr);
     const tgUserId = tgUser.id ? tgUser.id.toString() : '';
 
-    // Check if Telegram user is authorized Admin
     const isAdmin = Boolean(ADMIN_TELEGRAM_USER_ID && tgUserId === ADMIN_TELEGRAM_USER_ID);
 
-    // Handle Firestore storage gracefully
-    const userRef = doc(db, 'users', tgUserId);
     let existingData: any = null;
-    try {
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        existingData = userSnap.data();
-      }
-    } catch (err) {
-      console.warn("Firestore lookup warning during auth (possible quota limit):", err);
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseAdmin()!;
+      const { data } = await supabase.from('customers').select('*').eq('tg_user_id', tgUserId).single();
+      existingData = data;
     }
 
-    const primeMemberId = existingData?.primeMemberId || generateMemberId();
+    const primeMemberId = existingData?.prime_member_id || generateMemberId();
     const role = isAdmin ? 'admin' : (existingData?.role || 'customer');
     const fullName = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || tgUser.username || `User ${tgUserId}`;
 
-    const userProfileData = {
-      tgUserId,
-      tgName: fullName,
-      firstName: tgUser.first_name || '',
-      lastName: tgUser.last_name || '',
-      tgUsername: tgUser.username || '',
-      languageCode: tgUser.language_code || 'en',
-      isPremium: Boolean(tgUser.is_premium),
-      allowsWriteToPm: Boolean(tgUser.allows_write_to_pm),
-      photoUrl: tgUser.photo_url || '',
-      rawTelegramData: tgUser,
-      primeMemberId,
-      role,
-      lastSeen: new Date().toISOString(),
-      authDate: params.get('auth_date') || new Date().toISOString(),
-      createdAt: existingData?.createdAt || new Date().toISOString()
-    };
-
-    try {
-      await setDoc(userRef, userProfileData, { merge: true });
-    } catch (err) {
-      console.warn("Firestore setDoc warning during auth (possible quota limit):", err);
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseAdmin()!;
+      const now = new Date().toISOString();
+      const customerPayload = {
+        id: tgUserId,
+        tg_user_id: tgUserId,
+        tg_name: fullName,
+        tg_username: tgUser.username || '',
+        prime_member_id: primeMemberId,
+        role,
+        photo_url: tgUser.photo_url || '',
+        updated_at: now
+      };
+      await supabase.from('customers').upsert(customerPayload, { onConflict: 'id' });
     }
 
-    // Generate session cryptotoken
     const cryptoToken = crypto.randomBytes(32).toString('hex');
-    
-    // Store fingerprint (separate collection and user document snapshot)
     let savedFp = null;
-    if (fingerprint) {
+
+    if (fingerprint && isSupabaseConfigured()) {
       try {
         const rawIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
         const clientIp = rawIp.split(',')[0].trim();
@@ -111,16 +92,9 @@ export async function POST(request: NextRequest) {
           ...fingerprint,
           ipSession: clientIp,
           ...enriched,
-          enrollmentDate: existingData?.createdAt || new Date().toISOString(),
+          enrollmentDate: existingData?.created_at || new Date().toISOString(),
           lastSeen: new Date().toISOString()
         });
-
-        // Also update primary device identifiers on user doc for rapid fraud lookup
-        await setDoc(userRef, {
-          deviceId: fingerprint.deviceId || existingData?.deviceId || "",
-          hardwareId: fingerprint.hardwareId || existingData?.hardwareId || "",
-          appId: fingerprint.appId || existingData?.appId || "PRIME_SHOP_APP"
-        }, { merge: true });
       } catch (err) {
         console.error("Device tracking failed:", err);
       }

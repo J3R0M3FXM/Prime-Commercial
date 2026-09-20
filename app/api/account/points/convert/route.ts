@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, runTransaction } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 400 });
+    }
+    const supabase = getSupabaseAdmin()!;
     const body = await request.json();
     const { customerId, pointsType, amount } = body;
 
@@ -20,54 +23,53 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid points type. Must be purchasing or referral.' }, { status: 400 });
     }
 
-    const uRef = doc(db, 'users', customerId);
+    const { data: customer, error: fetchErr } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', customerId)
+      .single();
 
-    const result = await runTransaction(db, async (txn) => {
-      const uSnap = await txn.get(uRef);
-      if (!uSnap.exists()) {
-        throw new Error('Customer profile not found.');
-      }
+    if (fetchErr || !customer) {
+      return NextResponse.json({ error: 'Customer profile not found.' }, { status: 404 });
+    }
 
-      const uData = uSnap.data();
-      const fieldKey = pointsType === 'purchasing' ? 'purchasingPoints' : 'referralPoints';
-      const currentPoints = Number(uData[fieldKey] || 0);
+    const currentPoints = Number(customer.points || 0);
 
-      if (currentPoints < convertAmount) {
-        throw new Error(`Insufficient ${pointsType === 'purchasing' ? 'Purchasing' : 'Referral'} Points. Available: ${currentPoints}`);
-      }
+    if (currentPoints < convertAmount) {
+      return NextResponse.json({ error: `Insufficient Points. Available: ${currentPoints}` }, { status: 400 });
+    }
 
-      const newPointsBalance = currentPoints - convertAmount;
-      const currentCredits = Number(uData.storeCredits || 0);
-      const newCreditsBalance = currentCredits + convertAmount; // 1 point = ₱1 credit
+    const newPointsBalance = currentPoints - convertAmount;
+    const currentCredits = Number(customer.store_credits || 0);
+    const newCreditsBalance = currentCredits + convertAmount;
 
-      // Update user doc
-      txn.update(uRef, {
-        [fieldKey]: newPointsBalance,
-        storeCredits: newCreditsBalance,
-        updatedAt: new Date().toISOString()
-      });
+    const { error: updateErr } = await supabase
+      .from('customers')
+      .update({
+        points: newPointsBalance,
+        store_credits: newCreditsBalance,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', customerId);
 
-      // Record transaction
-      const txId = `tx-conv-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-      const txRef = doc(db, 'point_transactions', txId);
-      txn.set(txRef, {
-        userId: customerId,
-        type: pointsType === 'purchasing' ? 'conversion_purchasing' : 'conversion_referral',
-        amount: convertAmount,
-        description: `Converted ${convertAmount} ${pointsType === 'purchasing' ? 'Purchasing' : 'Referral'} Points to ₱${convertAmount} Store Credits`,
-        createdAt: new Date().toISOString()
-      });
+    if (updateErr) throw updateErr;
 
-      return {
-        success: true,
-        pointsType,
-        convertedAmount: convertAmount,
-        newPointsBalance,
-        newCreditsBalance
-      };
+    await supabase.from('point_transactions').insert([{
+      id: `tx-conv-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      user_id: customerId,
+      type: pointsType === 'purchasing' ? 'conversion_purchasing' : 'conversion_referral',
+      amount: convertAmount,
+      description: `Converted ${convertAmount} Points to ₱${convertAmount} Store Credits`,
+      created_at: new Date().toISOString()
+    }]);
+
+    return NextResponse.json({
+      success: true,
+      pointsType,
+      convertedAmount: convertAmount,
+      newPointsBalance,
+      newCreditsBalance
     });
-
-    return NextResponse.json(result);
   } catch (err: any) {
     console.error('Point conversion error:', err);
     return NextResponse.json({ error: err.message || 'Conversion failed.' }, { status: 400 });

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,28 +13,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ valid: false, error: 'Referral code is required.' }, { status: 400 });
     }
 
-    // A customer cannot refer themselves
     if (customerMemberId && cleanCode === String(customerMemberId).trim().toUpperCase()) {
       return NextResponse.json({ valid: false, error: 'You cannot use your own PRIME Member ID as a referral code.' });
     }
 
-    // Search for existing user with this primeMemberId
-    const usersCol = collection(db, 'users');
-    const q = query(usersCol, where('primeMemberId', '==', cleanCode));
-    const snap = await getDocs(q);
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ valid: false, error: 'Supabase is not configured.' }, { status: 400 });
+    }
+    const supabase = getSupabaseAdmin()!;
 
-    if (snap.empty) {
+    const { data: referrer, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('prime_member_id', cleanCode)
+      .single();
+
+    if (error || !referrer) {
       return NextResponse.json({ 
         valid: false, 
         error: 'Invalid referral code. The PRIME Member ID does not exist.' 
       });
     }
 
-    const referrerDoc = snap.docs[0];
-    const referrerData = referrerDoc.data();
-
-    // Prevent referring self via customerId or tgUserId
-    if (customerId && (referrerDoc.id === customerId || referrerData.tgUserId === customerId)) {
+    if (customerId && (referrer.id === customerId || referrer.tg_user_id === customerId)) {
       return NextResponse.json({ 
         valid: false, 
         error: 'You cannot use your own PRIME Member ID as a referral code.' 
@@ -44,10 +44,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       valid: true,
-      referrerUserId: referrerDoc.id,
-      referrerMemberId: referrerData.primeMemberId || cleanCode,
-      referrerName: referrerData.tgName || 'Valued Member',
-      referrerUsername: referrerData.tgUsername || ''
+      referrerUserId: referrer.id,
+      referrerMemberId: referrer.prime_member_id || cleanCode,
+      referrerName: referrer.tg_name || 'Valued Member',
+      referrerUsername: referrer.tg_username || ''
     });
   } catch (err: any) {
     console.error('Referral validate error:', err);

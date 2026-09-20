@@ -1,7 +1,5 @@
-// app/api/media/videos/[id]/view/route.ts
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc, increment } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +9,14 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const docRef = doc(db, 'videos', id);
-    await updateDoc(docRef, {
-      views: increment(1),
-    });
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+    }
+    const supabase = getSupabaseAdmin()!;
+    const { data } = await supabase.from('videos').select('views').eq('id', id).single();
+    const currentViews = data?.views || 0;
+    await supabase.from('videos').update({ views: currentViews + 1 }).eq('id', id);
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,64 +1,39 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getChargesFromDb } from '@/lib/db-adapter';
 import { normalizeCharge } from '@/lib/charges';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-let cachedCharges: any[] | null = null;
-let lastChargesFetchTime = 0;
-const CHARGES_CACHE_TTL_MS = 60000; // 60 seconds
-
 export async function GET() {
   try {
-    const now = Date.now();
-    if (cachedCharges && (now - lastChargesFetchTime < CHARGES_CACHE_TTL_MS)) {
-      return NextResponse.json(cachedCharges);
-    }
-
-    const chargesSnap = await getDocs(collection(db, 'charges'));
-    const charges = chargesSnap.docs.map(d => {
-      const data = d.data();
-      return normalizeCharge({ id: d.id, ...data }, d.id);
-    });
-
-    cachedCharges = charges;
-    lastChargesFetchTime = now;
-
+    const charges = await getChargesFromDb();
     return NextResponse.json(charges);
   } catch (error: any) {
-    if (cachedCharges) return NextResponse.json(cachedCharges);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    cachedCharges = null;
+    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
+    const supabase = getSupabaseAdmin()!;
     const data = await request.json();
     const normalized = normalizeCharge(data);
     
-    const docRef = await addDoc(collection(db, 'charges'), {
+    const payload = {
       name: normalized.name,
       type: normalized.type,
-      amount: normalized.amount,
-      isDefault: normalized.isDefault,
-      isActive: normalized.isActive !== false,
-      schedules: {
-        date: normalized.schedules?.date || '',
-        days: normalized.schedules?.days || [],
-        daysOfWeek: normalized.schedules?.days || [],
-        time: normalized.schedules?.time || '',
-        isOvernight: Boolean(normalized.schedules?.isOvernight),
-        overnight: Boolean(normalized.schedules?.isOvernight),
-        isRecurring: Boolean(normalized.schedules?.isRecurring),
-        recurring: Boolean(normalized.schedules?.isRecurring),
-      },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    return NextResponse.json({ success: true, id: docRef.id });
+      rate: normalized.amount,
+      is_active: normalized.isActive !== false,
+      description: JSON.stringify(normalized.schedules || {}),
+      sort_order: 0,
+    };
+
+    const { data: inserted, error } = await supabase.from('charges').insert([payload]).select().single();
+    if (error) throw error;
+    return NextResponse.json({ success: true, id: inserted.id });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -66,32 +41,25 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    cachedCharges = null;
+    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
+    const supabase = getSupabaseAdmin()!;
     const data = await request.json();
     const { id, ...updateData } = data;
     if (!id) return NextResponse.json({ error: "Missing charge ID" }, { status: 400 });
 
     const normalized = normalizeCharge({ id, ...updateData }, id);
 
-    const docRef = doc(db, 'charges', id);
-    await updateDoc(docRef, {
+    const payload = {
       name: normalized.name,
       type: normalized.type,
-      amount: normalized.amount,
-      isDefault: normalized.isDefault,
-      isActive: normalized.isActive !== false,
-      schedules: {
-        date: normalized.schedules?.date || '',
-        days: normalized.schedules?.days || [],
-        daysOfWeek: normalized.schedules?.days || [],
-        time: normalized.schedules?.time || '',
-        isOvernight: Boolean(normalized.schedules?.isOvernight),
-        overnight: Boolean(normalized.schedules?.isOvernight),
-        isRecurring: Boolean(normalized.schedules?.isRecurring),
-        recurring: Boolean(normalized.schedules?.isRecurring),
-      },
-      updatedAt: serverTimestamp()
-    });
+      rate: normalized.amount,
+      is_active: normalized.isActive !== false,
+      description: JSON.stringify(normalized.schedules || {}),
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase.from('charges').update(payload).eq('id', id);
+    if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -100,16 +68,16 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    cachedCharges = null;
+    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
+    const supabase = getSupabaseAdmin()!;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: "Missing charge ID" }, { status: 400 });
 
-    const docRef = doc(db, 'charges', id);
-    await deleteDoc(docRef);
+    const { error } = await supabase.from('charges').delete().eq('id', id);
+    if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-

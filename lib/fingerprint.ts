@@ -1,5 +1,4 @@
-import { db } from '@/lib/firebase';
-import { doc, collection, addDoc, setDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface FingerprintPayload {
   deviceId?: string;
@@ -52,22 +51,15 @@ export async function enrichFingerprintData(ip: string, lat?: number, lon?: numb
   const geoapifyKey = process.env.GEOAPIFY_API_KEY;
   const iplocateKey = process.env.IPLOCATE_API_KEY;
 
-  // 1. If GPS coordinates are available, reverse-geocode using Geoapify API to get exact street-level address
   if (hasGps && lat && lon) {
     let geoapifySuccess = false;
-
     if (geoapifyKey) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000);
-
         const geoUrl = `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&format=json&apiKey=${geoapifyKey}`;
-        const geoRes = await fetch(geoUrl, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' }
-        });
+        const geoRes = await fetch(geoUrl, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
         clearTimeout(timeoutId);
-
         if (geoRes.ok) {
           const geoData = await geoRes.json();
           const result = geoData.results?.[0] || geoData.features?.[0]?.properties;
@@ -84,24 +76,18 @@ export async function enrichFingerprintData(ip: string, lat?: number, lon?: numb
       }
     }
 
-    // Fallback to OpenStreetMap Nominatim only if Geoapify wasn't available or errored
     if (!geoapifySuccess) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3500);
-
         const nomRes = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
           {
             signal: controller.signal,
-            headers: {
-              'Accept': 'application/json',
-              'User-Agent': 'PrimeStorefront/1.0 (internal-store)'
-            }
+            headers: { 'Accept': 'application/json', 'User-Agent': 'PrimeStorefront/1.0' }
           }
         );
         clearTimeout(timeoutId);
-
         if (nomRes.ok) {
           const nomData = await nomRes.json();
           if (nomData && nomData.display_name) {
@@ -118,23 +104,15 @@ export async function enrichFingerprintData(ip: string, lat?: number, lon?: numb
     }
   }
 
-  // 2. Lookup Internet Provider and network location using IPLocate API (with fallback if needed)
   if (!isLocalIp) {
     let iplocateSuccess = false;
-
-    // Primary: IPLocate API
     if (iplocateKey) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000);
-
         const ipUrl = `https://www.iplocate.io/api/lookup/${ip}?apikey=${iplocateKey}`;
-        const ipRes = await fetch(ipUrl, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' }
-        });
+        const ipRes = await fetch(ipUrl, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
         clearTimeout(timeoutId);
-
         if (ipRes.ok) {
           const ipData = await ipRes.json();
           isp = ipData.company?.name || ipData.asn?.name || isp;
@@ -157,18 +135,12 @@ export async function enrichFingerprintData(ip: string, lat?: number, lon?: numb
       }
     }
 
-    // Secondary fallback: ipwho.is if IPLocate key is missing or failed
     if (!iplocateSuccess) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2500);
-
-        const res = await fetch(`https://ipwho.is/${ip}`, { 
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' }
-        });
+        const res = await fetch(`https://ipwho.is/${ip}`, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
         clearTimeout(timeoutId);
-
         if (res.ok) {
           const data = await res.json();
           if (data.success) {
@@ -185,7 +157,7 @@ export async function enrichFingerprintData(ip: string, lat?: number, lon?: numb
           }
         }
       } catch {
-        // Silent fallback
+        // silent
       }
     }
   }
@@ -208,8 +180,8 @@ export async function enrichFingerprintData(ip: string, lat?: number, lon?: numb
 }
 
 export async function saveFingerprint(tgUserId: string, rawData: FingerprintPayload) {
-  if (!tgUserId) return null;
-
+  if (!tgUserId || !isSupabaseConfigured()) return null;
+  const supabase = getSupabaseAdmin()!;
   const nowIso = new Date().toISOString();
   const fingerprintRecord = {
     ...rawData,
@@ -219,46 +191,50 @@ export async function saveFingerprint(tgUserId: string, rawData: FingerprintPayl
   };
 
   try {
-    const userRef = doc(db, 'users', tgUserId);
-    const fingerprintsCol = collection(userRef, 'fingerprints');
-    
-    // 1. Add historical snapshot entry
-    const docRef = await addDoc(fingerprintsCol, {
-      ...fingerprintRecord,
-      createdAt: nowIso
-    });
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('id, fingerprints')
+      .eq('tg_user_id', tgUserId)
+      .single();
 
-    // 2. Also cache latest fingerprint snapshot directly on user document for instant hydration
-    await setDoc(userRef, {
-      latestFingerprint: {
-        ...fingerprintRecord,
-        snapshotId: docRef.id
-      },
-      lastSeen: nowIso
-    }, { merge: true });
+    const existingFingerprints = customer?.fingerprints || [];
+    const updatedFingerprints = [fingerprintRecord, ...existingFingerprints].slice(0, 50);
 
-    return { id: docRef.id, ...fingerprintRecord };
+    if (customer) {
+      await supabase
+        .from('customers')
+        .update({
+          fingerprints: updatedFingerprints,
+          updated_at: nowIso
+        })
+        .eq('id', customer.id);
+    } else {
+      await supabase.from('customers').insert([{
+        tg_user_id: tgUserId,
+        fingerprints: updatedFingerprints,
+        created_at: nowIso,
+        updated_at: nowIso
+      }]);
+    }
+
+    return fingerprintRecord;
   } catch (err) {
-    console.error(`Error saving fingerprint snapshot for ${tgUserId}:`, err);
+    console.error(`Error saving fingerprint for ${tgUserId}:`, err);
     return null;
   }
 }
 
 export async function getUserFingerprints(tgUserId: string) {
+  if (!tgUserId || !isSupabaseConfigured()) return [];
+  const supabase = getSupabaseAdmin()!;
   try {
-    const userRef = doc(db, 'users', tgUserId);
-    const fingerprintsCol = collection(userRef, 'fingerprints');
-    const q = query(fingerprintsCol, orderBy('createdAt', 'desc'), limit(25));
-    const snap = await getDocs(q);
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('fingerprints')
+      .eq('tg_user_id', tgUserId)
+      .single();
 
-    return snap.docs.map(d => {
-      const data = d.data();
-      return {
-        id: d.id,
-        ...data,
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt || new Date().toISOString()
-      };
-    });
+    return customer?.fingerprints || [];
   } catch (err) {
     console.error(`Failed to load fingerprint history for ${tgUserId}:`, err);
     return [];

@@ -397,16 +397,16 @@ export default function Shopfront() {
                     )}
                   </div>
                   
-                  <div className="p-2 sm:p-3 flex flex-col flex-1 justify-between gap-1 sm:gap-1.5">
+                  <div className="p-2 sm:p-2.5 flex flex-col flex-1 justify-between gap-0.5 sm:gap-1">
                     {/* Category */}
                     {p.category && (
-                      <p className="text-[8.5px] sm:text-[9.5px] font-mono font-bold uppercase tracking-widest text-slate-400 truncate leading-none">
+                      <p className="text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-widest text-slate-400 truncate leading-none mb-0.5">
                         {p.category}
                       </p>
                     )}
 
                     {/* Product Name */}
-                    <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-[1.12] text-[11.5px] sm:text-sm tracking-tight">
+                    <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-[1.05] text-[11px] sm:text-[12.5px] tracking-tight">
                       {p.name}
                     </h3>
 

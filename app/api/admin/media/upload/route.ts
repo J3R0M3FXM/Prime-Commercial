@@ -1,13 +1,15 @@
-// app/api/admin/media/upload/route.ts
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { uploadVideoToTelegram, getTelegramBotToken } from '@/lib/telegram-media';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+    }
+    const supabase = getSupabaseAdmin()!;
     const formData = await request.formData();
     const file = formData.get('video') as File | null;
     const title = (formData.get('title') as string || '').trim();
@@ -30,16 +32,14 @@ export async function POST(request: Request) {
     const token = getTelegramBotToken();
     if (!token) {
       return NextResponse.json(
-        { error: 'TELEGRAM_BOT_TOKEN is not configured in server environment. Please configure it in settings.' },
+        { error: 'TELEGRAM_BOT_TOKEN is not configured in server environment.' },
         { status: 500 }
       );
     }
 
-    // Convert file to Buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Telegram Storage
     const uploadRes = await uploadVideoToTelegram(buffer, file.name, {
       caption: `🎬 ${title}\n📁 ${category}\n${description ? `\n${description}` : ''}`,
       chatId: customChatId || undefined,
@@ -52,14 +52,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Prepare tags
     const tags = tagsRaw
       .split(',')
       .map(t => t.trim())
       .filter(Boolean);
 
-    // Save record in Firestore
-    const newDocRef = doc(collection(db, 'videos'));
     const now = new Date().toISOString();
 
     const videoRecord = {
@@ -67,29 +64,39 @@ export async function POST(request: Request) {
       description,
       category,
       tags,
-      telegramFileId: uploadRes.fileId,
-      telegramFileUniqueId: uploadRes.fileUniqueId || '',
-      telegramMessageId: uploadRes.messageId || null,
-      storageChatId: uploadRes.chatId || '',
-      storageType: 'telegram',
-      thumbnailUrl: customThumbnail || '',
+      telegram_file_id: uploadRes.fileId,
+      telegram_file_unique_id: uploadRes.fileUniqueId || '',
+      telegram_message_id: uploadRes.messageId || null,
+      storage_chat_id: uploadRes.chatId || '',
+      storage_type: 'telegram',
+      thumbnail_url: customThumbnail || '',
       duration: uploadRes.duration || 0,
-      fileSize: uploadRes.fileSize || buffer.length,
+      file_size: uploadRes.fileSize || buffer.length,
       width: uploadRes.width || 1920,
       height: uploadRes.height || 1080,
       views: 0,
-      isPublished,
+      is_published: isPublished,
       featured,
-      createdAt: now,
-      updatedAt: now,
+      created_at: now,
+      updated_at: now,
     };
 
-    await setDoc(newDocRef, videoRecord);
+    const { data: inserted, error } = await supabase.from('videos').insert([videoRecord]).select().single();
+    if (error) throw error;
 
     return NextResponse.json({
       success: true,
-      id: newDocRef.id,
-      ...videoRecord,
+      id: inserted.id,
+      title: inserted.title,
+      description: inserted.description,
+      category: inserted.category,
+      tags: inserted.tags,
+      telegramFileId: inserted.telegram_file_id,
+      thumbnailUrl: inserted.thumbnail_url,
+      views: inserted.views,
+      isPublished: inserted.is_published,
+      featured: inserted.featured,
+      createdAt: inserted.created_at
     });
   } catch (error: any) {
     console.error('Failed to handle video upload to Telegram:', error);

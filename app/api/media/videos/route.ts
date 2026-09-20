@@ -1,7 +1,5 @@
-// app/api/media/videos/route.ts
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { getTelegramFilePath } from '@/lib/telegram-media';
 
 export const dynamic = 'force-dynamic';
@@ -14,20 +12,43 @@ export async function GET(request: Request) {
     const search = searchParams.get('search')?.toLowerCase().trim();
     const featuredOnly = searchParams.get('featured') === 'true';
 
-    const snap = await getDocs(collection(db, 'videos'));
-    let videos = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+    }
+    const supabase = getSupabaseAdmin()!;
+    const { data, error } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
 
-    // Filter by published status if not includeAll
+    let videos = (data || []).map(v => ({
+      id: v.id,
+      title: v.title,
+      description: v.description,
+      category: v.category,
+      tags: v.tags,
+      telegramFileId: v.telegram_file_id || v.telegramFileId,
+      telegramMessageId: v.telegram_message_id || v.telegramMessageId,
+      storageType: v.storage_type || v.storageType,
+      directUrl: v.direct_url || v.directUrl,
+      thumbnailUrl: v.thumbnail_url || v.thumbnailUrl,
+      duration: v.duration,
+      fileSize: v.file_size || v.fileSize,
+      width: v.width,
+      height: v.height,
+      views: v.views,
+      isPublished: v.is_published !== undefined ? v.is_published : v.isPublished,
+      featured: v.featured,
+      createdAt: v.created_at || v.createdAt,
+      updatedAt: v.updated_at || v.updatedAt,
+    }));
+
     if (!includeAll) {
       videos = videos.filter(v => v.isPublished !== false);
     }
 
-    // Filter by category
     if (category && category !== 'All') {
       videos = videos.filter(v => v.category?.toLowerCase() === category.toLowerCase());
     }
 
-    // Filter by search term
     if (search) {
       videos = videos.filter(v => {
         const titleMatch = v.title?.toLowerCase().includes(search);
@@ -37,12 +58,10 @@ export async function GET(request: Request) {
       });
     }
 
-    // Filter featured
     if (featuredOnly) {
       videos = videos.filter(v => Boolean(v.featured));
     }
 
-    // Sort: Featured first, then newest first
     videos.sort((a, b) => {
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
@@ -73,7 +92,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Either Telegram File ID or a Video URL is required' }, { status: 400 });
     }
 
-    // If telegramFileId provided, try to verify with Telegram API to auto-fill metadata
     let detectedDuration = Number(data.duration) || 0;
     let detectedFileSize = Number(data.fileSize) || 0;
 
@@ -84,10 +102,15 @@ export async function POST(request: Request) {
       }
     }
 
-    const newDocRef = doc(collection(db, 'videos'));
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+    }
+    const supabase = getSupabaseAdmin()!;
+    const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
     const videoRecord = {
+      id,
       title,
       description: typeof data.description === 'string' ? data.description.trim() : '',
       category: data.category || 'Product Demos',
@@ -96,24 +119,42 @@ export async function POST(request: Request) {
         : typeof data.tags === 'string'
         ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
         : [],
-      telegramFileId,
-      telegramMessageId: data.telegramMessageId || '',
-      storageType: telegramFileId ? 'telegram' : 'url',
-      directUrl: directUrl || '',
-      thumbnailUrl: typeof data.thumbnailUrl === 'string' ? data.thumbnailUrl : '',
+      telegram_file_id: telegramFileId,
+      telegram_message_id: data.telegramMessageId || '',
+      storage_type: telegramFileId ? 'telegram' : 'url',
+      direct_url: directUrl || '',
+      thumbnail_url: typeof data.thumbnailUrl === 'string' ? data.thumbnailUrl : '',
       duration: detectedDuration,
-      fileSize: detectedFileSize,
+      file_size: detectedFileSize,
       width: Number(data.width) || 1920,
       height: Number(data.height) || 1080,
       views: 0,
-      isPublished: data.isPublished !== false,
+      is_published: data.isPublished !== false,
       featured: Boolean(data.featured),
-      createdAt: now,
-      updatedAt: now,
+      created_at: now,
+      updated_at: now,
     };
 
-    await setDoc(newDocRef, videoRecord);
-    return NextResponse.json({ id: newDocRef.id, ...videoRecord });
+    const { error } = await supabase.from('videos').insert([videoRecord]);
+    if (error) throw error;
+
+    return NextResponse.json({ 
+      id,
+      title: videoRecord.title,
+      description: videoRecord.description,
+      category: videoRecord.category,
+      tags: videoRecord.tags,
+      telegramFileId: videoRecord.telegram_file_id,
+      directUrl: videoRecord.direct_url,
+      thumbnailUrl: videoRecord.thumbnail_url,
+      duration: videoRecord.duration,
+      fileSize: videoRecord.file_size,
+      views: videoRecord.views,
+      isPublished: videoRecord.is_published,
+      featured: videoRecord.featured,
+      createdAt: videoRecord.created_at,
+      updatedAt: videoRecord.updated_at
+    });
   } catch (error: any) {
     console.error('Failed to create video record:', error);
     return NextResponse.json({ error: error.message || 'Failed to create video record' }, { status: 500 });

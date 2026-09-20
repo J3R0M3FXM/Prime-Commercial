@@ -1,18 +1,8 @@
-import { db } from '@/lib/firebase';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  where, 
-  runTransaction,
-  writeBatch
-} from 'firebase/firestore';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface CustomerTierInfo {
   tier: 'Titanium' | 'Platinum' | 'Gold' | 'Bronze' | 'Silver' | 'Member';
-  currentSpending: number; // In current 30-day cycle, items only
+  currentSpending: number;
   cycleStartDate: string;
   cycleEndDate: string;
   daysRemainingInCycle: number;
@@ -41,18 +31,11 @@ export interface PointTransactionRecord {
   metadata?: Record<string, any>;
 }
 
-/**
- * Calculates purchasing points: 10 points for each ₱100 spending on purchased items
- */
 export function calculatePurchasingPoints(itemsSubtotal: number): number {
   const safeItems = Math.max(0, Number(itemsSubtotal) || 0);
   return Math.floor(safeItems / 100) * 10;
 }
 
-/**
- * Calculates member tier according to the rolling 30-day window based on
- * the customer's very first Delivered/Completed order.
- */
 export function calculateCustomerTier(
   completedOrders: Array<{ subTotal?: number; totalAmount?: number; createdAt?: string; deliveredAt?: string }>,
   now: Date = new Date()
@@ -71,7 +54,6 @@ export function calculateCustomerTier(
     };
   }
 
-  // Find the date of the very first completed order
   const sorted = [...completedOrders].sort((a, b) => {
     const tA = new Date(a.deliveredAt || a.createdAt || 0).getTime();
     const tB = new Date(b.deliveredAt || b.createdAt || 0).getTime();
@@ -90,7 +72,6 @@ export function calculateCustomerTier(
   const cycleEnd = new Date(cycleStart.getTime() + cycleMs);
   const daysRemaining = Math.max(0, Math.ceil((cycleEnd.getTime() - currentTimestamp) / (24 * 60 * 60 * 1000)));
 
-  // Calculate items purchased amount (subTotal) strictly in current cycle
   let cycleItemsSpend = 0;
   for (const ord of completedOrders) {
     const ordDate = new Date(ord.deliveredAt || ord.createdAt || 0).getTime();
@@ -99,12 +80,6 @@ export function calculateCustomerTier(
     }
   }
 
-  // Tiers threshold
-  // Titanium: >= ₱25,000
-  // Platinum: >= ₱20,000
-  // Gold:     >= ₱15,000
-  // Bronze:   >= ₱10,000
-  // Silver:   >= ₱5,000
   let tier: CustomerTierInfo['tier'] = 'Member';
   let nextTier: string | null = 'Silver';
   let amountNeeded = 5000 - cycleItemsSpend;
@@ -150,82 +125,79 @@ export function calculateCustomerTier(
   };
 }
 
-/**
- * Checks and credits any matured referral points (30 minutes after order Delivered/Completed).
- * Safe to call idempotently.
- */
 export async function processMaturedReferrals(): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+  const supabase = getSupabaseAdmin()!;
   try {
-    const ordersCol = collection(db, 'orders');
-    const q = query(ordersCol, where('referralPointsStatus', '==', 'pending_30m'));
-    const snap = await getDocs(q);
-
-    if (snap.empty) return 0;
-
     const nowIso = new Date().toISOString();
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('referral_points_status', 'pending_30m');
+
+    if (error || !orders || orders.length === 0) return 0;
+
     let processedCount = 0;
-
-    for (const ordDoc of snap.docs) {
-      const ordData = ordDoc.data();
-      const creditAfter = ordData.referralPointsCreditAfter;
-
+    for (const ord of orders) {
+      const creditAfter = ord.referral_points_credit_after;
       if (creditAfter && creditAfter <= nowIso) {
-        const refereeId = ordData.referredByUserId;
-        const refereeMemberId = ordData.referredByMemberId;
+        const refereeId = ord.referred_by_user_id;
+        const refereeMemberId = ord.referred_by_member_id;
 
-        // Locate referee user doc
-        let refereeUserDocId: string | null = refereeId || null;
-        if (!refereeUserDocId && refereeMemberId) {
-          const userQ = query(collection(db, 'users'), where('primeMemberId', '==', refereeMemberId));
-          const uSnap = await getDocs(userQ);
-          if (!uSnap.empty) {
-            refereeUserDocId = uSnap.docs[0].id;
-          }
+        let refereeCustomerId: string | null = refereeId || null;
+        if (!refereeCustomerId && refereeMemberId) {
+          const { data: cust } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('prime_member_id', refereeMemberId)
+            .single();
+          if (cust) refereeCustomerId = cust.id;
         }
 
-        if (refereeUserDocId) {
-          const targetRef = refereeUserDocId;
-          await runTransaction(db, async (txn) => {
-            const uRef = doc(db, 'users', targetRef);
-            const uSnap = await txn.get(uRef);
-            if (uSnap.exists()) {
-              const uData = uSnap.data();
-              const currentRefPts = Number(uData.referralPoints || 0);
-              const lifetimeRefPts = Number(uData.lifetimeReferralPoints || 0);
-              const newRefPts = currentRefPts + 50;
+        if (refereeCustomerId) {
+          const { data: custData } = await supabase
+            .from('customers')
+            .select('points, lifetime_referral_points')
+            .eq('id', refereeCustomerId)
+            .single();
 
-              txn.update(uRef, {
-                referralPoints: newRefPts,
-                lifetimeReferralPoints: lifetimeRefPts + 50,
-                updatedAt: new Date().toISOString()
-              });
+          if (custData) {
+            const currentPts = Number(custData.points || 0);
+            const lifetimeRef = Number(custData.lifetime_referral_points || 0);
 
-              const txId = `tx-ref-${ordDoc.id}-${Date.now()}`;
-              const txRef = doc(db, 'point_transactions', txId);
-              txn.set(txRef, {
-                userId: targetRef,
-                type: 'referral',
-                amount: 50,
-                orderId: ordDoc.id,
-                orderNumber: ordData.orderNumber || ordDoc.id,
-                description: `50 Referral Points for Order #${ordData.orderNumber || ordDoc.id} by ${ordData.customerName || 'Referred Friend'}`,
-                referredCustomerId: ordData.customerId || ordData.tgUserId || '',
-                referredCustomerName: ordData.customerName || 'Friend',
-                createdAt: new Date().toISOString()
-              });
+            await supabase
+              .from('customers')
+              .update({
+                points: currentPts + 50,
+                lifetime_referral_points: lifetimeRef + 50,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', refereeCustomerId);
 
-              txn.update(ordDoc.ref, {
-                referralPointsStatus: 'credited',
-                referralPointsCreditedAt: new Date().toISOString(),
-                referralPointsAmount: 50
-              });
-            }
-          });
-          processedCount++;
+            await supabase.from('point_transactions').insert([{
+              id: `tx-ref-${ord.id}-${Date.now()}`,
+              user_id: refereeCustomerId,
+              type: 'referral',
+              amount: 50,
+              order_id: ord.id,
+              description: `50 Referral Points for Order #${ord.order_number}`,
+              created_at: new Date().toISOString()
+            }]);
+
+            await supabase
+              .from('orders')
+              .update({
+                referral_points_status: 'credited',
+                referral_points_credited_at: new Date().toISOString(),
+                referral_points_amount: 50
+              })
+              .eq('id', ord.id);
+
+            processedCount++;
+          }
         }
       }
     }
-
     return processedCount;
   } catch (err) {
     console.error('Error processing matured referrals:', err);

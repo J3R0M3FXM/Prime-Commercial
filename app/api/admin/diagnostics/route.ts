@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, limit, query } from "firebase/firestore";
+import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 
 export interface DiagnosticItem {
   id: string;
@@ -62,7 +61,7 @@ export async function GET(req: NextRequest) {
           category: "telegram",
           status: "degraded",
           latencyMs: latency,
-          message: `Telegram returned: ${data.description || "Authentication failure (code " + data.error_code + ")"}`,
+          message: `Telegram returned: ${data.description || "Authentication failure"}`,
           details: { errorCode: data.error_code, description: data.description },
           lastChecked: timestamp,
         });
@@ -173,7 +172,7 @@ export async function GET(req: NextRequest) {
           category: "location",
           status: "operational",
           latencyMs: latency,
-          message: `IP Lookup operational (${data.country || "Global"}, ISP: ${data.company?.name || data.asn?.name || "Google"})`,
+          message: `IP Lookup operational (${data.country || "Global"})`,
           details: {
             country: data.country,
             city: data.city,
@@ -206,11 +205,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 4. Database (Firestore)
+  // 4. Database (Supabase PostgreSQL)
   const dbStart = performance.now();
   try {
-    const testQuery = query(collection(db, "products"), limit(1));
-    const snap = await getDocs(testQuery);
+    if (!isSupabaseConfigured()) throw new Error("Supabase not configured");
+    const supabase = getSupabaseAdmin()!;
+    const { count, error } = await supabase.from('products').select('*', { count: 'exact', head: true });
+    if (error) throw error;
     const dbLatency = Math.round(performance.now() - dbStart);
     results.push({
       id: "database",
@@ -218,10 +219,9 @@ export async function GET(req: NextRequest) {
       category: "infrastructure",
       status: "operational",
       latencyMs: dbLatency,
-      message: `Cloud Firestore connection active & healthy (${snap.size} sample docs read)`,
+      message: `Supabase PostgreSQL connection active & healthy (${count || 0} products)`,
       details: {
-        engine: "Google Cloud Firestore",
-        databaseId: (db as any)._databaseId?.database || "default",
+        engine: "Supabase PostgreSQL",
       },
       lastChecked: timestamp,
     });
@@ -233,12 +233,12 @@ export async function GET(req: NextRequest) {
       category: "infrastructure",
       status: "error",
       latencyMs: dbLatency,
-      message: `Firestore connection error: ${err.message}`,
+      message: `Supabase connection error: ${err.message}`,
       lastChecked: timestamp,
     });
   }
 
-  // 5. Server (Next.js Application Engine)
+  // 5. Server
   const serverUptimeSeconds = Math.round(process.uptime());
   const memUsage = process.memoryUsage();
   const heapUsedMb = Math.round(memUsage.heapUsed / 1024 / 1024);
@@ -260,153 +260,6 @@ export async function GET(req: NextRequest) {
     },
     lastChecked: timestamp,
   });
-
-  // 6. Storage (Firebase Storage & Cloud Object Asset Service)
-  const storageBucket =
-    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    process.env.FIREBASE_STORAGE_BUCKET ||
-    "perfect-buttress-4dzcr.firebasestorage.app";
-  const storageStart = performance.now();
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-    const storageRes = await fetch(`https://firebasestorage.googleapis.com/v0/b/${storageBucket}`, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    });
-    clearTimeout(timeout);
-    const storageLatency = Math.round(performance.now() - storageStart);
-
-    // Google Cloud Storage returns 200, 401, or 403 when reachable (which verifies bucket endpoint presence)
-    if (storageRes.status < 500) {
-      results.push({
-        id: "storage",
-        name: "Storage",
-        category: "infrastructure",
-        status: "operational",
-        latencyMs: storageLatency,
-        message: `Bucket endpoint reachable (${storageBucket})`,
-        details: { bucket: storageBucket, httpStatus: storageRes.status },
-        lastChecked: timestamp,
-      });
-    } else {
-      results.push({
-        id: "storage",
-        name: "Storage",
-        category: "infrastructure",
-        status: "degraded",
-        latencyMs: storageLatency,
-        message: `Storage returned HTTP status ${storageRes.status}`,
-        lastChecked: timestamp,
-      });
-    }
-  } catch (err: any) {
-    const storageLatency = Math.round(performance.now() - storageStart);
-    results.push({
-      id: "storage",
-      name: "Storage",
-      category: "infrastructure",
-      status: "degraded",
-      latencyMs: storageLatency,
-      message: `Endpoint ping error: ${err.message}`,
-      lastChecked: timestamp,
-    });
-  }
-
-  // 7. Vercel (Edge Network & API Gateway)
-  const vercelStart = performance.now();
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch("https://api.vercel.com", {
-      method: "HEAD",
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    const vercelLatency = Math.round(performance.now() - vercelStart);
-    if (res.ok || res.status < 500) {
-      results.push({
-        id: "vercel",
-        name: "Vercel",
-        category: "deployment",
-        status: "operational",
-        latencyMs: vercelLatency,
-        message: "Vercel Global Edge & API Gateway operational",
-        details: { httpStatus: res.status },
-        lastChecked: timestamp,
-      });
-    } else {
-      results.push({
-        id: "vercel",
-        name: "Vercel",
-        category: "deployment",
-        status: "degraded",
-        latencyMs: vercelLatency,
-        message: `Vercel Gateway responded with status ${res.status}`,
-        lastChecked: timestamp,
-      });
-    }
-  } catch (err: any) {
-    const vercelLatency = Math.round(performance.now() - vercelStart);
-    results.push({
-      id: "vercel",
-      name: "Vercel",
-      category: "deployment",
-      status: "error",
-      latencyMs: vercelLatency,
-      message: err.name === "AbortError" ? "Connection timed out (3.5s)" : err.message,
-      lastChecked: timestamp,
-    });
-  }
-
-  // 8. GitHub (API & Remote Repository Services)
-  const ghStart = performance.now();
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch("https://api.github.com", {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "PRIME-System-Diagnostics",
-        Accept: "application/vnd.github.v3+json",
-      },
-    });
-    clearTimeout(timeout);
-    const ghLatency = Math.round(performance.now() - ghStart);
-    if (res.ok) {
-      results.push({
-        id: "github",
-        name: "GitHub",
-        category: "deployment",
-        status: "operational",
-        latencyMs: ghLatency,
-        message: "GitHub API & Version Control Services operational",
-        details: { httpStatus: res.status },
-        lastChecked: timestamp,
-      });
-    } else {
-      results.push({
-        id: "github",
-        name: "GitHub",
-        category: "deployment",
-        status: "degraded",
-        latencyMs: ghLatency,
-        message: `GitHub responded with status ${res.status}`,
-        lastChecked: timestamp,
-      });
-    }
-  } catch (err: any) {
-    const ghLatency = Math.round(performance.now() - ghStart);
-    results.push({
-      id: "github",
-      name: "GitHub",
-      category: "deployment",
-      status: "error",
-      latencyMs: ghLatency,
-      message: err.name === "AbortError" ? "Connection timed out (3.5s)" : err.message,
-      lastChecked: timestamp,
-    });
-  }
 
   return NextResponse.json({
     timestamp,

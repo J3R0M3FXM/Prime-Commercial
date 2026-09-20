@@ -245,7 +245,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         )}
 
         {/* Cart Items */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+        <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
           {safeCart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-3 py-12">
               <ShoppingCart className="w-12 h-12 opacity-20" />
@@ -261,17 +261,17 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             safeCart.map((item: any) => {
               if (!item || !item.id) return null;
               return (
-                <div key={item.id} className="flex gap-2.5 p-2 bg-gray-50 rounded-lg border border-gray-100 items-center">
+                <div key={item.id} className="flex gap-2 p-1.5 bg-gray-50 rounded-lg border border-gray-100 items-center">
                   <input 
                     type="checkbox" 
                     checked={item.selected !== false}
                     onChange={(e) => toggleSelection && toggleSelection(item.id, e.target.checked)}
-                    className="w-4 h-4 cursor-pointer accent-black shrink-0"
+                    className="w-3.5 h-3.5 cursor-pointer accent-black shrink-0"
                   />
                   <img 
                     src={item.imageUrl || "https://picsum.photos/seed/prime/100"} 
                     alt={item.name || "Item"} 
-                    className="w-12 h-12 object-cover rounded-md bg-white border border-gray-200 shrink-0"
+                    className="w-10 h-10 object-cover rounded-md bg-white border border-gray-200 shrink-0"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src = "https://picsum.photos/seed/prime/100";
                     }}
@@ -279,19 +279,19 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                   <div className="flex-1 min-w-0 flex flex-col justify-between">
                     <div className="flex justify-between items-start gap-1">
                       <div className="min-w-0">
-                        <h3 className="font-heading font-normal uppercase text-gray-900 line-clamp-1 text-xs">{item.name || "Product"}</h3>
-                        <p className="text-xs font-bold text-gray-800 font-mono mt-0.5">{formatPHP(item.price || 0)}</p>
+                        <h3 className="font-heading font-normal uppercase text-gray-900 line-clamp-1 text-[11px]">{item.name || "Product"}</h3>
+                        <p className="text-[11px] font-bold text-gray-800 font-mono mt-0.5">{formatPHP(item.price || 0)}</p>
                       </div>
                       <button 
                         onClick={() => removeFromCart && removeFromCart(item.id)}
                         className="p-1 text-gray-400 hover:text-red-500 transition-colors cursor-pointer shrink-0"
                         title="Remove item"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                     
-                    <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex items-center gap-2 mt-1">
                       <div className="flex items-center border border-gray-200 rounded bg-white">
                         <button 
                           className="px-1.5 py-0.5 text-gray-500 hover:text-black hover:bg-gray-50 cursor-pointer"
@@ -299,7 +299,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                         >
                           <Minus className="w-2.5 h-2.5" />
                         </button>
-                        <span className="text-xs font-mono font-bold w-6 text-center">{item.quantity || 1}</span>
+                        <span className="text-[11px] font-mono font-bold w-5 text-center">{item.quantity || 1}</span>
                         <button 
                           className="px-1.5 py-0.5 text-gray-500 hover:text-black hover:bg-gray-50 cursor-pointer"
                           onClick={() => updateQuantity && updateQuantity(item.id, (item.quantity || 1) + 1)}

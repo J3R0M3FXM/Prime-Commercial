@@ -27,9 +27,9 @@ export default function LiveHeaderClock() {
 
   if (!mounted) {
     return (
-      <div className="flex flex-col justify-between h-7 sm:h-[28px] text-right select-none shrink-0" id="live-clock-placeholder" style={{ width: '135px' }}>
-        <div className="text-[11px] sm:text-[12px] font-mono font-bold text-gray-300 tracking-tight leading-none h-3 bg-gray-100 rounded animate-pulse w-28 ml-auto" />
-        <div className="text-[8px] sm:text-[8.5px] font-mono font-bold text-slate-400 tracking-[0.025em] leading-none whitespace-nowrap">
+      <div className="flex flex-col justify-center h-7 sm:h-[28px] text-right select-none shrink-0" id="live-clock-placeholder">
+        <div className="text-[12.5px] sm:text-[13.5px] font-mono font-bold text-gray-300 h-3.5 bg-gray-100 rounded animate-pulse w-36 ml-auto mb-1" />
+        <div className="text-[8.5px] sm:text-[9px] font-mono font-bold text-slate-400 tracking-[0.14em]">
           SECURED CUSTOMER ACCESS
         </div>
       </div>
@@ -37,11 +37,11 @@ export default function LiveHeaderClock() {
   }
 
   return (
-    <div className="flex flex-col justify-between h-7 sm:h-[28px] text-right select-none shrink-0" id="live-clock-container" style={{ width: '135px' }}>
-      <div className="text-[11px] sm:text-[12px] font-mono font-bold text-slate-700 tracking-[-0.01em] leading-none whitespace-nowrap">
+    <div className="flex flex-col justify-center h-7 sm:h-[28px] text-right select-none shrink-0" id="live-clock-container">
+      <div className="text-[12.5px] sm:text-[13.5px] font-mono font-bold text-slate-800 tracking-tight leading-none mb-0.5 whitespace-nowrap">
         {timeStr}
       </div>
-      <div className="text-[8px] sm:text-[8.5px] font-mono font-bold text-slate-400 tracking-[0.025em] leading-none whitespace-nowrap">
+      <div className="text-[8.5px] sm:text-[9px] font-mono font-bold text-slate-400 tracking-[0.14em] leading-none whitespace-nowrap">
         SECURED CUSTOMER ACCESS
       </div>
     </div>

@@ -1,8 +1,6 @@
-// app/api/media/stream/[fileId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getTelegramFilePath, getTelegramDownloadUrl, getTelegramBotToken } from '@/lib/telegram-media';
-import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { getTelegramFilePath, getTelegramDownloadUrl } from '@/lib/telegram-media';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,28 +15,28 @@ export async function GET(
     }
 
     let targetStreamUrl = '';
-    let isTelegram = false;
 
-    // 1. Check if fileId is actually a Firestore document ID
     try {
-      const docSnap = await getDoc(doc(db, 'videos', fileId));
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.telegramFileId) {
-          const tgInfo = await getTelegramFilePath(data.telegramFileId);
-          if (tgInfo.success && tgInfo.filePath) {
-            targetStreamUrl = getTelegramDownloadUrl(tgInfo.filePath);
-            isTelegram = true;
+      if (isSupabaseConfigured()) {
+        const supabase = getSupabaseAdmin()!;
+        const { data } = await supabase.from('videos').select('*').eq('id', fileId).single();
+        if (data) {
+          const telegramFileId = data.telegram_file_id || data.telegramFileId;
+          const directUrl = data.direct_url || data.directUrl;
+          if (telegramFileId) {
+            const tgInfo = await getTelegramFilePath(telegramFileId);
+            if (tgInfo.success && tgInfo.filePath) {
+              targetStreamUrl = getTelegramDownloadUrl(tgInfo.filePath);
+            }
+          } else if (directUrl) {
+            targetStreamUrl = directUrl;
           }
-        } else if (data.directUrl) {
-          targetStreamUrl = data.directUrl;
         }
       }
     } catch {
       // Not a doc ID, continue
     }
 
-    // 2. If not resolved from doc ID, check if it's a direct Telegram File ID
     if (!targetStreamUrl) {
       if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
         targetStreamUrl = decodeURIComponent(fileId);
@@ -46,7 +44,6 @@ export async function GET(
         const tgInfo = await getTelegramFilePath(fileId);
         if (tgInfo.success && tgInfo.filePath) {
           targetStreamUrl = getTelegramDownloadUrl(tgInfo.filePath);
-          isTelegram = true;
         } else {
           return new NextResponse(
             `Unable to locate video on Telegram: ${tgInfo.error || 'Invalid file ID'}`,
@@ -56,10 +53,9 @@ export async function GET(
       }
     }
 
-    // 3. Prepare headers and forward Range request for smooth seeking
     const rangeHeader = request.headers.get('range');
     const proxyHeaders: Record<string, string> = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      'User-Agent': 'Mozilla/5.0'
     };
     if (rangeHeader) {
       proxyHeaders['Range'] = rangeHeader;
@@ -76,20 +72,15 @@ export async function GET(
       );
     }
 
-    // Build client response headers
     const responseHeaders = new Headers();
     responseHeaders.set('Content-Type', videoResponse.headers.get('Content-Type') || 'video/mp4');
     responseHeaders.set('Accept-Ranges', 'bytes');
     
     const contentLength = videoResponse.headers.get('Content-Length');
-    if (contentLength) {
-      responseHeaders.set('Content-Length', contentLength);
-    }
+    if (contentLength) responseHeaders.set('Content-Length', contentLength);
     
     const contentRange = videoResponse.headers.get('Content-Range');
-    if (contentRange) {
-      responseHeaders.set('Content-Range', contentRange);
-    }
+    if (contentRange) responseHeaders.set('Content-Range', contentRange);
 
     responseHeaders.set('Cache-Control', 'public, max-age=3600, s-maxage=3600');
 
