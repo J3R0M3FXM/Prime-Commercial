@@ -21,7 +21,8 @@ export async function POST(request: Request) {
     const isDefault = data.isDefault === true;
 
     if (isDefault) {
-      await supabase.from('warehouses').update({ is_default: false }).neq('id', '0');
+      const { error: clearDefaultError } = await supabase.from('warehouses').update({ is_default: false }).neq('id', '0');
+      if (clearDefaultError) throw clearDefaultError;
     }
 
     const payload = {
@@ -56,7 +57,8 @@ export async function PUT(request: Request) {
 
     const isDefault = data.isDefault === true;
     if (isDefault) {
-      await supabase.from('warehouses').update({ is_default: false }).neq('id', id);
+      const { error: clearDefaultError } = await supabase.from('warehouses').update({ is_default: false }).neq('id', id);
+      if (clearDefaultError) throw clearDefaultError;
     }
 
     const payload = {
