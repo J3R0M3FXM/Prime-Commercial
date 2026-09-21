@@ -457,7 +457,7 @@ export default function Shopfront() {
           setIsAccountOpen(false);
           setIsOrderHistoryOpen(true);
         }}
-      />
+      />}
 
       {/* Free Video Gallery Modal (Telegram Cloud) */}
       {activeTab === "media" && <VideoGalleryModal
