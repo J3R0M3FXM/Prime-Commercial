@@ -1667,6 +1667,8 @@ export default function CheckoutModal({
 
 
 
+              </div>
+
               {/* Side-by-Side Voucher (Left) and Referral (Right) Code Inputs */}
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 {/* Voucher / Promo Code (Left) */}
@@ -1935,8 +1937,6 @@ export default function CheckoutModal({
                 </div>
               </div>
 
-
-              </div>
               {/* Optional Notes */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 font-heading">
