@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTelegramInitData } from '@/lib/telegram-init-data';
-import { verifyTelegramInitData } from '@/lib/telegram-init-data';
 
 const PUBLIC = new Set(['/api/auth/telegram/validate', '/api/admin/auth']);
 const MAX_AGE = 86400;
@@ -54,6 +53,71 @@ async function getTelegramSessionKey() {
     false,
     ['sign']
   );
+}
+
+async function verifyTelegramInitData(initData: string | undefined) {
+  try {
+    const raw = typeof initData === 'string' ? initData.trim() : '';
+    const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+    if (!raw || !botToken) return null;
+
+    const params = new URLSearchParams(raw);
+    const hash = params.get('hash')?.toLowerCase() || '';
+    params.delete('hash');
+    if (!/^[0-9a-f]{64}$/.test(hash)) return null;
+
+    const dataCheckString = Array.from(params.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}=${value}`)
+      .join('\\n');
+
+    const secretKey = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode('WebAppData'),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const telegramSecret = await crypto.subtle.sign(
+      'HMAC',
+      secretKey,
+      new TextEncoder().encode(botToken)
+    );
+    const telegramKey = await crypto.subtle.importKey(
+      'raw',
+      telegramSecret,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const calculated = new Uint8Array(await crypto.subtle.sign(
+      'HMAC',
+      telegramKey,
+      new TextEncoder().encode(dataCheckString)
+    ));
+    let calculatedHex = '';
+    for (let i = 0; i < calculated.length; i++) {
+      calculatedHex += calculated[i].toString(16).padStart(2, '0');
+    }
+    if (calculatedHex !== hash) return null;
+
+    const authDate = Number(params.get('auth_date') || 0);
+    const now = Math.floor(Date.now() / 1000);
+    if (!Number.isSafeInteger(authDate) || authDate <= 0 || authDate > now + 300 || now - authDate > 86400) {
+      return null;
+    }
+
+    const user = JSON.parse(params.get('user') || '{}');
+    const tgUserId = user?.id != null ? String(user.id) : '';
+    if (!/^[0-9]+$/.test(tgUserId)) return null;
+
+    return {
+      tgUserId,
+      isAdmin: Boolean(process.env.ADMIN_TELEGRAM_USER_ID?.trim() && tgUserId === process.env.ADMIN_TELEGRAM_USER_ID.trim()),
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function verifyAdminSession(value: string | undefined) {
