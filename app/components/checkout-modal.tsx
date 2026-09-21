@@ -1103,9 +1103,9 @@ export default function CheckoutModal({
   if (!isOpen) return null;
 
   return (
-    <div ref={overlayRef} className="w-full flex justify-center bg-gray-50 py-3 sm:py-5">
+    <div ref={overlayRef} className="w-full bg-gray-50 flex justify-center py-3 sm:py-5">
       <div 
-        className="w-full max-w-[760px] min-h-[calc(100vh-120px)] bg-white shadow-sm border-x border-slate-200 overflow-hidden flex flex-col"
+        className="bg-white w-full max-w-[760px] rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
       >
