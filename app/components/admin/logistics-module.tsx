@@ -49,6 +49,7 @@ export default function LogisticsModule() {
   const [whLon, setWhLon] = useState<number | null>(120.9842);
   const [isDefaultWh, setIsDefaultWh] = useState(false);
   const [isSavingWh, setIsSavingWh] = useState(false);
+  const [warehouseError, setWarehouseError] = useState<string | null>(null);
   
   // Autocomplete State
   const [searchQuery, setSearchQuery] = useState("");
@@ -243,11 +244,15 @@ export default function LogisticsModule() {
 
   const fetchWarehouses = async () => {
     try {
-      const res = await fetch("/api/admin/warehouses");
-      const data = await res.json();
-      setWarehouses(data || []);
-    } catch (e) {
-      console.error(e);
+      const res = await fetch("/api/admin/warehouses", { cache: "no-store" });
+      const data = await res.json().catch(() => []);
+      if (!res.ok) throw new Error(data?.error || `Failed to load warehouses (HTTP ${res.status})`);
+      if (!Array.isArray(data)) throw new Error("Invalid warehouse response from server");
+      setWarehouses(data);
+    } catch (e: any) {
+      console.error("Load warehouses error:", e);
+      setWarehouseError(e.message || "Failed to load warehouses.");
+      setWarehouses([]);
     } finally {
       setLoadingWarehouses(false);
     }
@@ -255,11 +260,15 @@ export default function LogisticsModule() {
 
   const fetchCouriers = async () => {
     try {
-      const res = await fetch("/api/admin/couriers");
-      const data = await res.json();
-      setCouriers(data || []);
-    } catch (e) {
-      console.error(e);
+      const res = await fetch("/api/admin/couriers", { cache: "no-store" });
+      const data = await res.json().catch(() => []);
+      if (!res.ok) throw new Error(data?.error || `Failed to load couriers (HTTP ${res.status})`);
+      if (!Array.isArray(data)) throw new Error("Invalid courier response from server");
+      setCouriers(data);
+    } catch (e: any) {
+      console.error("Load couriers error:", e);
+      setCourierError(e.message || "Failed to load couriers.");
+      setCouriers([]);
     } finally {
       setLoadingCouriers(false);
     }
@@ -321,11 +330,13 @@ export default function LogisticsModule() {
     setIsDefaultWh(false);
     setSearchQuery("");
     setEditingWarehouse(null);
+    setWarehouseError(null);
   };
 
   const saveWarehouse = async () => {
     if (!whName || !whAddress || !whLat || !whLon) return;
     setIsSavingWh(true);
+    setWarehouseError(null);
     try {
       const formData = {
         name: whName,
@@ -349,8 +360,9 @@ export default function LogisticsModule() {
       await fetchWarehouses();
       setShowWarehouseModal(false);
       resetWarehouseForm();
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("Save warehouse error:", e);
+      setWarehouseError(e.message || "Failed to save warehouse. Please try again.");
     } finally {
       setIsSavingWh(false);
     }
@@ -359,10 +371,13 @@ export default function LogisticsModule() {
   const deleteWarehouse = async (id: string) => {
     if (!confirm("Delete this warehouse?")) return;
     try {
-      await fetch(`/api/admin/warehouses?id=${id}`, { method: "DELETE" });
-      fetchWarehouses();
-    } catch (e) {
-      console.error(e);
+      const res = await fetch(`/api/admin/warehouses?id=${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Failed to delete warehouse (HTTP ${res.status})`);
+      await fetchWarehouses();
+    } catch (e: any) {
+      console.error("Delete warehouse error:", e);
+      setWarehouseError(e.message || "Failed to delete warehouse. Please try again.");
     }
   };
 
@@ -406,6 +421,13 @@ export default function LogisticsModule() {
               <Plus className="w-4 h-4" /> Add Warehouse
             </button>
           </div>
+
+          {warehouseError && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{warehouseError}</span>
+            </div>
+          )}
 
           {loadingWarehouses ? (
             <div className="flex items-center justify-center py-12">
@@ -487,6 +509,13 @@ export default function LogisticsModule() {
               <Plus className="w-4 h-4" /> Add Courier
             </button>
           </div>
+
+          {courierError && !showCourierModal && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{courierError}</span>
+            </div>
+          )}
 
           {loadingCouriers ? (
             <div className="flex items-center justify-center py-12">
