@@ -1237,7 +1237,7 @@ export default function AdminPage() {
   const handleSimulateOrder = async (customerId: string, customerName: string, primeMemberId: string) => {
     try {
       const sampleItem = products[0] || { id: "item-1", name: "PRIME Special Drop", price: 99 };
-      const res = await fetch("/api/orders", {
+      const res = await fetch("/api/admin/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1541,7 +1541,7 @@ export default function AdminPage() {
         status: "Pending"
       };
 
-      const res = await fetch("/api/orders", {
+      const res = await fetch("/api/admin/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -1768,7 +1768,7 @@ export default function AdminPage() {
       const data = await res.json();
       if (res.ok && data.success && data.analysis) {
         // Persist analysis to the order in Firestore
-        await fetch("/api/orders", {
+        await fetch("/api/admin/orders", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
