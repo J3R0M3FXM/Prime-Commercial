@@ -35,10 +35,19 @@ async function getTelegramSessionKey() {
     derivationKey,
     new TextEncoder().encode(SESSION_DERIVATION_LABEL)
   );
+  // Match lib/telegram-session.ts exactly: the derived digest is encoded as
+  // base64url text and that text is then used as the HMAC key.
+  const bytes = new Uint8Array(derived);
+  let derivedBase64Url = '';
+  for (let i = 0; i < bytes.length; i++) derivedBase64Url += String.fromCharCode(bytes[i]);
+  derivedBase64Url = btoa(derivedBase64Url)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 
   return crypto.subtle.importKey(
     'raw',
-    derived,
+    new TextEncoder().encode(derivedBase64Url),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign']
