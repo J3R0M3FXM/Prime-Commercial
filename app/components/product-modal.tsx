@@ -23,10 +23,19 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [localQuantity, setLocalQuantity] = useState(1);
 
-  // Reset selection when product changes
+  // Preserve the customer's selected variant when the live product row updates.
+  // Realtime stock/configuration changes should refresh the option without resetting the UI.
   useEffect(() => {
-    setSelectedVariant(null);
-    setLocalQuantity(1);
+    setSelectedVariant((prev: any) => {
+      if (!prev) return null;
+      const live = variants.find((v: any) => String(v?.id) === String(prev.id));
+      return live || null;
+    });
+    setLocalQuantity((prev) => {
+      const liveSelected = variants.find((v: any) => String(v?.id) === String(selectedVariant?.id));
+      const liveStock = Number(liveSelected?.stock ?? 0);
+      return Math.min(Math.max(1, prev), Math.max(1, liveStock || 1));
+    });
   }, [product]);
 
   if (!product) return null;
