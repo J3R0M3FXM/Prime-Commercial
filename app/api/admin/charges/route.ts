@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       type: normalized.type,
       rate: normalized.amount,
       is_active: normalized.isActive !== false,
-      description: JSON.stringify(normalized.schedules || {}),
+      description: JSON.stringify({ ...(normalized.schedules || {}), isDefault: normalized.isDefault }),
       sort_order: 0,
     };
 
@@ -54,7 +54,7 @@ export async function PUT(request: Request) {
       type: normalized.type,
       rate: normalized.amount,
       is_active: normalized.isActive !== false,
-      description: JSON.stringify(normalized.schedules || {}),
+      description: JSON.stringify({ ...(normalized.schedules || {}), isDefault: normalized.isDefault }),
       updated_at: new Date().toISOString()
     };
 
