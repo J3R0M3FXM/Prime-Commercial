@@ -127,7 +127,8 @@ type AdminView =
   | "charges"
   | "payments"
   | "promos"
-  | "media"\n  | "automation";
+  | "media"
+  | "automation";
 
 function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promise<void> }) {
   const [accessCode, setAccessCode] = useState("");
