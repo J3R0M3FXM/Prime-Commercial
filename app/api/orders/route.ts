@@ -59,43 +59,64 @@ export async function POST(request: Request) {
     const finalMemberId = authenticatedCustomer.prime_member_id || '';
 
     const orderNumber = getOrderNumber();
-    const payload = {
+
+    // The database is the final authority for product availability and variant stock.
+    // This RPC locks each product row, validates current stock, decrements it, and
+    // inserts the order in one transaction. Frontend quantities/configuration are
+    // never trusted as the source of inventory truth.
+    const orderForInventory = {
       id: orderNumber,
-      order_number: orderNumber,
-      customer_id: resolvedCustomerId,
-      customer_name: authenticatedCustomer.tg_name || customerName || receiverName || '',
-      customer_phone: receiverPhone || '',
-      tg_user_id: String(authenticatedCustomer.tg_user_id || ''),
-      prime_member_id: finalMemberId || '',
+      customerId: resolvedCustomerId,
+      customerName: authenticatedCustomer.tg_name || customerName || receiverName || '',
+      customerPhone: receiverPhone || '',
+      tgUserId: String(authenticatedCustomer.tg_user_id || ''),
+      primeMemberId: finalMemberId || '',
       items: items || [],
       subtotal: Number(subTotal) || 0,
-      delivery_fee: Number(deliveryFee) || 0,
-      discount_amount: Number(body.discountAmount) || 0,
-      applied_promo_code: promoCode || '',
-      points_discount: Number(body.pointsDiscount) || 0,
-      charges_breakdown: appliedCharges || [],
-      total_amount: Number(totalAmount) || 0,
-      payable_now: Number(payableNow) || Number(totalAmount) || 0,
-      payable_on_delivery: Number(payableOnDelivery) || 0,
+      deliveryFee: Number(deliveryFee) || 0,
+      discountAmount: Number(body.discountAmount) || 0,
+      appliedPromoCode: promoCode || '',
+      pointsDiscount: Number(body.pointsDiscount) || 0,
+      chargesBreakdown: appliedCharges || [],
+      totalAmount: Number(totalAmount) || 0,
+      payableNow: Number(payableNow) || Number(totalAmount) || 0,
+      payableOnDelivery: Number(payableOnDelivery) || 0,
       status: 'Pending',
-      payment_status: body.paymentProofImage ? 'Pending Review' : 'Unpaid',
-      payment_method_id: body.paymentMethodId || '',
-      payment_method_name: body.paymentMethodName || '',
-      payment_proof_image: body.paymentProofImage || '',
-      ocr_analysis: body.ocrAnalysis || null,
-      review_status: 'Pending Manual Review',
-      requires_manual_review: true,
-      delivery_address: deliveryAddress || {},
-      courier_id: courier || '',
-      courier_name: body.courierName || '',
+      paymentStatus: body.paymentProofImage ? 'Pending Review' : 'Unpaid',
+      paymentMethodId: body.paymentMethodId || '',
+      paymentMethodName: body.paymentMethodName || '',
+      paymentProofImage: body.paymentProofImage || '',
+      ocrAnalysis: body.ocrAnalysis || null,
+      deliveryAddress: deliveryAddress || {},
+      courierId: courier || '',
+      courierName: body.courierName || '',
+      trackingNumber: body.trackingNumber || '',
       notes: notes || '',
-      fingerprint_snapshot: body.fingerprintSnapshot || body.deviceSnapshot || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      fingerprintSnapshot: body.fingerprintSnapshot || body.deviceSnapshot || null,
     };
 
-    const { error } = await supabase.from('orders').insert([payload]);
-    if (error) throw error;
+    const { data: inventoryOrder, error: inventoryError } = await supabase.rpc(
+      'create_order_with_inventory',
+      {
+        p_order: orderForInventory,
+        p_order_number: orderNumber,
+      }
+    );
+
+    if (inventoryError) {
+      console.error('Atomic inventory/order validation failed:', inventoryError);
+      const status = inventoryError.code === 'P0002' ? 409 : 500;
+      return NextResponse.json(
+        { error: inventoryError.message || 'Inventory validation failed. Please refresh and try again.' },
+        {
+          status,
+          headers: {
+            'Cache-Control': 'no-store',
+            'Pragma': 'no-cache',
+          },
+        }
+      );
+    }
 
     cacheStore.invalidateOrders();
 
