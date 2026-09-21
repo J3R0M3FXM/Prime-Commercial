@@ -164,7 +164,6 @@ export async function POST(request: Request) {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 400 });
     }
-    const supabase = getSupabaseAdmin()!;
     const auth = await getAuthenticatedCustomer(request);
     if (auth.error || !auth.customer) {
       return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
