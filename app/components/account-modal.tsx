@@ -60,6 +60,59 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
   // Referrals view modal
   const [showReferralsList, setShowReferralsList] = useState(false);
 
+  const getLiveTelegramInitData = () => {
+    if (typeof window === 'undefined') return '';
+    const webApp = (window as any).Telegram?.WebApp;
+    return typeof webApp?.initData === 'string' ? webApp.initData.trim() : '';
+  };
+
+  const bootstrapTelegramSession = async () => {
+    const initData = getLiveTelegramInitData();
+    if (!initData) throw new Error('Telegram authentication required. Please reopen PRIME from Telegram.');
+
+    const response = await fetch('/api/auth/telegram/validate', {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Unable to restore Telegram session.');
+    }
+
+    const sessionCheck = await fetch('/api/auth/telegram/validate', {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    const session = await sessionCheck.json().catch(() => ({}));
+    if (!sessionCheck.ok || !session.authenticated || !session.sessionReady) {
+      throw new Error('Telegram session could not be restored. Please reopen PRIME from Telegram.');
+    }
+  };
+
+  const authenticatedFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    let response = await fetch(input, {
+      ...init,
+      credentials: 'include',
+      cache: 'no-store',
+    });
+
+    if (response.status === 401) {
+      await bootstrapTelegramSession();
+      response = await fetch(input, {
+        ...init,
+        credentials: 'include',
+        cache: 'no-store',
+      });
+    }
+
+    return response;
+  };
+
   const fetchAccount = async () => {
     try {
       setLoading(true);
@@ -90,7 +143,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
       if (customerId) params.set('customerId', customerId);
       if (primeMemberId) params.set('primeMemberId', primeMemberId);
 
-      const res = await fetch(`/api/account?${params.toString()}`);
+      const res = await authenticatedFetch(`/api/account?${params.toString()}`);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Failed to load account profile');
@@ -130,7 +183,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
     if (!convertAmount || Number(convertAmount) <= 0) return;
     try {
       setConverting(true);
-      const res = await fetch('/api/account/points/convert', {
+      const res = await authenticatedFetch('/api/account/points/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,7 +212,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
 
     try {
       setTransferring(true);
-      const res = await fetch('/api/account/points/transfer', {
+      const res = await authenticatedFetch('/api/account/points/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -202,7 +255,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
 
       try {
         setUploadingPhoto(true);
-        const res = await fetch('/api/account', {
+        const res = await authenticatedFetch('/api/account', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
