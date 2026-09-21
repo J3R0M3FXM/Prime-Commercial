@@ -97,7 +97,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
       // Fetch Active Charges Fresh with No Cache
       setLoadingCharges(true);
-      fetch(`/api/admin/charges?_t=${Date.now()}`, {
+      fetch(`/api/charges?_t=${Date.now()}`, {
         cache: "no-store",
         headers: { "Pragma": "no-cache" }
       })
