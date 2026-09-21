@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    const auth = await getAuthenticatedCustomer(request);
+    if (auth.error || !auth.customer) {
+      return NextResponse.json({ valid: false, error: auth.error || 'Telegram authentication required' }, { status: 401 });
+    }
+
     const body = await request.json();
-    const { referralCode, customerId, customerMemberId } = body;
+    const { referralCode } = body;
+    const customerId = auth.customer.id;
+    const customerMemberId = auth.customer.prime_member_id || '';
 
     const cleanCode = String(referralCode || '').trim().toUpperCase();
     if (!cleanCode) {
