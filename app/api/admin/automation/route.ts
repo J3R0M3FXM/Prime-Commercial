@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyAdminRequest } from '@/lib/admin-session';
-import { createAutomationFlow, deleteAutomationFlow, getAutomationFlows, getAutomationSettings, updateAutomationFlow, updateAutomationSettings } from '@/lib/telegram-automation';
+import { createAutomationFlow, deleteAutomationFlow, getAutomationChats, getAutomationFlows, getAutomationSettings, setAutomationChatPaused, updateAutomationFlow, updateAutomationSettings } from '@/lib/telegram-automation';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,8 +11,8 @@ function unauthorized() {
 export async function GET(request: Request) {
   if (!verifyAdminRequest(request)) return unauthorized();
   try {
-    const [settings, flows] = await Promise.all([getAutomationSettings(), getAutomationFlows()]);
-    return NextResponse.json({ settings, flows });
+    const [settings, flows, chats] = await Promise.all([getAutomationSettings(), getAutomationFlows(), getAutomationChats()]);
+    return NextResponse.json({ settings, flows, chats });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Failed to load automation settings.' }, { status: 500 });
   }
@@ -34,6 +34,10 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json();
     if (body.type === 'settings') return NextResponse.json(await updateAutomationSettings(body));
+    if (body.type === 'chat_pause') {
+      if (!body.businessConnectionId || body.chatId === undefined) return NextResponse.json({ error: 'Business connection and chat ID are required.' }, { status: 400 });
+      return NextResponse.json(await setAutomationChatPaused(String(body.businessConnectionId), Number(body.chatId), Boolean(body.paused)));
+    }
     if (!body.id) return NextResponse.json({ error: 'Automation ID is required.' }, { status: 400 });
     const { id, type, ...updates } = body;
     return NextResponse.json(await updateAutomationFlow(id, updates));
