@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { cacheStore } from '@/lib/cache';
 import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
+import { notifyOrderCreated, notifyPaymentUpdated } from '@/lib/telegram-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,6 +98,18 @@ export async function POST(request: Request) {
     if (error) throw error;
 
     cacheStore.invalidateOrders();
+
+    // Telegram delivery is intentionally non-blocking for order persistence.
+    void notifyOrderCreated({
+      chatId: authenticatedCustomer.tg_user_id,
+      orderNumber,
+      status: payload.status,
+      customerName: payload.customer_name,
+      totalAmount: payload.total_amount,
+      payableNow: payload.payable_now,
+      items: payload.items,
+      event: 'created',
+    });
 
     return NextResponse.json({ 
       success: true, 
@@ -207,6 +220,16 @@ export async function PUT(request: Request) {
     if (error) throw error;
 
     cacheStore.invalidateOrders();
+
+    void notifyPaymentUpdated({
+      chatId: auth.customer.tg_user_id,
+      orderNumber: String(orderId),
+      status: 'Pending',
+      totalAmount: Number(data.totalAmount) || undefined,
+      paymentStatus: 'Pending Review',
+      event: 'payment',
+    });
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error updating order payment proof:', error);
