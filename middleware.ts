@@ -132,6 +132,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Video management is an Admin capability. Published gallery reads remain
+  // available to authenticated Telegram customers, while unpublished reads and
+  // all writes require the Admin Access Code session.
+  if (pathname === '/api/media/videos') {
+    const includeAll = request.nextUrl.searchParams.get('all') === 'true';
+    const adminOperation = request.method !== 'GET' || includeAll;
+    if (adminOperation) {
+      const adminSession = await verifyAdminSession(request.cookies.get('prime_admin_session')?.value);
+      if (!adminSession) {
+        return NextResponse.json({ error: 'Admin access code required' }, { status: 401 });
+      }
+      return NextResponse.next();
+    }
+  }
+
   if (!apiProtected) return NextResponse.next();
 
   const session = await verifySession(request.cookies.get('prime_telegram_session')?.value);
