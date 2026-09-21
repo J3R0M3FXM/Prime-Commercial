@@ -1212,17 +1212,22 @@ export default function AdminPage() {
 
   const handleUpdateOrderPaymentStatus = async (orderId: string, paymentStatus: string) => {
     try {
-      await fetch("/api/admin/orders", {
+      const res = await fetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: orderId, paymentStatus })
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to update payment status (HTTP ${res.status})`);
+      }
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentStatus } : o));
       if (selectedCustomerId) {
         fetchCustomerDetail(selectedCustomerId);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("Payment status update error:", e);
+      showAlert(`Failed to update payment status: ${e.message || String(e)}`, "Error", "error");
     }
   };
 
