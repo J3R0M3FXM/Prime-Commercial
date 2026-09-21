@@ -95,16 +95,27 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
   };
 
   const authenticatedFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const initData = getLiveTelegramInitData();
+    const headers = new Headers(init?.headers || {});
+    if (initData) headers.set('X-Telegram-Init-Data', initData);
+
     let response = await fetch(input, {
       ...init,
+      headers,
       credentials: 'include',
       cache: 'no-store',
     });
 
     if (response.status === 401) {
       await bootstrapTelegramSession();
+
+      const retryHeaders = new Headers(init?.headers || {});
+      const retryInitData = getLiveTelegramInitData();
+      if (retryInitData) retryHeaders.set('X-Telegram-Init-Data', retryInitData);
+
       response = await fetch(input, {
         ...init,
+        headers: retryHeaders,
         credentials: 'include',
         cache: 'no-store',
       });
