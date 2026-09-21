@@ -117,12 +117,18 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/ocr/') ||
     pathname.startsWith('/api/download') ||
     pathname.startsWith('/api/media/stream/') ||
+    pathname.startsWith('/api/storage/') ||
+    pathname === '/api/promos/validate' ||
+    pathname === '/api/referral/validate' ||
     pathname.startsWith('/api/geoapify/') ||
     pathname === '/api/products' ||
     pathname === '/api/media/videos' ||
     pathname.startsWith('/api/media/videos/') ||
     pathname === '/api/charges' ||
-    pathname === '/api/payment-methods';
+    pathname === '/api/payment-methods' ||
+    pathname === '/api/storage/' ||
+    pathname === '/api/storage';
+
 
   if (pathname.startsWith('/admin')) return NextResponse.next();
   if (PUBLIC.has(pathname)) return NextResponse.next();
