@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { findAutomationResponse, getAutomationFlows, getAutomationSettings, getAutomationChatState, recordBotMessage, recordCustomerMessage, recordHumanTakeover, saveBusinessConnection, shouldStartAutomation } from '@/lib/telegram-automation';
+import { findAutomationResponse, findWelcomeResponse, getAutomationFlows, getAutomationSettings, getAutomationChatState, recordBotMessage, recordCustomerMessage, recordHumanTakeover, saveBusinessConnection, shouldStartAutomation } from '@/lib/telegram-automation';
 
 export const dynamic = 'force-dynamic';
 const TELEGRAM_API_BASE = 'https://api.telegram.org';
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       const eligible = shouldStartAutomation(state, now);
       await recordCustomerMessage(connectionId, Number(chatId), now);
       if (!eligible) return NextResponse.json({ ok: true, matched: false, reason: 'within_24h' });
-      const result = await findAutomationResponse('message', text);
+      const result = await findWelcomeResponse() || await findAutomationResponse('message', text);
       if (!result) return NextResponse.json({ ok: true, matched: false });
       const responseText = result.flow?.responseText || result.settings.fallbackResponse;
       if (!responseText) return NextResponse.json({ ok: true, matched: false });
