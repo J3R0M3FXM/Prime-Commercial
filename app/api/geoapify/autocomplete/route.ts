@@ -30,8 +30,19 @@ export async function GET(request: Request) {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok && Array.isArray(data?.results)) {
+        const results = data.results.map((item: any) => ({
+          ...item,
+          formatted: item.formatted || item.address_line1 || item.name || '',
+          address_line1: item.address_line1 || item.formatted || item.name || '',
+          address_line2: item.address_line2 || [item.city, item.state, item.postcode, item.country]
+            .filter(Boolean)
+            .join(', '),
+          lat: Number(item.lat),
+          lon: Number(item.lon),
+        })).filter((item: any) => item.formatted && Number.isFinite(item.lat) && Number.isFinite(item.lon));
+
         return NextResponse.json(
-          { results: data.results },
+          { results },
           { headers: { 'Cache-Control': 'no-store' } }
         );
       }
@@ -66,6 +77,8 @@ export async function GET(request: Request) {
       return NextResponse.json({
         results: data.map((item: any) => ({
           formatted: item.display_name,
+          address_line1: item.display_name,
+          address_line2: '',
           name: item.name || item.display_name,
           lat: Number(item.lat),
           lon: Number(item.lon),
