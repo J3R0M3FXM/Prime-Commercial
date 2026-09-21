@@ -36,8 +36,8 @@ class CartErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
   render() {
     if (this.state.hasError) {
       return (
-        <div className="fixed inset-0 z-50 flex justify-center bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-[430px] bg-white h-full shadow-2xl flex flex-col p-6 items-center justify-center text-center relative border-x border-slate-200">
+        <div className="w-full flex justify-center bg-gray-50">
+          <div className="w-full max-w-[760px] min-h-[calc(100vh-120px)] bg-white shadow-sm flex flex-col p-6 items-center justify-center text-center relative border-x border-slate-200">
             <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
               <AlertCircle className="w-7 h-7" />
             </div>
@@ -215,8 +215,8 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-center bg-black/60 transition-opacity">
-      <div className="w-full max-w-[430px] bg-white h-full shadow-2xl flex flex-col transform transition-transform duration-300 relative border-x border-slate-200">
+    <div className="w-full flex justify-center bg-gray-50">
+      <div className="w-full max-w-[760px] bg-white min-h-[calc(100vh-120px)] shadow-sm flex flex-col relative border-x border-slate-200">
         
         {/* Header */}
         <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
