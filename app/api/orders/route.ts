@@ -109,8 +109,6 @@ export async function POST(request: Request) {
   }
 }
 
-const PUBLIC_ORDERS_CACHE_TTL_MS = 60000;
-
 export async function GET(request: Request) {
   try {
     const auth = await getAuthenticatedCustomer(request);
@@ -152,21 +150,6 @@ export async function GET(request: Request) {
     if (customerOrdersError) throw customerOrdersError;
     return NextResponse.json(customerOrders || []);
 
-    const now = Date.now();
-    let allOrders = cacheStore.orders;
-    if (!allOrders || (now - cacheStore.lastOrdersFetchTime > PUBLIC_ORDERS_CACHE_TTL_MS)) {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (error) throw error;
-      allOrders = data || [];
-      cacheStore.orders = allOrders;
-      cacheStore.lastOrdersFetchTime = now;
-    }
-
-    return NextResponse.json(allOrders);
   } catch (error: any) {
     if (cacheStore.orders) {
       return NextResponse.json(cacheStore.orders);
