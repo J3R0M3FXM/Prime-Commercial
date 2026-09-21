@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface FingerprintPayload {
@@ -184,58 +183,38 @@ export async function saveFingerprint(tgUserId: string, rawData: FingerprintPayl
   if (!tgUserId || !isSupabaseConfigured()) return null;
   const supabase = getSupabaseAdmin()!;
   const nowIso = new Date().toISOString();
-  const sessionToken = typeof rawData.sessionToken === 'string' ? rawData.sessionToken.trim() : '';
-  const deviceId = typeof rawData.deviceId === 'string' ? rawData.deviceId.trim() : '';
+  const fingerprintRecord = {
+    ...rawData,
+    userId: tgUserId,
+    lastSeen: nowIso,
+    capturedAt: nowIso
+  };
 
   try {
-    const { data: customer, error: customerError } = await supabase
+    const { data: customer } = await supabase
       .from('customers')
       .select('id, fingerprints')
       .eq('tg_user_id', tgUserId)
-      .maybeSingle();
-    if (customerError) throw customerError;
+      .single();
 
-    const existingFingerprints = Array.isArray(customer?.fingerprints) ? customer.fingerprints : [];
-    const sessionIndex = sessionToken
-      ? existingFingerprints.findIndex((fp: any) => String(fp?.sessionToken || '') === sessionToken)
-      : -1;
-    const deviceIndex = sessionIndex < 0 && deviceId
-      ? existingFingerprints.findIndex((fp: any) => !fp?.sessionToken && String(fp?.deviceId || '') === deviceId)
-      : -1;
-    const existingIndex = sessionIndex >= 0 ? sessionIndex : deviceIndex;
-    const existing = existingIndex >= 0 ? existingFingerprints[existingIndex] : null;
-    const firstSeen = existing?.createdAt || existing?.firstSeen || existing?.capturedAt || existing?.timestamp || nowIso;
+    const existingFingerprints = customer?.fingerprints || [];
+    const updatedFingerprints = [fingerprintRecord, ...existingFingerprints].slice(0, 50);
 
-    const fingerprintRecord = {
-      ...(existing || {}),
-      ...rawData,
-      id: existing?.id || `sess_${crypto.randomUUID()}`,
-      userId: tgUserId,
-      createdAt: firstSeen,
-      firstSeen,
-      capturedAt: existing?.capturedAt || nowIso,
-      lastSeen: nowIso,
-    };
-
-    const updatedFingerprints = [...existingFingerprints];
-    if (existingIndex >= 0) updatedFingerprints[existingIndex] = fingerprintRecord;
-    else updatedFingerprints.unshift(fingerprintRecord);
-    updatedFingerprints.sort((a: any, b: any) =>
-      new Date(b?.lastSeen || b?.createdAt || b?.capturedAt || b?.timestamp || 0).getTime() -
-      new Date(a?.lastSeen || a?.createdAt || a?.capturedAt || a?.timestamp || 0).getTime()
-    );
-
-    const payload = { fingerprints: updatedFingerprints.slice(0, 50), updated_at: nowIso };
     if (customer) {
-      const { error } = await supabase.from('customers').update(payload).eq('id', customer.id);
-      if (error) throw error;
+      await supabase
+        .from('customers')
+        .update({
+          fingerprints: updatedFingerprints,
+          updated_at: nowIso
+        })
+        .eq('id', customer.id);
     } else {
-      const { error } = await supabase.from('customers').insert([{
+      await supabase.from('customers').insert([{
         tg_user_id: tgUserId,
-        ...payload,
+        fingerprints: updatedFingerprints,
         created_at: nowIso,
+        updated_at: nowIso
       }]);
-      if (error) throw error;
     }
 
     return fingerprintRecord;

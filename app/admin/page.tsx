@@ -844,59 +844,6 @@ export default function AdminPage() {
     }
   };
 
-  // Customers/Device Forensics has its own live refresh so session telemetry is not tied to order polling.
-  useEffect(() => {
-    if (!authorized || (view !== "customers" && view !== "customer-detail")) return;
-    let cancelled = false;
-
-    const refreshCustomers = async () => {
-      try {
-        const res = await fetch("/api/admin/customers?_fresh=" + Date.now(), {
-          cache: "no-store",
-          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && Array.isArray(data)) setCustomers(data);
-      } catch (err) {
-        console.warn("Customer telemetry refresh failed:", err);
-      }
-    };
-
-    void refreshCustomers();
-    const timer = window.setInterval(refreshCustomers, 15000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [authorized, view]);
-
-  useEffect(() => {
-    if (!authorized || view !== "customer-detail" || !selectedCustomerId) return;
-    let cancelled = false;
-
-    const refreshDetail = async () => {
-      try {
-        const res = await fetch(
-          "/api/admin/customers?id=" + encodeURIComponent(selectedCustomerId) + "&_fresh=" + Date.now(),
-          { cache: "no-store", headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } }
-        );
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && data?.customer) setCustomerDetail(data);
-      } catch (err) {
-        console.warn("Customer detail telemetry refresh failed:", err);
-      }
-    };
-
-    void refreshDetail();
-    const timer = window.setInterval(refreshDetail, 15000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [authorized, view, selectedCustomerId]);
-
   // The Admin Panel always starts at the access-code gate.
   // No existing admin cookie is allowed to bypass this screen.
   useEffect(() => {

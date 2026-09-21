@@ -39,7 +39,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const initData = typeof body.initData === 'string' ? body.initData.trim() : '';
     const fingerprint = body.fingerprint;
-    const heartbeat = Boolean(body.heartbeat);
 
     if (!initData) return json({ error: 'Missing Telegram WebApp initData' }, 400);
 
@@ -147,31 +146,22 @@ export async function POST(request: NextRequest) {
     let savedFp = null;
     if (fingerprint && getSupabaseAdmin()) {
       try {
-        const nowIso = new Date().toISOString();
-        if (heartbeat) {
-          savedFp = await saveFingerprint(tgUserId, {
-            ...fingerprint,
-            enrollmentDate: existingData?.created_at || nowIso,
-            lastSeen: nowIso,
-          });
-        } else {
-          const rawIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
-          const clientIp = rawIp.split(',')[0].trim();
-          const enriched = await enrichFingerprintData(
-            clientIp,
-            fingerprint.location?.lat,
-            fingerprint.location?.lon,
-            fingerprint.location?.accuracy
-          );
+        const rawIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
+        const clientIp = rawIp.split(',')[0].trim();
+        const enriched = await enrichFingerprintData(
+          clientIp,
+          fingerprint.location?.lat,
+          fingerprint.location?.lon,
+          fingerprint.location?.accuracy
+        );
 
-          savedFp = await saveFingerprint(tgUserId, {
-            ...fingerprint,
-            ipSession: clientIp,
-            ...enriched,
-            enrollmentDate: existingData?.created_at || nowIso,
-            lastSeen: nowIso,
-          });
-        }
+        savedFp = await saveFingerprint(tgUserId, {
+          ...fingerprint,
+          ipSession: clientIp,
+          ...enriched,
+          enrollmentDate: existingData?.created_at || new Date().toISOString(),
+          lastSeen: new Date().toISOString(),
+        });
       } catch (err) {
         console.error('Device tracking failed:', err);
       }
