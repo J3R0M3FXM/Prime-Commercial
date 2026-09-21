@@ -46,6 +46,9 @@ export async function getAutomationSettings() {
     enabled: data?.enabled === true,
     fallbackEnabled: data?.fallback_enabled === true,
     fallbackResponse: data?.fallback_response || '',
+    businessConnectionId: data?.business_connection_id || '',
+    businessUserId: data?.business_user_id ? String(data.business_user_id) : '',
+    businessUserChatId: data?.business_user_chat_id ? String(data.business_user_chat_id) : '',
   };
 }
 
@@ -57,6 +60,9 @@ export async function updateAutomationSettings(input: any) {
     enabled: Boolean(input.enabled),
     fallback_enabled: Boolean(input.fallbackEnabled),
     fallback_response: String(input.fallbackResponse || ''),
+    business_connection_id: String(input.businessConnectionId || '') || null,
+    business_user_id: input.businessUserId ? Number(input.businessUserId) : null,
+    business_user_chat_id: input.businessUserChatId ? Number(input.businessUserChatId) : null,
     updated_at: new Date().toISOString(),
   };
   const { data, error } = await supabase.from('telegram_automation_settings').upsert(payload).select().single();
@@ -136,4 +142,69 @@ export async function findAutomationResponse(triggerType: 'message' | 'callback'
     return { flow: null, settings };
   }
   return null;
+}
+
+
+export async function saveBusinessConnection(connection: any) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  const supabase = getSupabaseAdmin()!;
+  const { error } = await supabase.from('telegram_automation_settings').upsert({
+    id: 'default',
+    business_connection_id: connection?.id || null,
+    business_user_id: connection?.user?.id ? Number(connection.user.id) : null,
+    business_user_chat_id: connection?.user_chat_id ? Number(connection.user_chat_id) : null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'id' });
+  if (error) throw error;
+}
+
+export async function getAutomationChatState(connectionId: string, chatId: number) {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = getSupabaseAdmin()!;
+  const { data, error } = await supabase.from('telegram_automation_chats')
+    .select('*').eq('business_connection_id', connectionId).eq('chat_id', chatId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function recordCustomerMessage(connectionId: string, chatId: number, now: Date) {
+  if (!isSupabaseConfigured()) return;
+  const supabase = getSupabaseAdmin()!;
+  const { error } = await supabase.from('telegram_automation_chats').upsert({
+    business_connection_id: connectionId, chat_id: chatId,
+    last_customer_message_at: now.toISOString(), updated_at: now.toISOString()
+  }, { onConflict: 'business_connection_id,chat_id' });
+  if (error) throw error;
+}
+
+export async function recordHumanTakeover(connectionId: string, chatId: number, now: Date) {
+  if (!isSupabaseConfigured()) return;
+  const until = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const supabase = getSupabaseAdmin()!;
+  const { error } = await supabase.from('telegram_automation_chats').upsert({
+    business_connection_id: connectionId, chat_id: chatId,
+    last_human_message_at: now.toISOString(), human_takeover_until: until.toISOString(),
+    updated_at: now.toISOString()
+  }, { onConflict: 'business_connection_id,chat_id' });
+  if (error) throw error;
+}
+
+export async function recordBotMessage(connectionId: string, chatId: number, now: Date) {
+  if (!isSupabaseConfigured()) return;
+  const supabase = getSupabaseAdmin()!;
+  const { error } = await supabase.from('telegram_automation_chats').upsert({
+    business_connection_id: connectionId, chat_id: chatId,
+    last_bot_message_at: now.toISOString(), updated_at: now.toISOString()
+  }, { onConflict: 'business_connection_id,chat_id' });
+  if (error) throw error;
+}
+
+export function shouldStartAutomation(state: any, now: Date) {
+  if (!state?.last_customer_message_at) return true;
+  const lastCustomer = new Date(state.last_customer_message_at).getTime();
+  if (now.getTime() - lastCustomer >= 24 * 60 * 60 * 1000) {
+    if (!state.human_takeover_until) return true;
+    return now.getTime() >= new Date(state.human_takeover_until).getTime();
+  }
+  return false;
 }
