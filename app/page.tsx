@@ -32,13 +32,6 @@ export default function Shopfront() {
   const [isVideoGalleryOpen, setIsVideoGalleryOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("shop");
 
-  const showFeatureToast = (featureName: string) => {
-    setNoticeToast(`${featureName} module is under development`);
-    setTimeout(() => {
-      setNoticeToast(null);
-    }, 2800);
-  };
-
   const { cart, cartCount, addToCart, updateQuantity } = useCart();
 
   useEffect(() => {
