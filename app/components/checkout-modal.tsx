@@ -2412,7 +2412,7 @@ export default function CheckoutModal({
                             </div>
                           )}
                           {!isApi && (
-                          {/* Upload Proof of Payment & GPT-5.3 OCR Analysis Container */}
+                          <div className="space-y-3">
                           <div className="border-t border-gray-100 pt-4 space-y-3">
                             <input
                               type="file"
@@ -2674,7 +2674,6 @@ export default function CheckoutModal({
                               </div>
                             )}
                           </div>
-                          )}
                         </div>
                       );
                     })()}
