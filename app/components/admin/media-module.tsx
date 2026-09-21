@@ -345,11 +345,15 @@ export default function MediaModule() {
       setVideos((prev) =>
         prev.map((v) => (v.id === video.id ? { ...v, isPublished: nextStatus } : v))
       );
-      await fetch(`/api/media/videos/${video.id}`, {
+      const res = await fetch(`/api/media/videos/${video.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isPublished: nextStatus })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Failed to update publish state (HTTP ${res.status})`);
+      }
       showToast(`Video ${nextStatus ? "published" : "hidden"} successfully`);
     } catch (err) {
       fetchVideos();
@@ -363,11 +367,15 @@ export default function MediaModule() {
       setVideos((prev) =>
         prev.map((v) => (v.id === video.id ? { ...v, featured: nextFeatured } : v))
       );
-      await fetch(`/api/media/videos/${video.id}`, {
+      const res = await fetch(`/api/media/videos/${video.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ featured: nextFeatured })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Failed to update featured state (HTTP ${res.status})`);
+      }
       showToast(nextFeatured ? "Marked as Featured" : "Removed from Featured");
     } catch (err) {
       fetchVideos();
