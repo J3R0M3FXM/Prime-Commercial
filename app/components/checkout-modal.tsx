@@ -98,6 +98,8 @@ export default function CheckoutModal({
   const [currentPaymentPage, setCurrentPaymentPage] = useState(0);
   const [isPaymentQrModalOpen, setIsPaymentQrModalOpen] = useState(false);
   const [zoomedPaymentMethod, setZoomedPaymentMethod] = useState<any>(null);
+  const [isStartingMayaCheckout, setIsStartingMayaCheckout] = useState(false);
+  const [mayaCheckoutError, setMayaCheckoutError] = useState("");
   const proofInputRef = useRef<HTMLInputElement>(null);
   const [isPreviewProofOpen, setIsPreviewProofOpen] = useState(false);
 
@@ -435,6 +437,8 @@ export default function CheckoutModal({
       setCurrentPaymentPage(0);
       setIsPaymentQrModalOpen(false);
       setZoomedPaymentMethod(null);
+      setIsStartingMayaCheckout(false);
+      setMayaCheckoutError("");
     }
   }, [isOpen]);
 
@@ -468,7 +472,57 @@ export default function CheckoutModal({
       }
     }, 60000);
 
-    return () => clearInterval(syncInterval);
+    // Start a Maya-hosted checkout for the selected API payment method.
+  // The server owns the Maya credential and order correlation; the browser
+  // receives only Maya's hosted redirect URL.
+  const handleStartMayaCheckout = async () => {
+    if (!completedOrder || !selectedPaymentMethod) return;
+
+    const paymentType = String(selectedPaymentMethod.paymentType || selectedPaymentMethod.type || "").toLowerCase();
+    const isApi = paymentType === "api" || paymentType === "webhook";
+    if (!isApi) return;
+
+    const orderId = String(completedOrder.id || completedOrder.orderNumber || "").trim();
+    if (!orderId) {
+      setMayaCheckoutError("Order reference is missing. Please contact PRIME support.");
+      return;
+    }
+
+    try {
+      setIsStartingMayaCheckout(true);
+      setMayaCheckoutError("");
+      const res = await authenticatedFetch("/api/maya/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          paymentMethodId: selectedPaymentMethod.id,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success || !data.redirectUrl) {
+        throw new Error(data.error || "Unable to start Maya Checkout.");
+      }
+
+      setCompletedOrder((prev: any) => ({
+        ...prev,
+        paymentMethodId: selectedPaymentMethod.id,
+        paymentMethodName: selectedPaymentMethod.name,
+        paymentStatus: "Awaiting Maya Payment",
+        mayaPaymentId: data.checkoutId || prev?.mayaPaymentId,
+        mayaRequestReferenceNumber: data.orderNumber || prev?.mayaRequestReferenceNumber,
+      }));
+
+      window.location.assign(data.redirectUrl);
+    } catch (error: any) {
+      console.error("Maya Checkout start failed:", error);
+      setMayaCheckoutError(error?.message || "Unable to start Maya Checkout.");
+    } finally {
+      setIsStartingMayaCheckout(false);
+    }
+  };
+  return () => clearInterval(syncInterval);
   }, [currentStep, completedOrder?.id, completedOrder?.orderNumber]);
 
   // Perform full address validation (local logic + online Geoapify verification)
@@ -2315,18 +2369,49 @@ export default function CheckoutModal({
                             </div>
                           )}
 
-                          {/* API Block */}
+                          {/* Maya Hosted Checkout */}
                           {isApi && (
-                            <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-lg space-y-1">
-                              <p className="text-xs text-blue-900 font-medium">
-                                Online checkout API is active.
-                              </p>
-                              <p className="text-[11px] text-blue-700 font-mono">
-                                Public Key: {selectedPaymentMethod.publicKey ? `${selectedPaymentMethod.publicKey.slice(0, 8)}...` : "None"}
+                            <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl space-y-3">
+                              <div className="space-y-1">
+                                <p className="text-xs text-blue-950 font-heading font-black uppercase tracking-wide">
+                                  Maya Checkout is ready
+                                </p>
+                                <p className="text-[11px] text-blue-700 font-mono leading-relaxed">
+                                  Continue to Maya's secure hosted payment page. The final payment status is confirmed from Maya's server-to-server webhook.
+                                </p>
+                              </div>
+
+                              {mayaCheckoutError && (
+                                <div className="text-[10px] font-mono text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
+                                  {mayaCheckoutError}
+                                </div>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={handleStartMayaCheckout}
+                                disabled={isStartingMayaCheckout || Number(completedOrder?.payableNow ?? currentPayableNow ?? 0) <= 0}
+                                className="w-full px-3.5 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-heading font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                              >
+                                {isStartingMayaCheckout ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Opening Maya Checkout...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <ExternalLink className="w-4 h-4" />
+                                    <span>Continue to Maya Checkout</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <p className="text-[9px] text-blue-600 font-mono text-center">
+                                PRIME will mark the order paid only after the Maya webhook is received and validated.
                               </p>
                             </div>
                           )}
-
+                          {!isApi && (
                           {/* Upload Proof of Payment & GPT-5.3 OCR Analysis Container */}
                           <div className="border-t border-gray-100 pt-4 space-y-3">
                             <input
@@ -2589,6 +2674,7 @@ export default function CheckoutModal({
                               </div>
                             )}
                           </div>
+                          )}
                         </div>
                       );
                     })()}
