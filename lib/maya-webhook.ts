@@ -183,14 +183,23 @@ async function findOrder(supabase: ReturnType<typeof getSupabaseAdmin>, payload:
   ).trim();
 
   if (metadataOrderId) {
-    const { data, error } = await supabase
+    const { data: byId, error: byIdError } = await supabase
       .from('orders')
       .select('*')
-      .or(`id.eq.${metadataOrderId},order_number.eq.${metadataOrderId}`)
+      .eq('id', metadataOrderId)
       .limit(1)
       .maybeSingle();
-    if (error) throw error;
-    if (data) return data;
+    if (byIdError) throw byIdError;
+    if (byId) return byId;
+
+    const { data: byOrderNumber, error: byOrderNumberError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('order_number', metadataOrderId)
+      .limit(1)
+      .maybeSingle();
+    if (byOrderNumberError) throw byOrderNumberError;
+    if (byOrderNumber) return byOrderNumber;
   }
 
   return null;
@@ -254,6 +263,7 @@ export async function processMayaWebhook(
   const fundSourceType = getFundSourceType(payload);
   const eventKey = getEventKey(payload);
 
+  let eventId = '';
   const { data: insertedEvent, error: eventInsertError } = await supabase
     .from('maya_webhook_events')
     .insert([{
@@ -273,14 +283,47 @@ export async function processMayaWebhook(
     .single();
 
   if (eventInsertError) {
-    if (eventInsertError.code === '23505') {
-      return { status: 200, body: { received: true, duplicate: true } };
+    if (eventInsertError.code !== '23505') {
+      console.error('[MAYA WEBHOOK] Event audit insert failed:', eventInsertError);
+      return { status: 500, body: { received: false, error: 'Webhook audit storage failed' } };
     }
-    console.error('[MAYA WEBHOOK] Event audit insert failed:', eventInsertError);
-    return { status: 500, body: { received: false, error: 'Webhook audit storage failed' } };
+
+    const { data: existingEvent, error: existingEventError } = await supabase
+      .from('maya_webhook_events')
+      .select('id,processing_status')
+      .eq('event_key', eventKey)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingEventError) {
+      console.error('[MAYA WEBHOOK] Existing event lookup failed:', existingEventError);
+      return { status: 500, body: { received: false, error: 'Webhook audit lookup failed' } };
+    }
+
+    if (!existingEvent) {
+      return { status: 500, body: { received: false, error: 'Webhook audit state unavailable' } };
+    }
+
+    if (existingEvent.processing_status === 'PROCESSED' || existingEvent.processing_status === 'UNMATCHED' || existingEvent.processing_status === 'REJECTED') {
+      return { status: 200, body: { received: true, duplicate: true, processingStatus: existingEvent.processing_status } };
+    }
+
+    eventId = String(existingEvent.id);
+    await supabase
+      .from('maya_webhook_events')
+      .update({
+        processing_status: 'RECEIVED',
+        processing_error: null,
+        processed_at: null,
+      })
+      .eq('id', eventId);
+  } else {
+    eventId = String(insertedEvent?.id || '');
   }
 
-  const eventId = insertedEvent?.id as string;
+  if (!eventId) {
+    return { status: 500, body: { received: false, error: 'Webhook audit event ID missing' } };
+  }
   let order: any = null;
 
   try {
@@ -307,11 +350,32 @@ export async function processMayaWebhook(
     }
 
     if (currency !== 'PHP') {
-      throw new Error(`Unsupported currency: ${currency}`);
+      const message = `Unsupported currency: ${currency}`;
+      await supabase
+        .from('maya_webhook_events')
+        .update({
+          order_id: order.id,
+          processing_status: 'REJECTED',
+          processing_error: message,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', eventId);
+      return { status: 200, body: { received: true, processed: false, rejected: true, error: message } };
     }
 
     if (!amountsMatch(order, webhookAmount)) {
-      throw new Error(`Payment amount mismatch: expected ${Number(order.payable_now ?? order.total_amount ?? 0).toFixed(2)}, received ${Number(webhookAmount).toFixed(2)}`);
+      const expected = Number(order.payable_now ?? order.total_amount ?? 0);
+      const message = `Payment amount mismatch: expected ${expected.toFixed(2)}, received ${Number(webhookAmount).toFixed(2)}`;
+      await supabase
+        .from('maya_webhook_events')
+        .update({
+          order_id: order.id,
+          processing_status: 'REJECTED',
+          processing_error: message,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', eventId);
+      return { status: 200, body: { received: true, processed: false, rejected: true, error: message } };
     }
 
     const labels = paymentStatusLabel(paymentStatus);
@@ -404,8 +468,8 @@ export async function processMayaWebhook(
       error: message,
     });
 
-    // Return 200 after recording the event so Maya does not repeatedly retry
-    // an event that has already been audited and rejected by PRIME business rules.
-    return { status: 200, body: { received: true, processed: false, error: message } };
+    // Transient processing failures must return 5xx so Maya can retry. The
+    // event row remains FAILED and is eligible for reprocessing on the next delivery.
+    return { status: 500, body: { received: false, processed: false, error: 'Temporary webhook processing failure' } };
   }
 }
