@@ -42,6 +42,7 @@ import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
 import { getClientFingerprint, getClientLocation, getOrCreateSessionToken } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
+import { authenticatedFetch } from "./telegram-auth-client";
 
 // Dynamic map import to ensure zero SSR conflicts
 const AddressPickerMap = dynamic(() => import("./address-picker-map"), {
@@ -290,7 +291,7 @@ export default function CheckoutModal({
       // Synchronize directly with Firestore customer record to guarantee primeMemberId hydration
       if (resolvedId) {
         setIsLoadingProfile(true);
-        fetch(`/api/account?customerId=${encodeURIComponent(resolvedId)}`, { credentials: 'include', cache: 'no-store' })
+        authenticatedFetch(`/api/account?customerId=${encodeURIComponent(resolvedId)}`, { credentials: 'include', cache: 'no-store' })
           .then(res => res.json())
           .then(data => {
             const customer = data?.customer;
@@ -376,7 +377,7 @@ export default function CheckoutModal({
     const fetchCharges = async () => {
       try {
         setIsLoadingCharges(true);
-        const res = await fetch(`/api/charges?_t=${Date.now()}`, {
+        const res = await authenticatedFetch(`/api/charges?_t=${Date.now()}`, {
           cache: "no-store",
           headers: { "Pragma": "no-cache" }
         });
@@ -401,7 +402,7 @@ export default function CheckoutModal({
     const fetchPaymentMethods = async () => {
       try {
         setIsLoadingPaymentMethods(true);
-        const res = await fetch(`/api/payment-methods?_t=${Date.now()}`, {
+        const res = await authenticatedFetch(`/api/payment-methods?_t=${Date.now()}`, {
           cache: "no-store",
           headers: { "Pragma": "no-cache" }
         });
@@ -455,7 +456,7 @@ export default function CheckoutModal({
       }
 
       try {
-        const res = await fetch(`/api/orders?orderId=${encodeURIComponent(orderId)}`);
+        const res = await authenticatedFetch(`/api/orders?orderId=${encodeURIComponent(orderId)}`);
         if (res.ok) {
           const orderData = await res.json();
           if (orderData && (orderData.id || orderData.orderNumber)) {
@@ -478,7 +479,7 @@ export default function CheckoutModal({
 
     if (localResult.isValid && targetAddr && targetAddr.trim().length >= 5) {
       try {
-        const res = await fetch("/api/geoapify/validate", {
+        const res = await authenticatedFetch("/api/geoapify/validate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -535,7 +536,7 @@ export default function CheckoutModal({
     setIsSearchingAddress(true);
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/geoapify/autocomplete?text=${encodeURIComponent(query)}`);
+        const res = await authenticatedFetch(`/api/geoapify/autocomplete?text=${encodeURIComponent(query)}`);
         if (res.ok) {
           const data = await res.json();
           setAddressSuggestions(data.results || []);
@@ -566,7 +567,7 @@ export default function CheckoutModal({
   // Reverse Geocoding Helper
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
-      const res = await fetch(`/api/geoapify/reverse?lat=${lat}&lon=${lon}`);
+      const res = await authenticatedFetch(`/api/geoapify/reverse?lat=${lat}&lon=${lon}`);
       if (res.ok) {
         const data = await res.json();
         if (data.results && data.results.length > 0) {
@@ -623,7 +624,7 @@ export default function CheckoutModal({
       setIsLoadingCouriers(true);
       setCourierFetchError("");
 
-      const res = await fetch("/api/checkout/delivery-fee", {
+      const res = await authenticatedFetch("/api/checkout/delivery-fee", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ destinationLat: lat, destinationLon: lon }),
@@ -752,7 +753,7 @@ export default function CheckoutModal({
     try {
       setIsAnalyzingReceipt(true);
       setOcrError("");
-      const res = await fetch("/api/ocr/analyze-receipt", {
+      const res = await authenticatedFetch("/api/ocr/analyze-receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -818,7 +819,7 @@ export default function CheckoutModal({
       try {
         const fpData = await getClientFingerprint();
         const totalItemCount = selectedItems.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
-        const res = await fetch("/api/promos/validate", {
+        const res = await authenticatedFetch("/api/promos/validate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -882,7 +883,7 @@ export default function CheckoutModal({
       setReferralError("");
       setReferralSuccess("");
       try {
-        const res = await fetch("/api/referral/validate", {
+        const res = await authenticatedFetch("/api/referral/validate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -930,7 +931,7 @@ export default function CheckoutModal({
     try {
       const fpData = await getClientFingerprint();
       const totalItemCount = selectedItems.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
-      const res = await fetch("/api/promos/validate", {
+      const res = await authenticatedFetch("/api/promos/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -990,7 +991,7 @@ export default function CheckoutModal({
     setReferralError("");
     setReferralSuccess("");
     try {
-      const res = await fetch("/api/referral/validate", {
+      const res = await authenticatedFetch("/api/referral/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1179,7 +1180,7 @@ export default function CheckoutModal({
         },
       };
 
-      const res = await fetch("/api/orders", {
+      const res = await authenticatedFetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderData),
@@ -2609,7 +2610,7 @@ export default function CheckoutModal({
                                       
                                       // Upload to Supabase Storage Bucket if configured
                                       try {
-                                        const storageRes = await fetch("/api/storage/upload", {
+                                        const storageRes = await authenticatedFetch("/api/storage/upload", {
                                           method: "POST",
                                           headers: { "Content-Type": "application/json" },
                                           body: JSON.stringify({
@@ -2626,7 +2627,7 @@ export default function CheckoutModal({
                                         console.warn("Storage upload fallback to payload:", storageErr);
                                       }
 
-                                      const res = await fetch("/api/orders", {
+                                      const res = await authenticatedFetch("/api/orders", {
                                         method: "PUT",
                                         headers: { "Content-Type": "application/json" },
                                         body: JSON.stringify({
