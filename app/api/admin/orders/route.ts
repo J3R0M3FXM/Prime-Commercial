@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const now = Date.now();
-    if (cacheStore.adminOrders && (now - cacheStore.lastAdminOrdersFetchTime < 60000)) {
+    const { searchParams } = new URL(request.url);
+    const forceFresh = searchParams.has('_fresh');
+    if (!forceFresh && cacheStore.adminOrders && (now - cacheStore.lastAdminOrdersFetchTime < 60000)) {
       return NextResponse.json(cacheStore.adminOrders);
     }
 
@@ -81,15 +83,25 @@ export async function PUT(request: Request) {
     if (Array.isArray(body.ids) && body.ids.length > 0 && body.status) {
       const { ids, status } = body;
       const results: string[] = [];
+      const failures: { id: string; error: string }[] = [];
       for (const orderId of ids) {
-        try {
-          await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).or(`id.eq.${orderId},order_number.eq.${orderId}`);
+        const { error } = await supabase
+          .from('orders')
+          .update({ status, updated_at: new Date().toISOString() })
+          .or(`id.eq.${orderId},order_number.eq.${orderId}`);
+        if (error) {
+          failures.push({ id: orderId, error: error.message });
+        } else {
           results.push(orderId);
-        } catch (err) {
-          console.warn(`Failed to update order ${orderId}:`, err);
         }
       }
       cacheStore.invalidateOrders();
+      if (failures.length > 0) {
+        return NextResponse.json(
+          { error: `Failed to update ${failures.length} of ${ids.length} orders`, updatedCount: results.length, ids: results, failures },
+          { status: 500 }
+        );
+      }
       return NextResponse.json({ success: true, updatedCount: results.length, ids: results });
     }
 
