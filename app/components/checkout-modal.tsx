@@ -290,7 +290,7 @@ export default function CheckoutModal({
       // Synchronize directly with Firestore customer record to guarantee primeMemberId hydration
       if (resolvedId) {
         setIsLoadingProfile(true);
-        fetch(`/api/admin/customers?id=${encodeURIComponent(resolvedId)}`)
+        fetch(`/api/account?customerId=${encodeURIComponent(resolvedId)}`, { credentials: 'include', cache: 'no-store' })
           .then(res => res.json())
           .then(data => {
             const customer = data?.customer;
@@ -376,7 +376,7 @@ export default function CheckoutModal({
     const fetchCharges = async () => {
       try {
         setIsLoadingCharges(true);
-        const res = await fetch(`/api/admin/charges?_t=${Date.now()}`, {
+        const res = await fetch(`/api/charges?_t=${Date.now()}`, {
           cache: "no-store",
           headers: { "Pragma": "no-cache" }
         });
@@ -401,7 +401,7 @@ export default function CheckoutModal({
     const fetchPaymentMethods = async () => {
       try {
         setIsLoadingPaymentMethods(true);
-        const res = await fetch(`/api/admin/payments?_t=${Date.now()}`, {
+        const res = await fetch(`/api/payment-methods?_t=${Date.now()}`, {
           cache: "no-store",
           headers: { "Pragma": "no-cache" }
         });
