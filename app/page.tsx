@@ -415,7 +415,7 @@ export default function Shopfront() {
       </main>
 
       {activeTab === "notifications" && (
-        <section className="w-full max-w-[760px] mx-auto bg-white border-x border-gray-200 min-h-[calc(100vh-120px)] p-5 sm:p-7">
+        <section className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-4 sm:p-6">
           <div className="border-b border-gray-100 pb-4 mb-5">
             <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Customer Center</p>
             <h1 className="mt-1 text-xl font-heading font-black uppercase tracking-tight text-slate-900">Notifications</h1>
@@ -428,7 +428,7 @@ export default function Shopfront() {
         </section>
       )}
       {activeTab === "support" && (
-        <section className="w-full max-w-[760px] mx-auto bg-white border-x border-gray-200 min-h-[calc(100vh-120px)] p-5 sm:p-7">
+        <section className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-4 sm:p-6">
           <div className="border-b border-gray-100 pb-4 mb-5">
             <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Customer Center</p>
             <h1 className="mt-1 text-xl font-heading font-black uppercase tracking-tight text-slate-900">Support</h1>
