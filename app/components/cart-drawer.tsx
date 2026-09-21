@@ -1,5 +1,7 @@
 "use client";
 
+import { authenticatedFetch } from "./telegram-auth-client";
+
 import React, { useEffect, useState, useMemo, Component, ErrorInfo, ReactNode } from 'react';
 import { useCart } from './cart-context';
 import { ShoppingCart, X, Plus, Minus, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
@@ -86,7 +88,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
       setCheckoutStatus({ type: null, message: '' });
 
       // Sync Products
-      fetch("/api/products")
+      authenticatedFetch("/api/products")
         .then(res => res.json())
         .then(data => {
            if (data && Array.isArray(data) && typeof syncWithServerData === 'function') {
@@ -97,7 +99,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
       // Fetch Active Charges Fresh with No Cache
       setLoadingCharges(true);
-      fetch(`/api/charges?_t=${Date.now()}`, {
+      authenticatedFetch(`/api/charges?_t=${Date.now()}`, {
         cache: "no-store",
         headers: { "Pragma": "no-cache" }
       })
@@ -166,7 +168,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         } catch (e) {}
       }
       
-      const res = await fetch("/api/orders", {
+      const res = await authenticatedFetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
