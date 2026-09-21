@@ -49,6 +49,7 @@ export async function getAutomationSettings() {
     businessConnectionId: data?.business_connection_id || '',
     businessUserId: data?.business_user_id ? String(data.business_user_id) : '',
     businessUserChatId: data?.business_user_chat_id ? String(data.business_user_chat_id) : '',
+    welcomeFlowId: data?.welcome_flow_id || '',
   };
 }
 
@@ -63,6 +64,7 @@ export async function updateAutomationSettings(input: any) {
     business_connection_id: String(input.businessConnectionId || '') || null,
     business_user_id: input.businessUserId ? Number(input.businessUserId) : null,
     business_user_chat_id: input.businessUserChatId ? Number(input.businessUserChatId) : null,
+    welcome_flow_id: String(input.welcomeFlowId || '') || null,
     updated_at: new Date().toISOString(),
   };
   const { data, error } = await supabase.from('telegram_automation_settings').upsert(payload).select().single();
@@ -207,4 +209,14 @@ export function shouldStartAutomation(state: any, now: Date) {
     return now.getTime() >= new Date(state.human_takeover_until).getTime();
   }
   return false;
+}
+
+
+export async function findWelcomeResponse() {
+  const settings = await getAutomationSettings();
+  if (!settings.enabled || !settings.welcomeFlowId) return null;
+  const flows = await getAutomationFlows();
+  const flow = flows.find(item => item.id === settings.welcomeFlowId && item.active);
+  if (!flow || !flow.responseText) return null;
+  return { flow, settings };
 }
