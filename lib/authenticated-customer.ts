@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyTelegramSessionCookie } from '@/lib/telegram-session';
+import { verifyTelegramInitData } from '@/lib/telegram-init-data';
 
 function generateMemberId() {
   return crypto.randomBytes(6).toString('hex').toUpperCase();
@@ -19,7 +20,9 @@ export async function getAuthenticatedCustomer(request: Request) {
     ? match.slice('prime_telegram_session='.length)
     : undefined;
 
-  const session = verifyTelegramSessionCookie(cookieValue);
+  const headerInitData = request.headers.get('x-telegram-init-data') || '';
+  const initDataSession = await verifyTelegramInitData(headerInitData);
+  const session = initDataSession || verifyTelegramSessionCookie(cookieValue);
   if (!session) return { customer: null, error: 'Telegram authentication required' as string };
 
   const { data: customer, error } = await supabase
