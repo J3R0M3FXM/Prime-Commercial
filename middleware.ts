@@ -2,6 +2,48 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const PUBLIC = new Set(['/api/auth/telegram/validate', '/api/admin/auth']);
 const MAX_AGE = 86400;
+const SESSION_DERIVATION_LABEL = 'PRIME_TELEGRAM_SESSION_V1';
+
+async function getTelegramSessionKey() {
+  const configured = process.env.SESSION_SECRET?.trim();
+  const material = configured && configured.length >= 32
+    ? configured
+    : process.env.TELEGRAM_BOT_TOKEN?.trim();
+
+  if (!material) return null;
+
+  if (configured && configured.length >= 32) {
+    return crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(material),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+  }
+
+  // Match lib/telegram-session.ts fallback derivation exactly.
+  const derivationKey = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(material),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const derived = await crypto.subtle.sign(
+    'HMAC',
+    derivationKey,
+    new TextEncoder().encode(SESSION_DERIVATION_LABEL)
+  );
+
+  return crypto.subtle.importKey(
+    'raw',
+    derived,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+}
 
 async function verifyAdminSession(value: string | undefined) {
   if (!value) return null;
@@ -22,12 +64,7 @@ async function verifyAdminSession(value: string | undefined) {
     false,
     ['sign']
   );
-  const sig = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    new TextEncoder().encode(payload)
-  );
-
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
   const bytes = new Uint8Array(sig);
   let expected = '';
   for (let i = 0; i < bytes.length; i++) expected += String.fromCharCode(bytes[i]);
@@ -40,34 +77,38 @@ async function verifySession(value: string | undefined) {
   if (!value) return null;
   const parts = value.split('|');
   if (parts.length !== 4) return null;
+
   const [tgUserId, issuedRaw, adminRaw, signature] = parts;
   const issued = Number(issuedRaw);
   const now = Math.floor(Date.now() / 1000);
-  const secret = process.env.SESSION_SECRET;
-  if (!secret || secret.length < 32 || !tgUserId || !Number.isFinite(issued) || issued > now || now - issued > MAX_AGE) return null;
-  const payload = `${tgUserId}|${issued}|${adminRaw}`;
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
+  if (
+    !/^[0-9]+$/.test(tgUserId) ||
+    (adminRaw !== '0' && adminRaw !== '1') ||
+    !/^[0-9]+$/.test(issuedRaw) ||
+    !Number.isSafeInteger(issued) ||
+    issued > now ||
+    now - issued > MAX_AGE
+  ) return null;
+
+  const key = await getTelegramSessionKey();
+  if (!key) return null;
+
+  const payload = `${tgUserId}|${issuedRaw}|${adminRaw}`;
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
   const bytes = new Uint8Array(sig);
   let expected = '';
   for (let i = 0; i < bytes.length; i++) expected += String.fromCharCode(bytes[i]);
   expected = btoa(expected).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
   if (expected !== signature) return null;
   return { tgUserId, isAdmin: adminRaw === '1' };
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  // Telegram Mini Apps provide initData in the client-side WebApp object/hash.
-  // The initial document request cannot reliably contain that value, so page rendering
-  // must remain reachable; sensitive API routes remain server-gated below.
-  const pageProtected = false;
+
+  // Telegram Mini App initData is available client-side, so the initial document
+  // remains reachable while sensitive API requests are server-gated.
   const apiProtected =
     pathname.startsWith('/api/admin/') ||
     pathname.startsWith('/api/account') ||
@@ -80,8 +121,6 @@ export async function middleware(request: NextRequest) {
     pathname === '/api/products' ||
     pathname === '/api/media/videos';
 
-  // The Admin Panel is intentionally reachable from a native browser.
-  // Its sensitive APIs require a server-issued ADMIN_ACCESS_CODE session cookie.
   if (pathname.startsWith('/admin')) return NextResponse.next();
   if (PUBLIC.has(pathname)) return NextResponse.next();
 
@@ -99,6 +138,7 @@ export async function middleware(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: 'Telegram authentication required' }, { status: 401 });
   }
+
   return NextResponse.next();
 }
 
