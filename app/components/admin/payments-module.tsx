@@ -29,6 +29,7 @@ interface PaymentMethod {
   webhookUrl?: string;
   publicKey?: string;
   secretKey?: string;
+  secretKeyConfigured?: boolean;
   walletAddress?: string;
   accountName?: string;
   accountNumber?: string;
@@ -197,6 +198,7 @@ export default function PaymentsModule() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [publicKey, setPublicKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
+  const [secretKeyConfigured, setSecretKeyConfigured] = useState(false);
   const [walletAddress, setWalletAddress] = useState("");
   const [accountName, setAccountName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -311,6 +313,7 @@ export default function PaymentsModule() {
     setWebhookUrl("");
     setPublicKey("");
     setSecretKey("");
+    setSecretKeyConfigured(false);
     setWalletAddress("");
     setAccountName("");
     setAccountNumber("");
@@ -327,7 +330,8 @@ export default function PaymentsModule() {
     setQrCodeImage(m.qrCodeImage || "");
     setWebhookUrl(m.webhookUrl || "");
     setPublicKey(m.publicKey || "");
-    setSecretKey(m.secretKey || "");
+    setSecretKey("");
+    setSecretKeyConfigured(Boolean(m.secretKeyConfigured));
     setWalletAddress(m.walletAddress || "");
     setAccountName(m.accountName || "");
     setAccountNumber(m.accountNumber || "");
@@ -703,7 +707,7 @@ export default function PaymentsModule() {
                   >
                     <option value="qr_code">Static QR Code Scan</option>
                     <option value="manual_transfer">Manual Transfer (Online Banking / E-Wallet)</option>
-                    <option value="api">Online checkout API Webhook</option>
+                    <option value="api">Maya Checkout API / Webhook</option>
                     <option value="crypto">Cryptocurrency Wallet Deposit</option>
                   </select>
                 </div>
@@ -806,13 +810,15 @@ export default function PaymentsModule() {
                     </div>
                     <div className="space-y-1">
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 font-heading">
-                        Secret API Key
+                        Secret API Key {secretKeyConfigured && (
+                          <span className="ml-1 text-emerald-700">(Already configured — leave blank to keep)</span>
+                        )}
                       </label>
                       <input
                         type="password"
                         value={secretKey}
                         onChange={(e) => setSecretKey(e.target.value)}
-                        placeholder="sk_test_..."
+                        placeholder={secretKeyConfigured ? "•••••••••••••••• (leave blank to keep existing key)" : "sk_test_..."}
                         className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-slate-900"
                       />
                     </div>
