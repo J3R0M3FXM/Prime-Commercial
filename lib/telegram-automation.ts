@@ -160,6 +160,26 @@ export async function saveBusinessConnection(connection: any) {
   if (error) throw error;
 }
 
+export async function getAutomationChats(limit = 100) {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = getSupabaseAdmin()!;
+  const { data, error } = await supabase.from('telegram_automation_chats')
+    .select('*').order('updated_at', { ascending: false }).limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function setAutomationChatPaused(connectionId: string, chatId: number, paused: boolean) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  const supabase = getSupabaseAdmin()!;
+  const now = new Date().toISOString();
+  const { data, error } = await supabase.from('telegram_automation_chats').upsert({
+    business_connection_id: connectionId, chat_id: chatId, bot_paused: paused, updated_at: now
+  }, { onConflict: 'business_connection_id,chat_id' }).select().single();
+  if (error) throw error;
+  return data;
+}
+
 export async function getAutomationChatState(connectionId: string, chatId: number) {
   if (!isSupabaseConfigured()) return null;
   const supabase = getSupabaseAdmin()!;
@@ -202,6 +222,7 @@ export async function recordBotMessage(connectionId: string, chatId: number, now
 }
 
 export function shouldStartAutomation(state: any, now: Date) {
+  if (state?.bot_paused === true) return false;
   if (!state?.last_customer_message_at) return true;
   const lastCustomer = new Date(state.last_customer_message_at).getTime();
   if (now.getTime() - lastCustomer >= 24 * 60 * 60 * 1000) {
