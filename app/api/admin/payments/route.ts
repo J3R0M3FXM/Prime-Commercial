@@ -34,7 +34,7 @@ export async function GET() {
       qrCodeImage: p.qr_code_image,
       webhookUrl: p.webhook_url,
       publicKey: p.public_key,
-      secretKey: p.secret_key,
+      secretKeyConfigured: Boolean(p.secret_key),
       walletAddress: p.wallet_address,
       accountName: p.account_name,
       accountNumber: p.account_number,
@@ -153,6 +153,13 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Missing required fields (id, name, paymentType)" }, { status: 400 });
     }
 
+    const { data: currentPaymentMethod, error: currentPaymentMethodError } = await supabase
+      .from('payment_methods')
+      .select('secret_key')
+      .eq('id', id)
+      .single();
+    if (currentPaymentMethodError) throw currentPaymentMethodError;
+
     const updatePayload: any = {
       name: String(name),
       logo: String(logo || ''),
@@ -160,7 +167,9 @@ export async function PUT(request: Request) {
       qr_code_image: String(qrCodeImage || ''),
       webhook_url: String(webhookUrl || ''),
       public_key: String(publicKey || ''),
-      secret_key: String(secretKey || ''),
+      // Never clear an existing provider secret just because the masked
+      // credential field was left blank in the admin UI.
+      secret_key: String(secretKey || '').trim() || String(currentPaymentMethod?.secret_key || ''),
       wallet_address: String(walletAddress || ''),
       account_name: String(accountName || ''),
       account_number: String(accountNumber || ''),
