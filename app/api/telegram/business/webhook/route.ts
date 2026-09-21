@@ -72,16 +72,22 @@ export async function POST(request: Request) {
       const now = new Date();
       const state = await getAutomationChatState(connectionId, Number(chatId));
       const eligible = shouldStartAutomation(state, now);
-      await recordCustomerMessage(connectionId, Number(chatId), now);
-      if (!eligible) return NextResponse.json({ ok: true, matched: false, reason: 'within_24h' });
+      if (!eligible) {
+        await recordCustomerMessage(connectionId, Number(chatId), now);
+        return NextResponse.json({ ok: true, matched: false, reason: 'within_24h' });
+      }
       const result = await findWelcomeResponse() || await findAutomationResponse('message', text);
       if (!result) return NextResponse.json({ ok: true, matched: false });
       const responseText = result.flow?.responseText || result.settings.fallbackResponse;
-      if (!responseText) return NextResponse.json({ ok: true, matched: false });
+      if (!responseText) {
+        await recordCustomerMessage(connectionId, Number(chatId), now);
+        return NextResponse.json({ ok: true, matched: false });
+      }
       await telegram('sendMessage', {
         business_connection_id: connectionId, chat_id: chatId, text: renderTemplate(responseText, businessMessage),
         reply_markup: result.flow ? keyboard(result.flow) : undefined, disable_web_page_preview: true
       });
+      await recordCustomerMessage(connectionId, Number(chatId), now);
       await recordBotMessage(connectionId, Number(chatId), new Date());
       return NextResponse.json({ ok: true, matched: true });
     }
