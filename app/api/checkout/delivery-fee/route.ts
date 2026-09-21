@@ -1,140 +1,133 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { calculateDeliveryFee, calculateRoadDistanceFallback } from '@/lib/delivery-fee';
 
-function calculateCourierFee(courier: any, distanceKm: number) {
-  const baseFare = Number(courier?.baseFare || courier?.base_fare) || 0;
-  const firstMile = Number(courier?.firstMile || courier?.first_mile) || 0;
-  const firstMileFee = Number(courier?.firstMileFee || courier?.first_mile_fee) || 0;
-  const exceedingKmFee = Number(courier?.exceedingKmFee || courier?.exceeding_km_fee) || 0;
-  const surcharge = Number(courier?.surcharge) || 0;
-  const nightDifferential = Number(courier?.nightDifferential || courier?.night_differential) || 0;
-
-  let fee = baseFare;
-
-  if (distanceKm <= firstMile) {
-    fee += (distanceKm * firstMileFee);
-  } else {
-    fee += (firstMile * firstMileFee);
-    const excessKm = distanceKm - firstMile;
-    fee += (excessKm * exceedingKmFee);
-  }
-
-  fee += surcharge + nightDifferential;
-  return Math.round(fee * 100) / 100;
-}
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const { destinationLat, destinationLon, courierId } = await request.json();
+    const body = await request.json();
+    const destinationLat = Number(body?.destinationLat);
+    const destinationLon = Number(body?.destinationLon);
+    const courierId = String(body?.courierId || '');
 
-    if (!destinationLat || !destinationLon) {
-      return NextResponse.json({ error: "Missing destination coordinates" }, { status: 400 });
+    if (!Number.isFinite(destinationLat) || !Number.isFinite(destinationLon) ||
+        destinationLat < -90 || destinationLat > 90 ||
+        destinationLon < -180 || destinationLon > 180) {
+      return NextResponse.json({ error: 'Valid destination coordinates are required.' }, { status: 400 });
     }
 
-    let originLat = 14.5995;
-    let originLon = 120.9842;
-
-    if (isSupabaseConfigured()) {
-      try {
-        const supabase = getSupabaseAdmin()!;
-        const { data: whData } = await supabase.from('warehouses').select('*').order('sort_order', { ascending: true });
-        if (whData && whData.length > 0) {
-          const defaultWh = whData.find((w: any) => w.is_default) || whData[0];
-          originLat = defaultWh.lat || originLat;
-          originLon = defaultWh.lon || originLon;
-        }
-      } catch (e) {
-        console.warn("Notice: Warehouse query fallback used", e);
-      }
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: 'Logistics database is not configured.' }, { status: 503 });
     }
 
-    let couriersList: any[] = [];
-    if (isSupabaseConfigured()) {
-      try {
-        const supabase = getSupabaseAdmin()!;
-        const { data: cData } = await supabase.from('couriers').select('*').order('sort_order', { ascending: true });
-        if (cData) {
-          couriersList = cData.map(c => ({
-            id: c.id,
-            name: c.name,
-            baseFare: c.base_fare || c.baseFare || 49,
-            firstMile: c.first_mile || c.firstMile || 3.5,
-            firstMileFee: c.first_mile_fee || c.firstMileFee || 9,
-            exceedingKmFee: c.exceeding_km_fee || c.exceedingKmFee || 10.5,
-            surcharge: c.surcharge || 0,
-            nightDifferential: c.night_differential || c.nightDifferential || 0,
-            logo: c.logo || ''
-          }));
-        }
-      } catch (e) {
-        console.warn("Couriers fetch error:", e);
-      }
+    const supabase = getSupabaseAdmin()!;
+
+    const { data: warehouses, error: warehouseError } = await supabase
+      .from('warehouses')
+      .select('id,name,address,latitude,longitude,is_active,is_default,sort_order')
+      .eq('is_active', true)
+      .order('is_default', { ascending: false })
+      .order('sort_order', { ascending: true });
+
+    if (warehouseError) throw warehouseError;
+
+    const warehouse = (warehouses || []).find(
+      (w: any) => Number.isFinite(Number(w.latitude)) && Number.isFinite(Number(w.longitude))
+    );
+
+    if (!warehouse) {
+      return NextResponse.json(
+        { error: 'No active warehouse with valid coordinates is configured. Set up a warehouse before calculating delivery fees.' },
+        { status: 409 }
+      );
     }
+
+    const originLat = Number(warehouse.latitude);
+    const originLon = Number(warehouse.longitude);
+
+    const { data: courierRows, error: courierError } = await supabase
+      .from('couriers')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (courierError) throw courierError;
+
+    const couriersList = (courierRows || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      logo: c.logo || '',
+      type: c.type || 'Standard',
+      baseFare: Number(c.base_fare) || 0,
+      firstMile: Number(c.first_mile) || 0,
+      firstMileFee: Number(c.first_mile_fee) || 0,
+      exceedingKmFee: Number(c.exceeding_km_fee) || 0,
+      surcharge: Number(c.surcharge) || 0,
+      nightDifferential: Number(c.night_differential) || 0,
+    }));
 
     if (couriersList.length === 0) {
-      couriersList = [
-        {
-          id: "standard-lalamove",
-          name: "Lalamove",
-          baseFare: 49,
-          firstMile: 3.5,
-          firstMileFee: 9,
-          exceedingKmFee: 10.5,
-          surcharge: 0,
-          nightDifferential: 0,
-          logo: ""
-        }
-      ];
+      return NextResponse.json({ error: 'No active couriers are configured.' }, { status: 409 });
     }
 
+    let distanceKm: number | null = null;
+    let routingSource = 'geodesic-fallback';
     const apiKey = process.env.GEOAPIFY_API_KEY;
-    let distanceKm = 5;
 
     if (apiKey) {
       try {
-        const routingUrl = `https://api.geoapify.com/v1/routing?waypoints=${originLat},${originLon}|${destinationLat},${destinationLon}&mode=drive&apiKey=${apiKey}`;
-        const routeRes = await fetch(routingUrl);
+        const routingUrl =
+          'https://api.geoapify.com/v1/routing' +
+          `?waypoints=${encodeURIComponent(`${originLat},${originLon}|${destinationLat},${destinationLon}`)}` +
+          `&mode=drive&apiKey=${encodeURIComponent(apiKey)}`;
+
+        const routeRes = await fetch(routingUrl, { cache: 'no-store' });
         if (routeRes.ok) {
           const routeData = await routeRes.json();
-          if (routeData.features && routeData.features.length > 0) {
-            const distanceMeters = routeData.features[0].properties.distance;
-            distanceKm = distanceMeters / 1000;
+          const meters = Number(routeData?.features?.[0]?.properties?.distance);
+          if (Number.isFinite(meters) && meters >= 0) {
+            distanceKm = meters / 1000;
+            routingSource = 'geoapify';
           }
         }
-      } catch (err) {
-        const R = 6371;
-        const dLat = (destinationLat - originLat) * Math.PI / 180;
-        const dLon = (destinationLon - originLon) * Math.PI / 180;
-        const a = 
-          Math.sin(dLat/2) * Math.sin(dLat/2) +
-          Math.cos(originLat * Math.PI / 180) * Math.cos(destinationLat * Math.PI / 180) * 
-          Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        distanceKm = Math.max(1, Math.round(R * c * 1.3 * 10) / 10);
+      } catch (error) {
+        console.warn('Geoapify routing unavailable; using distance fallback.', error);
       }
     }
 
-    const roundedDistance = Math.round(distanceKm * 100) / 100;
+    if (distanceKm === null) {
+      distanceKm = calculateRoadDistanceFallback(originLat, originLon, destinationLat, destinationLon);
+    }
 
-    const computedCouriers = couriersList.map(c => {
-      const fee = calculateCourierFee(c, roundedDistance);
-      return {
-        ...c,
-        calculatedFee: fee,
-        distanceKm: roundedDistance,
-      };
-    });
+    const roundedDistance = Math.round(Math.max(0, distanceKm) * 100) / 100;
 
-    const targetCourier = (courierId ? computedCouriers.find(c => c.id === courierId) : null) || computedCouriers[0];
+    const computedCouriers = couriersList.map((courier: any) => ({
+      ...courier,
+      calculatedFee: calculateDeliveryFee(courier, roundedDistance),
+      distanceKm: roundedDistance,
+    }));
+
+    const targetCourier =
+      (courierId && computedCouriers.find((c: any) => c.id === courierId)) ||
+      computedCouriers[0];
 
     return NextResponse.json({
+      warehouse: {
+        id: warehouse.id,
+        name: warehouse.name,
+        address: warehouse.address,
+        lat: originLat,
+        lon: originLon,
+      },
       distanceKm: roundedDistance,
-      fee: targetCourier?.calculatedFee || 0,
+      fee: targetCourier.calculatedFee,
       courier: targetCourier,
-      couriers: computedCouriers
+      couriers: computedCouriers,
+      routingSource,
     });
-
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Delivery fee calculation error:', error);
+    return NextResponse.json({ error: error?.message || 'Failed to calculate delivery fee.' }, { status: 500 });
   }
 }
