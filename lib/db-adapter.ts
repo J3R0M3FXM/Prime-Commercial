@@ -577,17 +577,37 @@ export async function getChargesFromDb() {
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('charges').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
-  return (data || []).map(ch => ({
-    id: ch.id,
-    name: ch.name,
-    type: ch.type,
-    rate: Number(ch.rate),
-    isActive: ch.is_active,
-    sortOrder: ch.sort_order,
-    description: ch.description,
-    createdAt: ch.created_at,
-    updatedAt: ch.updated_at
-  }));
+  return (data || []).map(ch => {
+    let schedules: any = {};
+    try {
+      if (typeof ch.description === 'string' && ch.description.trim().startsWith('{')) {
+        schedules = JSON.parse(ch.description);
+      }
+    } catch {}
+    return {
+      id: ch.id,
+      name: ch.name,
+      type: ch.type,
+      amount: Number(ch.rate) || 0,
+      value: Number(ch.rate) || 0,
+      rate: Number(ch.rate) || 0,
+      isActive: ch.is_active,
+      isDefault: typeof schedules.isDefault === 'boolean' ? schedules.isDefault : undefined,
+      defaultAddToBill: typeof schedules.isDefault === 'boolean' ? schedules.isDefault : undefined,
+      schedules: {
+        ...schedules,
+        days: Array.isArray(schedules.days) ? schedules.days : (Array.isArray(schedules.daysOfWeek) ? schedules.daysOfWeek : []),
+        daysOfWeek: Array.isArray(schedules.days) ? schedules.days : (Array.isArray(schedules.daysOfWeek) ? schedules.daysOfWeek : []),
+        isOvernight: Boolean(schedules.isOvernight ?? schedules.overnight ?? false),
+        overnight: Boolean(schedules.isOvernight ?? schedules.overnight ?? false),
+        isRecurring: Boolean(schedules.isRecurring ?? schedules.recurring ?? false),
+        recurring: Boolean(schedules.isRecurring ?? schedules.recurring ?? false),
+      },
+      description: ch.description,
+      createdAt: ch.created_at,
+      updatedAt: ch.updated_at
+    };
+  });
 }
 
 export async function getPaymentMethodsFromDb() {
