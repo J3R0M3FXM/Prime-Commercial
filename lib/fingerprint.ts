@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface FingerprintPayload {
@@ -209,7 +208,7 @@ export async function saveFingerprint(tgUserId: string, rawData: FingerprintPayl
     const fingerprintRecord = {
       ...(existing || {}),
       ...rawData,
-      id: existing?.id || `sess_${crypto.randomUUID()}`,
+      id: existing?.id || `sess_${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`,
       userId: tgUserId,
       createdAt: firstSeen,
       firstSeen,
