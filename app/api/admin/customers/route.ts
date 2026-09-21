@@ -111,7 +111,7 @@ export async function GET(request: Request) {
     const { data: customersData, error } = await supabase.from('customers').select('*').order('updated_at', { ascending: false });
     if (error) throw error;
     const { data: allOrdersData, error: ordersError } = await supabase
-      .from('orders').select('id,customer_id,tg_user_id,prime_member_id,total_amount,status,created_at');
+      .from('orders').select('id,customer_id,tg_user_id,prime_member_id,total_amount,sub_total,status,created_at,delivered_at');
     if (ordersError) throw ordersError;
     const allOrders = allOrdersData || [];
 
@@ -131,7 +131,14 @@ export async function GET(request: Request) {
       const telemetry = telemetryFrom(fingerprints);
       const identifiers = new Set(fingerprints.flatMap((fp: any) => [fp.deviceId, fp.hardwareId].filter(Boolean).map(String)));
       const sharedAccountCount = Array.from(identifiers).reduce((max, id) => Math.max(max, Math.max(0, (deviceOwners.get(id)?.size || 1) - 1)), 0);
-      const completed = customerOrders.filter((o: any) => ['delivered', 'completed'].includes(String(o.status || '').toLowerCase()));
+      const completed = customerOrders
+        .filter((o: any) => ['delivered', 'completed'].includes(String(o.status || '').toLowerCase()))
+        .map((o: any) => ({
+          subTotal: Number(o.sub_total ?? 0),
+          totalAmount: Number(o.total_amount ?? 0),
+          createdAt: o.created_at,
+          deliveredAt: o.delivered_at,
+        }));
       return {
         id:c.id, tgUserId:c.tg_user_id, tgName:c.tg_name, tgUsername:c.tg_username, primeMemberId:c.prime_member_id,
         phone:c.phone_number ?? c.phone ?? '', photoUrl:c.photo_url ?? '', role:c.role || 'customer', isPremium:Boolean(c.is_premium),
