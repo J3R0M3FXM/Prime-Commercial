@@ -285,11 +285,15 @@ export default function LogisticsModule() {
     debounceRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`/api/geoapify/autocomplete?text=${encodeURIComponent(searchQuery)}`);
-        const data = await res.json();
-        setSuggestions(data.results || []);
-      } catch (e) {
+        const res = await fetch(`/api/geoapify/autocomplete?text=${encodeURIComponent(searchQuery)}`, { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || `Address search failed (HTTP ${res.status})`);
+        setSuggestions(Array.isArray(data.results) ? data.results : []);
+        if (!Array.isArray(data.results) || data.results.length === 0) setWarehouseError("No address match found. You can click the map to drop the warehouse pin and save it manually.");
+      } catch (e: any) {
         console.error(e);
+        setSuggestions([]);
+        setWarehouseError(e?.message || "Address search failed. You can still place the pin manually on the map.");
       } finally {
         setIsSearching(false);
       }
@@ -334,7 +338,9 @@ export default function LogisticsModule() {
   };
 
   const saveWarehouse = async () => {
-    if (!whName || !whAddress || !whLat || !whLon) return;
+    if (!whName.trim()) { setWarehouseError("Warehouse name is required."); return; }
+    if (!whAddress.trim()) { setWarehouseError("Warehouse address is required."); return; }
+    if (whLat === null || whLon === null || !Number.isFinite(whLat) || !Number.isFinite(whLon)) { setWarehouseError("Please select a map location or address result so coordinates can be assigned."); return; }
     setIsSavingWh(true);
     setWarehouseError(null);
     try {
