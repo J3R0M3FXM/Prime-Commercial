@@ -69,7 +69,7 @@ export async function updateAutomationSettings(input: any) {
   };
   const { data, error } = await supabase.from('telegram_automation_settings').upsert(payload).select().single();
   if (error) throw error;
-  return { enabled: data.enabled, fallbackEnabled: data.fallback_enabled, fallbackResponse: data.fallback_response || '' };
+  return { enabled: data.enabled, fallbackEnabled: data.fallback_enabled, fallbackResponse: data.fallback_response || '', welcomeFlowId: data.welcome_flow_id || '', businessConnectionId: data.business_connection_id || '', businessUserId: data.business_user_id ? String(data.business_user_id) : '', businessUserChatId: data.business_user_chat_id ? String(data.business_user_chat_id) : '' };
 }
 
 export async function getAutomationFlows() {
