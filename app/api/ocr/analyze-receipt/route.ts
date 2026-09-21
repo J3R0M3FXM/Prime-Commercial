@@ -40,7 +40,7 @@ function getGenAiClient(): GoogleGenAI | null {
 /**
  * Intelligent Fallback Heuristic Parser if API Key is not set or network fails
  */
-function heuristicFallbackAnalysis(
+function manualReviewFallbackAnalysis(
   expectedAmount: number = 0,
   paymentMethodName: string = ''
 ): OcrReceiptAnalysis {
@@ -49,29 +49,29 @@ function heuristicFallbackAnalysis(
   const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
   
   // Generate a plausible mock or detected pattern for clean UI testing
-  const randomRef = `REF-${Math.floor(100000000000 + Math.random() * 900000000000)}`;
-  const provider = paymentMethodName || 'E-Wallet / Bank Transfer';
+    const provider = paymentMethodName || 'E-Wallet / Bank Transfer';
 
   return {
-    referenceNumber: randomRef,
-    amountPaid: expectedAmount > 0 ? expectedAmount : 0,
+    referenceNumber: '',
+    amountPaid: 0,
     detectedCurrency: 'PHP',
     paymentProvider: provider,
     transactionDate: dateStr,
-    senderName: 'Verified Account Holder',
-    senderPhone: '09** *** ****',
-    recipientName: 'Official Merchant Account',
-    recipientAccount: '***-****-***',
-    confidenceScore: 94,
-    matchStatus: 'MATCHED',
-    rawSummary: `Payment receipt successfully scanned via GPT-5.3 OCR Engine. Reference: ${randomRef}, Amount: ₱${expectedAmount.toFixed(2)}, Provider: ${provider}.`,
+    senderName: '',
+    senderPhone: '',
+    recipientName: '',
+    recipientAccount: '',
+    confidenceScore: 0,
+    matchStatus: 'PENDING_MANUAL_REVIEW',
+    matchDiscrepancyReason: 'Automated receipt verification is unavailable. Manual review is required.',
+    rawSummary: 'Receipt verification service is unavailable. The submitted receipt must be reviewed manually.',
     keyFields: {
-      'Transaction Ref': randomRef,
+      'Transaction Ref': 'N/A',
       'Provider': provider,
-      'Status': 'Successful',
-      'Scan Engine': 'GPT-5.3 Vision OCR'
+      'Status': 'PENDING MANUAL REVIEW',
+      'Scan Engine': 'Unavailable'
     },
-    model: 'GPT-5.3 (Multimodal Vision OCR)',
+    model: 'manual-review-fallback',
     analyzedAt: new Date().toISOString(),
     requiresManualReview: true,
   };
@@ -92,6 +92,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Receipt image data is required' }, { status: 400 });
     }
 
+    if (image.length > 12 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Receipt image is too large.' }, { status: 413 });
+    }
+
     // Extract Base64 and MimeType
     let mimeType = 'image/jpeg';
     let base64Data = image;
@@ -110,7 +114,7 @@ export async function POST(request: Request) {
 
     if (!ai) {
       // Graceful fallback with heuristic analysis
-      const fallbackResult = heuristicFallbackAnalysis(expectedAmount, paymentMethodName);
+      const fallbackResult = manualReviewFallbackAnalysis(expectedAmount, paymentMethodName);
       return NextResponse.json({
         success: true,
         analysis: fallbackResult,
@@ -193,7 +197,7 @@ Ensure to accurately find:
         parsed = JSON.parse(text);
       } catch (jsonErr) {
         console.warn('Failed to parse AI JSON response, falling back:', jsonErr);
-        parsed = heuristicFallbackAnalysis(expectedAmount, paymentMethodName);
+        parsed = manualReviewFallbackAnalysis(expectedAmount, paymentMethodName);
       }
 
       // Format clean response
@@ -241,7 +245,7 @@ Ensure to accurately find:
 
     } catch (aiErr: any) {
       console.warn('AI OCR Error, falling back gracefully to heuristic analyzer:', aiErr);
-      const fallbackResult = heuristicFallbackAnalysis(expectedAmount, paymentMethodName);
+      const fallbackResult = manualReviewFallbackAnalysis(expectedAmount, paymentMethodName);
       return NextResponse.json({
         success: true,
         analysis: fallbackResult,
