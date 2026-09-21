@@ -107,8 +107,10 @@ export default function Shopfront() {
         
         const response = await fetch("/api/auth/telegram/validate", {
           method: "POST",
+          credentials: "include",
+          cache: "no-store",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             initData: initDataRaw,
             fingerprint: {
               ...fingerprintData,
@@ -119,6 +121,19 @@ export default function Shopfront() {
 
         if (response.ok) {
           const authData = await response.json();
+
+          // Confirm the browser actually retained the server-issued HttpOnly session
+          // before touching protected customer APIs. This prevents a silent fallback
+          // when cookie creation/storage is unavailable.
+          const sessionCheck = await fetch("/api/auth/telegram/validate", {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+          });
+          const sessionData = await sessionCheck.json().catch(() => ({}));
+          if (!sessionCheck.ok || !sessionData.authenticated || !sessionData.sessionReady) {
+            throw new Error("Telegram session could not be established. Please reopen PRIME from Telegram.");
+          }
 
           // If connection is from authorized Telegram Admin
           if (authData.isAdmin) {
