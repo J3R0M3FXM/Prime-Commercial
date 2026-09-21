@@ -3,18 +3,30 @@ import { uploadToSupabaseStorage, isSupabaseConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
+const MAX_IMAGE_CHARS = 12 * 1024 * 1024;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { image, bucket = 'receipt-proofs', filename, contentType = 'image/png' } = body;
 
-    if (!image) {
+    if (!image || typeof image !== 'string') {
       return NextResponse.json({ error: 'Image data is required' }, { status: 400 });
     }
+    if (image.length > MAX_IMAGE_CHARS) {
+      return NextResponse.json({ error: 'Image is too large.' }, { status: 413 });
+    }
 
-    // Check if Supabase is configured
+    // Customer receipt uploads are intentionally restricted to the receipt bucket.
+    if (bucket !== 'receipt-proofs') {
+      return NextResponse.json({ error: 'Invalid storage bucket' }, { status: 400 });
+    }
+
+    if (!/^image\/(jpeg|jpg|png|webp)$/.test(String(contentType))) {
+      return NextResponse.json({ error: 'Unsupported image type' }, { status: 400 });
+    }
+
     if (!isSupabaseConfigured()) {
-      // If not yet configured, return image as-is (base64 string)
       return NextResponse.json({
         success: true,
         url: image,
@@ -23,8 +35,9 @@ export async function POST(request: Request) {
       });
     }
 
-    const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    const path = filename ? `${uniqueId}-${filename}` : `receipt-${uniqueId}.png`;
+    const uniqueId = crypto.randomUUID();
+    const safeFilename = String(filename || 'receipt.png').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
+    const path = `receipt-${uniqueId}-${safeFilename}`;
 
     const result = await uploadToSupabaseStorage({
       bucket,
@@ -34,13 +47,8 @@ export async function POST(request: Request) {
     });
 
     if (result.error) {
-      console.warn('Supabase storage upload failed, falling back to base64:', result.error);
-      return NextResponse.json({
-        success: true,
-        url: image,
-        isSupabase: false,
-        error: result.error
-      });
+      console.warn('Supabase storage upload failed:', result.error);
+      return NextResponse.json({ error: 'Receipt upload failed.' }, { status: 502 });
     }
 
     return NextResponse.json({
@@ -51,6 +59,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Storage upload route error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to process upload' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to process upload' }, { status: 400 });
   }
 }
