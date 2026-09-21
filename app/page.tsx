@@ -298,7 +298,7 @@ export default function Shopfront() {
       </header>
 
       {/* Search & Filter Controls (Below Header, matching the thin footer style/height) */}
-      <div className="px-4 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[53px]">
+      <div className={`${activeTab !== "shop" ? "hidden" : ""} px-4 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[53px]`}>
         <div className="relative flex-[5] flex items-center">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input 
@@ -322,7 +322,7 @@ export default function Shopfront() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-3 sm:p-3.5 w-full">
+      <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 p-3 sm:p-3.5 w-full`}>
         
         {/* Product Grid */}
         {products.length === 0 ? (
@@ -423,9 +423,13 @@ export default function Shopfront() {
         )}
       </main>
 
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-      {selectedProduct && <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
-      <OrderHistoryModal isOpen={isOrderHistoryOpen} onClose={() => setIsOrderHistoryOpen(false)} />
+      {activeTab === "cart" && (
+        <CartDrawer isOpen={true} onClose={() => { setIsCartOpen(false); setActiveTab("shop"); }} />
+      )}
+      {activeTab === "shop" && selectedProduct && <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
+      {activeTab === "orders" && (
+        <OrderHistoryModal isOpen={true} onClose={() => setActiveTab("shop")} />
+      )}
 
       {/* Back to Shopfront Confirmation Modal */}
       {isBackToShopfrontModalOpen && (
@@ -470,9 +474,9 @@ export default function Shopfront() {
       )}
 
       {/* Customer Account & Points Modal */}
-      <AccountModal
-        isOpen={isAccountOpen}
-        onClose={() => setIsAccountOpen(false)}
+      {activeTab === "account" && <AccountModal
+        isOpen={true}
+        onClose={() => setActiveTab("shop")}
         onSelectOrder={(ord) => {
           setIsAccountOpen(false);
           setIsOrderHistoryOpen(true);
@@ -480,13 +484,13 @@ export default function Shopfront() {
       />
 
       {/* Free Video Gallery Modal (Telegram Cloud) */}
-      <VideoGalleryModal
-        isOpen={isVideoGalleryOpen}
+      {activeTab === "media" && <VideoGalleryModal
+        isOpen={true}
         onClose={() => {
           setIsVideoGalleryOpen(false);
           setActiveTab("shop");
         }}
-      />
+      />}
 
       {/* Feature Notification Toast */}
       {noticeToast && (
