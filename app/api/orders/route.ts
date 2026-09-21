@@ -124,19 +124,25 @@ export async function POST(request: Request) {
     void notifyOrderCreated({
       chatId: authenticatedCustomer.tg_user_id,
       orderNumber,
-      status: payload.status,
-      customerName: payload.customer_name,
-      totalAmount: payload.total_amount,
-      payableNow: payload.payable_now,
-      items: payload.items,
+      status: orderForInventory.status,
+      customerName: orderForInventory.customerName,
+      totalAmount: orderForInventory.totalAmount,
+      payableNow: orderForInventory.payableNow,
+      items: inventoryOrder?.items || orderForInventory.items,
       event: 'created',
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      id: orderNumber, 
+    return NextResponse.json({
+      success: true,
+      id: orderNumber,
       orderNumber,
-      ...body 
+      ...body,
+      items: inventoryOrder?.items || body.items,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store',
+        'Pragma': 'no-cache',
+      },
     });
   } catch (error: any) {
     console.error('Error creating order:', error);
