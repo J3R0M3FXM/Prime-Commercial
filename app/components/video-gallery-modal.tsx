@@ -139,7 +139,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
   if (!isOpen) return null;
 
   return (
-    <div className="w-full bg-slate-950 flex justify-center py-3 sm:py-5">
+    <div className="w-full bg-gray-50 flex justify-center py-3 sm:py-5">
       <div className="w-full max-w-[760px] min-h-[calc(100vh-120px)] bg-slate-950 flex flex-col overflow-hidden text-slate-100 shadow-sm relative sm:border-x sm:border-slate-800">
         {/* 1. TOP NAVIGATION HEADER */}
       <header className="sticky top-0 z-20 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 py-3 sm:px-6 flex items-center justify-between gap-4">
