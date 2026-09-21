@@ -1,5 +1,7 @@
 "use client";
 
+import { authenticatedFetch } from "./telegram-auth-client";
+
 import React, { useState, useEffect, useRef } from "react";
 import {
   Film,
@@ -69,7 +71,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
   const loadGallery = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/media/videos");
+      const res = await authenticatedFetch("/api/media/videos");
       if (!res.ok) throw new Error("Failed to fetch gallery videos");
       const data = await res.json();
       setVideos(Array.isArray(data) ? data : []);
@@ -92,7 +94,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
     if (activeVideo) {
       setIsPlaying(true);
       // Fire view counter increment
-      fetch(`/api/media/videos/${activeVideo.id}/view`, { method: "POST" }).catch(() => {});
+      authenticatedFetch(`/api/media/videos/${activeVideo.id}/view`, { method: "POST" }).catch(() => {});
     } else {
       setIsPlaying(false);
     }
