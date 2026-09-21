@@ -87,6 +87,7 @@ import OrderPrintView from "@/app/components/admin/order-print-view";
 import ShareOrderModal from "@/app/components/admin/share-order-modal";
 import { StaticOrderMap } from "@/app/components/static-order-map";
 import dynamic from 'next/dynamic';
+import AutomationModule from '@/app/components/admin/automation-module';
 
 const LogisticsModule = dynamic(() => import('@/app/components/admin/logistics-module'), { 
   ssr: false,
@@ -126,7 +127,7 @@ type AdminView =
   | "charges"
   | "payments"
   | "promos"
-  | "media";
+  | "media"\n  | "automation";
 
 function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promise<void> }) {
   const [accessCode, setAccessCode] = useState("");
@@ -2067,7 +2068,8 @@ export default function AdminPage() {
                   { id: "charges", name: "Charges", icon: Receipt, desc: "Global Additional Fees", count: "Config" },
                   { id: "payments", name: "Payments", icon: CreditCard, desc: "Config Payment Methods", count: "Active Methods" },
                   { id: "promos", name: "Promos", icon: Tag, desc: "Discounts & Anti-Fraud", count: "Vouchers" },
-                  { id: "media", name: "Media", icon: Film, desc: "Telegram Video Gallery", count: "Videos" }
+                  { id: "media", name: "Media", icon: Film, desc: "Telegram Video Gallery", count: "Videos" },
+                  { id: "automation", name: "Automation", icon: MessageSquare, desc: "Telegram Secretary", count: "Rules" }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -6284,6 +6286,30 @@ export default function AdminPage() {
             <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
               <PromosModule />
             </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* AUTOMATION: TELEGRAM BUSINESS SECRETARY */}
+        {/* ========================================================================= */}
+        {view === "automation" && (
+          <motion.div
+            key="automation"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+          >
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <button onClick={() => setView("dashboard")} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+                </button>
+                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">Telegram Automation</h2>
+              </div>
+            </div>
+            <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8"><AutomationModule /></div>
           </motion.div>
         )}
 
