@@ -6,26 +6,34 @@ import {
 } from '@/lib/db-adapter';
 import { calculatePromoDiscount, type PromoConfig } from '@/lib/promos';
 import { calculateCustomerTier } from '@/lib/points-system';
+import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    const auth = await getAuthenticatedCustomer(request);
+    if (auth.error || !auth.customer) {
+      return NextResponse.json({ valid: false, error: auth.error || 'Telegram authentication required' }, { status: 401 });
+    }
+
     const body = await request.json();
-    const { 
-      code, 
-      itemsSubtotal = 0, 
+    const {
+      code,
+      itemsSubtotal = 0,
       itemQuantity = 0,
       totalItems = 0,
-      deliveryFee = 0, 
-      customerId = '', 
-      primeMemberId = '',
-      customerTier = '',
+      deliveryFee = 0,
+      customerTier: _clientTier = '',
       paymentMethod = '',
       courierId = '',
-      deviceId = '', 
-      hardwareId = '' 
+      deviceId = '',
+      hardwareId = ''
     } = body;
+
+    const customerId = auth.customer.id;
+    const primeMemberId = auth.customer.prime_member_id || '';
+    const customerTier = '';
 
     const cleanCode = String(code || '').trim().toUpperCase();
     if (!cleanCode) {
