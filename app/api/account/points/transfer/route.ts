@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,15 +10,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 400 });
     }
     const supabase = getSupabaseAdmin()!;
+    const auth = await getAuthenticatedCustomer(request);
+    if (auth.error || !auth.customer) {
+      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
+    }
     const body = await request.json();
-    const { senderCustomerId, recipientMemberId, amount } = body;
+    const { recipientMemberId, amount } = body;
 
     const transferAmount = Math.floor(Number(amount) || 0);
     const cleanRecipientCode = String(recipientMemberId || '').trim().toUpperCase();
-
-    if (!senderCustomerId) {
-      return NextResponse.json({ error: 'Sender identity is required.' }, { status: 400 });
-    }
     if (!cleanRecipientCode) {
       return NextResponse.json({ error: 'Recipient PRIME Member ID is required.' }, { status: 400 });
     }
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
     const { data: sender, error: senderErr } = await supabase
       .from('customers')
       .select('*')
-      .eq('id', senderCustomerId)
+      .eq('id', auth.customer.id)
       .single();
 
     if (senderErr || !sender) {
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
 
     await supabase.from('point_transactions').insert([{
       id: `tx-out-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      user_id: senderCustomerId,
+      user_id: auth.customer.id,
       type: 'transfer_out',
       amount: -transferAmount,
       description: `Transferred ₱${transferAmount.toLocaleString()} to ${recipient.tg_name || 'Member'} (${cleanRecipientCode})`,
