@@ -1,0 +1,106 @@
+"use client";
+import { useEffect, useState } from 'react';
+import { Plus, Save, Trash2, Power, MessageSquare, GripVertical } from 'lucide-react';
+
+type Button = { id: string; text: string; response: string; url?: string };
+type Flow = { id: string; name: string; active: boolean; triggerType: 'message'|'callback'; triggerValue: string; matchMode: 'exact'|'contains'|'starts_with'; responseText: string; buttons: Button[]; priority: number };
+
+const emptyFlow = (): Flow => ({ id: '', name: 'New Automation', active: true, triggerType: 'message', triggerValue: '', matchMode: 'contains', responseText: '', buttons: [], priority: 100 });
+
+export default function AutomationModule() {
+  const [flows, setFlows] = useState<Flow[]>([]);
+  const [settings, setSettings] = useState({ enabled: false, fallbackEnabled: false, fallbackResponse: '' });
+  const [selected, setSelected] = useState<Flow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    const res = await fetch('/api/admin/automation', { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load automation.');
+    setFlows(data.flows || []); setSettings(data.settings || settings);
+    setLoading(false);
+  };
+  useEffect(() => { void load().catch(e => { setMessage(e.message); setLoading(false); }); }, []);
+
+  const saveSettings = async () => {
+    setSaving(true); setMessage('');
+    try {
+      const res = await fetch('/api/admin/automation', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'settings', ...settings }) });
+      const data = await res.json(); if (!res.ok) throw new Error(data.error);
+      setSettings(data); setMessage('Automation settings saved.');
+    } catch (e: any) { setMessage(e.message || 'Save failed.'); } finally { setSaving(false); }
+  };
+
+  const saveFlow = async () => {
+    if (!selected?.name.trim() || !selected.triggerValue.trim() || !selected.responseText.trim()) { setMessage('Name, trigger and response are required.'); return; }
+    setSaving(true); setMessage('');
+    try {
+      const method = selected.id ? 'PUT' : 'POST';
+      const res = await fetch('/api/admin/automation', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selected) });
+      const data = await res.json(); if (!res.ok) throw new Error(data.error);
+      setFlows(current => selected.id ? current.map(f => f.id === data.id ? data : f) : [...current, data]);
+      setSelected(data); setMessage('Automation saved.');
+    } catch (e: any) { setMessage(e.message || 'Save failed.'); } finally { setSaving(false); }
+  };
+
+  const removeFlow = async (id: string) => {
+    if (!confirm('Delete this automation?')) return;
+    const res = await fetch('/api/admin/automation?id=' + encodeURIComponent(id), { method: 'DELETE' });
+    if (!res.ok) { const data = await res.json(); setMessage(data.error || 'Delete failed.'); return; }
+    setFlows(current => current.filter(f => f.id !== id)); if (selected?.id === id) setSelected(null);
+  };
+
+  const updateButton = (index: number, patch: Partial<Button>) => setSelected(current => current ? { ...current, buttons: current.buttons.map((b, i) => i === index ? { ...b, ...patch } : b) } : current);
+  const addButton = () => setSelected(current => current ? { ...current, buttons: [...current.buttons, { id: 'btn_' + Date.now(), text: 'New Button', response: '' }] } : current);
+  const deleteButton = (index: number) => setSelected(current => current ? { ...current, buttons: current.buttons.filter((_, i) => i !== index) } : current);
+
+  return <div className="space-y-5">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div><p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Telegram Business Secretary</p><h1 className="text-2xl font-heading font-black uppercase tracking-tight text-slate-900">Automation</h1><p className="text-xs text-slate-500 mt-1">Configure automatic replies and inline-button conversations for your connected Business account.</p></div>
+      <button onClick={() => setSelected(emptyFlow())} className="h-10 px-4 rounded-xl bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-2"><Plus className="w-4 h-4"/> New Automation</button>
+    </div>
+
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
+      <div className="flex items-center justify-between"><div><p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Engine</p><h2 className="font-heading font-black uppercase">Business Automation</h2></div><button onClick={() => setSettings(s => ({ ...s, enabled: !s.enabled }))} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase ${settings.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}><Power className="inline w-3 h-3 mr-1"/>{settings.enabled ? 'Enabled' : 'Disabled'}</button></div>
+      <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={settings.fallbackEnabled} onChange={e => setSettings(s => ({ ...s, fallbackEnabled: e.target.checked }))}/> Use fallback response when no trigger matches</label>
+      <textarea value={settings.fallbackResponse} onChange={e => setSettings(s => ({ ...s, fallbackResponse: e.target.value }))} placeholder="Fallback response..." className="w-full min-h-20 rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-slate-900"/>
+      <button disabled={saving} onClick={saveSettings} className="h-9 px-4 rounded-lg bg-slate-900 text-white text-[10px] font-bold uppercase"><Save className="inline w-3 h-3 mr-1"/> Save Engine Settings</button>
+    </div>
+
+    {message && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-mono text-slate-600">{message}</div>}
+
+    <div className="grid lg:grid-cols-[280px_1fr] gap-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-2">
+        <div className="px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-slate-400">Automations ({flows.length})</div>
+        {loading ? <div className="p-4 text-xs text-slate-400">Loading...</div> : flows.length === 0 ? <div className="p-4 text-xs text-slate-400">No automations configured.</div> : flows.map(flow => <button key={flow.id} onClick={() => setSelected(flow)} className={`w-full text-left p-3 rounded-xl border mb-1 ${selected?.id === flow.id ? 'border-slate-900 bg-slate-50' : 'border-transparent hover:bg-slate-50'}`}><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-slate-400"/><span className="font-bold text-xs truncate flex-1">{flow.name}</span><span className={`w-2 h-2 rounded-full ${flow.active ? 'bg-emerald-500' : 'bg-slate-300'}`}/></div><p className="text-[9px] text-slate-400 font-mono mt-1 truncate">{flow.triggerValue}</p></button>)}
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5">
+        {!selected ? <div className="min-h-80 flex items-center justify-center text-center text-slate-400"><div><MessageSquare className="w-8 h-8 mx-auto mb-2"/><p className="text-xs">Select an automation or create a new one.</p></div></div> : <div className="space-y-5">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Field label="Automation Name" value={selected.name} onChange={v => setSelected({ ...selected, name: v })}/>
+            <Field label="Trigger" value={selected.triggerValue} onChange={v => setSelected({ ...selected, triggerValue: v })}/>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <Select label="Trigger Type" value={selected.triggerType} options={[['message','Incoming message'],['callback','Callback data']]} onChange={v => setSelected({ ...selected, triggerType: v as any })}/>
+            <Select label="Match" value={selected.matchMode} options={[['contains','Contains'],['exact','Exact'],['starts_with','Starts with']]} onChange={v => setSelected({ ...selected, matchMode: v as any })}/>
+            <Field label="Priority" type="number" value={String(selected.priority)} onChange={v => setSelected({ ...selected, priority: Number(v) || 100 })}/>
+          </div>
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selected.active} onChange={e => setSelected({ ...selected, active: e.target.checked })}/> Automation active</label>
+          <div><label className="block text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">Response</label><textarea value={selected.responseText} onChange={e => setSelected({ ...selected, responseText: e.target.value })} placeholder="Use {{name}}, {{username}} or {{user_id}}" className="w-full min-h-28 rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-slate-900"/></div>
+          <div className="border-t border-slate-100 pt-4 space-y-3">
+            <div className="flex items-center justify-between"><div><p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Inline Keyboard</p><p className="text-xs text-slate-500">Each button can edit the current Telegram message with its configured response.</p></div><button onClick={addButton} className="h-8 px-3 rounded-lg border border-slate-200 text-[9px] font-bold uppercase"><Plus className="inline w-3 h-3 mr-1"/> Add Button</button></div>
+            {selected.buttons.map((button, index) => <div key={button.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2"><div className="flex gap-2 items-center"><GripVertical className="w-4 h-4 text-slate-300"/><input value={button.text} onChange={e => updateButton(index, { text: e.target.value })} placeholder="Button label" className="flex-1 h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"/><button onClick={() => deleteButton(index)} className="p-2 text-red-500"><Trash2 className="w-4 h-4"/></button></div><input value={button.url || ''} onChange={e => updateButton(index, { url: e.target.value })} placeholder="Optional URL (leave blank for callback)" className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs"/><textarea value={button.response} onChange={e => updateButton(index, { response: e.target.value })} placeholder="Response after button click" className="w-full min-h-20 rounded-lg border border-slate-200 bg-white p-2 text-xs"/></div>)}
+          </div>
+          <div className="flex flex-wrap justify-between gap-2 pt-2"><div>{selected.id && <button onClick={() => removeFlow(selected.id)} className="h-9 px-3 rounded-lg border border-red-200 text-red-600 text-[10px] font-bold uppercase"><Trash2 className="inline w-3 h-3 mr-1"/> Delete</button>}</div><button disabled={saving} onClick={saveFlow} className="h-9 px-4 rounded-lg bg-slate-900 text-white text-[10px] font-bold uppercase"><Save className="inline w-3 h-3 mr-1"/> Save Automation</button></div>
+        </div>}
+      </div>
+    </div>
+  </div>;
+}
+
+function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) { return <label className="block"><span className="block text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">{label}</span><input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full h-9 rounded-lg border border-slate-200 px-2 text-xs outline-none focus:border-slate-900"/></label>; }
+function Select({ label, value, options, onChange }: { label: string; value: string; options: string[][]; onChange: (value: string) => void }) { return <label className="block"><span className="block text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">{label}</span><select value={value} onChange={e => onChange(e.target.value)} className="w-full h-9 rounded-lg border border-slate-200 px-2 text-xs bg-white">{options.map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></label>; }
