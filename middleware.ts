@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTelegramInitData } from '@/lib/telegram-init-data';
+import { verifyTelegramInitData } from '@/lib/telegram-init-data';
 
 const PUBLIC = new Set(['/api/auth/telegram/validate', '/api/admin/auth']);
 const MAX_AGE = 86400;
