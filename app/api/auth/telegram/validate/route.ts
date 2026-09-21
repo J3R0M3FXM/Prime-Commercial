@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { enrichFingerprintData, saveFingerprint } from '@/lib/fingerprint';
 import { createTelegramSessionCookie, verifyTelegramSessionCookie } from '@/lib/telegram-session';
 
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     const isAdmin = Boolean(ADMIN_TELEGRAM_USER_ID && tgUserId === ADMIN_TELEGRAM_USER_ID);
 
     let existingData: any = null;
-    if (isSupabaseConfigured()) {
+    if (getSupabaseAdmin()) {
       const supabase = getSupabaseAdmin()!;
       const { data } = await supabase
         .from('customers')
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       tgUser.username ||
       `User ${tgUserId}`;
 
-    if (isSupabaseConfigured()) {
+    if (getSupabaseAdmin()) {
       const supabase = getSupabaseAdmin()!;
       const now = new Date().toISOString();
       const customerPayload = {
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     }
 
     let savedFp = null;
-    if (fingerprint && isSupabaseConfigured()) {
+    if (fingerprint && getSupabaseAdmin()) {
       try {
         const rawIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
         const clientIp = rawIp.split(',')[0].trim();

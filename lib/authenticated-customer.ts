@@ -1,8 +1,9 @@
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyTelegramSessionCookie } from '@/lib/telegram-session';
 
 export async function getAuthenticatedCustomer(request: Request) {
-  if (!isSupabaseConfigured()) return { customer: null, error: 'Supabase is not configured.' as string };
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { customer: null, error: 'Supabase server configuration is missing.' as string };
 
   const cookieHeader = request.headers.get('cookie') || '';
   const match = cookieHeader
@@ -16,7 +17,6 @@ export async function getAuthenticatedCustomer(request: Request) {
   const session = verifyTelegramSessionCookie(cookieValue);
   if (!session) return { customer: null, error: 'Telegram authentication required' as string };
 
-  const supabase = getSupabaseAdmin()!;
   const { data: customer, error } = await supabase
     .from('customers')
     .select('*')
