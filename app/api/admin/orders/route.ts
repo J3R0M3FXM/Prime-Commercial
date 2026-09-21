@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { cacheStore } from '@/lib/cache';
+import { notifyOrderStatusChanged, notifyPaymentUpdated } from '@/lib/telegram-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,14 +86,40 @@ export async function PUT(request: Request) {
       const results: string[] = [];
       const failures: { id: string; error: string }[] = [];
       for (const orderId of ids) {
+        const { data: existingOrder, error: lookupError } = await supabase
+          .from('orders')
+          .select('id, order_number, customer_name, tg_user_id, total_amount, payable_now, courier_name, tracking_number, status, payment_status')
+          .or(`id.eq.${orderId},order_number.eq.${orderId}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (lookupError) {
+          failures.push({ id: orderId, error: lookupError.message });
+          continue;
+        }
+
         const { error } = await supabase
           .from('orders')
           .update({ status, updated_at: new Date().toISOString() })
           .or(`id.eq.${orderId},order_number.eq.${orderId}`);
+
         if (error) {
           failures.push({ id: orderId, error: error.message });
         } else {
           results.push(orderId);
+          if (existingOrder && existingOrder.status !== status) {
+            void notifyOrderStatusChanged({
+              chatId: existingOrder.tg_user_id,
+              orderNumber: existingOrder.order_number || existingOrder.id,
+              status,
+              customerName: existingOrder.customer_name,
+              totalAmount: Number(existingOrder.total_amount) || 0,
+              payableNow: Number(existingOrder.payable_now) || 0,
+              courierName: existingOrder.courier_name,
+              trackingNumber: existingOrder.tracking_number,
+              event: 'status',
+            });
+          }
         }
       }
       cacheStore.invalidateOrders();
@@ -108,6 +135,15 @@ export async function PUT(request: Request) {
     const { id, status, notes, paymentStatus, trackingNumber, totalAmount } = body;
     if (!id) return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
 
+    const { data: existingOrder, error: existingOrderError } = await supabase
+      .from('orders')
+      .select('id, order_number, customer_name, tg_user_id, total_amount, payable_now, courier_name, tracking_number, status, payment_status')
+      .or(`id.eq.${id},order_number.eq.${id}`)
+      .limit(1)
+      .maybeSingle();
+    if (existingOrderError) throw existingOrderError;
+    if (!existingOrder) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+
     const updateData: any = { updated_at: new Date().toISOString() };
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
@@ -119,6 +155,37 @@ export async function PUT(request: Request) {
     if (error) throw error;
 
     cacheStore.invalidateOrders();
+
+    const resolvedOrderNumber = existingOrder.order_number || existingOrder.id;
+    const changedStatus = status !== undefined && existingOrder.status !== status;
+    const changedTracking = trackingNumber !== undefined && (existingOrder.tracking_number || '') !== (trackingNumber || '');
+    const changedPayment = paymentStatus !== undefined && existingOrder.payment_status !== paymentStatus;
+
+    if (changedStatus || changedTracking) {
+      void notifyOrderStatusChanged({
+        chatId: existingOrder.tg_user_id,
+        orderNumber: resolvedOrderNumber,
+        status: status !== undefined ? status : existingOrder.status,
+        customerName: existingOrder.customer_name,
+        totalAmount: totalAmount !== undefined ? Number(totalAmount) : Number(existingOrder.total_amount) || 0,
+        payableNow: Number(existingOrder.payable_now) || 0,
+        courierName: existingOrder.courier_name,
+        trackingNumber: trackingNumber !== undefined ? trackingNumber : existingOrder.tracking_number,
+        event: 'status',
+      });
+    }
+
+    if (changedPayment) {
+      void notifyPaymentUpdated({
+        chatId: existingOrder.tg_user_id,
+        orderNumber: resolvedOrderNumber,
+        status: status !== undefined ? status : existingOrder.status,
+        totalAmount: totalAmount !== undefined ? Number(totalAmount) : Number(existingOrder.total_amount) || 0,
+        paymentStatus,
+        event: 'payment',
+      });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
