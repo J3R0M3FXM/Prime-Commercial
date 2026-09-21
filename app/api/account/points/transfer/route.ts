@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Recipient not found. Please verify the PRIME Member ID.' }, { status: 404 });
     }
 
-    if (recipient.id === senderCustomerId) {
+    if (recipient.id === auth.customer.id) {
       return NextResponse.json({ error: 'You cannot transfer Store Credits to yourself.' }, { status: 400 });
     }
 
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     await supabase
       .from('customers')
       .update({ store_credits: newSenderBalance, updated_at: new Date().toISOString() })
-      .eq('id', senderCustomerId);
+      .eq('id', auth.customer.id);
 
     await supabase
       .from('customers')
