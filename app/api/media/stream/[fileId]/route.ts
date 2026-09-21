@@ -38,18 +38,17 @@ export async function GET(
     }
 
     if (!targetStreamUrl) {
-      if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
-        targetStreamUrl = decodeURIComponent(fileId);
+      // Raw URLs are intentionally rejected. A customer must reference a video
+      // record or a Telegram file ID; accepting arbitrary URLs here would turn
+      // this authenticated proxy into an SSRF primitive.
+      const tgInfo = await getTelegramFilePath(fileId);
+      if (tgInfo.success && tgInfo.filePath) {
+        targetStreamUrl = getTelegramDownloadUrl(tgInfo.filePath);
       } else {
-        const tgInfo = await getTelegramFilePath(fileId);
-        if (tgInfo.success && tgInfo.filePath) {
-          targetStreamUrl = getTelegramDownloadUrl(tgInfo.filePath);
-        } else {
-          return new NextResponse(
-            `Unable to locate video on Telegram: ${tgInfo.error || 'Invalid file ID'}`,
-            { status: 404 }
-          );
-        }
+        return new NextResponse(
+          'Unable to locate video on Telegram: invalid video identifier',
+          { status: 404 }
+        );
       }
     }
 
