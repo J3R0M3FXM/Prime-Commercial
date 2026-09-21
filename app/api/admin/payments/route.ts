@@ -120,10 +120,15 @@ export async function PUT(request: Request) {
     const data = await request.json();
 
     if (Array.isArray(data.reorder)) {
+      const failures: string[] = [];
       for (const item of data.reorder) {
         if (item.id && typeof item.sortOrder === 'number') {
-          await supabase.from('payment_methods').update({ sort_order: item.sortOrder }).eq('id', item.id);
+          const { error } = await supabase.from('payment_methods').update({ sort_order: item.sortOrder }).eq('id', item.id);
+          if (error) failures.push(`${item.id}: ${error.message}`);
         }
+      }
+      if (failures.length > 0) {
+        return NextResponse.json({ error: "One or more payment method order updates failed", failures }, { status: 500 });
       }
       return NextResponse.json({ success: true, message: "Order updated" });
     }
