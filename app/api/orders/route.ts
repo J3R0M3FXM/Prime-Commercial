@@ -88,6 +88,7 @@ export async function POST(request: Request) {
       courier_id: courier || '',
       courier_name: body.courierName || '',
       notes: notes || '',
+      fingerprint_snapshot: body.fingerprintSnapshot || body.deviceSnapshot || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
