@@ -128,7 +128,7 @@ export default function OrderHistoryModal({
   // Load payment methods for proof submission
   const loadPaymentMethods = async () => {
     try {
-      const res = await fetch(`/api/admin/payment-methods?_t=${Date.now()}`, { cache: "no-store" });
+      const res = await fetch(`/api/payment-methods?_t=${Date.now()}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
