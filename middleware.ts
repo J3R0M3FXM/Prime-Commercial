@@ -126,8 +126,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/media/videos/') ||
     pathname === '/api/charges' ||
     pathname === '/api/payment-methods' ||
-    pathname === '/api/storage/' ||
-    pathname === '/api/storage';
+    pathname === '/api/storage/';
 
 
   if (pathname.startsWith('/admin')) return NextResponse.next();
