@@ -1,7 +1,5 @@
 "use client";
 
-import { authenticatedFetch } from "./telegram-auth-client";
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getClientFingerprint, getClientLocation } from "./components/fingerprint-collector";
