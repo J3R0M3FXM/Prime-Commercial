@@ -14,6 +14,7 @@ import SplashScreen from "./components/splash-screen";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Bell, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { authenticatedFetch } from "./components/telegram-auth-client";
+import { getSupabaseClient } from "@/lib/supabase";
 
 export default function Shopfront() {
   const router = useRouter();
@@ -33,6 +34,75 @@ export default function Shopfront() {
   const [activeTab, setActiveTab] = useState<string>("shop");
 
   const { cart, cartCount, addToCart, updateQuantity } = useCart();
+
+  const normalizeProductRow = (row: any) => {
+    const bundleConfig = row?.bundle_config && typeof row.bundle_config === "object" ? row.bundle_config : {};
+    return {
+      id: row.id,
+      name: row.name,
+      price: Number(row.price) || 0,
+      stock: Number(row.stock) || 0,
+      category: row.category,
+      imageUrl: row.image_url || "",
+      description: row.description || "",
+      isActive: row.is_active !== false,
+      active: row.is_active !== false,
+      isFeatured: Boolean(row.is_featured),
+      sortOrder: Number(row.sort_order) || 0,
+      bundleConfig,
+      variants: Array.isArray(bundleConfig.variants) ? bundleConfig.variants : [],
+      lowStockThreshold: Number(bundleConfig.lowStockThreshold ?? 10),
+      tags: row.tags || [],
+      gallery: row.gallery || [],
+      updatedAt: row.updated_at,
+    };
+  };
+
+  // Stream product configuration and stock changes directly from Postgres.
+  // The REST route is still the canonical snapshot; Realtime keeps the UI current.
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel("prime-products-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const deletedId = String((payload.old as any)?.id || "");
+            if (!deletedId) return;
+            setProducts(prev => prev.filter(p => String(p.id) !== deletedId));
+            setSelectedProduct(prev => String(prev?.id || "") === deletedId ? null : prev);
+            return;
+          }
+
+          const incoming = normalizeProductRow(payload.new);
+          if (!incoming.id) return;
+
+          setProducts(prev => {
+            const found = prev.some(p => String(p.id) === String(incoming.id));
+            const next = found
+              ? prev.map(p => String(p.id) === String(incoming.id) ? { ...p, ...incoming } : p)
+              : [...prev, incoming];
+            return next.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
+          });
+
+          setSelectedProduct(prev => {
+            if (String(prev?.id || "") !== String(incoming.id)) return prev;
+            return { ...prev, ...incoming };
+          });
+        }
+      )
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED") console.warn("Product realtime status:", status);
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     async function checkAuth() {
