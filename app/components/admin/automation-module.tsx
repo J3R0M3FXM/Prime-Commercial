@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react';
 import { Plus, Save, Trash2, Power, MessageSquare, GripVertical } from 'lucide-react';
 
 type Button = { id: string; text: string; response: string; url?: string };
+type Chat = { business_connection_id: string; chat_id: number; last_customer_message_at?: string | null; last_human_message_at?: string | null; last_bot_message_at?: string | null; human_takeover_until?: string | null; bot_paused?: boolean };
 type Flow = { id: string; name: string; active: boolean; triggerType: 'message'|'callback'; triggerValue: string; matchMode: 'exact'|'contains'|'starts_with'; responseText: string; buttons: Button[]; priority: number };
 
 const emptyFlow = (): Flow => ({ id: '', name: 'New Automation', active: true, triggerType: 'message', triggerValue: '', matchMode: 'contains', responseText: '', buttons: [], priority: 100 });
 
 export default function AutomationModule() {
   const [flows, setFlows] = useState<Flow[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
   const [settings, setSettings] = useState({ enabled: false, fallbackEnabled: false, fallbackResponse: '', welcomeFlowId: '', businessConnectionId: '', businessUserId: '', businessUserChatId: '' });
   const [selected, setSelected] = useState<Flow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +22,7 @@ export default function AutomationModule() {
     const res = await fetch('/api/admin/automation', { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to load automation.');
-    setFlows(data.flows || []); setSettings(data.settings || settings);
+    setFlows(data.flows || []); setChats(data.chats || []); setSettings(data.settings || settings);
     setLoading(false);
   };
   useEffect(() => { void load().catch(e => { setMessage(e.message); setLoading(false); }); }, []);
@@ -32,6 +34,15 @@ export default function AutomationModule() {
       const data = await res.json(); if (!res.ok) throw new Error(data.error);
       setSettings(data); setMessage('Automation settings saved.');
     } catch (e: any) { setMessage(e.message || 'Save failed.'); } finally { setSaving(false); }
+  };
+
+  const toggleChat = async (chat: Chat) => {
+    const paused = !chat.bot_paused;
+    const res = await fetch('/api/admin/automation', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'chat_pause', businessConnectionId: chat.business_connection_id, chatId: chat.chat_id, paused }) });
+    const data = await res.json();
+    if (!res.ok) { setMessage(data.error || 'Failed to update chat.'); return; }
+    setChats(current => current.map(item => item.business_connection_id === chat.business_connection_id && item.chat_id === chat.chat_id ? { ...item, bot_paused: paused, updated_at: data.updated_at } : item));
+    setMessage(paused ? 'Automation paused for this chat.' : 'Automation resumed for this chat.');
   };
 
   const saveFlow = async () => {
@@ -71,6 +82,11 @@ export default function AutomationModule() {
     </div>
 
     {message && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-mono text-slate-600">{message}</div>}
+
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3">
+      <div><p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Per-Chat Control</p><h2 className="font-heading font-black uppercase">Human Takeover / Pause</h2><p className="text-xs text-slate-500 mt-1">Pause automation for a specific customer when you want to handle the conversation manually. Paused chats stay silent until resumed.</p></div>
+      {chats.length === 0 ? <p className="text-xs text-slate-400 py-3">No customer chats have reached the automation webhook yet.</p> : <div className="space-y-2">{chats.map(chat => <div key={chat.business_connection_id + ':' + chat.chat_id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3"><div className="flex-1 min-w-0"><p className="font-mono text-xs font-bold text-slate-800">Chat {chat.chat_id}</p><p className="text-[9px] text-slate-400 mt-1">Last customer: {chat.last_customer_message_at ? new Date(chat.last_customer_message_at).toLocaleString() : '—'}</p></div><span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-lg ${chat.bot_paused ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{chat.bot_paused ? 'Paused' : 'Active'}</span><button onClick={() => toggleChat(chat)} className="h-8 px-3 rounded-lg border border-slate-200 bg-white text-[9px] font-bold uppercase">{chat.bot_paused ? 'Resume Bot' : 'Pause Bot'}</button></div>)}</div>}
+    </div>
 
     <div className="grid lg:grid-cols-[280px_1fr] gap-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-2">
