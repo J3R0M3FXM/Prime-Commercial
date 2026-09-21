@@ -1,5 +1,7 @@
 "use client";
 
+import { authenticatedFetch } from "./telegram-auth-client";
+
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   X, 
@@ -128,7 +130,7 @@ export default function OrderHistoryModal({
   // Load payment methods for proof submission
   const loadPaymentMethods = async () => {
     try {
-      const res = await fetch(`/api/payment-methods?_t=${Date.now()}`, { cache: "no-store" });
+      const res = await authenticatedFetch(`/api/payment-methods?_t=${Date.now()}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
@@ -203,7 +205,7 @@ export default function OrderHistoryModal({
     setProofSuccess(false);
 
     try {
-      const res = await fetch("/api/orders", {
+      const res = await authenticatedFetch("/api/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
