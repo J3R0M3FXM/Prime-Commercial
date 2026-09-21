@@ -36,23 +36,29 @@ export async function getProductsFromDb() {
     throw error;
   }
 
-  return (data || []).map(p => ({
-    id: p.id,
-    name: p.name,
-    price: Number(p.price),
-    stock: Number(p.stock),
-    category: p.category,
-    imageUrl: p.image_url,
-    description: p.description,
-    isActive: p.is_active,
-    isFeatured: p.is_featured,
-    sortOrder: p.sort_order,
-    bundleConfig: p.bundle_config,
-    tags: p.tags,
-    gallery: p.gallery,
-    createdAt: p.created_at,
-    updatedAt: p.updated_at,
-  }));
+  return (data || []).map(p => {
+    const bundleConfig = (p.bundle_config && typeof p.bundle_config === 'object') ? p.bundle_config : {};
+    return {
+      id: p.id,
+      name: p.name,
+      price: Number(p.price),
+      stock: Number(p.stock),
+      category: p.category,
+      imageUrl: p.image_url,
+      description: p.description,
+      isActive: p.is_active,
+      active: p.is_active,
+      isFeatured: p.is_featured,
+      sortOrder: p.sort_order,
+      bundleConfig,
+      variants: Array.isArray(bundleConfig.variants) ? bundleConfig.variants : [],
+      lowStockThreshold: Number(bundleConfig.lowStockThreshold ?? 10),
+      tags: p.tags,
+      gallery: p.gallery,
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+    };
+  });
 }
 
 export async function createProductInDb(productData: any) {
@@ -68,7 +74,11 @@ export async function createProductInDb(productData: any) {
     is_active: productData.isActive !== false,
     is_featured: Boolean(productData.isFeatured),
     sort_order: Number(productData.sortOrder) || 0,
-    bundle_config: productData.bundleConfig || {},
+    bundle_config: {
+      ...((productData.bundleConfig && typeof productData.bundleConfig === 'object') ? productData.bundleConfig : {}),
+      ...(Array.isArray(productData.variants) ? { variants: productData.variants } : {}),
+      ...(productData.lowStockThreshold !== undefined ? { lowStockThreshold: Number(productData.lowStockThreshold) || 0 } : {}),
+    },
     tags: productData.tags || [],
     gallery: productData.gallery || [],
   };
@@ -89,9 +99,25 @@ export async function updateProductInDb(id: string, updates: any) {
   if (updates.imageUrl !== undefined) payload.image_url = updates.imageUrl;
   if (updates.description !== undefined) payload.description = updates.description;
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+  if (updates.active !== undefined) payload.is_active = Boolean(updates.active);
   if (updates.isFeatured !== undefined) payload.is_featured = updates.isFeatured;
   if (updates.sortOrder !== undefined) payload.sort_order = Number(updates.sortOrder);
   if (updates.bundleConfig !== undefined) payload.bundle_config = updates.bundleConfig;
+  if (updates.variants !== undefined || updates.lowStockThreshold !== undefined) {
+    const { data: current, error: currentError } = await supabase
+      .from('products')
+      .select('bundle_config')
+      .eq('id', id)
+      .single();
+    if (currentError) throw currentError;
+    const currentBundle = (current?.bundle_config && typeof current.bundle_config === 'object') ? current.bundle_config : {};
+    payload.bundle_config = {
+      ...currentBundle,
+      ...(updates.bundleConfig && typeof updates.bundleConfig === 'object' ? updates.bundleConfig : {}),
+      ...(updates.variants !== undefined ? { variants: updates.variants } : {}),
+      ...(updates.lowStockThreshold !== undefined ? { lowStockThreshold: Number(updates.lowStockThreshold) || 0 } : {}),
+    };
+  }
   if (updates.tags !== undefined) payload.tags = updates.tags;
   if (updates.gallery !== undefined) payload.gallery = updates.gallery;
   payload.updated_at = new Date().toISOString();
