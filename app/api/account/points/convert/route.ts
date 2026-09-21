@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,13 +10,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 400 });
     }
     const supabase = getSupabaseAdmin()!;
+    const auth = await getAuthenticatedCustomer(request);
+    if (auth.error || !auth.customer) {
+      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
+    }
     const body = await request.json();
-    const { customerId, pointsType, amount } = body;
+    const { pointsType, amount } = body;
 
     const convertAmount = Math.floor(Number(amount) || 0);
-    if (!customerId) {
-      return NextResponse.json({ error: 'Customer ID is required.' }, { status: 400 });
-    }
     if (convertAmount <= 0) {
       return NextResponse.json({ error: 'Please specify a valid amount of points to convert.' }, { status: 400 });
     }
@@ -23,17 +25,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid points type. Must be purchasing or referral.' }, { status: 400 });
     }
 
-    const { data: customer, error: fetchErr } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('id', customerId)
-      .single();
-
-    if (fetchErr || !customer) {
-      return NextResponse.json({ error: 'Customer profile not found.' }, { status: 404 });
-    }
-
-    const currentPoints = Number(customer.points || 0);
+    const customer = auth.customer;
+    const currentPoints = pointsType === 'referral'
+      ? Number(customer.referral_points || 0)
+      : Number(customer.points || 0);
 
     if (currentPoints < convertAmount) {
       return NextResponse.json({ error: `Insufficient Points. Available: ${currentPoints}` }, { status: 400 });
@@ -46,17 +41,19 @@ export async function POST(request: Request) {
     const { error: updateErr } = await supabase
       .from('customers')
       .update({
-        points: newPointsBalance,
+        ...(pointsType === 'referral'
+          ? { referral_points: newPointsBalance }
+          : { points: newPointsBalance }),
         store_credits: newCreditsBalance,
         updated_at: new Date().toISOString()
       })
-      .eq('id', customerId);
+      .eq('id', customer.id);
 
     if (updateErr) throw updateErr;
 
     await supabase.from('point_transactions').insert([{
       id: `tx-conv-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      user_id: customerId,
+      user_id: customer.id,
       type: pointsType === 'purchasing' ? 'conversion_purchasing' : 'conversion_referral',
       amount: convertAmount,
       description: `Converted ${convertAmount} Points to ₱${convertAmount} Store Credits`,
