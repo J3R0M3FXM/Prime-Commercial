@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { calculateCustomerTier, processMaturedReferrals } from '@/lib/points-system';
+import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,17 +10,12 @@ const MATURED_REFERRALS_INTERVAL_MS = 5 * 60 * 1000;
 
 export async function GET(request: Request) {
   try {
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 400 });
+    const auth = await getAuthenticatedCustomer(request);
+    if (auth.error || !auth.customer) {
+      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
     }
+    const customer = auth.customer;
     const supabase = getSupabaseAdmin()!;
-    const { searchParams } = new URL(request.url);
-    const customerId = searchParams.get('customerId') || searchParams.get('id') || '';
-    const primeMemberId = searchParams.get('primeMemberId') || '';
-
-    if (!customerId && !primeMemberId) {
-      return NextResponse.json({ error: 'Customer identifier is required.' }, { status: 400 });
-    }
 
     const now = Date.now();
     if (now - lastMaturedReferralsProcessTime > MATURED_REFERRALS_INTERVAL_MS) {
@@ -27,28 +23,8 @@ export async function GET(request: Request) {
       processMaturedReferrals().catch(() => {});
     }
 
-    let customer: any = null;
-
-    if (customerId) {
-      const { data } = await supabase.from('customers').select('*').eq('id', customerId).single();
-      customer = data;
-      if (!customer) {
-        const { data: tgData } = await supabase.from('customers').select('*').eq('tg_user_id', customerId).single();
-        customer = tgData;
-      }
-    }
-
-    if (!customer && primeMemberId) {
-      const { data } = await supabase.from('customers').select('*').eq('prime_member_id', primeMemberId).single();
-      customer = data;
-    }
-
-    if (!customer) {
-      return NextResponse.json({ error: 'Customer profile not found.' }, { status: 404 });
-    }
-
     const userId = customer.id;
-    const finalMemberId = customer.prime_member_id || primeMemberId || '';
+    const finalMemberId = customer.prime_member_id || '';
 
     const { data: ordersData } = await supabase
       .from('orders')
@@ -189,19 +165,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 400 });
     }
     const supabase = getSupabaseAdmin()!;
-    const body = await request.json();
-    const { customerId, photoUrl } = body;
-
-    if (!customerId) {
-      return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
+    const auth = await getAuthenticatedCustomer(request);
+    if (auth.error || !auth.customer) {
+      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
     }
-    if (!photoUrl) {
+    const supabase = getSupabaseAdmin()!;
+    const body = await request.json();
+    const { photoUrl } = body;
+
+    if (!photoUrl || typeof photoUrl !== 'string') {
       return NextResponse.json({ error: 'Photo URL or Base64 data is required' }, { status: 400 });
     }
-
-    const { data: customer } = await supabase.from('customers').select('*').eq('id', customerId).single();
-    if (!customer) {
-      return NextResponse.json({ error: 'Customer profile not found' }, { status: 404 });
+    if (photoUrl.length > 3_000_000) {
+      return NextResponse.json({ error: 'Photo is too large.' }, { status: 413 });
     }
 
     await supabase
@@ -211,7 +187,7 @@ export async function POST(request: Request) {
         has_custom_photo: true,
         updated_at: new Date().toISOString()
       })
-      .eq('id', customerId);
+      .eq('id', auth.customer.id);
 
     return NextResponse.json({ success: true, photoUrl });
   } catch (err: any) {
