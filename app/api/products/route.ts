@@ -1,30 +1,34 @@
 import { NextResponse } from 'next/server';
-import { cacheStore } from '@/lib/cache';
 import { getProductsFromDb } from '@/lib/db-adapter';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const PRODUCTS_CACHE_TTL_MS = 120000; // 120 seconds (2 minutes)
-
 export async function GET() {
   try {
-    const now = Date.now();
-    if (cacheStore.products && (now - cacheStore.lastProductsFetchTime < PRODUCTS_CACHE_TTL_MS)) {
-      return NextResponse.json(cacheStore.products);
-    }
-
+    // Product configuration and stock are server-authoritative.
+    // Do not serve process-local Vercel cache here: another instance may have
+    // already received an admin configuration/stock update.
     const products = await getProductsFromDb();
 
-    cacheStore.products = products;
-    cacheStore.lastProductsFetchTime = now;
-
-    return NextResponse.json(products);
+    return NextResponse.json(products, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store',
+      },
+    });
   } catch (err: any) {
-    if (cacheStore.products) {
-      return NextResponse.json(cacheStore.products);
-    }
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || 'Failed to load products' },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      }
+    );
   }
 }
-
