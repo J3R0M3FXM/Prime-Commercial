@@ -5,6 +5,47 @@ import { notifyOrderStatusChanged, notifyPaymentUpdated } from '@/lib/telegram-n
 
 export const dynamic = 'force-dynamic';
 
+
+function getOrderNumber(): string {
+  const d = new Date();
+  const pht = new Date(d.getTime() + 8 * 60 * 60 * 1000);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(pht.getUTCDate())}${pad(pht.getUTCMonth() + 1)}${pht.getUTCFullYear().toString().slice(-2)}${pad(pht.getUTCHours())}${pad(pht.getUTCMinutes())}${pad(pht.getUTCSeconds())}`;
+}
+
+export async function POST(request: Request) {
+  try {
+    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+    const body = await request.json();
+    if (!body.customerId) return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
+    if (!Array.isArray(body.items) || body.items.length === 0) return NextResponse.json({ error: 'Cart items are required' }, { status: 400 });
+    const supabase = getSupabaseAdmin()!;
+    const orderNumber = getOrderNumber();
+    const now = new Date().toISOString();
+    const payload = {
+      id: orderNumber, order_number: orderNumber, customer_id: body.customerId,
+      customer_name: body.customerName || '', customer_phone: body.receiverPhone || '',
+      tg_user_id: String(body.tgUserId || body.customerTelegramId || ''), prime_member_id: body.primeMemberId || '',
+      items: body.items, subtotal: Number(body.subTotal ?? body.totalAmount) || 0, delivery_fee: Number(body.deliveryFee) || 0,
+      discount_amount: Number(body.discountAmount) || 0, applied_promo_code: body.promoCode || '', points_discount: Number(body.pointsDiscount) || 0,
+      charges_breakdown: body.appliedCharges || [], total_amount: Number(body.totalAmount) || 0,
+      payable_now: Number(body.payableNow ?? body.totalAmount) || 0, payable_on_delivery: Number(body.payableOnDelivery) || 0,
+      status: body.status || 'Pending', payment_status: body.paymentStatus || 'Unpaid', payment_method_id: body.paymentMethodId || '',
+      payment_method_name: body.paymentMethodName || '', delivery_address: body.deliveryAddress || {}, courier_id: body.courier || '',
+      courier_name: body.courierName || '', notes: body.notes || '', review_status: 'Pending Manual Review', requires_manual_review: true,
+      created_at: now, updated_at: now
+    };
+    const { error } = await supabase.from('orders').insert([payload]);
+    if (error) throw error;
+    cacheStore.invalidateOrders();
+    void notifyOrderStatusChanged({chatId: payload.tg_user_id, orderNumber, status: payload.status, customerName: payload.customer_name, totalAmount: payload.total_amount, payableNow: payload.payable_now, event: 'status'});
+    return NextResponse.json({ success: true, id: orderNumber, orderNumber, ...body });
+  } catch (error: any) {
+    console.error('Admin order creation failed:', error);
+    return NextResponse.json({ error: error?.message || 'Failed to create order' }, { status: 500 });
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const now = Date.now();
@@ -132,7 +173,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: true, updatedCount: results.length, ids: results });
     }
 
-    const { id, status, notes, paymentStatus, trackingNumber, totalAmount } = body;
+    const { id, status, notes, paymentStatus, trackingNumber, totalAmount, ocrAnalysis } = body;
     if (!id) return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
 
     const { data: existingOrder, error: existingOrderError } = await supabase
@@ -150,6 +191,7 @@ export async function PUT(request: Request) {
     if (paymentStatus !== undefined) updateData.payment_status = paymentStatus;
     if (trackingNumber !== undefined) updateData.tracking_number = trackingNumber;
     if (totalAmount !== undefined) updateData.total_amount = Number(totalAmount);
+    if (ocrAnalysis !== undefined) updateData.ocr_analysis = ocrAnalysis;
 
     const { error } = await supabase.from('orders').update(updateData).or(`id.eq.${id},order_number.eq.${id}`);
     if (error) throw error;
