@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { verifyTelegramSessionCookie } from '@/lib/telegram-session';
-import { verifyTelegramInitData } from '@/lib/telegram-init-data';
 
 function generateMemberId() {
   return crypto.randomBytes(6).toString('hex').toUpperCase();
@@ -21,7 +20,40 @@ export async function getAuthenticatedCustomer(request: Request) {
     : undefined;
 
   const headerInitData = request.headers.get('x-telegram-init-data') || '';
-  const initDataSession = await verifyTelegramInitData(headerInitData);
+  let initDataSession: { tgUserId: string; isAdmin: boolean } | null = null;
+  if (headerInitData) {
+    try {
+      const params = new URLSearchParams(headerInitData);
+      const hash = params.get('hash')?.toLowerCase() || '';
+      params.delete('hash');
+      const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim() || '';
+      if (/^[0-9a-f]{64}$/.test(hash) && botToken) {
+        const dataCheckString = Array.from(params.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, value]) => `${key}=${value}`)
+          .join('\\n');
+        const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+        const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+        const authDate = Number(params.get('auth_date') || 0);
+        const now = Math.floor(Date.now() / 1000);
+        const user = JSON.parse(params.get('user') || '{}');
+        const tgUserId = user?.id != null ? String(user.id) : '';
+        if (
+          calculatedHash === hash &&
+          /^[0-9]+$/.test(tgUserId) &&
+          Number.isSafeInteger(authDate) &&
+          authDate > 0 &&
+          authDate <= now + 300 &&
+          now - authDate <= 86400
+        ) {
+          initDataSession = {
+            tgUserId,
+            isAdmin: Boolean(process.env.ADMIN_TELEGRAM_USER_ID?.trim() && tgUserId === process.env.ADMIN_TELEGRAM_USER_ID.trim()),
+          };
+        }
+      }
+    } catch {}
+  }
   const session = initDataSession || verifyTelegramSessionCookie(cookieValue);
   if (!session) return { customer: null, error: 'Telegram authentication required' as string };
 
