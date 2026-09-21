@@ -74,7 +74,7 @@ export default function Shopfront() {
             const deletedId = String((payload.old as any)?.id || "");
             if (!deletedId) return;
             setProducts(prev => prev.filter(p => String(p.id) !== deletedId));
-            setSelectedProduct(prev => String(prev?.id || "") === deletedId ? null : prev);
+            setSelectedProduct((prev: any) => String(prev?.id || "") === deletedId ? null : prev);
             return;
           }
 
@@ -89,7 +89,7 @@ export default function Shopfront() {
             return next.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
           });
 
-          setSelectedProduct(prev => {
+          setSelectedProduct((prev: any) => {
             if (String(prev?.id || "") !== String(incoming.id)) return prev;
             return { ...prev, ...incoming };
           });
