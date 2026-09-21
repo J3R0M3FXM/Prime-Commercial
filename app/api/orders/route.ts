@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { cacheStore } from '@/lib/cache';
+import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,11 +20,16 @@ function getOrderNumber(): string {
 
 export async function POST(request: Request) {
   try {
+    const auth = await getAuthenticatedCustomer(request);
+    if (auth.error || !auth.customer) {
+      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
+    }
+    const authenticatedCustomer = auth.customer;
+
     const body = await request.json();
-    const { 
-      items, 
-      customerId, 
-      customerName, 
+    const {
+      items,
+      customerName,
       primeMemberId, 
       subTotal,
       appliedCharges,
@@ -48,41 +54,17 @@ export async function POST(request: Request) {
     }
     const supabase = getSupabaseAdmin()!;
 
-    let finalMemberId = primeMemberId || '';
-    let resolvedCustomerId: string | null = null;
-    const requestedCustomerId = customerId ? String(customerId) : '';
-    const requestedTgUserId = body.tgUserId ? String(body.tgUserId) : '';
-
-    if (requestedCustomerId) {
-      const { data: byId } = await supabase.from('customers').select('*').eq('id', requestedCustomerId).maybeSingle();
-      if (byId) {
-        resolvedCustomerId = byId.id;
-        if (!finalMemberId) finalMemberId = byId.prime_member_id || '';
-      } else {
-        const { data: byTelegramId } = await supabase.from('customers').select('*').eq('tg_user_id', requestedCustomerId).maybeSingle();
-        if (byTelegramId) {
-          resolvedCustomerId = byTelegramId.id;
-          if (!finalMemberId) finalMemberId = byTelegramId.prime_member_id || '';
-        }
-      }
-    }
-
-    if (!resolvedCustomerId && requestedTgUserId) {
-      const { data: byTelegramId } = await supabase.from('customers').select('*').eq('tg_user_id', requestedTgUserId).maybeSingle();
-      if (byTelegramId) {
-        resolvedCustomerId = byTelegramId.id;
-        if (!finalMemberId) finalMemberId = byTelegramId.prime_member_id || '';
-      }
-    }
+    const resolvedCustomerId = authenticatedCustomer.id;
+    const finalMemberId = authenticatedCustomer.prime_member_id || '';
 
     const orderNumber = getOrderNumber();
     const payload = {
       id: orderNumber,
       order_number: orderNumber,
       customer_id: resolvedCustomerId,
-      customer_name: customerName || receiverName || '',
+      customer_name: authenticatedCustomer.tg_name || customerName || receiverName || '',
       customer_phone: receiverPhone || '',
-      tg_user_id: String(body.tgUserId || ''),
+      tg_user_id: String(authenticatedCustomer.tg_user_id || ''),
       prime_member_id: finalMemberId || '',
       items: items || [],
       subtotal: Number(subTotal) || 0,
@@ -131,10 +113,15 @@ const PUBLIC_ORDERS_CACHE_TTL_MS = 60000;
 
 export async function GET(request: Request) {
   try {
+    const auth = await getAuthenticatedCustomer(request);
+    if (auth.error || !auth.customer) {
+      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
+    }
+    const authenticatedCustomer = auth.customer;
+
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get('orderId') || searchParams.get('id');
     const orderNumber = searchParams.get('orderNumber');
-    const customerId = searchParams.get('customerId');
 
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
@@ -147,6 +134,7 @@ export async function GET(request: Request) {
         .from('orders')
         .select('*')
         .or(`id.eq.${target},order_number.eq.${target}`)
+        .eq('customer_id', authenticatedCustomer.id)
         .limit(1)
         .single();
       if (error || !data) {
@@ -155,16 +143,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ id: data.id, ...data });
     }
 
-    if (customerId) {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('customer_id', customerId)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return NextResponse.json(data || []);
-    }
+    const { data: customerOrders, error: customerOrdersError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('customer_id', authenticatedCustomer.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (customerOrdersError) throw customerOrdersError;
+    return NextResponse.json(customerOrders || []);
 
     const now = Date.now();
     let allOrders = cacheStore.orders;
@@ -191,6 +177,11 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const auth = await getAuthenticatedCustomer(request);
+    if (auth.error || !auth.customer) {
+      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
+    }
+
     const data = await request.json();
     const {
       orderId,
@@ -225,8 +216,9 @@ export async function PUT(request: Request) {
 
     const { error } = await supabase
       .from('orders')
-      .update(updatePayload)
-      .or(`id.eq.${orderId},order_number.eq.${orderId}`);
+.update(updatePayload)
+      .or(`id.eq.${orderId},order_number.eq.${orderId}`)
+      .eq('customer_id', auth.customer.id);
 
     if (error) throw error;
 
