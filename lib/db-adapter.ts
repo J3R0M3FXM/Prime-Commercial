@@ -303,6 +303,8 @@ function deserializePromo(p: any) {
       if (meta.isPaydayOnly !== undefined) isPaydayOnly = meta.isPaydayOnly;
       if (meta.flashHourStart !== undefined) flashHourStart = meta.flashHourStart;
       if (meta.flashHourEnd !== undefined) flashHourEnd = meta.flashHourEnd;
+      if (meta.cappedShippingDiscount !== undefined) cappedShippingDiscount = meta.cappedShippingDiscount;
+      if (meta.cashbackPercentage !== undefined) cashbackPercentage = meta.cashbackPercentage;
     }
   } catch {
     // plain text
@@ -328,6 +330,8 @@ function deserializePromo(p: any) {
     isPaydayOnly,
     flashHourStart: flashHourStart !== null ? Number(flashHourStart) : undefined,
     flashHourEnd: flashHourEnd !== null ? Number(flashHourEnd) : undefined,
+    cappedShippingDiscount: cappedShippingDiscount !== null ? Number(cappedShippingDiscount) : undefined,
+    cashbackPercentage: cashbackPercentage !== null ? Number(cashbackPercentage) : undefined,
     totalUsageLimit: p.total_usage_limit !== null ? Number(p.total_usage_limit) : undefined,
     usageCount: Number(p.usage_count) || 0,
     usageLimitPerCustomer: Number(p.usage_limit_per_customer) || 1,
@@ -352,7 +356,9 @@ function serializePromoDescription(promoData: any) {
     activeDaysOfWeek: promoData.activeDaysOfWeek || [0, 1, 2, 3, 4, 5, 6],
     isPaydayOnly: Boolean(promoData.isPaydayOnly),
     flashHourStart: promoData.flashHourStart !== undefined ? promoData.flashHourStart : null,
-    flashHourEnd: promoData.flashHourEnd !== undefined ? promoData.flashHourEnd : null
+    flashHourEnd: promoData.flashHourEnd !== undefined ? promoData.flashHourEnd : null,
+    cappedShippingDiscount: promoData.cappedShippingDiscount !== undefined ? promoData.cappedShippingDiscount : null,
+    cashbackPercentage: promoData.cashbackPercentage !== undefined ? promoData.cashbackPercentage : null
   };
   return JSON.stringify(meta);
 }
@@ -443,6 +449,8 @@ export async function updatePromoInDb(id: string, updates: any) {
   if (updates.isPaydayOnly !== undefined) currentMeta.isPaydayOnly = updates.isPaydayOnly;
   if (updates.flashHourStart !== undefined) currentMeta.flashHourStart = updates.flashHourStart;
   if (updates.flashHourEnd !== undefined) currentMeta.flashHourEnd = updates.flashHourEnd;
+  if (updates.cappedShippingDiscount !== undefined) currentMeta.cappedShippingDiscount = updates.cappedShippingDiscount;
+  if (updates.cashbackPercentage !== undefined) currentMeta.cashbackPercentage = updates.cashbackPercentage;
 
   const payload: Record<string, any> = { updated_at: new Date().toISOString() };
   if (updates.code !== undefined) payload.code = String(updates.code).trim().toUpperCase();
