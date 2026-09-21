@@ -188,6 +188,46 @@ export default function Shopfront() {
     checkAuth();
   }, [router]);
 
+  // Keep the customer's active Telegram session fresh in Supabase.
+  // Heartbeats only touch the current fingerprint session; they do not trigger external geolocation lookups.
+  useEffect(() => {
+    if (!authorized || isAdmin) return;
+    let stopped = false;
+
+    const sendHeartbeat = async () => {
+      if (stopped || typeof window === "undefined") return;
+      try {
+        const webApp = (window as any).Telegram?.WebApp;
+        const initData = typeof webApp?.initData === "string" ? webApp.initData.trim() : "";
+        if (!initData) return;
+
+        const fingerprint = await getClientFingerprint();
+        if (stopped) return;
+
+        const response = await fetch("/api/auth/telegram/validate", {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData, fingerprint, heartbeat: true }),
+        });
+
+        if (!response.ok && response.status !== 401) {
+          console.warn("Telegram session heartbeat returned", response.status);
+        }
+      } catch (err) {
+        console.warn("Telegram session heartbeat skipped:", err);
+      }
+    };
+
+    void sendHeartbeat();
+    const timer = window.setInterval(sendHeartbeat, 60000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [authorized, isAdmin]);
+
   const safeProducts = Array.isArray(products) ? products : [];
   const categories = ["All", ...Array.from(new Set(safeProducts.map(p => p?.category || "General")))];
 
