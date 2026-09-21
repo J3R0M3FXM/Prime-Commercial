@@ -311,8 +311,8 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
   const activeTierTheme = tierColors[tier?.tier || 'Member'] || tierColors.Member;
 
   return (
-    <div id="account-modal-overlay" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs">
-      <div className="bg-white border border-gray-200 w-full max-w-[430px] max-h-[92vh] flex flex-col shadow-2xl overflow-hidden rounded-2xl">
+    <div id="account-modal-overlay" className="w-full bg-gray-50 flex justify-center py-3 sm:py-5">
+      <div className="bg-white border border-gray-200 w-full max-w-[760px] flex flex-col shadow-sm overflow-hidden rounded-2xl">
         {/* Modal Header */}
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between bg-white sticky top-0 z-10">
           <div className="flex items-center gap-2">
