@@ -1,5 +1,7 @@
 "use client";
 
+import { authenticatedFetch } from "./telegram-auth-client";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getClientFingerprint, getClientLocation } from "./components/fingerprint-collector";
@@ -13,6 +15,7 @@ import LiveHeaderClock from "./components/live-header-clock";
 import SplashScreen from "./components/splash-screen";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Bell, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
+import { authenticatedFetch } from "./components/telegram-auth-client";
 
 export default function Shopfront() {
   const router = useRouter();
@@ -122,18 +125,7 @@ export default function Shopfront() {
         if (response.ok) {
           const authData = await response.json();
 
-          // Confirm the browser actually retained the server-issued HttpOnly session
-          // before touching protected customer APIs. This prevents a silent fallback
-          // when cookie creation/storage is unavailable.
-          const sessionCheck = await fetch("/api/auth/telegram/validate", {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-          });
-          const sessionData = await sessionCheck.json().catch(() => ({}));
-          if (!sessionCheck.ok || !sessionData.authenticated || !sessionData.sessionReady) {
-            throw new Error("Telegram session could not be established. Please reopen PRIME from Telegram.");
-          }
+          // Protected storefront APIs send live Telegram initData directly; the HttpOnly cookie is only a fallback.
 
           // If connection is from authorized Telegram Admin
           if (authData.isAdmin) {
@@ -143,7 +135,7 @@ export default function Shopfront() {
             if (shopMode) {
               setAuthorized(true);
               setIsAdmin(true);
-              const productsRes = await fetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
+              const productsRes = await authenticatedFetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
               const pData = await productsRes.json();
               setProducts(Array.isArray(pData) ? pData : []);
               await ensure10Sec();
@@ -177,7 +169,7 @@ export default function Shopfront() {
           }
 
           setAuthorized(true);
-          const productsRes = await fetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
+          const productsRes = await authenticatedFetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
           const pData = await productsRes.json();
           setProducts(Array.isArray(pData) ? pData : []);
         } else {
