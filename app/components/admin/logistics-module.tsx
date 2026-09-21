@@ -277,29 +277,40 @@ export default function LogisticsModule() {
   // Autocomplete logic
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!searchQuery.trim()) {
+    setWarehouseError(null);
+    const query = searchQuery.trim();
+    if (query.length < 2) {
       setSuggestions([]);
+      setIsSearching(false);
       return;
     }
-    
+
+    const controller = new AbortController();
     debounceRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`/api/geoapify/autocomplete?text=${encodeURIComponent(searchQuery)}`, { cache: "no-store" });
+        const res = await fetch(`/api/geoapify/autocomplete?text=${encodeURIComponent(query)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || `Address search failed (HTTP ${res.status})`);
-        setSuggestions(Array.isArray(data.results) ? data.results : []);
-        if (!Array.isArray(data.results) || data.results.length === 0) setWarehouseError("No address match found. You can click the map to drop the warehouse pin and save it manually.");
+        const results = Array.isArray(data.results) ? data.results : [];
+        setSuggestions(results);
+        if (!results.length && data?.error) setWarehouseError(data.error);
       } catch (e: any) {
-        console.error(e);
-        setSuggestions([]);
-        setWarehouseError(e?.message || "Address search failed. You can still place the pin manually on the map.");
+        if (e?.name !== "AbortError") {
+          console.error("Warehouse address search:", e);
+          setSuggestions([]);
+          setWarehouseError(e?.message || "Address search failed.");
+        }
       } finally {
         setIsSearching(false);
       }
-    }, 300);
+    }, 350);
 
     return () => {
+      controller.abort();
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [searchQuery]);
