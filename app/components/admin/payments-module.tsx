@@ -262,11 +262,15 @@ export default function PaymentsModule() {
     try {
       setIsReordering(true);
       const reorderPayload = updated.map((m, idx) => ({ id: m.id, sortOrder: idx }));
-      await fetch("/api/admin/payments", {
+      const res = await fetch("/api/admin/payments", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reorder: reorderPayload })
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to persist payment method order (HTTP ${res.status})`);
+      }
     } catch (e) {
       console.error("Failed to persist reorder", e);
     } finally {
