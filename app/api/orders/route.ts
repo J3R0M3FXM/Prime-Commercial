@@ -105,7 +105,10 @@ export async function POST(request: Request) {
 
     if (inventoryError) {
       console.error('Atomic inventory/order validation failed:', inventoryError);
-      const status = inventoryError.code === 'P0002' ? 409 : 500;
+      const isInventoryConflict =
+        inventoryError.code === 'P0002' ||
+        /insufficient stock|no longer available|no longer active|selected variant/i.test(inventoryError.message || '');
+      const status = isInventoryConflict ? 409 : 500;
       return NextResponse.json(
         { error: inventoryError.message || 'Inventory validation failed. Please refresh and try again.' },
         {
