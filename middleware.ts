@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyTelegramInitData } from '@/lib/telegram-init-data';
 
 const PUBLIC = new Set(['/api/auth/telegram/validate', '/api/admin/auth']);
 const MAX_AGE = 86400;
@@ -165,6 +166,13 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!apiProtected) return NextResponse.next();
+
+  // Telegram's signed initData is accepted directly so protected requests do not
+  // depend on browser cookie persistence inside Telegram's WebView.
+  const initDataSession = await verifyTelegramInitData(
+    request.headers.get('x-telegram-init-data') || undefined
+  );
+  if (initDataSession) return NextResponse.next();
 
   const session = await verifySession(request.cookies.get('prime_telegram_session')?.value);
   if (!session) {
