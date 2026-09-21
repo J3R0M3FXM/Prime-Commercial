@@ -9,7 +9,7 @@ const emptyFlow = (): Flow => ({ id: '', name: 'New Automation', active: true, t
 
 export default function AutomationModule() {
   const [flows, setFlows] = useState<Flow[]>([]);
-  const [settings, setSettings] = useState({ enabled: false, fallbackEnabled: false, fallbackResponse: '' });
+  const [settings, setSettings] = useState({ enabled: false, fallbackEnabled: false, fallbackResponse: '', welcomeFlowId: '', businessConnectionId: '', businessUserId: '', businessUserChatId: '' });
   const [selected, setSelected] = useState<Flow | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,9 +63,9 @@ export default function AutomationModule() {
       <button onClick={() => setSelected(emptyFlow())} className="h-10 px-4 rounded-xl bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-2"><Plus className="w-4 h-4"/> New Automation</button>
     </div>
 
-    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4"><div className="grid sm:grid-cols-3 gap-3"><ReadOnly label="Business User ID" value={settings.businessUserId}/><ReadOnly label="Business User Chat ID" value={settings.businessUserChatId}/><ReadOnly label="Business Connection ID" value={settings.businessConnectionId}/></div>
       <div className="flex items-center justify-between"><div><p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Engine</p><h2 className="font-heading font-black uppercase">Business Automation</h2></div><button onClick={() => setSettings(s => ({ ...s, enabled: !s.enabled }))} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase ${settings.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}><Power className="inline w-3 h-3 mr-1"/>{settings.enabled ? 'Enabled' : 'Disabled'}</button></div>
-      <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={settings.fallbackEnabled} onChange={e => setSettings(s => ({ ...s, fallbackEnabled: e.target.checked }))}/> Use fallback response when no trigger matches</label>
+      <label className="block text-[9px] font-bold uppercase tracking-widest text-slate-500">24-hour Welcome Automation</label><select value={settings.welcomeFlowId} onChange={e => setSettings(s => ({ ...s, welcomeFlowId: e.target.value }))} className="w-full h-9 rounded-lg border border-slate-200 px-2 text-xs bg-white"><option value="">Select an automation</option>{flows.filter(f => f.active).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select><p className="text-[9px] text-slate-400">This response is sent on the first customer message, then again only after 24 hours of inactivity.</p><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={settings.fallbackEnabled} onChange={e => setSettings(s => ({ ...s, fallbackEnabled: e.target.checked }))}/> Use fallback response when no trigger matches</label>
       <textarea value={settings.fallbackResponse} onChange={e => setSettings(s => ({ ...s, fallbackResponse: e.target.value }))} placeholder="Fallback response..." className="w-full min-h-20 rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-slate-900"/>
       <button disabled={saving} onClick={saveSettings} className="h-9 px-4 rounded-lg bg-slate-900 text-white text-[10px] font-bold uppercase"><Save className="inline w-3 h-3 mr-1"/> Save Engine Settings</button>
     </div>
@@ -104,3 +104,4 @@ export default function AutomationModule() {
 
 function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) { return <label className="block"><span className="block text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">{label}</span><input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full h-9 rounded-lg border border-slate-200 px-2 text-xs outline-none focus:border-slate-900"/></label>; }
 function Select({ label, value, options, onChange }: { label: string; value: string; options: string[][]; onChange: (value: string) => void }) { return <label className="block"><span className="block text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">{label}</span><select value={value} onChange={e => onChange(e.target.value)} className="w-full h-9 rounded-lg border border-slate-200 px-2 text-xs bg-white">{options.map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></label>; }
+function ReadOnly({ label, value }: { label: string; value: string }) { return <label className="block"><span className="block text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">{label}</span><input readOnly value={value || 'Not connected'} className="w-full h-9 rounded-lg border border-slate-200 px-2 text-[10px] font-mono bg-slate-50 text-slate-600"/></label>; }
