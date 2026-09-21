@@ -1,0 +1,152 @@
+const TELEGRAM_API_BASE = 'https://api.telegram.org';
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function money(value: unknown): string {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return '₱0.00';
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+  }).format(amount);
+}
+
+function getStatusIcon(status: string): string {
+  const normalized = status.toLowerCase();
+  if (normalized.includes('deliver')) return '🚚';
+  if (normalized.includes('ship') || normalized.includes('dispatch')) return '📦';
+  if (normalized.includes('process')) return '⚙️';
+  if (normalized.includes('confirm') || normalized.includes('approved')) return '✅';
+  if (normalized.includes('cancel') || normalized.includes('reject')) return '❌';
+  if (normalized.includes('pending')) return '⏳';
+  return '🔔';
+}
+
+async function sendTelegramMessage(chatId: string | number, text: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !chatId) {
+    console.warn('Telegram notification skipped: missing TELEGRAM_BOT_TOKEN or chat ID');
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `${TELEGRAM_API_BASE}/bot${token}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: String(chatId),
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }),
+        cache: 'no-store',
+      }
+    );
+
+    if (!response.ok) {
+      const detail = await response.text();
+      console.error('Telegram notification failed:', response.status, detail);
+      return false;
+    }
+
+    const result = await response.json();
+    if (!result.ok) {
+      console.error('Telegram notification rejected:', result.description);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Telegram notification error:', error);
+    return false;
+  }
+}
+
+export type OrderNotification = {
+  chatId?: string | number | null;
+  orderNumber: string;
+  status: string;
+  customerName?: string | null;
+  totalAmount?: number | null;
+  payableNow?: number | null;
+  paymentStatus?: string | null;
+  courierName?: string | null;
+  trackingNumber?: string | null;
+  items?: Array<{ name?: string; quantity?: number; qty?: number; price?: number }> | null;
+  event?: 'created' | 'status' | 'payment';
+};
+
+export async function notifyOrderCreated(order: OrderNotification): Promise<boolean> {
+  if (!order.chatId) return false;
+
+  const items = Array.isArray(order.items)
+    ? order.items
+        .slice(0, 10)
+        .map((item) => {
+          const quantity = Number(item.quantity ?? item.qty ?? 1);
+          return `• ${escapeHtml(item.name || 'Item')} × ${quantity}`;
+        })
+        .join('\n')
+    : '';
+
+  const message = [
+    '🛍️ <b>ORDER RECEIVED</b>',
+    '',
+    `Hello ${escapeHtml(order.customerName || 'Customer')}!`,
+    'Your order has been received and is now being processed.',
+    '',
+    `🧾 <b>Order:</b> <code>${escapeHtml(order.orderNumber)}</code>`,
+    `📌 <b>Status:</b> ${escapeHtml(order.status)}`,
+    order.totalAmount !== undefined ? `💰 <b>Total:</b> ${money(order.totalAmount)}` : '',
+    order.payableNow !== undefined ? `💳 <b>Payable now:</b> ${money(order.payableNow)}` : '',
+    items ? `\n<b>Items</b>\n${items}` : '',
+    '',
+    'We will send you another Telegram notification whenever your order status changes.',
+  ].filter(Boolean).join('\n');
+
+  return sendTelegramMessage(order.chatId, message);
+}
+
+export async function notifyOrderStatusChanged(order: OrderNotification): Promise<boolean> {
+  if (!order.chatId) return false;
+
+  const message = [
+    `${getStatusIcon(order.status)} <b>ORDER UPDATE</b>`,
+    '',
+    `🧾 <b>Order:</b> <code>${escapeHtml(order.orderNumber)}</code>`,
+    `📌 <b>New status:</b> ${escapeHtml(order.status)}`,
+    order.courierName ? `🚚 <b>Courier:</b> ${escapeHtml(order.courierName)}` : '',
+    order.trackingNumber ? `🔎 <b>Tracking:</b> <code>${escapeHtml(order.trackingNumber)}</code>` : '',
+    order.totalAmount !== undefined ? `💰 <b>Total:</b> ${money(order.totalAmount)}` : '',
+    '',
+    'Your order record has been updated. We will keep you informed of the next step.',
+  ].filter(Boolean).join('\n');
+
+  return sendTelegramMessage(order.chatId, message);
+}
+
+export async function notifyPaymentUpdated(order: OrderNotification): Promise<boolean> {
+  if (!order.chatId) return false;
+
+  const message = [
+    '💳 <b>PAYMENT UPDATE</b>',
+    '',
+    `🧾 <b>Order:</b> <code>${escapeHtml(order.orderNumber)}</code>`,
+    `📌 <b>Order status:</b> ${escapeHtml(order.status)}`,
+    `💰 <b>Total:</b> ${money(order.totalAmount)}`,
+    `💳 <b>Payment status:</b> ${escapeHtml(order.paymentStatus || 'Updated')}`,
+    '',
+    'Your payment information has been received and is being reviewed.',
+  ].join('\n');
+
+  return sendTelegramMessage(order.chatId, message);
+}
