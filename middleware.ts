@@ -214,6 +214,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Geoapify is also used by the Admin Logistics module. That module authenticates
+  // with the Admin Access Code, not the Telegram customer session. Accept a valid
+  // admin session here before falling through to the normal Telegram protection.
+  if (pathname.startsWith('/api/geoapify/')) {
+    const adminSession = await verifyAdminSession(request.cookies.get('prime_admin_session')?.value);
+    if (adminSession) return NextResponse.next();
+  }
+
   // Video management is an Admin capability. Published gallery reads remain
   // available to authenticated Telegram customers, while unpublished reads and
   // all writes require the Admin Access Code session.
