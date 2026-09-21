@@ -30,9 +30,7 @@ export default function Shopfront() {
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isVideoGalleryOpen, setIsVideoGalleryOpen] = useState(false);
-  const [isBackToShopfrontModalOpen, setIsBackToShopfrontModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("shop");
-  const [noticeToast, setNoticeToast] = useState<string | null>(null);
 
   const showFeatureToast = (featureName: string) => {
     setNoticeToast(`${featureName} module is under development`);
@@ -431,48 +429,6 @@ export default function Shopfront() {
         <OrderHistoryModal isOpen={true} onClose={() => setActiveTab("shop")} />
       )}
 
-      {/* Back to Shopfront Confirmation Modal */}
-      {isBackToShopfrontModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs" 
-            onClick={() => setIsBackToShopfrontModalOpen(false)}
-          />
-          <div className="relative bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl border border-gray-100 animate-in zoom-in-95 duration-150">
-            <h3 className="font-heading font-bold text-lg text-slate-950 uppercase tracking-widest mb-2">
-              Back to Shopfront
-            </h3>
-            <p className="text-xs text-slate-600 font-mono leading-relaxed mb-6">
-              Would you like to return to the main catalog page and reset all of your search queries and filter settings?
-            </p>
-            
-            <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={() => setIsBackToShopfrontModalOpen(false)}
-                className="px-4 py-2 text-xs font-heading font-bold uppercase tracking-wider text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm("");
-                  setSelectedCategory("All");
-                  setIsBackToShopfrontModalOpen(false);
-                  if (typeof window !== "undefined") {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }
-                }}
-                className="px-5 py-2 text-xs font-heading font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg transition-colors cursor-pointer"
-              >
-                Confirm & Return
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Customer Account & Points Modal */}
       {activeTab === "account" && <AccountModal
         isOpen={true}
@@ -491,14 +447,6 @@ export default function Shopfront() {
           setActiveTab("shop");
         }}
       />}
-
-      {/* Feature Notification Toast */}
-      {noticeToast && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-4 py-2 rounded-xl shadow-xl border border-slate-800 text-xs font-mono flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <Info className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{noticeToast}</span>
-        </div>
-      )}
 
       {/* Fixed Non-Scrolling Bottom Navigation Bar (sitting right above system footer) */}
       <nav className="fixed bottom-[20px] left-0 right-0 max-w-[430px] mx-auto z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/90 shadow-lg px-0.5 py-1.5 flex items-center justify-between font-['Roboto_Condensed'] select-none">
@@ -558,7 +506,7 @@ export default function Shopfront() {
         <button
           type="button"
           onClick={() => {
-            showFeatureToast("NOTIFICATIONS");
+            setActiveTab("notifications");
           }}
           className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
         >
@@ -600,7 +548,7 @@ export default function Shopfront() {
         <button
           type="button"
           onClick={() => {
-            showFeatureToast("SUPPORT");
+            setActiveTab("support");
           }}
           className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
         >
