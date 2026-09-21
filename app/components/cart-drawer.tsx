@@ -216,7 +216,8 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
   return (
     <div className="w-full flex justify-center bg-gray-50">
-      <div className="w-full max-w-[760px] bg-white min-h-[calc(100vh-120px)] shadow-sm flex flex-col relative border-x border-slate-200">
+      {!isCheckoutOpen && (
+        <div className="w-full max-w-[760px] bg-white min-h-[calc(100vh-120px)] shadow-sm flex flex-col relative border-x border-slate-200">
         
         {/* Header */}
         <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
@@ -340,9 +341,10 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             </button>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
-      {/* Multi-Step Checkout Modal */}
+      {/* Multi-Step Checkout Modal replaces the cart panel while checkout is open */}
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
