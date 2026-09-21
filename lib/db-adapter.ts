@@ -287,6 +287,8 @@ function deserializePromo(p: any) {
   let isPaydayOnly = false;
   let flashHourStart = null;
   let flashHourEnd = null;
+  let cappedShippingDiscount = null;
+  let cashbackPercentage = null;
 
   try {
     if (description && description.startsWith('{') && description.endsWith('}')) {
