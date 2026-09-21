@@ -804,121 +804,6 @@ export default function CheckoutModal({
     }
   };
 
-  // Real-time Promo / Voucher Code Validation
-  useEffect(() => {
-    const cleanCode = promoCodeInput.trim().toUpperCase();
-    if (!cleanCode) {
-      setAppliedPromo(null);
-      setPromoError("");
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setIsCheckingPromo(true);
-      setPromoError("");
-      try {
-        const fpData = await getClientFingerprint();
-        const totalItemCount = selectedItems.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
-        const res = await authenticatedFetch("/api/promos/validate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code: cleanCode,
-            itemsSubtotal,
-            itemQuantity: totalItemCount,
-            totalItems: totalItemCount,
-            deliveryFee: courierDeliveryFee,
-            customerId: tgCustomer.id,
-            primeMemberId: tgCustomer.primeMemberId,
-            customerTier: tgCustomer.tier || 'MEMBER',
-            paymentMethod: deliveryPaymentMethod === 'upon_delivery' ? 'upon_delivery' : 'upon_checkout',
-            courierId: selectedCourier?.id || selectedCourierId,
-            deviceId: fpData.deviceId,
-            hardwareId: fpData.hardwareId
-          })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.valid) {
-          setAppliedPromo(null);
-          setPromoError(data.error || "Invalid voucher code.");
-        } else {
-          setAppliedPromo({
-            code: data.code,
-            title: data.title || data.code,
-            promoId: data.promoId,
-            voucherType: data.voucherType,
-            discountAmount: Number(data.discountAmount) || 0,
-            discountType: data.discountType,
-            discountValue: data.discountValue,
-            maxDiscountAmount: data.maxDiscountAmount,
-            isFreeShipping: Boolean(data.isFreeShipping),
-            shippingSubsidy: Number(data.shippingSubsidy) || 0,
-            cashbackPoints: Number(data.cashbackPoints) || 0
-          });
-          setPromoError("");
-        }
-      } catch (err: any) {
-        setAppliedPromo(null);
-        setPromoError(err.message || "Failed to validate voucher code.");
-      } finally {
-        setIsCheckingPromo(false);
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [promoCodeInput, itemsSubtotal, courierDeliveryFee, deliveryPaymentMethod, selectedCourierId, selectedCourier, tgCustomer, selectedItems]);
-
-  // Real-time Referral Code Validation
-  useEffect(() => {
-    const cleanCode = referralCodeInput.trim().toUpperCase();
-    if (!cleanCode) {
-      setAppliedReferral(null);
-      setReferralError("");
-      setReferralSuccess("");
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setIsCheckingReferral(true);
-      setReferralError("");
-      setReferralSuccess("");
-      try {
-        const res = await authenticatedFetch("/api/referral/validate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            referralCode: cleanCode,
-            customerId: tgCustomer.id,
-            customerMemberId: tgCustomer.primeMemberId
-          })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.valid) {
-          setAppliedReferral(null);
-          setReferralError(data.error || "Invalid referral code.");
-        } else {
-          setAppliedReferral({
-            code: data.referrerMemberId,
-            referrerName: data.referrerName || "Valued Member",
-            referrerMemberId: data.referrerMemberId
-          });
-          setReferralSuccess(`Referred by ${data.referrerName} (${data.referrerMemberId})`);
-          setReferralError("");
-          try {
-            localStorage.setItem("prime_referred_by", data.referrerMemberId);
-          } catch (e) {}
-        }
-      } catch (err: any) {
-        setAppliedReferral(null);
-        setReferralError(err.message || "Failed to validate referral code.");
-      } finally {
-        setIsCheckingReferral(false);
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [referralCodeInput, tgCustomer]);
-
   // Promo Code Validation Handler
   const handleApplyPromo = async () => {
     const cleanCode = promoCodeInput.trim().toUpperCase();
@@ -1637,10 +1522,10 @@ export default function CheckoutModal({
             <div className="space-y-6">
               <div className="border-b border-gray-100 pb-2">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 font-heading">
-                  Full Order Details & Complete Breakdown
+                  Review Order & Finalize
                 </h3>
                 <p className="text-xs text-gray-500 font-mono">
-                  Review all charges, delivery details, and items before placing order
+                  Delivery information, items, charges, and final adjustments
                 </p>
               </div>
 
@@ -1650,6 +1535,35 @@ export default function CheckoutModal({
                   <span>{submitError}</span>
                 </div>
               )}
+
+              {/* Delivery Information */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2.5 text-xs font-mono">
+                <div className="flex justify-between items-start">
+                  <span className="text-gray-500 uppercase text-[10px]">Receiver</span>
+                  <span className="font-bold text-gray-900 text-right">
+                    {receiverName} ({receiverPhone})
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-start pt-1 border-t border-gray-200">
+                  <span className="text-gray-500 uppercase text-[10px] flex items-center gap-1">
+                    <span>Address</span>
+                  </span>
+                  <span className="font-medium text-gray-900 text-right max-w-xs break-words">
+                    {selectedAddress}
+                    <span className="block text-gray-500 text-[11px]">Unit/Landmark: {unitDetails.trim() || "Non"}</span>
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center pt-1 border-t border-gray-200">
+                  <span className="text-gray-500 uppercase text-[10px]">Courier</span>
+                  <span className="font-bold text-gray-900">
+                    {selectedCourier?.name} ({calculatedDistance} km)
+                  </span>
+                </div>
+              </div>
+
+
 
               {/* Items Recap */}
               <div className="space-y-2">
@@ -1692,219 +1606,7 @@ export default function CheckoutModal({
                 </div>
               </div>
 
-              {/* Delivery & Receiver Summary */}
-              <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-2 text-xs font-mono">
-                <div className="flex justify-between items-start">
-                  <span className="text-gray-500 uppercase text-[10px]">Receiver</span>
-                  <span className="font-bold text-gray-900 text-right">
-                    {receiverName} ({receiverPhone})
-                  </span>
-                </div>
 
-                <div className="flex justify-between items-start pt-1 border-t border-gray-200">
-                  <span className="text-gray-500 uppercase text-[10px] flex items-center gap-1">
-                    <span>Address</span>
-                  </span>
-                  <span className="font-medium text-gray-900 text-right max-w-xs break-words">
-                    {selectedAddress}
-                    <span className="block text-gray-500 text-[11px]">Unit/Landmark: {unitDetails.trim() || "Non"}</span>
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center pt-1 border-t border-gray-200">
-                  <span className="text-gray-500 uppercase text-[10px]">Courier</span>
-                  <span className="font-bold text-gray-900">
-                    {selectedCourier?.name} ({calculatedDistance} km)
-                  </span>
-                </div>
-              </div>
-
-              {/* Side-by-Side Voucher (Left) and Referral (Right) Code Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Voucher / Promo Code (Left) */}
-                <div className="border border-gray-200 rounded-xl p-3 sm:p-3.5 bg-white space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-900">
-                      <Tag className="w-3.5 h-3.5 text-slate-700" />
-                      <span>Voucher Code</span>
-                    </div>
-                    {appliedPromo && (
-                      <span className="text-[10px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-300">
-                        Applied
-                      </span>
-                    )}
-                  </div>
-
-                  {appliedPromo ? (
-                    <div className="p-2 bg-emerald-50/80 border border-emerald-200 rounded-lg flex items-center justify-between text-xs font-mono">
-                      <div className="min-w-0 flex-1 pr-1">
-                        <span className="font-bold text-emerald-950 uppercase block truncate">{appliedPromo.code}</span>
-                        <span className="text-[10px] text-emerald-700 font-semibold block truncate">
-                          {appliedPromo.isFreeShipping
-                            ? "Free Shipping"
-                            : appliedPromo.discountType === "percentage"
-                            ? `${appliedPromo.discountValue}% OFF`
-                            : `₱${appliedPromo.discountAmount.toLocaleString()} OFF`}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAppliedPromo(null);
-                          setPromoCodeInput("");
-                          setPromoError("");
-                        }}
-                        className="p-1 text-emerald-700 hover:text-emerald-900 rounded transition-colors cursor-pointer shrink-0"
-                        title="Remove voucher"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <div className="relative flex items-center">
-                        <input
-                          type="text"
-                          value={promoCodeInput}
-                          onChange={(e) => {
-                            setPromoCodeInput(e.target.value.toUpperCase());
-                          }}
-                          placeholder="ENTER VOUCHER CODE"
-                          className="w-full pl-3 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
-                        />
-                        {isCheckingPromo && (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400 absolute right-2.5" />
-                        )}
-                      </div>
-
-                      {promoError && (
-                        <div className="text-[10px] font-mono text-red-600 flex items-center gap-1 bg-red-50 p-1.5 rounded border border-red-200">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{promoError}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Referral Code (Right) */}
-                <div className="border border-gray-200 rounded-xl p-3 sm:p-3.5 bg-white space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-900">
-                      <Gift className="w-3.5 h-3.5 text-slate-700" />
-                      <span>Referral Code</span>
-                    </div>
-                    {(existingReferrer || appliedReferral) && (
-                      <span className="text-[10px] font-mono font-bold uppercase bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200">
-                        Linked
-                      </span>
-                    )}
-                  </div>
-
-                  {existingReferrer ? (
-                    <div className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono flex items-center justify-between">
-                      <div className="truncate">
-                        <span className="text-gray-500 text-[9px] uppercase block">Referred By</span>
-                        <span className="font-bold text-gray-900 truncate block">{existingReferrer.name || "Member"} ({existingReferrer.memberId})</span>
-                      </div>
-                      <span className="text-[9px] text-gray-400 font-mono uppercase shrink-0">Permanent</span>
-                    </div>
-                  ) : appliedReferral ? (
-                    <div className="p-2 bg-blue-50/80 border border-blue-200 rounded-lg flex items-center justify-between text-xs font-mono">
-                      <div className="min-w-0 flex-1 pr-1">
-                        <span className="text-blue-600 text-[9px] uppercase font-bold block">Referral Applied</span>
-                        <span className="font-bold text-blue-950 truncate block">{appliedReferral.referrerName} ({appliedReferral.code})</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAppliedReferral(null);
-                          setReferralCodeInput("");
-                          setReferralError("");
-                          setReferralSuccess("");
-                        }}
-                        className="p-1 text-blue-600 hover:text-blue-900 rounded transition-colors cursor-pointer shrink-0"
-                        title="Remove referral code"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <div className="relative flex items-center">
-                        <input
-                          type="text"
-                          value={referralCodeInput}
-                          onChange={(e) => {
-                            setReferralCodeInput(e.target.value.toUpperCase());
-                          }}
-                          placeholder="ENTER FRIEND'S ID"
-                          className="w-full pl-3 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
-                        />
-                        {isCheckingReferral && (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400 absolute right-2.5" />
-                        )}
-                      </div>
-
-                      {referralError && (
-                        <div className="text-[10px] font-mono text-red-600 flex items-center gap-1 bg-red-50 p-1.5 rounded border border-red-200">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{referralError}</span>
-                        </div>
-                      )}
-                      {referralSuccess && (
-                        <div className="text-[10px] font-mono text-blue-700 flex items-center gap-1 bg-blue-50 p-1.5 rounded border border-blue-200">
-                          <Check className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{referralSuccess}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* PRIME Store Credits Section */}
-              {availableStoreCredits > 0 && (
-                <div className="border border-amber-200/80 rounded-xl p-3.5 sm:p-4 bg-amber-50/30 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-amber-950">
-                      <Coins className="w-3.5 h-3.5 text-amber-700" />
-                      <span>PRIME Store Credits</span>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-amber-900">
-                      ₱{availableStoreCredits.toLocaleString()} Available
-                    </span>
-                  </div>
-
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none bg-white p-2.5 rounded-lg border border-amber-200">
-                    <input
-                      type="checkbox"
-                      checked={useStoreCredits}
-                      onChange={(e) => setUseStoreCredits(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                    />
-                    <div className="text-xs font-mono flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-gray-900">
-                          Apply Store Credits to this order
-                        </span>
-                        {useStoreCredits && creditsDeducted > 0 && (
-                          <span className="font-bold text-emerald-700 font-mono">
-                            -{formatPHP(creditsDeducted)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        {useStoreCredits
-                          ? (payableBeforeCredits <= availableStoreCredits
-                              ? "Full payable amount covered by your store credits."
-                              : `Deducting ₱${creditsDeducted.toLocaleString()} from your payable total.`)
-                          : "Use your accumulated PRIME Store Credits for instant order deduction."}
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              )}
 
               {/* Comprehensive Charges Breakdown */}
               <div className="border border-gray-200 rounded-xl p-4 bg-white space-y-1.5">
@@ -1963,6 +1665,222 @@ export default function CheckoutModal({
                   </div>
                 </div>
 
+
+
+              {/* Side-by-Side Voucher (Left) and Referral (Right) Code Inputs */}
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                {/* Voucher / Promo Code (Left) */}
+                <div className="border border-gray-200 rounded-xl p-3 sm:p-3.5 bg-white space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-900">
+                      <Tag className="w-3.5 h-3.5 text-slate-700" />
+                      <span>Voucher Code</span>
+                    </div>
+                    {appliedPromo && (
+                      <span className="text-[10px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-300">
+                        Applied
+                      </span>
+                    )}
+                  </div>
+
+                  {appliedPromo ? (
+                    <div className="p-2 bg-emerald-50/80 border border-emerald-200 rounded-lg flex items-center justify-between text-xs font-mono">
+                      <div className="min-w-0 flex-1 pr-1">
+                        <span className="font-bold text-emerald-950 uppercase block truncate">{appliedPromo.code}</span>
+                        <span className="text-[10px] text-emerald-700 font-semibold block truncate">
+                          {appliedPromo.isFreeShipping
+                            ? "Free Shipping"
+                            : appliedPromo.discountType === "percentage"
+                            ? `${appliedPromo.discountValue}% OFF`
+                            : `₱${appliedPromo.discountAmount.toLocaleString()} OFF`}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAppliedPromo(null);
+                          setPromoCodeInput("");
+                          setPromoError("");
+                        }}
+                        className="p-1 text-emerald-700 hover:text-emerald-900 rounded transition-colors cursor-pointer shrink-0"
+                        title="Remove voucher"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={promoCodeInput}
+                          onChange={(e) => {
+                            setPromoCodeInput(e.target.value.toUpperCase());
+                            if (promoError) setPromoError("");
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void handleApplyPromo();
+                            }
+                          }}
+                          placeholder="ENTER CODE"
+                          aria-label="Voucher code"
+                          className="min-w-0 flex-1 pl-2.5 pr-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[10px] sm:text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+                        />
+                        <button type="button" onClick={handleApplyPromo} disabled={isCheckingPromo || !promoCodeInput.trim()} className="shrink-0 px-2 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-[9px] font-heading font-bold uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed">
+                          {isCheckingPromo ? "..." : "Apply"}
+                        </button>
+                      </div>
+
+                      {promoError && (
+                        <div className="text-[10px] font-mono text-red-600 flex items-center gap-1 bg-red-50 p-1.5 rounded border border-red-200">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{promoError}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Referral Code (Right) */}
+                <div className="border border-gray-200 rounded-xl p-3 sm:p-3.5 bg-white space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-900">
+                      <Gift className="w-3.5 h-3.5 text-slate-700" />
+                      <span>Referral Code</span>
+                    </div>
+                    {(existingReferrer || appliedReferral) && (
+                      <span className="text-[10px] font-mono font-bold uppercase bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200">
+                        Linked
+                      </span>
+                    )}
+                  </div>
+
+                  {existingReferrer ? (
+                    <div className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono flex items-center justify-between">
+                      <div className="truncate">
+                        <span className="text-gray-500 text-[9px] uppercase block">Referred By</span>
+                        <span className="font-bold text-gray-900 truncate block">{existingReferrer.name || "Member"} ({existingReferrer.memberId})</span>
+                      </div>
+                      <span className="text-[9px] text-gray-400 font-mono uppercase shrink-0">Permanent</span>
+                    </div>
+                  ) : appliedReferral ? (
+                    <div className="p-2 bg-blue-50/80 border border-blue-200 rounded-lg flex items-center justify-between text-xs font-mono">
+                      <div className="min-w-0 flex-1 pr-1">
+                        <span className="text-blue-600 text-[9px] uppercase font-bold block">Referral Applied</span>
+                        <span className="font-bold text-blue-950 truncate block">{appliedReferral.referrerName} ({appliedReferral.code})</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAppliedReferral(null);
+                          setReferralCodeInput("");
+                          setReferralError("");
+                          setReferralSuccess("");
+                        }}
+                        className="p-1 text-blue-600 hover:text-blue-900 rounded transition-colors cursor-pointer shrink-0"
+                        title="Remove referral code"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={referralCodeInput}
+                          onChange={(e) => {
+                            setReferralCodeInput(e.target.value.toUpperCase());
+                            if (referralError) setReferralError("");
+                            if (referralSuccess) setReferralSuccess("");
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void handleApplyReferral();
+                            }
+                          }}
+                          placeholder="ENTER ID"
+                          aria-label="Referral code"
+                          className="min-w-0 flex-1 pl-2.5 pr-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[10px] sm:text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+                        />
+                        <button type="button" onClick={handleApplyReferral} disabled={isCheckingReferral || !referralCodeInput.trim()} className="shrink-0 px-2 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-[9px] font-heading font-bold uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed">
+                          {isCheckingReferral ? "..." : "Apply"}
+                        </button>
+                      </div>
+
+                      {referralError && (
+                        <div className="text-[10px] font-mono text-red-600 flex items-center gap-1 bg-red-50 p-1.5 rounded border border-red-200">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{referralError}</span>
+                        </div>
+                      )}
+                      {referralSuccess && (
+                        <div className="text-[10px] font-mono text-blue-700 flex items-center gap-1 bg-blue-50 p-1.5 rounded border border-blue-200">
+                          <Check className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{referralSuccess}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+
+
+              {/* PRIME Store Credits Section */}
+              {availableStoreCredits > 0 && (
+                <div className="border border-amber-200/80 rounded-xl p-3.5 sm:p-4 bg-amber-50/30 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-amber-950">
+                      <Coins className="w-3.5 h-3.5 text-amber-700" />
+                      <span>PRIME Store Credits</span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-amber-900">
+                      ₱{availableStoreCredits.toLocaleString()} Available
+                    </span>
+                  </div>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none bg-white p-2.5 rounded-lg border border-amber-200">
+                    <input
+                      type="checkbox"
+                      checked={useStoreCredits}
+                      onChange={(e) => setUseStoreCredits(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <div className="text-xs font-mono flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-gray-900">
+                          Apply Store Credits to this order
+                        </span>
+                        {useStoreCredits && creditsDeducted > 0 && (
+                          <span className="font-bold text-emerald-700 font-mono">
+                            -{formatPHP(creditsDeducted)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {useStoreCredits
+                          ? (payableBeforeCredits <= availableStoreCredits
+                              ? "Full payable amount covered by your store credits."
+                              : `Deducting ₱${creditsDeducted.toLocaleString()} from your payable total.`)
+                          : "Use your accumulated PRIME Store Credits for instant order deduction."}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+
+
+              {/* Final Total & Applied Benefits */}
+              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-2">
+                <h4 className="text-xs font-bold tracking-wider text-gray-900 font-heading border-b border-slate-200 pb-2">
+                  Final Total
+                </h4>
+
                 {/* Promo Code Discount */}
                 {appliedPromo && promoDiscountAmount > 0 && (
                   <div className="flex justify-between items-center text-xs font-mono text-emerald-700 pt-1 border-t border-gray-100">
@@ -1985,9 +1903,9 @@ export default function CheckoutModal({
                   </div>
                 )}
 
-                {/* Store Credits Deduction */}
+
                 {useStoreCredits && creditsDeducted > 0 && (
-                  <div className="flex justify-between items-center text-xs font-mono text-emerald-700 pt-1 border-t border-gray-100">
+                  <div className="flex justify-between items-center text-xs font-mono text-emerald-700 pt-1 border-t border-gray-200">
                     <span className="font-medium flex items-center gap-1">
                       <Coins className="w-3 h-3 text-emerald-600" />
                       Store Credits Applied:
@@ -1995,7 +1913,6 @@ export default function CheckoutModal({
                     <span className="font-bold font-mono">-{formatPHP(creditsDeducted)}</span>
                   </div>
                 )}
-
                 {/* Total Amounts Section */}
                 <div className="pt-3 border-t border-gray-200 space-y-1.5">
                   <div className="flex justify-between items-center">
@@ -2018,6 +1935,8 @@ export default function CheckoutModal({
                 </div>
               </div>
 
+
+              </div>
               {/* Optional Notes */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 font-heading">
