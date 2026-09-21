@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { findAutomationResponse, getAutomationFlows } from '@/lib/telegram-automation';
+import { findAutomationResponse, getAutomationFlows, getAutomationSettings, getAutomationChatState, recordBotMessage, recordCustomerMessage, recordHumanTakeover, saveBusinessConnection, shouldStartAutomation } from '@/lib/telegram-automation';
 
 export const dynamic = 'force-dynamic';
 const TELEGRAM_API_BASE = 'https://api.telegram.org';
@@ -50,13 +50,30 @@ export async function POST(request: Request) {
   if (!verifyWebhookSecret(request)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
     const update = await request.json();
+    if (update?.business_connection) {
+      await saveBusinessConnection(update.business_connection);
+      return NextResponse.json({ ok: true, connection_saved: true });
+    }
     const businessMessage = update?.business_message;
     if (businessMessage) {
-      if (businessMessage.via_bot || businessMessage.from?.is_bot) return NextResponse.json({ ok: true, ignored: true });
       const text = String(businessMessage.text || businessMessage.caption || '').trim();
       const connectionId = businessMessage.business_connection_id || update?.business_connection?.id;
       const chatId = businessMessage.chat?.id;
       if (!text || !connectionId || chatId === undefined) return NextResponse.json({ ok: true, ignored: true });
+      const settings = await getAutomationSettings();
+      const senderId = businessMessage.from?.id ? String(businessMessage.from.id) : '';
+      const isBusinessOwner = Boolean(settings.businessUserId && senderId === settings.businessUserId);
+      const isBotGenerated = Boolean(businessMessage.via_bot || businessMessage.sender_business_bot || businessMessage.from?.is_bot);
+      if (isBusinessOwner && !isBotGenerated) {
+        await recordHumanTakeover(connectionId, Number(chatId), new Date());
+        return NextResponse.json({ ok: true, ignored: true, reason: 'human_takeover' });
+      }
+      if (isBotGenerated) return NextResponse.json({ ok: true, ignored: true, reason: 'bot_message' });
+      const now = new Date();
+      const state = await getAutomationChatState(connectionId, Number(chatId));
+      const eligible = shouldStartAutomation(state, now);
+      await recordCustomerMessage(connectionId, Number(chatId), now);
+      if (!eligible) return NextResponse.json({ ok: true, matched: false, reason: 'within_24h' });
       const result = await findAutomationResponse('message', text);
       if (!result) return NextResponse.json({ ok: true, matched: false });
       const responseText = result.flow?.responseText || result.settings.fallbackResponse;
@@ -65,6 +82,7 @@ export async function POST(request: Request) {
         business_connection_id: connectionId, chat_id: chatId, text: renderTemplate(responseText, businessMessage),
         reply_markup: result.flow ? keyboard(result.flow) : undefined, disable_web_page_preview: true
       });
+      await recordBotMessage(connectionId, Number(chatId), new Date());
       return NextResponse.json({ ok: true, matched: true });
     }
     const callback = update?.callback_query;
