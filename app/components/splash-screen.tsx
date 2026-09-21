@@ -77,18 +77,20 @@ export default function SplashScreen({
           </div>
         </div>
 
-        {/* Center Bottom Section: Clean PRIME Logo & Progress */}
-        <div className="flex flex-col items-center justify-center space-y-4 w-full pb-6">
-          <div className="w-40 h-1 bg-slate-100 rounded-full overflow-hidden">
-            <div className="w-full h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-sky-400 animate-[pulse_2s_ease-in-out_infinite]" />
-          </div>
-
-          <div className="flex items-center justify-center">
+        {/* Bottom Branding Section: PRIME Logo + Legal/Developer Footer */}
+        <div className="flex flex-col items-center justify-center w-full pb-4">
+          <div className="flex items-center justify-center mb-4">
             <img 
               src="/prime-transparent.png" 
               alt="PRIME Logo" 
               className="h-9 sm:h-10 w-auto object-contain drop-shadow-sm"
             />
+          </div>
+
+          <div className="text-center font-mono uppercase tracking-[0.14em] text-[8px] sm:text-[9px] leading-relaxed text-slate-400">
+            <div>© 2026 | PRIME HOLDINGS, LLC</div>
+            <div>DEVELOPED BY</div>
+            <div>CODESPACE BUSINESS SYSTEMS</div>
           </div>
         </div>
 
