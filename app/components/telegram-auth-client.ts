@@ -3,7 +3,16 @@
 export function getLiveTelegramInitData(): string {
   if (typeof window === 'undefined') return '';
   const webApp = (window as any).Telegram?.WebApp;
-  return typeof webApp?.initData === 'string' ? webApp.initData.trim() : '';
+  const live = typeof webApp?.initData === 'string' ? webApp.initData.trim() : '';
+  if (live) {
+    try { sessionStorage.setItem('prime_telegram_init_data', live); } catch {}
+    return live;
+  }
+  try {
+    return sessionStorage.getItem('prime_telegram_init_data')?.trim() || '';
+  } catch {
+    return '';
+  }
 }
 
 async function bootstrapTelegramSession(initData: string): Promise<void> {
