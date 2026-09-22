@@ -2151,7 +2151,7 @@ export default function AdminPage() {
           >
             {/* STICKY & FIXED NON-SCROLLING TOP SEARCH & HEADER BAR */}
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2">
+              <div className="w-full px-2 py-1">
                 {/* Navigation Row */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
@@ -2223,7 +2223,7 @@ export default function AdminPage() {
             </div>
 
             {/* COMPACT CUSTOMERS LIST (SCROLLABLE AREA) */}
-            <div className="flex-1 w-full p-2.5 sm:p-3 space-y-2.5">
+            <div className="flex-1 w-full p-0 space-y-1.5">
               {filteredCustomers.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center">
                   <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -2363,7 +2363,7 @@ export default function AdminPage() {
           >
             {/* Sticky Navigation Top Bar */}
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2 flex items-center justify-between">
+              <div className="w-full px-2 py-1 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
@@ -2401,7 +2401,7 @@ export default function AdminPage() {
                 <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
               </div>
             ) : (
-              <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3 space-y-3">
+              <div className="flex-1 w-full p-0 space-y-2">
                 
                 {/* SECTION 1: CUSTOMER IDENTITY CARD */}
                 <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none overflow-hidden relative">
@@ -3032,7 +3032,7 @@ export default function AdminPage() {
               const isRisk = linkedAccounts.length >= 2;
 
               return (
-                <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3 space-y-3">
+                <div className="flex-1 w-full p-0 space-y-2">
                   
                   {/* Hardware Header Card */}
                   <div className="bg-white border border-slate-200 rounded-none p-3 sm:p-3 shadow-none space-y-2.5">
@@ -5175,7 +5175,7 @@ export default function AdminPage() {
           >
             {/* Sticky non-scrolling search & header */}
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2">
+              <div className="w-full px-2 py-1">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
                     <button
@@ -5226,7 +5226,7 @@ export default function AdminPage() {
             </div>
 
             {/* Compact Products List */}
-            <div className="flex-1 w-full p-2.5 sm:p-3 space-y-2.5">
+            <div className="flex-1 w-full p-0 space-y-1.5">
               {filteredProducts.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center">
                   <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -5673,7 +5673,7 @@ export default function AdminPage() {
           >
             {/* Sticky non-scrolling search & header */}
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2">
+              <div className="w-full px-2 py-1">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
                     <button
@@ -5729,7 +5729,7 @@ export default function AdminPage() {
             </div>
 
             {/* Compact Stock Adjustment Rows with Variant-Level Management */}
-            <div className="flex-1 w-full p-2.5 sm:p-3 space-y-2.5">
+            <div className="flex-1 w-full p-0 space-y-1.5">
               {filteredInventory.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center">
                   <Boxes className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -6043,7 +6043,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2 flex items-center justify-between">
+              <div className="w-full px-2 py-1 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -6056,7 +6056,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3 space-y-3">
+            <div className="flex-1 w-full p-0 space-y-2">
               <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none space-y-2.5">
                 <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
                   Telegram Authentication Gateway
@@ -6108,7 +6108,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2 flex items-center justify-between">
+              <div className="w-full px-2 py-1 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -6121,7 +6121,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 w-full mx-auto p-3.5 sm:p-2.5 space-y-3">
+            <div className="flex-1 w-full mx-auto p-0 space-y-2">
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 <div className="bg-white border border-slate-200 rounded-none p-2.5 shadow-none">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Total Users</p>
@@ -6180,7 +6180,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2 flex items-center justify-between">
+              <div className="w-full px-2 py-1 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -6193,7 +6193,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-0">
               <DiagnosticsModule />
             </div>
           </motion.div>
@@ -6212,7 +6212,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2 flex items-center justify-between">
+              <div className="w-full px-2 py-1 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -6225,7 +6225,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-0">
               <LogisticsModule />
             </div>
           </motion.div>
@@ -6244,7 +6244,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2 flex items-center justify-between">
+              <div className="w-full px-2 py-1 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -6257,7 +6257,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-0">
               <ChargesModule />
             </div>
           </motion.div>
@@ -6276,7 +6276,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2 flex items-center justify-between">
+              <div className="w-full px-2 py-1 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -6289,7 +6289,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-0">
               <PaymentsModule />
             </div>
           </motion.div>
@@ -6308,7 +6308,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2 flex items-center justify-between">
+              <div className="w-full px-2 py-1 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -6321,7 +6321,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-0">
               <PromosModule />
             </div>
           </motion.div>
@@ -6340,14 +6340,14 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2 flex items-center justify-between">
+              <div className="w-full px-2 py-1 flex items-center justify-between">
                 <button onClick={() => setView("dashboard")} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer">
                   <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
                 </button>
                 <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">Telegram Automation</h2>
               </div>
             </div>
-            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3"><AutomationModule /></div>
+            <div className="flex-1 w-full p-0"><AutomationModule /></div>
           </motion.div>
         )}
 
@@ -6364,7 +6364,7 @@ export default function AdminPage() {
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-3 sm:px-3 py-2 flex items-center justify-between">
+              <div className="w-full px-2 py-1 flex items-center justify-between">
                 <button
                   onClick={() => setView("dashboard")}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -6377,7 +6377,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-0">
               <MediaModule />
             </div>
           </motion.div>
