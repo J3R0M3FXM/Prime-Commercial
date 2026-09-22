@@ -179,7 +179,7 @@ function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promi
         <button
           type="submit"
           disabled={submitting || !accessCode.trim()}
-          className="mt-4 w-full h-11 rounded-none bg-slate-900 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+          className="mt-2.5 w-full h-11 rounded-none bg-slate-900 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50"
         >
           {submitting ? "VERIFYING..." : "VERIFY ADMIN ACCESS"}
         </button>
@@ -2055,7 +2055,7 @@ export default function AdminPage() {
             )}
 
             {/* Management Section Tiles */}
-            <div className="mb-4">
+            <div className="mb-2.5">
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 {[
                   { id: "customers", name: "Customers", icon: Users, desc: "Profiles & Device Info", count: customers.length },
@@ -2186,7 +2186,7 @@ export default function AdminPage() {
             </div>
 
             {/* COMPACT CUSTOMERS LIST (SCROLLABLE AREA) */}
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 space-y-2.5">
+            <div className="flex-1 w-full p-2.5 sm:p-3 space-y-2.5">
               {filteredCustomers.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center">
                   <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -2364,11 +2364,11 @@ export default function AdminPage() {
                 <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
               </div>
             ) : (
-              <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 lg:p-3 space-y-3">
+              <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3 space-y-3">
                 
                 {/* SECTION 1: CUSTOMER IDENTITY CARD */}
                 <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none overflow-hidden relative">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-6 border-b border-slate-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-100">
                     <div className="flex items-center gap-2.5">
                 
                       {customerDetail.customer.photoUrl ? (
@@ -2418,7 +2418,7 @@ export default function AdminPage() {
                   </div>
 
                   {/* Identity Breakdown Grid */}
-                  <div className="grid grid-cols-2 gap-2.5 pt-6 text-xs">
+                  <div className="grid grid-cols-2 gap-2.5 pt-3 text-xs">
                     <div className="bg-slate-50 p-3 rounded-none border border-slate-100">
                       <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">First / Last Name</p>
                       <p className="font-mono text-slate-900 font-bold">
@@ -2451,7 +2451,7 @@ export default function AdminPage() {
 
                 {/* SECTION 1.5: PRIME LOYALTY, TIER STATUS & POINTS DOSSIER */}
                 <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none space-y-2.5">
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-none bg-amber-500 text-black flex items-center justify-center font-bold">
                         <Award className="w-4 h-4" />
@@ -2563,7 +2563,7 @@ export default function AdminPage() {
 
                 {/* SECTION 2: DEVICE ID & PROMO FRAUD DETECTION */}
                 <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none space-y-2.5">
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-none bg-slate-900 text-white flex items-center justify-center">
                         <Smartphone className="w-4 h-4" />
@@ -2665,7 +2665,7 @@ export default function AdminPage() {
 
                 {/* SECTION 3: SAVED SESSIONS (COMPACT LIST + CLICK FOR FULL SESSION DETAILS) */}
                 <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none space-y-2.5">
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <div>
                       <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
                         Saved Sessions ({customerDetail.fingerprints.length})
@@ -2853,7 +2853,7 @@ export default function AdminPage() {
 
                 {/* SECTION 4: CUSTOMER ORDER HISTORY */}
                 <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none">
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2.5">
                     <div>
                       <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
                         Customer Order History
@@ -2995,11 +2995,11 @@ export default function AdminPage() {
               const isRisk = linkedAccounts.length >= 2;
 
               return (
-                <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 lg:p-3 space-y-3">
+                <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3 space-y-3">
                   
                   {/* Hardware Header Card */}
                   <div className="bg-white border border-slate-200 rounded-none p-3 sm:p-3 shadow-none space-y-2.5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">Target Device Hardware Identifier</span>
@@ -3256,7 +3256,7 @@ export default function AdminPage() {
             </div>
 
             {/* Compact Orders List */}
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 space-y-2">
+            <div className="flex-1 w-full p-2.5 sm:p-3 space-y-2">
               {filteredOrders.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center shadow-xs">
                   <ClipboardList className="w-10 h-10 text-slate-300 mx-auto mb-2" />
@@ -3666,7 +3666,7 @@ export default function AdminPage() {
             </div>
 
             {/* Screen-Only Order Management Container */}
-            <div className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-3 lg:p-3 space-y-2.5 screen-only">
+            <div className="flex-1 w-full p-3 sm:p-3 lg:p-3 space-y-2.5 screen-only">
               <div className="bg-white border border-slate-200 rounded-none p-3.5 sm:p-2.5 shadow-none space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
                   <div className="flex items-start gap-3">
@@ -3829,7 +3829,7 @@ export default function AdminPage() {
 
                 {/* Status Explanation Popover / Guide for Administrative Staff */}
                 {showStatusGuide && (
-                  <div className="mt-4 p-2.5 rounded-none bg-blue-50/90 border border-blue-200 shadow-xs animate-in fade-in duration-150">
+                  <div className="mt-2.5 p-2.5 rounded-none bg-blue-50/90 border border-blue-200 shadow-xs animate-in fade-in duration-150">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <Info className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
@@ -4528,7 +4528,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* Line Items */}
-                <div className="pt-6">
+                <div className="pt-3">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <h3 className="font-heading font-normal text-sm uppercase text-slate-900 tracking-wide flex items-center gap-1.5">
@@ -4725,7 +4725,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* Payment Review Details */}
-                <div className="pt-6 mt-3 border-t border-slate-100">
+                <div className="pt-3 mt-3 border-t border-slate-100">
                   <h3 className="font-heading font-normal text-sm uppercase text-slate-900 mb-3 tracking-wide flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-slate-600" />
                     <span>Transaction & Payment Verification</span>
@@ -4949,7 +4949,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* Internal Notes & Staff Activity Log */}
-                <div className="pt-6 mt-3 border-t border-slate-100">
+                <div className="pt-3 mt-3 border-t border-slate-100">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-slate-600" />
@@ -5189,7 +5189,7 @@ export default function AdminPage() {
             </div>
 
             {/* Compact Products List */}
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 space-y-2.5">
+            <div className="flex-1 w-full p-2.5 sm:p-3 space-y-2.5">
               {filteredProducts.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center">
                   <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -5468,7 +5468,7 @@ export default function AdminPage() {
                     </div>
 
                     {/* Variants Management */}
-                    <div className="pt-4 border-t border-slate-100">
+                    <div className="pt-2 border-t border-slate-100">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-heading font-black uppercase text-xs tracking-wider text-slate-700">
                           Product Variants
@@ -5692,7 +5692,7 @@ export default function AdminPage() {
             </div>
 
             {/* Compact Stock Adjustment Rows with Variant-Level Management */}
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 space-y-2.5">
+            <div className="flex-1 w-full p-2.5 sm:p-3 space-y-2.5">
               {filteredInventory.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center">
                   <Boxes className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -6019,7 +6019,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 lg:p-3 space-y-3">
+            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3 space-y-3">
               <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none space-y-2.5">
                 <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
                   Telegram Authentication Gateway
@@ -6109,7 +6109,7 @@ export default function AdminPage() {
               </div>
 
               <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none">
-                <h3 className="font-heading font-black uppercase text-sm text-slate-900 tracking-wide mb-4">
+                <h3 className="font-heading font-black uppercase text-sm text-slate-900 tracking-wide mb-2.5">
                   Device Hardware Distribution
                 </h3>
                 <div className="space-y-3 font-mono text-xs">
@@ -6156,7 +6156,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
               <DiagnosticsModule />
             </div>
           </motion.div>
@@ -6188,7 +6188,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
               <LogisticsModule />
             </div>
           </motion.div>
@@ -6220,7 +6220,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
               <ChargesModule />
             </div>
           </motion.div>
@@ -6252,7 +6252,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
               <PaymentsModule />
             </div>
           </motion.div>
@@ -6284,7 +6284,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
               <PromosModule />
             </div>
           </motion.div>
@@ -6310,7 +6310,7 @@ export default function AdminPage() {
                 <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">Telegram Automation</h2>
               </div>
             </div>
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 lg:p-3"><AutomationModule /></div>
+            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3"><AutomationModule /></div>
           </motion.div>
         )}
 
@@ -6340,7 +6340,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 lg:p-3">
+            <div className="flex-1 w-full p-2.5 sm:p-3 lg:p-3">
               <MediaModule />
             </div>
           </motion.div>
@@ -6395,7 +6395,7 @@ export default function AdminPage() {
             className="bg-slate-900 border border-slate-800 text-white rounded-none p-3 shadow-none max-w-xs w-full cursor-default text-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-12 h-12 rounded-none bg-indigo-600 flex items-center justify-center mx-auto mb-4 text-white shadow-none">
+            <div className="w-12 h-12 rounded-none bg-indigo-600 flex items-center justify-center mx-auto mb-2.5 text-white shadow-none">
               <ExternalLink className="w-6 h-6" />
             </div>
             <h3 className="text-xs font-heading font-black uppercase tracking-widest text-white mb-2">Install on iOS Device</h3>
