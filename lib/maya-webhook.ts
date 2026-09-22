@@ -6,7 +6,6 @@ export type MayaWebhookChannel = 'card' | 'wallet' | 'unknown';
 
 const MAYA_PRODUCTION_IPS = new Set(['18.138.50.235', '3.1.207.200']);
 const MAYA_SANDBOX_IPS = new Set(['13.229.160.234', '3.1.199.75']);
-const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 
 const CARD_FUND_SOURCE_TYPES = new Set(['card']);
 const WALLET_FUND_SOURCE_TYPES = new Set([
@@ -224,36 +223,6 @@ export function validateMayaWebhookPayload(
   }
 
   return null;
-}
-
-export async function parseMayaWebhookRequest(request: Request): Promise<
-  { ok: true; payload: any } | { ok: false; status: number; error: string }
-> {
-  const contentLength = request.headers.get('content-length');
-  if (contentLength && Number(contentLength) > MAX_WEBHOOK_BODY_BYTES) {
-    return { ok: false, status: 413, error: 'Webhook payload too large' };
-  }
-
-  let rawBody = '';
-  try {
-    rawBody = await request.text();
-  } catch {
-    return { ok: false, status: 400, error: 'Unable to read request body' };
-  }
-
-  if (Buffer.byteLength(rawBody, 'utf8') > MAX_WEBHOOK_BODY_BYTES) {
-    return { ok: false, status: 413, error: 'Webhook payload too large' };
-  }
-
-  try {
-    const payload = JSON.parse(rawBody);
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      return { ok: false, status: 400, error: 'Invalid JSON payload' };
-    }
-    return { ok: true, payload };
-  } catch {
-    return { ok: false, status: 400, error: 'Invalid JSON' };
-  }
 }
 
 async function findOrder(supabase: ReturnType<typeof getSupabaseAdmin>, payload: any) {
