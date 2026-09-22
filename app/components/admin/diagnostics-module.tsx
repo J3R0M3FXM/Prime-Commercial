@@ -280,7 +280,7 @@ export default function DiagnosticsModule() {
             </div>
 
             {/* Quick Health Summary Ribbon */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-4 border-t border-slate-100">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-2 border-t border-slate-100">
               <div className="bg-slate-50 rounded-none p-3 border border-slate-100">
                 <p className="text-[10px] font-mono uppercase text-slate-500 font-bold">Total Monitored</p>
                 <p className="font-heading font-normal text-xl text-slate-900 mt-0.5">{services.length || 9} Systems</p>
