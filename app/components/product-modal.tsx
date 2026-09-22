@@ -8,16 +8,23 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
   const { cart, addToCart, updateQuantity } = useCart();
   
   // Extract variants
-  const variants = product?.variants && product.variants.length > 0
+  const fallbackImage = product?.imageUrl || "https://picsum.photos/seed/prime/600";
+  const rawVariants = Array.isArray(product?.variants) && product.variants.length > 0
     ? product.variants
     : [{
         id: "default",
         name: "Standard",
-        imageUrl: product?.imageUrl || "https://picsum.photos/seed/prime/600",
+        imageUrl: fallbackImage,
         stock: product?.stock ?? 10,
         price: product?.price || 0,
         tag: "NONE"
       }];
+
+  // Canonical variant shape: one image URL per variant.
+  const variants = rawVariants.map((variant: any) => ({
+    ...variant,
+    imageUrl: variant?.imageUrl || variant?.images?.[0]?.url || variant?.images?.[0] || fallbackImage,
+  }));
 
   // Do NOT pre-select an option by default — require customer choice first
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
@@ -203,14 +210,24 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
                 {product.description || "No description provided for this product. Premium quality guaranteed."}
               </p>
 
-              {/* Option / Variant selector */}
+              {/* Clean one-image-per-variant selector */}
               <div className="space-y-2 pt-2">
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 font-mono">
-                  Select Option
-                </label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 font-mono">
+                    Select Variant
+                  </label>
+                  {variants.length > 1 && (
+                    <span className="text-[9px] font-mono text-gray-400">
+                      {variants.length} OPTIONS
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   {variants.map((v: any) => {
                     const isSelected = selectedVariant?.id === v.id;
+                    const variantImage = v.imageUrl || fallbackImage;
+
                     return (
                       <button
                         key={v.id}
@@ -219,21 +236,39 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
                           setSelectedVariant(v);
                           setLocalQuantity(1);
                         }}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                          isSelected 
-                            ? "border-black bg-black text-white shadow-xs" 
-                            : "border-gray-200 bg-white hover:border-gray-300 text-gray-700 hover:bg-gray-50"
+                        className={`group relative overflow-hidden rounded-lg border text-left transition-all cursor-pointer ${isSelected
+                          ? "border-slate-900 ring-1 ring-slate-900 bg-slate-50"
+                          : "border-gray-200 bg-white hover:border-slate-400"
                         }`}
                       >
-                        {v.imageUrl && (
-                          <img 
-                            src={v.imageUrl} 
-                            alt={v.name} 
-                            className="w-4 h-4 rounded-md object-cover border border-gray-100" 
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
-                        )}
-                        <span>{v.name}</span>
+                        <div className="flex items-center gap-2.5 p-2">
+                          <div className="w-11 h-11 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                            <img
+                              src={variantImage}
+                              alt={v.name || "Variant"}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.currentTarget as HTMLImageElement;
+                                if (target.src !== fallbackImage) target.src = fallbackImage;
+                              }}
+                            />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <span className="block truncate text-[11px] font-bold uppercase tracking-wide text-slate-900">
+                              {v.name || "Variant"}
+                            </span>
+                            <span className="block mt-0.5 text-[10px] font-mono text-slate-500">
+                              {formatPHP(Number(v.price) || 0)}
+                            </span>
+                          </div>
+
+                          {isSelected && (
+                            <Check className="w-3.5 h-3.5 shrink-0 text-slate-900" />
+                          )}
+                        </div>
+
+                        <div className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-white/80 to-transparent pointer-events-none" />
                       </button>
                     );
                   })}
