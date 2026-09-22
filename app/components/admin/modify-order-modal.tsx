@@ -943,7 +943,7 @@ export default function ModifyOrderModal({
                   <button
                     type="button"
                     onClick={handleToggleDeliveryFree}
-                    className={`mt-4 px-3 py-1.5 rounded-none text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`mt-2.5 px-3 py-1.5 rounded-none text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer ${
                       isDeliveryFree
                         ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs"
                         : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200"
