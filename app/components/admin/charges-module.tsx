@@ -188,7 +188,7 @@ export default function ChargesModule() {
         </div>
       ) : charges.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center shadow-none">
-          <Receipt className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <Receipt className="w-12 h-12 text-slate-300 mx-auto mb-2.5" />
           <h4 className="text-slate-900 font-bold mb-2">No Charges Configured</h4>
           <p className="text-slate-500 text-sm max-w-sm mx-auto">
             You have not configured any additional charges yet. Click &quot;Add Charge&quot; to define a new fee.
@@ -205,7 +205,7 @@ export default function ChargesModule() {
                   isEnabled ? 'border-slate-200' : 'border-slate-200/60 opacity-60 bg-slate-50/50'
                 }`}
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-none flex items-center justify-center shrink-0 ${
                       isEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'
@@ -298,7 +298,7 @@ export default function ChargesModule() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-4 border-t border-slate-100 mt-auto">
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 mt-auto">
                   <button
                     onClick={() => handleEdit(charge)}
                     className="flex-1 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 py-2 rounded-md flex justify-center items-center gap-1.5 cursor-pointer"
@@ -412,8 +412,8 @@ export default function ChargesModule() {
               </div>
 
               {!isDefault && (
-                <div className="pt-6 border-t border-slate-100">
-                  <h4 className="font-heading font-black text-sm uppercase tracking-wider text-slate-800 mb-4 flex items-center gap-2">
+                <div className="pt-3 border-t border-slate-100">
+                  <h4 className="font-heading font-black text-sm uppercase tracking-wider text-slate-800 mb-2.5 flex items-center gap-2">
                     <Settings className="w-4 h-4" /> Schedule Configuration
                   </h4>
                   
