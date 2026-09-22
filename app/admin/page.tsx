@@ -710,7 +710,7 @@ export default function AdminPage() {
 
     try {
       // Only silently poll orders to detect new orders and proof changes
-      const ordRes = await fetch('/api/admin/orders');
+      const ordRes = await adminFetch('/api/admin/orders');
 
       if (ordRes.ok) {
         const newOrders: any[] = await ordRes.json();
@@ -781,9 +781,9 @@ export default function AdminPage() {
     setRefreshing(true);
     try {
       const [custRes, prodRes, ordRes] = await Promise.all([
-        fetch('/api/admin/customers'),
-        fetch('/api/products'),
-        fetch('/api/admin/orders')
+        adminFetch('/api/admin/customers'),
+        adminFetch('/api/products'),
+        adminFetch('/api/admin/orders')
       ]);
       if (custRes.ok) setCustomers(await custRes.json());
       if (prodRes.ok) setProducts(await prodRes.json());
@@ -834,7 +834,7 @@ export default function AdminPage() {
   const fetchCustomerDetail = async (id: string) => {
     setLoadingCustomerDetail(true);
     try {
-      const res = await fetch(`/api/admin/customers?id=${id}`);
+      const res = await adminFetch(`/api/admin/customers?id=${id}`);
       if (res.ok) {
         const data = await res.json();
         setCustomerDetail(data);
@@ -853,7 +853,7 @@ export default function AdminPage() {
 
     const refreshCustomers = async () => {
       try {
-        const res = await fetch("/api/admin/customers?_fresh=" + Date.now(), {
+        const res = await adminFetch("/api/admin/customers?_fresh=" + Date.now(), {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
         });
@@ -899,16 +899,53 @@ export default function AdminPage() {
     };
   }, [authorized, view, selectedCustomerId]);
 
-  // The Admin Panel always starts at the access-code gate.
-  // No existing admin cookie is allowed to bypass this screen.
+  // Restore the existing signed admin session before showing the access-code gate.
+  // The same-origin credential is explicitly included so this also works reliably
+  // inside installed PWAs and WebViews.
   useEffect(() => {
-    setCheckingAuth(false);
+    let cancelled = false;
+
+    const restoreAdminSession = async () => {
+      try {
+        const res = await adminFetch("/api/admin/auth", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!cancelled && res.ok && data?.authenticated && data?.isAdmin && data?.accessCodeVerified) {
+          setAuthorized(true);
+          setAdminUser(data.user || { id: "admin" });
+          return;
+        }
+      } catch (error) {
+        console.warn("Admin session restore failed:", error);
+      } finally {
+        if (!cancelled) setCheckingAuth(false);
+      }
+    };
+
+    void restoreAdminSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const adminFetch = useCallback((input: RequestInfo | URL, init: RequestInit = {}) => {
+    return fetch(input, {
+      ...init,
+      credentials: "include",
+      cache: init.cache ?? "no-store",
+    });
   }, []);
 
   const handleAdminAccessCodeSubmit = async (accessCode: string) => {
-    const res = await fetch("/api/admin/auth", {
+    const res = await adminFetch("/api/admin/auth", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
       body: JSON.stringify({ accessCode }),
     });
     const data = await res.json().catch(() => ({}));
@@ -935,7 +972,7 @@ export default function AdminPage() {
   const handleToggleProductActive = async (product: any) => {
     const newActive = product.active === false ? true : false;
     try {
-      const res = await fetch("/api/admin/products", {
+      const res = await adminFetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: product.id, active: newActive })
@@ -956,7 +993,7 @@ export default function AdminPage() {
       "Are you sure you want to permanently delete this product? This action cannot be undone.",
       async () => {
         try {
-          const res = await fetch("/api/admin/products", {
+          const res = await adminFetch("/api/admin/products", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id })
@@ -980,13 +1017,13 @@ export default function AdminPage() {
     try {
       let res;
       if (editingProduct?.id) {
-        res = await fetch("/api/admin/products", {
+        res = await adminFetch("/api/admin/products", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: editingProduct.id, ...productData })
         });
       } else {
-        res = await fetch("/api/admin/products", {
+        res = await adminFetch("/api/admin/products", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(productData)
@@ -1039,7 +1076,7 @@ export default function AdminPage() {
     })).sort((a: any, b: any) => (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999)));
 
     try {
-      const res = await fetch("/api/admin/products", {
+      const res = await adminFetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reorder: updates })
@@ -1062,7 +1099,7 @@ export default function AdminPage() {
   const handleSetProductSortOrder = async (productId: string, newSortOrder: number) => {
     const safeOrder = Math.max(1, newSortOrder);
     try {
-      const res = await fetch("/api/admin/products", {
+      const res = await adminFetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: productId, sortOrder: safeOrder })
@@ -1085,7 +1122,7 @@ export default function AdminPage() {
   const handleAdjustStock = async (productId: string, currentStock: number, delta: number) => {
     const newStock = Math.max(0, currentStock + delta);
     try {
-      const res = await fetch("/api/admin/products", {
+      const res = await adminFetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: productId, stock: newStock })
@@ -1104,7 +1141,7 @@ export default function AdminPage() {
   const handleSetProductStockDirect = async (productId: string, newStockValue: number) => {
     const safeStock = Math.max(0, newStockValue);
     try {
-      const res = await fetch("/api/admin/products", {
+      const res = await adminFetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: productId, stock: safeStock })
@@ -1135,7 +1172,7 @@ export default function AdminPage() {
     const totalStock = updatedVariants.reduce((sum: number, v: any) => sum + (Number(v.stock) || 0), 0);
 
     try {
-      const res = await fetch("/api/admin/products", {
+      const res = await adminFetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: productId, variants: updatedVariants, stock: totalStock })
@@ -1165,7 +1202,7 @@ export default function AdminPage() {
     const totalStock = updatedVariants.reduce((sum: number, v: any) => sum + (Number(v.stock) || 0), 0);
 
     try {
-      const res = await fetch("/api/admin/products", {
+      const res = await adminFetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: productId, variants: updatedVariants, stock: totalStock })
@@ -1186,7 +1223,7 @@ export default function AdminPage() {
     setStatusUpdatingId(orderId);
     setUpdatingToStatus(status);
     try {
-      const res = await fetch("/api/admin/orders", {
+      const res = await adminFetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: orderId, status })
@@ -1214,7 +1251,7 @@ export default function AdminPage() {
 
   const handleUpdateOrderPaymentStatus = async (orderId: string, paymentStatus: string) => {
     try {
-      const res = await fetch("/api/admin/orders", {
+      const res = await adminFetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: orderId, paymentStatus })
@@ -1237,7 +1274,7 @@ export default function AdminPage() {
   const handleSimulateOrder = async (customerId: string, customerName: string, primeMemberId: string) => {
     try {
       const sampleItem = products[0] || { id: "item-1", name: "PRIME Special Drop", price: 99 };
-      const res = await fetch("/api/admin/orders", {
+      const res = await adminFetch("/api/admin/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1279,7 +1316,7 @@ export default function AdminPage() {
     if (selectedOrderIds.length === 0) return;
     setIsBulkUpdating(true);
     try {
-      const res = await fetch("/api/admin/orders", {
+      const res = await adminFetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1475,7 +1512,7 @@ export default function AdminPage() {
 
   const handleUpdateSingleOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      const res = await fetch("/api/admin/orders", {
+      const res = await adminFetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: orderId, status: newStatus })
@@ -1497,7 +1534,7 @@ export default function AdminPage() {
   const handleDeleteSingleOrder = async (orderId: string) => {
     if (!confirm(`Are you sure you want to delete this order? This cannot be undone.`)) return;
     try {
-      const res = await fetch("/api/admin/orders", {
+      const res = await adminFetch("/api/admin/orders", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: orderId })
@@ -1541,7 +1578,7 @@ export default function AdminPage() {
         status: "Pending"
       };
 
-      const res = await fetch("/api/admin/orders", {
+      const res = await adminFetch("/api/admin/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -1666,7 +1703,7 @@ export default function AdminPage() {
     setIsSavingTrackingUrl(true);
     setTrackingSavedSuccess(false);
     try {
-      const res = await fetch("/api/admin/orders", {
+      const res = await adminFetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: orderId, trackingUrl: url.trim() })
@@ -1700,7 +1737,7 @@ export default function AdminPage() {
       };
       const updatedNotes = [newNoteObj, ...existingNotes];
 
-      const res = await fetch("/api/admin/orders", {
+      const res = await adminFetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: orderId, internalNotes: updatedNotes })
@@ -1730,7 +1767,7 @@ export default function AdminPage() {
       const existingNotes = Array.isArray(selectedOrder?.internalNotes) ? selectedOrder.internalNotes : [];
       const updatedNotes = existingNotes.filter((n: any) => n.id !== noteId);
 
-      const res = await fetch("/api/admin/orders", {
+      const res = await adminFetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: orderId, internalNotes: updatedNotes })
@@ -1753,7 +1790,7 @@ export default function AdminPage() {
     }
     try {
       setIsAdminScanningOcr(true);
-      const res = await fetch("/api/ocr/analyze-receipt", {
+      const res = await adminFetch("/api/ocr/analyze-receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1768,7 +1805,7 @@ export default function AdminPage() {
       const data = await res.json();
       if (res.ok && data.success && data.analysis) {
         // Persist analysis to the order in Firestore
-        await fetch("/api/admin/orders", {
+        await adminFetch("/api/admin/orders", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1903,7 +1940,7 @@ export default function AdminPage() {
     if (hasValidAddress) return;
 
     setLoadingGpsOrderId(orderId);
-    fetch(`/api/geoapify/reverse?lat=${devLat}&lon=${devLon}`)
+    adminFetch(`/api/geoapify/reverse?lat=${devLat}&lon=${devLon}`)
       .then(res => res.json())
       .then(data => {
         const formatted = data.results?.[0]?.formatted;
@@ -2004,7 +2041,7 @@ export default function AdminPage() {
                   <button
                     onClick={async () => {
                       try {
-                        await fetch("/api/admin/auth", { method: "DELETE" });
+                        await adminFetch("/api/admin/auth", { method: "DELETE" });
                       } finally {
                         setAuthorized(false);
                         setAdminUser(null);

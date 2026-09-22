@@ -237,6 +237,22 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // The Admin Panel also consumes a small set of shared APIs that are used by
+  // customers. A valid admin session must be accepted for those requests too;
+  // otherwise the panel authenticates successfully and immediately hits the
+  // Telegram-only branch with a 401 on data loads.
+  const adminSharedApi =
+    pathname === '/api/products' ||
+    pathname === '/api/charges' ||
+    pathname === '/api/payment-methods' ||
+    pathname.startsWith('/api/download') ||
+    pathname.startsWith('/api/storage/');
+
+  if (adminSharedApi) {
+    const adminSession = await verifyAdminSession(request.cookies.get('prime_admin_session')?.value);
+    if (adminSession) return NextResponse.next();
+  }
+
   if (!apiProtected) return NextResponse.next();
 
   // Telegram's signed initData is accepted directly so protected requests do not
