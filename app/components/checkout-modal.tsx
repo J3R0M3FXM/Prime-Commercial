@@ -48,7 +48,7 @@ import { authenticatedFetch } from "./telegram-auth-client";
 const AddressPickerMap = dynamic(() => import("./address-picker-map"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-44 sm:h-48 md:h-52 rounded-xl bg-gray-100 flex flex-col items-center justify-center text-gray-400 font-mono text-xs gap-2 border border-gray-200">
+    <div className="w-full h-44 sm:h-48 md:h-52 rounded-none bg-gray-100 flex flex-col items-center justify-center text-gray-400 font-mono text-xs gap-2 border border-gray-200">
       <Loader2 className="w-5 h-5 animate-spin text-gray-500" />
       <span>Loading Interactive Map...</span>
     </div>
@@ -1157,14 +1157,14 @@ export default function CheckoutModal({
   if (!isOpen) return null;
 
   return (
-    <div ref={overlayRef} className="w-full bg-gray-50 flex justify-center py-3 sm:py-5">
+    <div ref={overlayRef} className="prime-checkout w-full bg-gray-50 flex justify-center py-0">
       <div 
-        className="bg-white w-full max-w-[760px] rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col"
+        className="bg-white w-full max-w-[760px] shadow-sm border-x border-gray-200 overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
       >
         {/* Header with Step Tracker */}
-        <div className="border-b border-gray-100 bg-white px-5 py-4 sticky top-0 z-30 flex items-center justify-between">
+        <div className="border-b border-gray-100 bg-white px-3.5 py-2.5 sticky top-0 z-30 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {currentStep > 1 && currentStep < 5 && (
               <button
@@ -1211,11 +1211,11 @@ export default function CheckoutModal({
         )}
 
         {/* Modal Scrollable Content */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-2.5">
 
           {/* ================= STEP 1: IDENTITY & RECEIVER ================= */}
           {currentStep === 1 && (
-            <div className="space-y-4">
+            <div className="space-y-2.5">
               {receiverError && (
                 <div className="text-xs font-mono text-red-600 flex items-center gap-1.5 py-1">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -1224,7 +1224,7 @@ export default function CheckoutModal({
               )}
 
               {/* Telegram Identity (Read-Only) */}
-              <div className="p-3.5 sm:p-4 rounded-xl border border-gray-200 bg-gray-50/70">
+              <div className="p-3.5 sm:p-2.5 rounded-xl border border-gray-200 bg-gray-50/70">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 font-heading mb-3">
                   Telegram Identity
                 </h4>
@@ -1301,7 +1301,7 @@ export default function CheckoutModal({
               </div>
 
               {/* Receiver Information (Editable) */}
-              <div className="p-3.5 sm:p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="p-3.5 sm:p-3 rounded-xl border border-gray-200 bg-white shadow-sm">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 font-heading mb-3">
                   Receiver Information
                 </h4>
@@ -1342,7 +1342,7 @@ export default function CheckoutModal({
 
           {/* ================= STEP 2: ADDRESS & MAP ================= */}
           {currentStep === 2 && (
-            <div className="space-y-3.5">
+            <div className="space-y-2.5">
               <div className="border-b border-gray-100 pb-2">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 font-heading">
                   Delivery Destination & Location
@@ -1384,7 +1384,7 @@ export default function CheckoutModal({
 
                 {/* Autocomplete Suggestions Dropdown */}
                 {addressSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-[100] max-h-56 overflow-y-auto divide-y divide-gray-100">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-[100] max-h-56 overflow-y-auto divide-y divide-gray-100">
                     {addressSuggestions.map((item, idx) => (
                       <button
                         key={idx}
@@ -1458,7 +1458,7 @@ export default function CheckoutModal({
 
           {/* ================= STEP 3: COURIER & DELIVERY PAYMENT ================= */}
           {currentStep === 3 && (
-            <div className="space-y-6">
+            <div className="space-y-3">
               <div className="border-b border-gray-100 pb-2">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 font-heading">
                   Choose Courier & Delivery Fee Option <span className="text-red-500">*</span>
@@ -1542,7 +1542,7 @@ export default function CheckoutModal({
                       You have chosen <span className="font-bold text-slate-900">{selectedCourier?.name}</span> to handle your delivery from PRIME Network Distribution &amp; Fulfillment Center with a corresponding charge of <span className="font-bold text-slate-900 font-mono">{formatPHP(courierDeliveryFee)}</span>. How would you like to pay for the charge?
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
+                  <div className="grid grid-cols-2 gap-3 w-full">
                     <button
                       type="button"
                       onClick={() => setDeliveryPaymentMethod("upon_checkout")}
@@ -2009,7 +2009,7 @@ export default function CheckoutModal({
 
           {/* ================= STEP 5: ORDER CONFIRMATION ================= */}
           {currentStep === 5 && completedOrder && (
-            <div className="py-4 px-1 space-y-6">
+            <div className="py-2.5 px-1 space-y-6">
               {/* Success Banner */}
               <div className="text-center space-y-2.5">
                 <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto border-2 border-amber-200">
@@ -2026,7 +2026,7 @@ export default function CheckoutModal({
               </div>
 
               {/* Order summary collapsible card */}
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 font-mono text-xs space-y-2.5 max-w-md mx-auto">
+              <div className="bg-gray-50 border border-gray-200 rounded-none p-4 font-mono text-xs space-y-2.5 max-w-md mx-auto">
                 <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                   <span className="text-gray-400 uppercase text-[9px] font-bold">Order Identifier</span>
                   <span className="font-bold text-gray-900">{completedOrder.id || completedOrder.orderNumber}</span>
@@ -2094,7 +2094,7 @@ export default function CheckoutModal({
 
               {/* Settle Payment Section */}
               {Number(completedOrder.payableNow || 0) === 0 && Number(completedOrder.storeCreditsUsed || 0) > 0 ? (
-                <div className="border-t border-gray-200 pt-6">
+                <div className="border-t border-gray-200 pt-3">
                   <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1.5 max-w-md mx-auto">
                     <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
                       <CheckCircle2 className="w-6 h-6" />
@@ -2691,7 +2691,7 @@ export default function CheckoutModal({
 
         {/* Modal Bottom Action Bar */}
         {currentStep < 5 && (
-          <div className="border-t border-gray-100 bg-white px-5 py-4 flex items-center justify-between gap-3">
+          <div className="border-t border-gray-100 bg-white px-3.5 py-2.5 flex items-center justify-between gap-3">
             {currentStep > 1 ? (
               <button
                 type="button"
