@@ -159,7 +159,7 @@ function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promi
   };
 
   return (
-    <div className="admin-shell min-h-screen bg-slate-50 flex items-center justify-center p-2.5 font-sans antialiased">
+    <div className="admin-shell min-h-screen bg-slate-50 flex items-start justify-center px-2 pt-5 pb-2 font-sans antialiased">
       <form onSubmit={submit} className="w-full max-w-sm bg-white border border-slate-200 text-slate-900 p-3 rounded-none shadow-none">
         <div className="flex justify-center mb-3">
           <img src="/primefinal.png" alt="PRIME" className="h-8 w-auto object-contain" />
