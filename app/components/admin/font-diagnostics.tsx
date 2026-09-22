@@ -215,15 +215,15 @@ export default function FontDiagnostics() {
   const uniqueTags = Array.from(new Set(violations.map((v) => v.tag)));
 
   return (
-    <div id="font-diagnostics-module" className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-5">
+    <div id="font-diagnostics-module" className="bg-white border border-slate-200 rounded-none p-3 shadow-none space-y-3">
       {/* Invisible container for scan iframe */}
       <div ref={iframeContainerRef} aria-hidden="true" className="hidden" />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center">
+            <div className="w-8 h-8 rounded-none bg-slate-900 text-white flex items-center justify-center">
               <Type className="w-4 h-4" />
             </div>
             <div>
@@ -239,14 +239,14 @@ export default function FontDiagnostics() {
 
         <div className="flex items-center gap-2">
           {/* Target toggle */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-mono">
+          <div className="flex items-center bg-slate-100 p-1 rounded-none border border-slate-200 text-xs font-mono">
             <button
               type="button"
               onClick={() => {
                 setScanTarget("storefront");
                 runFontScan("storefront");
               }}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-none transition-all cursor-pointer ${
                 scanTarget === "storefront"
                   ? "bg-white text-slate-900 font-bold shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -260,7 +260,7 @@ export default function FontDiagnostics() {
                 setScanTarget("admin");
                 runFontScan("admin");
               }}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-none transition-all cursor-pointer ${
                 scanTarget === "admin"
                   ? "bg-white text-slate-900 font-bold shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -275,7 +275,7 @@ export default function FontDiagnostics() {
             id="btn-scan-fonts"
             onClick={() => runFontScan(scanTarget)}
             disabled={isScanning}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-heading font-normal uppercase tracking-wider rounded-xl hover:bg-neutral-800 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+            className="inline-flex items-center gap-2 px-3 py-2 bg-black text-white text-xs font-heading font-normal uppercase tracking-wider rounded-none hover:bg-neutral-800 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer shadow-none"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? "animate-spin" : ""}`} />
             {isScanning ? "Scanning DOM..." : "Scan Storefront"}
@@ -284,7 +284,7 @@ export default function FontDiagnostics() {
       </div>
 
       {/* Allowed Fonts Spec Banner */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+      <div className="bg-slate-50 border border-slate-200 rounded-none p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -294,7 +294,7 @@ export default function FontDiagnostics() {
             {ALLOWED_FONTS.map((font) => (
               <span
                 key={font}
-                className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-white text-slate-800 border border-slate-200 shadow-2xs"
+                className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-white text-slate-800 border border-slate-200 shadow-none"
               >
                 {font}
               </span>
@@ -305,7 +305,7 @@ export default function FontDiagnostics() {
 
       {/* Scan Summary Ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+        <div className="bg-slate-50 rounded-none p-3 border border-slate-100">
           <p className="text-[10px] font-mono uppercase text-slate-500 font-bold">Scanned Text Elements</p>
           <p className="font-heading font-normal text-xl text-slate-900 mt-0.5">
             {isScanning ? "Scanning..." : `${totalScanned} Elements`}
@@ -313,7 +313,7 @@ export default function FontDiagnostics() {
         </div>
 
         <div
-          className={`rounded-xl p-3 border ${
+          className={`rounded-none p-3 border ${
             violations.length === 0
               ? "bg-emerald-50/60 border-emerald-200 text-emerald-800"
               : "bg-rose-50/60 border-rose-200 text-rose-800"
@@ -337,7 +337,7 @@ export default function FontDiagnostics() {
           </div>
         </div>
 
-        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 col-span-2 sm:col-span-1">
+        <div className="bg-slate-50 rounded-none p-3 border border-slate-100 col-span-2 sm:col-span-1">
           <p className="text-[10px] font-mono uppercase text-slate-500 font-bold">Target Context</p>
           <p className="font-mono text-sm font-bold text-slate-800 mt-1 uppercase">
             {scanTarget === "storefront" ? "Storefront (Client Route /)" : "Admin Active DOM"}
@@ -347,7 +347,7 @@ export default function FontDiagnostics() {
 
       {/* If 0 Violations, show verified compliant confirmation */}
       {hasScanned && !isScanning && violations.length === 0 && (
-        <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-3">
+        <div className="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-none flex items-start gap-3">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <h4 className="text-xs font-heading uppercase font-bold text-emerald-900">
@@ -401,13 +401,13 @@ export default function FontDiagnostics() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search element, snippet, or font..."
-                className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-slate-900 w-full sm:w-64"
+                className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono text-slate-900 focus:outline-none focus:border-slate-900 w-full sm:w-64"
               />
             </div>
           </div>
 
           {/* List of Violations */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
+          <div className="border border-slate-200 rounded-none overflow-hidden divide-y divide-slate-100">
             {filteredViolations.map((item, idx) => (
               <div
                 key={item.id}
@@ -461,7 +461,7 @@ export default function FontDiagnostics() {
             ))}
 
             {filteredViolations.length === 0 && (
-              <div className="p-6 text-center text-slate-400 font-sans text-xs">
+              <div className="p-3 text-center text-slate-400 font-sans text-xs">
                 No violations match the search filter.
               </div>
             )}
