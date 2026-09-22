@@ -337,3 +337,77 @@ input.font-mono, textarea.font-mono, button.font-mono {
 body.splash-active #system-wide-proprietary-footer {
   display: none !important;
 }
+
+
+/* PRIME ADMIN COMPACT CONTRACT
+   Keep the control plane dense, square, and full-width. */
+.admin-shell input,
+.admin-shell select,
+.admin-shell textarea {
+  min-height: 34px !important;
+  border-radius: 0 !important;
+}
+
+.admin-shell textarea {
+  min-height: 68px !important;
+}
+
+.admin-shell button,
+.admin-shell a[role="button"] {
+  min-height: 34px !important;
+  border-radius: 0 !important;
+}
+
+/* Remove large/circular card geometry throughout the admin shell. */
+.admin-shell [class*="rounded-full"],
+.admin-shell [class*="rounded-3xl"],
+.admin-shell [class*="rounded-2xl"],
+.admin-shell [class*="rounded-xl"],
+.admin-shell [class*="rounded-lg"],
+.admin-shell [class*="rounded-md"],
+.admin-shell [class*="rounded-sm"] {
+  border-radius: 0 !important;
+}
+
+/* Collapse common vertical spacing utilities. */
+.admin-shell [class*="py-12"],
+.admin-shell [class*="py-10"],
+.admin-shell [class*="py-8"],
+.admin-shell [class*="py-6"],
+.admin-shell [class*="py-5"],
+.admin-shell [class*="py-4"] {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+.admin-shell [class*="p-12"],
+.admin-shell [class*="p-10"],
+.admin-shell [class*="p-8"],
+.admin-shell [class*="p-6"] {
+  padding: 6px !important;
+}
+
+.admin-shell [class*="p-5"],
+.admin-shell [class*="p-4"],
+.admin-shell [class*="p-3.5"] {
+  padding: 6px !important;
+}
+
+.admin-shell [class*="gap-8"],
+.admin-shell [class*="gap-6"] {
+  gap: 6px !important;
+}
+
+.admin-shell [class*="space-y-8"] > :not([hidden]) ~ :not([hidden]),
+.admin-shell [class*="space-y-6"] > :not([hidden]) ~ :not([hidden]),
+.admin-shell [class*="space-y-5"] > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 6px !important;
+}
+
+/* Let the admin shell itself own the width; avoid decorative outer gutters. */
+.admin-shell > .flex-1,
+.admin-shell main,
+.admin-shell section,
+.admin-shell article {
+  max-width: 100% !important;
+}
