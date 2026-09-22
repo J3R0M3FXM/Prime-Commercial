@@ -1193,7 +1193,7 @@ export default function CheckoutModal({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+            className="p-2 rounded-none text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
             aria-label="Close Checkout"
           >
             <X className="w-5 h-5" />
@@ -1224,7 +1224,7 @@ export default function CheckoutModal({
               )}
 
               {/* Telegram Identity (Read-Only) */}
-              <div className="p-3.5 sm:p-2.5 rounded-xl border border-gray-200 bg-gray-50/70">
+              <div className="p-3.5 sm:p-2.5 rounded-none border border-gray-200 bg-gray-50/70">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 font-heading mb-3">
                   Telegram Identity
                 </h4>
@@ -1301,7 +1301,7 @@ export default function CheckoutModal({
               </div>
 
               {/* Receiver Information (Editable) */}
-              <div className="p-3.5 sm:p-3 rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="p-3.5 sm:p-3 rounded-none border border-gray-200 bg-white shadow-sm">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 font-heading mb-3">
                   Receiver Information
                 </h4>
@@ -1384,7 +1384,7 @@ export default function CheckoutModal({
 
                 {/* Autocomplete Suggestions Dropdown */}
                 {addressSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-[100] max-h-56 overflow-y-auto divide-y divide-gray-100">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-none shadow-lg z-[100] max-h-56 overflow-y-auto divide-y divide-gray-100">
                     {addressSuggestions.map((item, idx) => (
                       <button
                         key={idx}
@@ -1482,12 +1482,12 @@ export default function CheckoutModal({
                 </label>
 
                 {isLoadingCouriers ? (
-                  <div className="p-8 text-center bg-gray-50 rounded-xl border border-gray-200 flex flex-col items-center justify-center gap-2 text-xs font-mono text-gray-500">
+                  <div className="p-8 text-center bg-gray-50 rounded-none border border-gray-200 flex flex-col items-center justify-center gap-2 text-xs font-mono text-gray-500">
                     <Loader2 className="w-6 h-6 animate-spin text-black" />
                     <span>Calculating real-time rates with Geoapify routing...</span>
                   </div>
                 ) : availableCouriers.length === 0 ? (
-                  <div className="p-6 text-center bg-amber-50 rounded-xl border border-amber-200 text-xs font-mono text-amber-800">
+                  <div className="p-6 text-center bg-amber-50 rounded-none border border-amber-200 text-xs font-mono text-amber-800">
                     No couriers currently available for this route. Please re-adjust address or contact support.
                   </div>
                 ) : (
@@ -1499,7 +1499,7 @@ export default function CheckoutModal({
                           <button
                             type="button"
                             onClick={() => setSelectedCourierId(courier.id)}
-                            className={`w-full h-[52px] sm:h-[60px] rounded-xl border-2 transition-all flex flex-col items-center justify-center p-1 relative overflow-hidden ${
+                            className={`w-full h-[52px] sm:h-[60px] rounded-none border-2 transition-all flex flex-col items-center justify-center p-1 relative overflow-hidden ${
                               isSelected
                                 ? "border-slate-900 shadow-sm ring-1 ring-slate-900"
                                 : "border-gray-200 bg-white hover:border-gray-300"
@@ -1573,7 +1573,7 @@ export default function CheckoutModal({
 
           {/* ================= STEP 4: ORDER BREAKDOWN & CONFIRM ================= */}
           {currentStep === 4 && (
-            <div className="space-y-6">
+            <div className="space-y-3">
               <div className="border-b border-gray-100 pb-2">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 font-heading">
                   Review Order & Finalize
@@ -1591,7 +1591,7 @@ export default function CheckoutModal({
               )}
 
               {/* Delivery Information */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2.5 text-xs font-mono">
+              <div className="p-2.5 rounded-none border border-slate-200 bg-slate-50 space-y-2.5 text-xs font-mono">
                 <div className="flex justify-between items-start">
                   <span className="text-gray-500 uppercase text-[10px]">Receiver</span>
                   <span className="font-bold text-gray-900 text-right">
@@ -1624,7 +1624,7 @@ export default function CheckoutModal({
                 <span className="text-xs font-bold uppercase tracking-wider text-gray-500 font-heading">
                   Selected Items ({selectedItems.length})
                 </span>
-                <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl bg-gray-50/50 p-2 max-h-48 overflow-y-auto">
+                <div className="divide-y divide-gray-100 border border-gray-200 rounded-none bg-gray-50/50 p-2 max-h-48 overflow-y-auto">
                   {selectedItems.map((item) => {
                     const isFreeItem = Boolean(item.isFree || Number(item.price) === 0);
                     return (
@@ -1663,7 +1663,7 @@ export default function CheckoutModal({
 
 
               {/* Comprehensive Charges Breakdown */}
-              <div className="border border-gray-200 rounded-xl p-4 bg-white space-y-1.5">
+              <div className="border border-gray-200 rounded-none p-2.5 bg-white space-y-1.5">
                 <h4 className="text-xs font-bold tracking-wider text-gray-900 font-heading border-b border-gray-100 pb-2">
                   Breakdown of charges
                 </h4>
@@ -1726,7 +1726,7 @@ export default function CheckoutModal({
               {/* Side-by-Side Voucher (Left) and Referral (Right) Code Inputs */}
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 {/* Voucher / Promo Code (Left) */}
-                <div className="border border-gray-200 rounded-xl p-3 sm:p-3.5 bg-white space-y-2">
+                <div className="border border-gray-200 rounded-none p-3 sm:p-3.5 bg-white space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-900">
                       <Tag className="w-3.5 h-3.5 text-slate-700" />
@@ -1800,7 +1800,7 @@ export default function CheckoutModal({
                 </div>
 
                 {/* Referral Code (Right) */}
-                <div className="border border-gray-200 rounded-xl p-3 sm:p-3.5 bg-white space-y-2">
+                <div className="border border-gray-200 rounded-none p-3 sm:p-3.5 bg-white space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-900">
                       <Gift className="w-3.5 h-3.5 text-slate-700" />
@@ -1888,7 +1888,7 @@ export default function CheckoutModal({
 
               {/* PRIME Store Credits Section */}
               {availableStoreCredits > 0 && (
-                <div className="border border-amber-200/80 rounded-xl p-3.5 sm:p-4 bg-amber-50/30 space-y-2.5">
+                <div className="border border-amber-200/80 rounded-none p-3.5 sm:p-2.5 bg-amber-50/30 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-amber-950">
                       <Coins className="w-3.5 h-3.5 text-amber-700" />
@@ -1932,7 +1932,7 @@ export default function CheckoutModal({
 
 
               {/* Final Total & Applied Benefits */}
-              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-2">
+              <div className="border border-slate-200 rounded-none p-2.5 bg-slate-50 space-y-2">
                 <h4 className="text-xs font-bold tracking-wider text-gray-900 font-heading border-b border-slate-200 pb-2">
                   Final Total
                 </h4>
@@ -2001,7 +2001,7 @@ export default function CheckoutModal({
                   value={customerNotes}
                   onChange={(e) => setCustomerNotes(e.target.value)}
                   placeholder="Special instructions for packing, gate codes, landmarks, or contact preferences..."
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-none text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
                 />
               </div>
             </div>
@@ -2009,7 +2009,7 @@ export default function CheckoutModal({
 
           {/* ================= STEP 5: ORDER CONFIRMATION ================= */}
           {currentStep === 5 && completedOrder && (
-            <div className="py-2.5 px-1 space-y-6">
+            <div className="py-2.5 px-1 space-y-3">
               {/* Success Banner */}
               <div className="text-center space-y-2.5">
                 <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto border-2 border-amber-200">
@@ -2026,7 +2026,7 @@ export default function CheckoutModal({
               </div>
 
               {/* Order summary collapsible card */}
-              <div className="bg-gray-50 border border-gray-200 rounded-none p-4 font-mono text-xs space-y-2.5 max-w-md mx-auto">
+              <div className="bg-gray-50 border border-gray-200 rounded-none p-2.5 font-mono text-xs space-y-2.5 w-full">
                 <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                   <span className="text-gray-400 uppercase text-[9px] font-bold">Order Identifier</span>
                   <span className="font-bold text-gray-900">{completedOrder.id || completedOrder.orderNumber}</span>
@@ -2065,7 +2065,7 @@ export default function CheckoutModal({
 
               {/* Live Courier Tracking Interactive Card */}
               {completedOrder.trackingUrl && (
-                <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 max-w-md mx-auto space-y-3 shadow-xs">
+                <div className="bg-blue-50/80 border border-blue-200 rounded-none p-2.5 w-full space-y-3 shadow-xs">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                       <Truck className="w-4 h-4" />
@@ -2084,7 +2084,7 @@ export default function CheckoutModal({
                     href={completedOrder.trackingUrl.startsWith("http") ? completedOrder.trackingUrl : `https://${completedOrder.trackingUrl}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                    className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-none flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     <span>Track Shipment</span>
@@ -2095,7 +2095,7 @@ export default function CheckoutModal({
               {/* Settle Payment Section */}
               {Number(completedOrder.payableNow || 0) === 0 && Number(completedOrder.storeCreditsUsed || 0) > 0 ? (
                 <div className="border-t border-gray-200 pt-3">
-                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1.5 max-w-md mx-auto">
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-none text-center space-y-1.5 w-full">
                     <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
                       <CheckCircle2 className="w-6 h-6" />
                     </div>
@@ -2108,7 +2108,7 @@ export default function CheckoutModal({
                   </div>
                 </div>
               ) : (
-                <div className="border-t border-gray-200 pt-6 space-y-4">
+                <div className="border-t border-gray-200 pt-3 space-y-2.5">
                   <div className="text-center">
                     <h4 className="text-sm font-heading font-bold uppercase tracking-wider text-gray-900">
                       Settle Your Payment
@@ -2119,16 +2119,16 @@ export default function CheckoutModal({
                   </div>
 
                 {isLoadingPaymentMethods ? (
-                  <div className="p-8 text-center bg-gray-50 border border-gray-200 rounded-xl flex flex-col items-center justify-center gap-2 text-xs font-mono text-gray-500">
+                  <div className="p-8 text-center bg-gray-50 border border-gray-200 rounded-none flex flex-col items-center justify-center gap-2 text-xs font-mono text-gray-500">
                     <Loader2 className="w-5 h-5 animate-spin text-black" />
                     <span>Loading payment options...</span>
                   </div>
                 ) : paymentMethods.length === 0 ? (
-                  <div className="p-6 text-center bg-gray-50 rounded-xl border border-gray-200 text-xs font-mono text-gray-600">
+                  <div className="p-6 text-center bg-gray-50 rounded-none border border-gray-200 text-xs font-mono text-gray-600">
                     No active payment methods are currently configured by the administrator. Please contact shop support to settle payment manually.
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-2.5">
                     {/* Method Tiles Selection (5 columns per row, max 2 rows per page, swipe left/right + dot indicators) */}
                     {(() => {
                       const itemsPerPage = 10;
@@ -2171,7 +2171,7 @@ export default function CheckoutModal({
                                           setIsPaymentQrModalOpen(true);
                                         }
                                       }}
-                                      className={`w-full h-[48px] sm:h-[56px] rounded-xl border-2 transition-all flex items-center justify-center p-1 relative overflow-hidden select-none ${
+                                      className={`w-full h-[48px] sm:h-[56px] rounded-none border-2 transition-all flex items-center justify-center p-1 relative overflow-hidden select-none ${
                                         isOffline
                                           ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90"
                                           : isSelected
@@ -2244,7 +2244,7 @@ export default function CheckoutModal({
                       const qrImg = selectedPaymentMethod.qrCodeImage || selectedPaymentMethod.qrCode || selectedPaymentMethod.qrImage || selectedPaymentMethod.qr_code_image || "";
 
                       return (
-                        <div className="p-4 rounded-xl border border-gray-200 bg-white space-y-4 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
+                        <div className="p-2.5 rounded-none border border-gray-200 bg-white space-y-2.5 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
                           <div className="border-b border-gray-100 pb-2 flex items-center justify-between">
                             <h5 className="text-xs font-heading font-black uppercase text-gray-900">
                               Instructions for {selectedPaymentMethod.name}
@@ -2260,7 +2260,7 @@ export default function CheckoutModal({
                           {/* Manual Transfer (Bank / E-Wallet) Block */}
                           {isManual && (
                             <div className="space-y-3">
-                              <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 space-y-1">
+                              <div className="bg-amber-50/80 border border-amber-200/80 rounded-none p-3 space-y-1">
                                 <span className="text-[11px] font-heading font-black text-amber-900 uppercase tracking-wide block">
                                   Transfer Payment Details
                                 </span>
@@ -2371,7 +2371,7 @@ export default function CheckoutModal({
 
                           {/* Maya Hosted Checkout */}
                           {isApi && (
-                            <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl space-y-3">
+                            <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-none space-y-3">
                               <div className="space-y-1">
                                 <p className="text-xs text-blue-950 font-heading font-black uppercase tracking-wide">
                                   Maya Checkout is ready
@@ -2391,7 +2391,7 @@ export default function CheckoutModal({
                                 type="button"
                                 onClick={handleStartMayaCheckout}
                                 disabled={isStartingMayaCheckout || Number(completedOrder?.payableNow ?? currentPayableNow ?? 0) <= 0}
-                                className="w-full px-3.5 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-heading font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="w-full px-3.5 py-3 bg-slate-900 hover:bg-black text-white rounded-none text-xs font-heading font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                               >
                                 {isStartingMayaCheckout ? (
                                   <>
@@ -2484,7 +2484,7 @@ export default function CheckoutModal({
 
                                 {/* Live GPT-5.3 OCR Scanning State */}
                                 {isAnalyzingReceipt && (
-                                  <div className="p-3.5 bg-slate-900 text-white rounded-xl border border-slate-800 space-y-2 animate-in fade-in duration-200">
+                                  <div className="p-3.5 bg-slate-900 text-white rounded-none border border-slate-800 space-y-2 animate-in fade-in duration-200">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <Cpu className="w-4 h-4 text-emerald-400 animate-pulse" />
@@ -2507,7 +2507,7 @@ export default function CheckoutModal({
 
                                 {/* GPT-5.3 OCR Analysis Result Display */}
                                 {ocrAnalysis && !isAnalyzingReceipt && (
-                                  <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/80 space-y-2.5 animate-in fade-in zoom-in-98 duration-200 text-left">
+                                  <div className="p-3.5 rounded-none border border-slate-200 bg-slate-50/80 space-y-2.5 animate-in fade-in zoom-in-98 duration-200 text-left">
                                     <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                                       <div className="flex items-center gap-1.5">
                                         <FileCheck className="w-4 h-4 text-emerald-600" />
@@ -2696,7 +2696,7 @@ export default function CheckoutModal({
               <button
                 type="button"
                 onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
-                className="px-4 py-3 border border-gray-200 hover:bg-gray-50 text-gray-700 font-mono text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-3 border border-gray-200 hover:bg-gray-50 text-gray-700 font-mono text-xs uppercase tracking-wider rounded-none transition-colors cursor-pointer"
               >
                 Back
               </button>
@@ -2763,7 +2763,7 @@ export default function CheckoutModal({
 
       {/* Upload Proof Preview Modal */}
       {isPreviewProofOpen && uploadedProofImage && (
-        <div className="fixed inset-0 z-[2500] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[2500] flex items-center justify-center p-2.5 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
           <button 
             onClick={() => setIsPreviewProofOpen(false)} 
             className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer"
@@ -2773,15 +2773,15 @@ export default function CheckoutModal({
           <img 
             src={uploadedProofImage} 
             alt="Payment Proof Preview" 
-            className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
+            className="max-w-full max-h-[85vh] object-contain rounded-none shadow-lg"
           />
         </div>
       )}
 
       {/* Success Submission Animated Modal */}
       {proofSubmitSuccess && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-2.5 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-lg text-center space-y-2.5 animate-in zoom-in-95 duration-300">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2">
               <Check className="w-8 h-8" />
             </div>
@@ -2809,8 +2809,8 @@ export default function CheckoutModal({
 
       {/* Enlarged Payment QR Code Pop-up Modal */}
       {isPaymentQrModalOpen && zoomedPaymentMethod && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-2.5 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm w-full shadow-lg space-y-2.5 text-center animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2 text-left">
                 <QrCode className="w-5 h-5 text-black shrink-0" />
@@ -2835,9 +2835,9 @@ export default function CheckoutModal({
               </button>
             </div>
 
-            <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col items-center justify-center space-y-3">
+            <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-none flex flex-col items-center justify-center space-y-3">
               {(zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image) ? (
-                <div className="p-3 bg-white rounded-xl shadow-xs border border-slate-200">
+                <div className="p-3 bg-white rounded-none shadow-xs border border-slate-200">
                   <img
                     src={zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image}
                     alt={`${zoomedPaymentMethod.name} QR Code`}
@@ -2846,7 +2846,7 @@ export default function CheckoutModal({
                   />
                 </div>
               ) : (
-                <div className="w-48 h-48 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 font-mono text-xs">
+                <div className="w-48 h-48 bg-white border border-slate-200 rounded-none flex items-center justify-center text-slate-400 font-mono text-xs">
                   No QR image uploaded
                 </div>
               )}
@@ -2862,7 +2862,7 @@ export default function CheckoutModal({
             </div>
 
             {zoomedPaymentMethod.accountName && (
-              <div className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-left text-[11px] font-mono text-gray-700">
+              <div className="p-2.5 bg-gray-50 border border-gray-100 rounded-none text-left text-[11px] font-mono text-gray-700">
                 <div className="font-bold text-gray-400 uppercase text-[9px] tracking-wider">Account Name</div>
                 <div className="font-bold uppercase text-slate-800 mt-0.5">{zoomedPaymentMethod.accountName}</div>
               </div>
@@ -2884,7 +2884,7 @@ export default function CheckoutModal({
                     document.body.removeChild(link);
                   }}
 
-                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold uppercase tracking-wider font-mono transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-none text-xs font-bold uppercase tracking-wider font-mono transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Download</span>
