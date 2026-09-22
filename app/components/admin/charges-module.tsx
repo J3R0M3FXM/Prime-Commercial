@@ -160,7 +160,7 @@ export default function ChargesModule() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-heading font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
@@ -176,7 +176,7 @@ export default function ChargesModule() {
             resetForm();
             setShowModal(true);
           }}
-          className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
+          className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add Charge
         </button>
@@ -187,7 +187,7 @@ export default function ChargesModule() {
           <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
         </div>
       ) : charges.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center shadow-none">
           <Receipt className="w-12 h-12 text-slate-300 mx-auto mb-4" />
           <h4 className="text-slate-900 font-bold mb-2">No Charges Configured</h4>
           <p className="text-slate-500 text-sm max-w-sm mx-auto">
@@ -195,19 +195,19 @@ export default function ChargesModule() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {charges.map(charge => {
             const isEnabled = charge.isActive !== false;
             return (
               <div 
                 key={charge.id} 
-                className={`bg-white border rounded-xl p-5 shadow-sm relative group overflow-hidden flex flex-col transition-all ${
+                className={`bg-white border rounded-none p-3 shadow-none relative group overflow-hidden flex flex-col transition-all ${
                   isEnabled ? 'border-slate-200' : 'border-slate-200/60 opacity-60 bg-slate-50/50'
                 }`}
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                    <div className={`w-10 h-10 rounded-none flex items-center justify-center shrink-0 ${
                       isEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'
                     }`}>
                       <Receipt className="w-5 h-5" />
@@ -226,7 +226,7 @@ export default function ChargesModule() {
                   <button
                     onClick={() => handleToggleActive(charge)}
                     title={isEnabled ? "Click to disable charge" : "Click to enable charge"}
-                    className={`p-1.5 rounded-lg border transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-mono font-bold uppercase ${
+                    className={`p-1.5 rounded-none border transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-mono font-bold uppercase ${
                       isEnabled 
                         ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' 
                         : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
@@ -237,7 +237,7 @@ export default function ChargesModule() {
                   </button>
                 </div>
 
-                <div className="space-y-3 text-xs font-mono text-slate-600 mb-6 flex-1">
+                <div className="space-y-3 text-xs font-mono text-slate-600 mb-3 flex-1">
                   <div className="flex justify-between items-center py-1 border-b border-slate-100">
                     <span className="text-slate-400">Value:</span>
                     <span className="font-bold text-slate-900 text-sm">
@@ -320,9 +320,9 @@ export default function ChargesModule() {
 
       {/* Charge Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
+          <div className="bg-white rounded-none shadow-none w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
                 {editingCharge ? "Edit Charge" : "New Charge"}
               </h3>
@@ -331,9 +331,9 @@ export default function ChargesModule() {
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+            <div className="p-3 overflow-y-auto flex-1 space-y-3">
               
-              <div className="space-y-4">
+              <div className="space-y-2.5">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Charge Name</label>
                   <input
@@ -341,17 +341,17 @@ export default function ChargesModule() {
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder="e.g. Service Charge, Platform Fee, Hazard Fee"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                   />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Value Type</label>
                     <select
                       value={type}
                       onChange={e => setType(e.target.value as 'fixed' | 'percentage')}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                     >
                       <option value="fixed">Fixed Amount (₱)</option>
                       <option value="percentage">Percentage (%)</option>
@@ -367,14 +367,14 @@ export default function ChargesModule() {
                       onChange={e => setAmount(e.target.valueAsNumber || 0)}
                       min={0}
                       step={type === 'percentage' ? '0.1' : '1'}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                     />
                   </div>
                 </div>
 
                 {/* Master Active Switch */}
                 <div className="pt-2">
-                  <label className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                  <label className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-none cursor-pointer hover:bg-slate-100 transition-colors">
                     <div>
                       <span className="block text-sm font-bold text-slate-900">Charge Enabled</span>
                       <span className="block text-xs text-slate-500">Enable or disable this charge rule entirely</span>
@@ -393,7 +393,7 @@ export default function ChargesModule() {
 
                 {/* Default Add to Bill Switch */}
                 <div>
-                  <label className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                  <label className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-none cursor-pointer hover:bg-slate-100 transition-colors">
                     <div>
                       <span className="block text-sm font-bold text-slate-900">Default Add to Bill</span>
                       <span className="block text-xs text-slate-500">Automatically applies to all orders (No schedule needed)</span>
@@ -417,15 +417,15 @@ export default function ChargesModule() {
                     <Settings className="w-4 h-4" /> Schedule Configuration
                   </h4>
                   
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-2 gap-2.5">
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Date (Optional)</label>
                         <input 
                           type="date" 
                           value={scheduleDate} 
                           onChange={e => setScheduleDate(e.target.value)} 
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm" 
+                          className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm" 
                         />
                       </div>
                       <div>
@@ -434,7 +434,7 @@ export default function ChargesModule() {
                           type="time" 
                           value={scheduleTime} 
                           onChange={e => setScheduleTime(e.target.value)} 
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm" 
+                          className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm" 
                         />
                       </div>
                     </div>
@@ -447,7 +447,7 @@ export default function ChargesModule() {
                             type="button" 
                             key={i} 
                             onClick={() => toggleDay(i)} 
-                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                            className={`flex-1 py-2 rounded-none text-xs font-bold transition-colors cursor-pointer ${
                               scheduleDay.includes(i) ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                           >
@@ -457,8 +457,8 @@ export default function ChargesModule() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 pt-2">
-                      <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                    <div className="grid grid-cols-2 gap-2.5 pt-2">
+                      <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-none cursor-pointer hover:bg-slate-100 transition-colors">
                         <input 
                           type="checkbox" 
                           checked={isOvernight} 
@@ -471,7 +471,7 @@ export default function ChargesModule() {
                         </div>
                       </label>
 
-                      <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                      <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-none cursor-pointer hover:bg-slate-100 transition-colors">
                         <input 
                           type="checkbox" 
                           checked={isRecurring} 
@@ -489,17 +489,17 @@ export default function ChargesModule() {
               )}
             </div>
 
-            <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
+            <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={isSaving || !name.trim()}
-                className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-xs"
+                className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-xs"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Save Charge
