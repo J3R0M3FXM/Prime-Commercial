@@ -449,7 +449,8 @@ body.splash-active #system-wide-proprietary-footer {
 }
 
 
-/* FINAL ADMIN DENSITY — keep module surfaces tight; controls retain usable hit areas. */
+/* FINAL ADMIN DENSITY — keep module surfaces tight; controls retain usable hit areas.
+   Root/module wrappers do not add vertical breathing room; inner controls own their spacing. */
 .admin-shell [class*="p-3.5"],
 .admin-shell [class*="p-3"],
 .admin-shell [class*="p-2.5"],
@@ -492,4 +493,14 @@ body.splash-active #system-wide-proprietary-footer {
 .admin-shell > .flex-1 > main,
 .admin-shell > .flex-1 > section {
   padding: 0 !important;
+}
+
+/* ADMIN ROOT — eliminate accidental outer vertical padding from module shells. */
+.admin-shell > .flex-1,
+.admin-shell > .flex-1 > .flex-1,
+.admin-shell > .flex-1 > main,
+.admin-shell > .flex-1 > section,
+.admin-shell > .flex-1 > article {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }

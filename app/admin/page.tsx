@@ -159,7 +159,7 @@ function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promi
   };
 
   return (
-    <div className="admin-shell min-h-screen bg-slate-50 flex items-start justify-center px-2 pt-5 pb-2 font-sans antialiased">
+    <div className="admin-shell min-h-screen bg-slate-50 flex items-start justify-center p-0 font-sans antialiased">
       <form onSubmit={submit} className="w-full max-w-sm bg-white border border-slate-200 text-slate-900 p-3 rounded-none shadow-none">
         <div className="flex justify-center mb-3">
           <img src="/primefinal.png" alt="PRIME" className="h-8 w-auto object-contain" />
@@ -2062,7 +2062,7 @@ export default function AdminPage() {
             </header>
 
             {/* Dashboard Content Area */}
-            <div className="flex-1 w-full mx-auto p-3.5 sm:p-2.5">
+            <div className="flex-1 w-full mx-auto p-0">
 
             {/* PWA Installation Card Banner */}
             {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (
@@ -2153,7 +2153,7 @@ export default function AdminPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.22 }}
-            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+            className="flex-1 flex flex-col bg-slate-50"
           >
             {/* STICKY & FIXED NON-SCROLLING TOP SEARCH & HEADER BAR */}
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
@@ -2365,7 +2365,7 @@ export default function AdminPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.22 }}
-            className="flex-1 flex flex-col min-h-screen bg-slate-100"
+            className="flex-1 flex flex-col bg-slate-100"
           >
             {/* Sticky Navigation Top Bar */}
             <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
