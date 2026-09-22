@@ -504,3 +504,9 @@ body.splash-active #system-wide-proprietary-footer {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
+
+
+/* Dashboard module tiles intentionally use slight rounding while preserving the square Admin system elsewhere. */
+.admin-shell .admin-module-tile {
+  border-radius: 8px !important;
+}
