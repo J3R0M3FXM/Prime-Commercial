@@ -305,9 +305,9 @@ export default function PromosModule() {
   });
 
   return (
-    <div id="promos-module-container" className="space-y-6">
+    <div id="promos-module-container" className="space-y-3">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 border border-gray-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-3 border border-gray-200">
         <div>
           <h2 className="text-xl font-normal text-gray-900 flex items-center gap-2">
             <Tag className="w-5 h-5 text-emerald-600" />
@@ -329,7 +329,7 @@ export default function PromosModule() {
           <button
             id="create-promo-btn"
             onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Create Promo
@@ -338,7 +338,7 @@ export default function PromosModule() {
       </div>
 
       {/* Search & Filter */}
-      <div className="bg-white p-4 border border-gray-200 flex items-center gap-3">
+      <div className="bg-white p-2.5 border border-gray-200 flex items-center gap-3">
         <Search className="w-4 h-4 text-gray-400" />
         <input
           id="search-promos-input"
@@ -357,12 +357,12 @@ export default function PromosModule() {
 
       {/* Promos Table / Grid */}
       {loading ? (
-        <div className="bg-white p-12 border border-gray-200 text-center text-gray-500 font-mono text-sm">
+        <div className="bg-white p-2.5 border border-gray-200 text-center text-gray-500 font-mono text-sm">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
           Loading promotional vouchers...
         </div>
       ) : filteredPromos.length === 0 ? (
-        <div className="bg-white p-12 border border-gray-200 text-center text-gray-500 font-mono text-sm">
+        <div className="bg-white p-2.5 border border-gray-200 text-center text-gray-500 font-mono text-sm">
           No promos found. Click "Create Promo" to publish your first marketplace discount voucher.
         </div>
       ) : (
@@ -370,14 +370,14 @@ export default function PromosModule() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-[11px] font-mono text-gray-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Code & Type</th>
-                <th className="py-3 px-4">Reward Value</th>
-                <th className="py-3 px-4">Eligibility & Channel</th>
-                <th className="py-3 px-4">Spend & Min Qty</th>
-                <th className="py-3 px-4">Schedule & Flash</th>
-                <th className="py-3 px-4">Usage & Fraud</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-2 px-3">Code & Type</th>
+                <th className="py-2 px-3">Reward Value</th>
+                <th className="py-2 px-3">Eligibility & Channel</th>
+                <th className="py-2 px-3">Spend & Min Qty</th>
+                <th className="py-2 px-3">Schedule & Flash</th>
+                <th className="py-2 px-3">Usage & Fraud</th>
+                <th className="py-2 px-3 text-center">Status</th>
+                <th className="py-2 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
@@ -386,7 +386,7 @@ export default function PromosModule() {
                 return (
                   <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                     {/* Code & Type */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-2.5 px-3">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-mono font-bold text-gray-900 bg-gray-100 px-2 py-0.5 border border-gray-300 text-xs">
                           {p.code}
@@ -419,7 +419,7 @@ export default function PromosModule() {
                     </td>
 
                     {/* Reward Value */}
-                    <td className="py-3.5 px-4 font-mono text-xs">
+                    <td className="py-2.5 px-3 font-mono text-xs">
                       {p.discountType === 'fixed' && (
                         <span className="text-emerald-700 font-bold">₱{Number(p.discountValue).toLocaleString()} OFF</span>
                       )}
@@ -448,7 +448,7 @@ export default function PromosModule() {
                     </td>
 
                     {/* Eligibility & Channel */}
-                    <td className="py-3.5 px-4 font-mono text-xs text-gray-600">
+                    <td className="py-2.5 px-3 font-mono text-xs text-gray-600">
                       <div>
                         {p.customerEligibility === 'new_customer' ? (
                           <span className="text-amber-700 font-semibold">New Customers Only</span>
@@ -470,7 +470,7 @@ export default function PromosModule() {
                     </td>
 
                     {/* Spend & Min Qty */}
-                    <td className="py-3.5 px-4 font-mono text-xs text-gray-600">
+                    <td className="py-2.5 px-3 font-mono text-xs text-gray-600">
                       <div>Min Spend: <span className="font-semibold text-gray-800">{p.minSpend ? `₱${Number(p.minSpend).toLocaleString()}` : '₱0'}</span></div>
                       {p.minItemQuantity && (
                         <div className="text-[11px] text-gray-500">Min Items: {p.minItemQuantity} pcs</div>
@@ -479,7 +479,7 @@ export default function PromosModule() {
                     </td>
 
                     {/* Schedule & Flash */}
-                    <td className="py-3.5 px-4 font-mono text-[11px] text-gray-500">
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-gray-500">
                       {p.flashHourStart !== undefined && p.flashHourStart !== null && (
                         <div className="text-amber-700 font-bold">
                           Flash: {String(p.flashHourStart).padStart(2, '0')}:00 - {String(p.flashHourEnd || 24).padStart(2, '0')}:00 PHT
@@ -496,7 +496,7 @@ export default function PromosModule() {
                     </td>
 
                     {/* Usage & Fraud */}
-                    <td className="py-3.5 px-4 font-mono text-xs">
+                    <td className="py-2.5 px-3 font-mono text-xs">
                       <div className="flex items-center gap-1.5 text-gray-800 font-semibold">
                         <Users className="w-3.5 h-3.5 text-gray-400" />
                         {p.usageCount || 0} {p.totalUsageLimit ? `/ ${p.totalUsageLimit}` : 'claimed'}
@@ -515,7 +515,7 @@ export default function PromosModule() {
                     </td>
 
                     {/* Status Toggle */}
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-2.5 px-3 text-center">
                       <button
                         onClick={() => handleToggleActive(p)}
                         className={`inline-flex items-center px-2.5 py-1 text-xs font-mono font-medium border transition-colors cursor-pointer ${
@@ -529,7 +529,7 @@ export default function PromosModule() {
                     </td>
 
                     {/* Actions */}
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-2.5 px-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => setAuditPromo(p)}
@@ -564,10 +564,10 @@ export default function PromosModule() {
 
       {/* Philippine Marketplace Standard Configurator Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white border border-gray-300 w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2.5">
+          <div className="bg-white border border-gray-300 w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-none flex flex-col">
             {/* Modal Header */}
-            <div className="p-5 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+            <div className="p-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
               <div>
                 <h3 className="text-lg font-normal text-gray-900 flex items-center gap-2">
                   <Tag className="w-5 h-5 text-emerald-600" />
@@ -587,12 +587,12 @@ export default function PromosModule() {
             </div>
 
             {/* Configurator Navigation Tabs */}
-            <div className="flex border-b border-gray-200 bg-white px-5 overflow-x-auto">
+            <div className="flex border-b border-gray-200 bg-white px-3 overflow-x-auto">
               <button
                 type="button"
                 id="tab-basic-btn"
                 onClick={() => setActiveTab('basic')}
-                className={`py-3 px-4 text-xs font-mono font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                className={`py-2 px-3 text-xs font-mono font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
                   activeTab === 'basic'
                     ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -604,7 +604,7 @@ export default function PromosModule() {
                 type="button"
                 id="tab-discount-btn"
                 onClick={() => setActiveTab('discount')}
-                className={`py-3 px-4 text-xs font-mono font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                className={`py-2 px-3 text-xs font-mono font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
                   activeTab === 'discount'
                     ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -616,7 +616,7 @@ export default function PromosModule() {
                 type="button"
                 id="tab-eligibility-btn"
                 onClick={() => setActiveTab('eligibility')}
-                className={`py-3 px-4 text-xs font-mono font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                className={`py-2 px-3 text-xs font-mono font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
                   activeTab === 'eligibility'
                     ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -628,7 +628,7 @@ export default function PromosModule() {
                 type="button"
                 id="tab-schedule-btn"
                 onClick={() => setActiveTab('schedule')}
-                className={`py-3 px-4 text-xs font-mono font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                className={`py-2 px-3 text-xs font-mono font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
                   activeTab === 'schedule'
                     ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -640,7 +640,7 @@ export default function PromosModule() {
                 type="button"
                 id="tab-limits-btn"
                 onClick={() => setActiveTab('limits')}
-                className={`py-3 px-4 text-xs font-mono font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                className={`py-2 px-3 text-xs font-mono font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
                   activeTab === 'limits'
                     ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -650,10 +650,10 @@ export default function PromosModule() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 flex-1 space-y-6">
+            <form onSubmit={handleSubmit} className="p-3 flex-1 space-y-3">
               {/* TAB 1: BASIC INFO & VOUCHER TYPE */}
               {activeTab === 'basic' && (
-                <div className="space-y-5">
+                <div className="space-y-3">
                   {/* Voucher Type Grid */}
                   <div>
                     <label className="block text-xs font-mono text-gray-600 uppercase mb-2">
@@ -759,7 +759,7 @@ export default function PromosModule() {
 
               {/* TAB 2: REWARD & DISCOUNT */}
               {activeTab === 'discount' && (
-                <div className="space-y-5">
+                <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-mono text-gray-600 uppercase mb-2">
                       Reward / Discount Mechanism *
@@ -789,7 +789,7 @@ export default function PromosModule() {
                   </div>
 
                   {/* Value Configuration */}
-                  <div className="p-4 bg-gray-50 border border-gray-200 space-y-4">
+                  <div className="p-2.5 bg-gray-50 border border-gray-200 space-y-2.5">
                     {discountType === 'fixed' && (
                       <div>
                         <label className="block text-xs font-mono text-gray-700 uppercase mb-1">
@@ -812,7 +812,7 @@ export default function PromosModule() {
                     )}
 
                     {discountType === 'percentage' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
                           <label className="block text-xs font-mono text-gray-700 uppercase mb-1">
                             Discount Percentage (1-100%) *
@@ -887,7 +887,7 @@ export default function PromosModule() {
                     )}
 
                     {discountType === 'coins_cashback' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
                           <label className="block text-xs font-mono text-gray-700 uppercase mb-1">
                             Cashback Rate (% of Subtotal) *
@@ -929,13 +929,13 @@ export default function PromosModule() {
 
               {/* TAB 3: BUYER & BASKET RULES */}
               {activeTab === 'eligibility' && (
-                <div className="space-y-5">
+                <div className="space-y-3">
                   {/* Basket Thresholds */}
                   <div>
                     <h4 className="text-xs font-mono uppercase text-gray-700 font-bold mb-2">
                       Basket Minimum Conditions
                     </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
                         <label className="block text-xs font-mono text-gray-600 mb-1">
                           Minimum Items Spend (₱)
@@ -1116,13 +1116,13 @@ export default function PromosModule() {
 
               {/* TAB 4: SCHEDULE & FLASH SALE */}
               {activeTab === 'schedule' && (
-                <div className="space-y-5">
+                <div className="space-y-3">
                   {/* Validity Date Range */}
                   <div>
                     <h4 className="text-xs font-mono uppercase text-gray-700 font-bold mb-2">
                       Voucher Validity Period
                     </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
                         <label className="block text-xs font-mono text-gray-600 mb-1">Start Date (PHT)</label>
                         <input
@@ -1147,7 +1147,7 @@ export default function PromosModule() {
                   </div>
 
                   {/* Philippine Marketplace Specials: Payday & Days of Week */}
-                  <div className="pt-3 border-t border-gray-200 space-y-4">
+                  <div className="pt-3 border-t border-gray-200 space-y-2.5">
                     <div className="flex items-start gap-3 p-3.5 bg-red-50/70 border border-red-200 rounded">
                       <input
                         id="promo-payday-check"
@@ -1228,7 +1228,7 @@ export default function PromosModule() {
                     </div>
 
                     {/* Flash Sale Rush Hour Window */}
-                    <div className="p-4 bg-amber-50/60 border border-amber-200 rounded">
+                    <div className="p-2.5 bg-amber-50/60 border border-amber-200 rounded">
                       <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-900 mb-1">
                         <Clock className="w-4 h-4 text-amber-700" />
                         Flash Sale Hour Window (PHT / UTC+8)
@@ -1236,7 +1236,7 @@ export default function PromosModule() {
                       <p className="text-[11px] text-amber-700 font-mono mb-3">
                         Restrict voucher to specific rush hours (e.g. 12:00 PM lunch flash, or 00:00 midnight drop). Leave blank for all day.
                       </p>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-2.5">
                         <div>
                           <label className="block text-[10px] font-mono text-gray-600 uppercase mb-1">
                             Start Hour (0 - 23)
@@ -1275,12 +1275,12 @@ export default function PromosModule() {
 
               {/* TAB 5: QUOTAS & ANTI-FRAUD */}
               {activeTab === 'limits' && (
-                <div className="space-y-5">
+                <div className="space-y-3">
                   <div>
                     <h4 className="text-xs font-mono uppercase text-gray-700 font-bold mb-2">
                       Redemption Quotas & Allocation
                     </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
                         <label className="block text-xs font-mono text-gray-600 mb-1">
                           Marketplace Total Redemptions Quota
@@ -1318,7 +1318,7 @@ export default function PromosModule() {
                   </div>
 
                   {/* Device Fingerprinting Anti-Fraud Guarantee */}
-                  <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded space-y-2">
+                  <div className="p-2.5 bg-emerald-50/60 border border-emerald-200 rounded space-y-2">
                     <div className="flex items-center gap-2 text-xs font-mono font-bold text-emerald-900">
                       <ShieldAlert className="w-4 h-4 text-emerald-700" />
                       Multi-Account Voucher Abuse Protection
@@ -1347,7 +1347,7 @@ export default function PromosModule() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                 <div className="flex items-center gap-2">
                   {activeTab !== 'basic' && (
                     <button
@@ -1382,7 +1382,7 @@ export default function PromosModule() {
                     type="button"
                     id="cancel-promo-modal-btn"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="px-3 py-2 border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -1390,7 +1390,7 @@ export default function PromosModule() {
                     type="submit"
                     id="submit-promo-modal-btn"
                     disabled={submitting}
-                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     {submitting ? 'Saving Voucher...' : editingPromo ? 'Update Voucher' : 'Publish Voucher'}
                   </button>
@@ -1403,9 +1403,9 @@ export default function PromosModule() {
 
       {/* Audit & Redemptions Modal */}
       {auditPromo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white border border-gray-300 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-xl">
-            <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2.5">
+          <div className="bg-white border border-gray-300 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-none">
+            <div className="p-3 border-b border-gray-200 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-normal text-gray-900 flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-emerald-600" />
@@ -1420,7 +1420,7 @@ export default function PromosModule() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-3 space-y-2.5">
               {/* Summary Stats */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="p-3 bg-gray-50 border border-gray-200 font-mono text-center">
@@ -1447,7 +1447,7 @@ export default function PromosModule() {
               <div>
                 <h4 className="text-xs font-mono text-gray-700 uppercase mb-2">Recent Redemptions Log</h4>
                 {(!auditPromo.redemptions || auditPromo.redemptions.length === 0) ? (
-                  <div className="p-8 border border-dashed border-gray-200 text-center text-xs font-mono text-gray-400">
+                  <div className="p-3 border border-dashed border-gray-200 text-center text-xs font-mono text-gray-400">
                     No orders have claimed this promo code yet.
                   </div>
                 ) : (
@@ -1487,7 +1487,7 @@ export default function PromosModule() {
               <div className="flex justify-end pt-2">
                 <button
                   onClick={() => setAuditPromo(null)}
-                  className="px-4 py-2 bg-gray-900 text-white text-xs font-mono hover:bg-black transition-colors cursor-pointer"
+                  className="px-3 py-2 bg-gray-900 text-white text-xs font-mono hover:bg-black transition-colors cursor-pointer"
                 >
                   Close Audit
                 </button>

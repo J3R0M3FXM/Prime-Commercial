@@ -436,15 +436,15 @@ export default function ModifyOrderModal({
   if (!isOpen || !order) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-3 bg-black/60 backdrop-blur-sm overflow-y-auto">
       <div 
-        className="bg-white border border-slate-200 rounded-2xl w-full max-w-[430px] shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
+        className="bg-white border border-slate-200 rounded-none w-full max-w-[430px] shadow-none overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="p-2.5 sm:p-3 bg-slate-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400">
+            <div className="w-9 h-9 rounded-none bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400">
               <Sliders className="w-5 h-5" />
             </div>
             <div>
@@ -465,7 +465,7 @@ export default function ModifyOrderModal({
           <button
             onClick={onClose}
             disabled={isSaving}
-            className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-none bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             title="Close"
           >
             <X className="w-4 h-4" />
@@ -473,9 +473,9 @@ export default function ModifyOrderModal({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 text-slate-800">
+        <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-3 text-slate-800">
           {errorMessage && (
-            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs font-mono text-red-700 flex items-center gap-2">
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-none text-xs font-mono text-red-700 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
               <span>{errorMessage}</span>
             </div>
@@ -495,16 +495,16 @@ export default function ModifyOrderModal({
 
             {/* Items List */}
             {items.length === 0 ? (
-              <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-xl">
+              <div className="p-3 text-center border-2 border-dashed border-slate-200 rounded-none">
                 <p className="text-xs font-mono text-slate-500">No items in this order. Please add at least one product.</p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden bg-white shadow-xs">
+              <div className="border border-slate-200 rounded-none divide-y divide-slate-100 overflow-hidden bg-white shadow-xs">
                 {items.map((it, idx) => (
                   <div key={idx} className="p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 transition-colors">
                     {/* Item Name & Details */}
                     <div className="flex items-center gap-3 min-w-0 sm:w-2/5">
-                      <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                      <div className="w-10 h-10 rounded-none bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
                         {it.imageUrl ? (
                           <img src={it.imageUrl} alt={it.name} className="w-full h-full object-cover" />
                         ) : (
@@ -597,7 +597,7 @@ export default function ModifyOrderModal({
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(idx)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-none transition-colors cursor-pointer"
                         title="Remove item from order"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -609,7 +609,7 @@ export default function ModifyOrderModal({
             )}
 
             {/* Add Product Controls */}
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-none space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
                   <Plus className="w-3.5 h-3.5 text-slate-600" />
@@ -633,7 +633,7 @@ export default function ModifyOrderModal({
                     <select
                       value={selectedProductToAdd}
                       onChange={(e) => handleSelectProduct(e.target.value)}
-                      className="w-full h-8 px-2 text-xs font-mono border border-slate-300 rounded-lg bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
+                      className="w-full h-8 px-2 text-xs font-mono border border-slate-300 rounded-none bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
                     >
                       <option value="">-- Choose a product --</option>
                       {catalogProducts.map((p) => (
@@ -651,7 +651,7 @@ export default function ModifyOrderModal({
                       <select
                         value={selectedVariantToAdd}
                         onChange={(e) => handleSelectVariant(e.target.value)}
-                        className="w-full h-8 px-2 text-xs font-mono border border-slate-300 rounded-lg bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
+                        className="w-full h-8 px-2 text-xs font-mono border border-slate-300 rounded-none bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
                       >
                         {selectedProductObj.variants.map((v: any) => (
                           <option key={v.id} value={v.id}>
@@ -670,7 +670,7 @@ export default function ModifyOrderModal({
                       min="1"
                       value={addQty}
                       onChange={(e) => setAddQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      className="w-full h-8 px-2 text-center font-mono text-xs border border-slate-300 rounded-lg bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
+                      className="w-full h-8 px-2 text-center font-mono text-xs border border-slate-300 rounded-none bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
                     />
                   </div>
 
@@ -696,7 +696,7 @@ export default function ModifyOrderModal({
                         disabled={addIsFree}
                         value={addIsFree ? 0 : addPrice}
                         onChange={(e) => setAddPrice(e.target.value)}
-                        className={`w-full h-8 pl-5 pr-2 font-mono text-xs border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-slate-900 ${
+                        className={`w-full h-8 pl-5 pr-2 font-mono text-xs border rounded-none focus:outline-hidden focus:ring-1 focus:ring-slate-900 ${
                           addIsFree ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-bold" : "bg-white border-slate-300 text-slate-900"
                         }`}
                         placeholder="0.00"
@@ -710,7 +710,7 @@ export default function ModifyOrderModal({
                       type="button"
                       disabled={!selectedProductToAdd}
                       onClick={handleAddProductToOrder}
-                      className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-mono font-bold uppercase rounded-none transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add to Order</span>
@@ -727,7 +727,7 @@ export default function ModifyOrderModal({
                       placeholder="e.g. VIP Rush Packing / Promo Item"
                       value={customItemName}
                       onChange={(e) => setCustomItemName(e.target.value)}
-                      className="w-full h-8 px-2 text-xs font-mono border border-slate-300 rounded-lg bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
+                      className="w-full h-8 px-2 text-xs font-mono border border-slate-300 rounded-none bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
                     />
                   </div>
 
@@ -738,7 +738,7 @@ export default function ModifyOrderModal({
                       min="1"
                       value={customItemQty}
                       onChange={(e) => setCustomItemQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      className="w-full h-8 px-2 text-center font-mono text-xs border border-slate-300 rounded-lg bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
+                      className="w-full h-8 px-2 text-center font-mono text-xs border border-slate-300 rounded-none bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
                     />
                   </div>
 
@@ -763,7 +763,7 @@ export default function ModifyOrderModal({
                         disabled={customItemIsFree}
                         value={customItemIsFree ? 0 : customItemPrice}
                         onChange={(e) => setCustomItemPrice(e.target.value)}
-                        className={`w-full h-8 pl-5 pr-2 font-mono text-xs border rounded-lg focus:outline-hidden focus:ring-1 focus:ring-slate-900 ${
+                        className={`w-full h-8 pl-5 pr-2 font-mono text-xs border rounded-none focus:outline-hidden focus:ring-1 focus:ring-slate-900 ${
                           customItemIsFree ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-bold" : "bg-white border-slate-300 text-slate-900"
                         }`}
                         placeholder="0.00"
@@ -776,7 +776,7 @@ export default function ModifyOrderModal({
                       type="button"
                       disabled={!customItemName.trim()}
                       onClick={handleAddCustomItem}
-                      className="w-full h-8 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                      className="w-full h-8 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-mono font-bold uppercase rounded-none transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add</span>
@@ -788,7 +788,7 @@ export default function ModifyOrderModal({
           </div>
 
           {/* Section 2: Charges & Delivery Management */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2 border-t border-slate-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
             {/* Applied Charges Column */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -807,13 +807,13 @@ export default function ModifyOrderModal({
               </div>
 
               {charges.length === 0 ? (
-                <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center text-xs font-mono text-slate-400">
+                <div className="p-2.5 border border-dashed border-slate-200 rounded-none text-center text-xs font-mono text-slate-400">
                   No additional charges currently applied.
                 </div>
               ) : (
                 <div className="space-y-2">
                   {charges.map((ch, cIdx) => (
-                    <div key={ch.id || cIdx} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2">
+                    <div key={ch.id || cIdx} className="p-2.5 bg-slate-50 border border-slate-200 rounded-none flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="font-mono font-bold text-xs text-slate-900 truncate">{ch.name}</p>
                         {ch.isFree && (
@@ -866,7 +866,7 @@ export default function ModifyOrderModal({
 
               {/* Add Custom Charge Inline Form */}
               {showAddChargeForm && (
-                <div className="p-3 bg-white border border-slate-300 rounded-xl space-y-2 shadow-xs">
+                <div className="p-3 bg-white border border-slate-300 rounded-none space-y-2 shadow-xs">
                   <p className="text-[10px] font-mono font-bold text-slate-600 uppercase">New Custom Charge</p>
                   <div className="flex gap-2">
                     <input
@@ -906,7 +906,7 @@ export default function ModifyOrderModal({
                 <span>Delivery Logistics & Fee</span>
               </h3>
 
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-none space-y-3">
                 <div className="flex items-center justify-between text-xs font-mono">
                   <span className="text-slate-500">Selected Courier:</span>
                   <span className="font-bold text-slate-900">{order.courier?.name || "Standard Courier"}</span>
@@ -943,7 +943,7 @@ export default function ModifyOrderModal({
                   <button
                     type="button"
                     onClick={handleToggleDeliveryFree}
-                    className={`mt-4 px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`mt-2.5 px-3 py-1.5 rounded-none text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer ${
                       isDeliveryFree
                         ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs"
                         : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200"
@@ -965,14 +965,14 @@ export default function ModifyOrderModal({
                   placeholder="e.g. Swapped variant per customer chat; waived delivery fee"
                   value={modificationReason}
                   onChange={(e) => setModificationReason(e.target.value)}
-                  className="w-full h-8 px-2.5 text-xs font-mono border border-slate-300 rounded-lg bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
+                  className="w-full h-8 px-2.5 text-xs font-mono border border-slate-300 rounded-none bg-white text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
                 />
               </div>
             </div>
           </div>
 
           {/* Section 3: Live Financial Summary Breakdown */}
-          <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3 font-mono">
+          <div className="p-2.5 bg-slate-900 text-white rounded-none space-y-3 font-mono">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <span className="text-xs font-heading font-normal uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -1005,7 +1005,7 @@ export default function ModifyOrderModal({
                 </span>
               </div>
 
-              <div className="bg-slate-800/80 p-2 rounded-xl border border-slate-700/80">
+              <div className="bg-slate-800/80 p-2 rounded-none border border-slate-700/80">
                 <span className="text-[10px] text-amber-300 uppercase font-bold block">New Grand Total</span>
                 <span className="text-base font-bold text-amber-400 mt-0.5 block">{formatPHP(grandTotal)}</span>
               </div>
@@ -1019,12 +1019,12 @@ export default function ModifyOrderModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+        <div className="p-2.5 sm:p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-mono font-bold uppercase transition-colors cursor-pointer"
+            className="px-3 py-2 rounded-none border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-mono font-bold uppercase transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -1034,7 +1034,7 @@ export default function ModifyOrderModal({
               type="button"
               disabled={isSaving || items.length === 0}
               onClick={handleSaveChanges}
-              className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-heading font-normal uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md"
+              className="px-3 py-2 rounded-none bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-heading font-normal uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-none"
             >
               {isSaving ? (
                 <>

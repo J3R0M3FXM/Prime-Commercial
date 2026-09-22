@@ -487,10 +487,10 @@ export default function MediaModule() {
   const totalPublished = videos.filter((v) => v.isPublished !== false).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Toast Alert */}
       {successMsg && (
-        <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl flex items-center justify-between text-xs font-mono animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-none flex items-center justify-between text-xs font-mono animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center gap-2">
             <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{successMsg}</span>
@@ -503,7 +503,7 @@ export default function MediaModule() {
 
       {/* Error Alert */}
       {error && (
-        <div className="p-3 bg-red-50 border border-red-300 text-red-800 rounded-xl flex items-center justify-between text-xs font-mono animate-in fade-in duration-200">
+        <div className="p-3 bg-red-50 border border-red-300 text-red-800 rounded-none flex items-center justify-between text-xs font-mono animate-in fade-in duration-200">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
             <span>{error}</span>
@@ -516,8 +516,8 @@ export default function MediaModule() {
 
       {/* TOP STATS & STORAGE INFO BAR */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+        <div className="bg-white border border-slate-200 rounded-none p-2.5 shadow-none flex items-center gap-3">
+          <div className="w-10 h-10 rounded-none bg-slate-900 text-white flex items-center justify-center shrink-0">
             <Film className="w-5 h-5" />
           </div>
           <div>
@@ -526,8 +526,8 @@ export default function MediaModule() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+        <div className="bg-white border border-slate-200 rounded-none p-2.5 shadow-none flex items-center gap-3">
+          <div className="w-10 h-10 rounded-none bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
             <CheckCircle className="w-5 h-5" />
           </div>
           <div>
@@ -536,8 +536,8 @@ export default function MediaModule() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+        <div className="bg-white border border-slate-200 rounded-none p-2.5 shadow-none flex items-center gap-3">
+          <div className="w-10 h-10 rounded-none bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
             <Eye className="w-5 h-5" />
           </div>
           <div>
@@ -546,9 +546,9 @@ export default function MediaModule() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-none p-2.5 shadow-none flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            <div className={`w-10 h-10 rounded-none flex items-center justify-center shrink-0 ${
               tgStatus?.connected ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-600"
             }`}>
               <Send className="w-5 h-5" />
@@ -563,7 +563,7 @@ export default function MediaModule() {
           <button
             onClick={checkTelegramStatus}
             title="Refresh connection status"
-            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+            className="p-1.5 hover:bg-slate-100 rounded-none text-slate-400 hover:text-slate-700 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${checkingTg ? "animate-spin" : ""}`} />
           </button>
@@ -571,7 +571,7 @@ export default function MediaModule() {
       </div>
 
       {/* ACTION BAR & CONTROLS */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+      <div className="bg-white border border-slate-200 rounded-none p-2.5 shadow-none space-y-2.5">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Search */}
           <div className="relative flex-1">
@@ -581,7 +581,7 @@ export default function MediaModule() {
               placeholder="Search videos by title, description, or tags..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900 transition-colors"
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900 transition-colors"
             />
           </div>
 
@@ -589,14 +589,14 @@ export default function MediaModule() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setIsUploadModalOpen(true)}
-              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-none"
             >
               <Upload className="w-3.5 h-3.5" /> Upload Video
             </button>
 
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <LinkIcon className="w-3.5 h-3.5" /> Import Link / ID
             </button>
@@ -604,7 +604,7 @@ export default function MediaModule() {
             {videos.length === 0 && (
               <button
                 onClick={handleSeedSamples}
-                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Load Sample Videos
               </button>
@@ -613,7 +613,7 @@ export default function MediaModule() {
             <button
               onClick={fetchVideos}
               title="Refresh videos"
-              className="p-2 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-600 cursor-pointer"
+              className="p-2 border border-slate-200 hover:bg-slate-50 rounded-none text-slate-600 cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -628,7 +628,7 @@ export default function MediaModule() {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 rounded-none text-xs font-bold transition-colors cursor-pointer ${
                   selectedCategory === cat
                     ? "bg-slate-900 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -640,7 +640,7 @@ export default function MediaModule() {
           </div>
 
           {/* Status filters */}
-          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px] font-mono font-bold">
+          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-none text-[11px] font-mono font-bold">
             {(["all", "published", "draft", "featured"] as const).map((s) => (
               <button
                 key={s}
@@ -658,12 +658,12 @@ export default function MediaModule() {
 
       {/* VIDEO GRID */}
       {loading && videos.length === 0 ? (
-        <div className="p-12 text-center bg-white border border-slate-200 rounded-2xl">
+        <div className="p-2.5 text-center bg-white border border-slate-200 rounded-none">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto text-slate-400 mb-2" />
           <p className="text-xs font-mono text-slate-500">Loading Telegram Media Gallery...</p>
         </div>
       ) : filteredVideos.length === 0 ? (
-        <div className="p-12 text-center bg-white border border-dashed border-slate-300 rounded-2xl space-y-3">
+        <div className="p-2.5 text-center bg-white border border-dashed border-slate-300 rounded-none space-y-3">
           <Film className="w-10 h-10 mx-auto text-slate-300" />
           <h3 className="text-base font-heading font-black uppercase text-slate-700">No Videos Found</h3>
           <p className="text-xs font-mono text-slate-500 max-w-md mx-auto">
@@ -674,24 +674,24 @@ export default function MediaModule() {
           <div className="flex items-center justify-center gap-2 pt-2">
             <button
               onClick={() => setIsUploadModalOpen(true)}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" /> Upload Video
             </button>
             <button
               onClick={handleSeedSamples}
-              className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" /> Load Sample Gallery
             </button>
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {filteredVideos.map((video) => (
             <div
               key={video.id}
-              className={`bg-white border rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col ${
+              className={`bg-white border rounded-none overflow-hidden shadow-xs hover:shadow-none transition-all duration-200 flex flex-col ${
                 video.featured ? "border-amber-300 ring-1 ring-amber-300" : "border-slate-200"
               }`}
             >
@@ -721,7 +721,7 @@ export default function MediaModule() {
 
                 {/* Play Button Overlay */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full bg-white/90 text-slate-950 flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 rounded-full bg-white/90 text-slate-950 flex items-center justify-center shadow-none transform group-hover:scale-110 transition-transform">
                     <Play className="w-5 h-5 fill-current ml-0.5" />
                   </div>
                 </div>
@@ -752,7 +752,7 @@ export default function MediaModule() {
               </div>
 
               {/* Card Body */}
-              <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+              <div className="p-2.5 flex-1 flex flex-col justify-between space-y-3">
                 <div className="space-y-1.5">
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="font-heading font-black text-sm text-slate-900 leading-snug line-clamp-2">
@@ -791,7 +791,7 @@ export default function MediaModule() {
                       type="button"
                       onClick={() => toggleFeatured(video)}
                       title={video.featured ? "Unmark Featured" : "Mark Featured"}
-                      className={`p-1.5 rounded-lg cursor-pointer transition-colors ${
+                      className={`p-1.5 rounded-none cursor-pointer transition-colors ${
                         video.featured ? "text-amber-500 hover:bg-amber-50" : "text-slate-300 hover:text-amber-500 hover:bg-slate-100"
                       }`}
                     >
@@ -820,7 +820,7 @@ export default function MediaModule() {
                         setIsEditModalOpen(true);
                       }}
                       title="Edit Details"
-                      className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg cursor-pointer"
+                      className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-none cursor-pointer"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
@@ -830,7 +830,7 @@ export default function MediaModule() {
                       type="button"
                       onClick={() => handleDeleteVideo(video)}
                       title="Delete Video"
-                      className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg cursor-pointer"
+                      className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-none cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -846,9 +846,9 @@ export default function MediaModule() {
       {/* 1. UPLOAD MODAL                                                            */}
       {/* ========================================================================= */}
       {isUploadModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-[430px] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2.5 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-none w-full max-w-[430px] overflow-hidden shadow-none animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-3 py-2 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Upload className="w-5 h-5 text-emerald-400" />
                 <h3 className="font-heading font-black text-sm uppercase tracking-wider">
@@ -865,7 +865,7 @@ export default function MediaModule() {
               </button>
             </div>
 
-            <form onSubmit={handleUploadSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleUploadSubmit} className="p-3 space-y-2.5">
               {/* File Dropzone */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
@@ -873,7 +873,7 @@ export default function MediaModule() {
                 </label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
+                  className={`border-2 border-dashed rounded-none p-3 text-center cursor-pointer transition-colors ${
                     uploadFile ? "border-emerald-500 bg-emerald-50/50" : "border-slate-300 hover:border-slate-500 bg-slate-50"
                   }`}
                 >
@@ -925,7 +925,7 @@ export default function MediaModule() {
                     value={uploadTitle}
                     onChange={(e) => setUploadTitle(e.target.value)}
                     placeholder="e.g. Unboxing Signature Model X"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                   />
                 </div>
 
@@ -936,7 +936,7 @@ export default function MediaModule() {
                   <select
                     value={uploadCategory}
                     onChange={(e) => setUploadCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                   >
                     {CATEGORIES.filter((c) => c !== "All").map((c) => (
                       <option key={c} value={c}>
@@ -957,7 +957,7 @@ export default function MediaModule() {
                   value={uploadDescription}
                   onChange={(e) => setUploadDescription(e.target.value)}
                   placeholder="Highlights, product details, or viewer instructions..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                 />
               </div>
 
@@ -972,7 +972,7 @@ export default function MediaModule() {
                     value={uploadTags}
                     onChange={(e) => setUploadTags(e.target.value)}
                     placeholder="e.g. unboxing, review, manila"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                   />
                 </div>
 
@@ -985,7 +985,7 @@ export default function MediaModule() {
                     value={uploadThumbnail}
                     onChange={(e) => setUploadThumbnail(e.target.value)}
                     placeholder="https://..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                   />
                 </div>
               </div>
@@ -1000,7 +1000,7 @@ export default function MediaModule() {
                   value={uploadChatId}
                   onChange={(e) => setUploadChatId(e.target.value)}
                   placeholder={tgStatus?.storageChatId || "Default Bot Storage Channel"}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                 />
                 <span className="text-[10px] text-slate-400 font-mono">
                   Leave empty to use configured TELEGRAM_STORAGE_CHAT_ID or ADMIN_TELEGRAM_USER_ID
@@ -1008,7 +1008,7 @@ export default function MediaModule() {
               </div>
 
               {/* Checkboxes */}
-              <div className="flex items-center gap-6 pt-1">
+              <div className="flex items-center gap-3 pt-1">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-mono">
                   <input
                     type="checkbox"
@@ -1047,19 +1047,19 @@ export default function MediaModule() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   disabled={uploading}
                   onClick={() => setIsUploadModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 hover:bg-slate-100 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-700 cursor-pointer"
+                  className="px-3 py-2 border border-slate-300 hover:bg-slate-100 rounded-none text-xs font-bold uppercase tracking-wider text-slate-700 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={uploading || !uploadFile}
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-sm"
+                  className="px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-none"
                 >
                   {uploading ? (
                     <>
@@ -1081,9 +1081,9 @@ export default function MediaModule() {
       {/* 2. IMPORT LINK / FILE ID MODAL                                             */}
       {/* ========================================================================= */}
       {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-[430px] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2.5 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-none w-full max-w-[430px] overflow-hidden shadow-none animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-3 py-2 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <LinkIcon className="w-5 h-5 text-sky-400" />
                 <h3 className="font-heading font-black text-sm uppercase tracking-wider">
@@ -1100,7 +1100,7 @@ export default function MediaModule() {
               </button>
             </div>
 
-            <form onSubmit={handleImportSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleImportSubmit} className="p-3 space-y-2.5">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Telegram File ID
@@ -1110,7 +1110,7 @@ export default function MediaModule() {
                   value={importFileId}
                   onChange={(e) => setImportFileId(e.target.value)}
                   placeholder="e.g. BAACAgUAAxkBAAI..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                 />
                 <span className="text-[10px] text-slate-400 font-mono">
                   From Telegram Bot API or forwarded video payload
@@ -1134,7 +1134,7 @@ export default function MediaModule() {
                   value={importDirectUrl}
                   onChange={(e) => setImportDirectUrl(e.target.value)}
                   placeholder="https://example.com/video.mp4"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                 />
               </div>
 
@@ -1149,7 +1149,7 @@ export default function MediaModule() {
                     value={importTitle}
                     onChange={(e) => setImportTitle(e.target.value)}
                     placeholder="Video Title"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                   />
                 </div>
 
@@ -1160,7 +1160,7 @@ export default function MediaModule() {
                   <select
                     value={importCategory}
                     onChange={(e) => setImportCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                   >
                     {CATEGORIES.filter((c) => c !== "All").map((c) => (
                       <option key={c} value={c}>
@@ -1180,7 +1180,7 @@ export default function MediaModule() {
                   value={importDescription}
                   onChange={(e) => setImportDescription(e.target.value)}
                   placeholder="Optional details..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                 />
               </div>
 
@@ -1193,7 +1193,7 @@ export default function MediaModule() {
                   value={importThumbnail}
                   onChange={(e) => setImportThumbnail(e.target.value)}
                   placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                 />
               </div>
 
@@ -1201,14 +1201,14 @@ export default function MediaModule() {
                 <button
                   type="button"
                   onClick={() => setIsImportModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 hover:bg-slate-100 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-700 cursor-pointer"
+                  className="px-3 py-2 border border-slate-300 hover:bg-slate-100 rounded-none text-xs font-bold uppercase tracking-wider text-slate-700 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={importing || (!importFileId && !importDirectUrl)}
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  className="px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-none"
                 >
                   {importing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                   Add to Gallery
@@ -1223,9 +1223,9 @@ export default function MediaModule() {
       {/* 3. EDIT VIDEO MODAL                                                        */}
       {/* ========================================================================= */}
       {isEditModalOpen && editingVideo && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-[430px] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2.5 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-none w-full max-w-[430px] overflow-hidden shadow-none animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-3 py-2 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Edit2 className="w-4 h-4 text-emerald-400" />
                 <h3 className="font-heading font-black text-sm uppercase tracking-wider">
@@ -1241,7 +1241,7 @@ export default function MediaModule() {
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleEditSubmit} className="p-3 space-y-2.5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
@@ -1252,7 +1252,7 @@ export default function MediaModule() {
                     required
                     value={editingVideo.title}
                     onChange={(e) => setEditingVideo({ ...editingVideo, title: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                   />
                 </div>
 
@@ -1263,7 +1263,7 @@ export default function MediaModule() {
                   <select
                     value={editingVideo.category}
                     onChange={(e) => setEditingVideo({ ...editingVideo, category: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                   >
                     {CATEGORIES.filter((c) => c !== "All").map((c) => (
                       <option key={c} value={c}>
@@ -1282,7 +1282,7 @@ export default function MediaModule() {
                   rows={2}
                   value={editingVideo.description || ""}
                   onChange={(e) => setEditingVideo({ ...editingVideo, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                 />
               </div>
 
@@ -1299,7 +1299,7 @@ export default function MediaModule() {
                       tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean)
                     })
                   }
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                 />
               </div>
 
@@ -1311,11 +1311,11 @@ export default function MediaModule() {
                   type="text"
                   value={editingVideo.thumbnailUrl || ""}
                   onChange={(e) => setEditingVideo({ ...editingVideo, thumbnailUrl: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
                 />
               </div>
 
-              <div className="flex items-center gap-6 pt-1">
+              <div className="flex items-center gap-3 pt-1">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-mono">
                   <input
                     type="checkbox"
@@ -1341,13 +1341,13 @@ export default function MediaModule() {
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 hover:bg-slate-100 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-700 cursor-pointer"
+                  className="px-3 py-2 border border-slate-300 hover:bg-slate-100 rounded-none text-xs font-bold uppercase tracking-wider text-slate-700 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer shadow-sm"
+                  className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-none text-xs font-bold uppercase tracking-wider cursor-pointer shadow-none"
                 >
                   Save Changes
                 </button>
@@ -1361,10 +1361,10 @@ export default function MediaModule() {
       {/* 4. PREVIEW VIDEO PLAYER MODAL                                              */}
       {/* ========================================================================= */}
       {previewVideo && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-[430px] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-2.5">
+          <div className="bg-slate-950 border border-slate-800 rounded-none w-full max-w-[430px] overflow-hidden shadow-none animate-in fade-in zoom-in-95 duration-200">
             {/* Player Header */}
-            <div className="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 text-white flex items-center justify-between">
+            <div className="px-3 py-2.5 bg-slate-900/90 border-b border-slate-800 text-white flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
                 <Film className="w-4 h-4 text-emerald-400 shrink-0" />
                 <h3 className="font-heading font-black text-sm uppercase tracking-wider truncate">
@@ -1374,7 +1374,7 @@ export default function MediaModule() {
               <button
                 type="button"
                 onClick={() => setPreviewVideo(null)}
-                className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+                className="p-1 hover:bg-slate-800 rounded-none text-slate-400 hover:text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1383,7 +1383,7 @@ export default function MediaModule() {
             {/* Video Player */}
             <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
               {previewVideoError ? (
-                <div className="p-6 text-center space-y-2 max-w-sm">
+                <div className="p-3 text-center space-y-2 max-w-sm">
                   <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">
                     <Film className="w-5 h-5" />
                   </div>
@@ -1393,7 +1393,7 @@ export default function MediaModule() {
                   </p>
                   <button
                     onClick={() => setPreviewVideoError(null)}
-                    className="mt-2 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-mono text-emerald-400 rounded-lg cursor-pointer inline-flex items-center gap-1.5"
+                    className="mt-2 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-mono text-emerald-400 rounded-none cursor-pointer inline-flex items-center gap-1.5"
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> Retry
                   </button>
@@ -1430,7 +1430,7 @@ export default function MediaModule() {
             </div>
 
             {/* Player Details Footer */}
-            <div className="p-5 space-y-3 bg-slate-900/60 text-slate-200">
+            <div className="p-3 space-y-3 bg-slate-900/60 text-slate-200">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-mono font-bold">
@@ -1453,7 +1453,7 @@ export default function MediaModule() {
                       navigator.clipboard.writeText(streamUrl);
                       showToast("Stream URL copied to clipboard!");
                     }}
-                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-mono flex items-center gap-1.5 cursor-pointer"
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-none text-xs font-mono flex items-center gap-1.5 cursor-pointer"
                   >
                     <Copy className="w-3 h-3" /> Copy Stream URL
                   </button>
