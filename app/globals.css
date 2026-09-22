@@ -411,3 +411,39 @@ body.splash-active #system-wide-proprietary-footer {
 .admin-shell article {
   max-width: 100% !important;
 }
+
+
+/* FINAL PRIME ADMIN DENSITY OVERRIDE */
+.admin-shell [class*="h-28"],
+.admin-shell [class*="h-32"] {
+  height: auto !important;
+  min-height: 68px !important;
+}
+
+.admin-shell [class*="p-3.5"],
+.admin-shell [class*="p-3"],
+.admin-shell [class*="p-2.5"] {
+  padding: 6px !important;
+}
+
+.admin-shell [class*="py-4"],
+.admin-shell [class*="py-3"],
+.admin-shell [class*="py-2.5"] {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+.admin-shell [class*="pt-4"],
+.admin-shell [class*="pt-3"],
+.admin-shell [class*="pt-2.5"],
+.admin-shell [class*="pb-4"],
+.admin-shell [class*="pb-3"],
+.admin-shell [class*="pb-2.5"] {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+.admin-shell [class*="space-y-4"] > :not([hidden]) ~ :not([hidden]),
+.admin-shell [class*="space-y-3"] > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 6px !important;
+}
