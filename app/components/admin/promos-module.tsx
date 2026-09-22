@@ -1347,7 +1347,7 @@ export default function PromosModule() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                 <div className="flex items-center gap-2">
                   {activeTab !== 'basic' && (
                     <button
