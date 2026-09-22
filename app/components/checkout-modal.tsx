@@ -1501,7 +1501,7 @@ export default function CheckoutModal({
                           <button
                             type="button"
                             onClick={() => setSelectedCourierId(courier.id)}
-                            className={`group w-full h-[82px] sm:h-[104px] rounded-none border transition-all flex items-center justify-center p-0 relative overflow-hidden ${
+                            className={`group w-full aspect-video rounded-none border transition-all flex items-center justify-center p-0 relative overflow-hidden ${
                               isSelected
                                 ? "border-slate-900 shadow-sm ring-1 ring-slate-900"
                                 : "border-gray-200 bg-white hover:border-gray-300"
@@ -2135,7 +2135,7 @@ export default function CheckoutModal({
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    {/* Method Tiles Selection (5 columns per row, max 2 rows per page, swipe left/right + dot indicators) */}
+                    {/* Method Tiles Selection (4 columns per row, max 2 rows per page, swipe left/right + dot indicators) */}
                     {(() => {
                       const itemsPerPage = 8;
                       const totalPages = Math.ceil(paymentMethods.length / itemsPerPage);
@@ -2177,7 +2177,7 @@ export default function CheckoutModal({
                                           setIsPaymentQrModalOpen(true);
                                         }
                                       }}
-                                      className={`group w-full h-[82px] sm:h-[104px] rounded-none border transition-all flex items-center justify-center p-0 relative overflow-hidden select-none ${
+                                      className={`group w-full aspect-video rounded-none border transition-all flex items-center justify-center p-0 relative overflow-hidden select-none ${
                                         isOffline
                                           ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90"
                                           : isSelected
