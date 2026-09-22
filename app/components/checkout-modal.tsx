@@ -1501,7 +1501,7 @@ export default function CheckoutModal({
                           <button
                             type="button"
                             onClick={() => setSelectedCourierId(courier.id)}
-                            className={`group w-full aspect-video rounded-none border transition-all flex items-center justify-center p-0 relative overflow-hidden ${
+                            className={`group w-full aspect-video rounded-2xl border transition-all flex items-center justify-center p-2.5 sm:p-3 relative overflow-hidden bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_18px_rgba(15,23,42,0.05),0_2px_6px_rgba(15,23,42,0.08)] ${
                               isSelected
                                 ? "border-slate-900 shadow-sm ring-1 ring-slate-900"
                                 : "border-gray-200 bg-white hover:border-gray-300"
@@ -1511,28 +1511,28 @@ export default function CheckoutModal({
                               <img
                                 src={courier.logo}
                                 alt={courier.name}
-                                className="absolute inset-0 w-full h-full object-cover scale-[1.03] transition-transform duration-300 group-hover:scale-[1.08]"
+                                className="relative z-[2] w-[68%] h-[68%] object-contain transition-transform duration-200"
                                 referrerPolicy="no-referrer"
                               />
                             ) : (
-                              <Truck className={`w-8 h-8 ${isSelected ? 'text-gray-600' : 'text-gray-300 opacity-40'}`} />
+                              <Truck className={`relative z-[2] w-8 h-8 ${isSelected ? 'text-gray-600' : 'text-gray-300 opacity-40'}`} />
                             )}
-                            <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-br from-white/35 via-white/5 to-transparent opacity-80" />
-                            <div className="absolute inset-x-0 top-0 z-[5] h-1/2 pointer-events-none bg-gradient-to-b from-white/20 to-transparent" />
-                            <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/75 via-black/20 to-transparent px-1.5 pt-6 pb-1.5">
-                              <span className="block truncate text-[9px] sm:text-[10px] font-heading font-black uppercase tracking-wide text-left text-white">
-                                {formatCourierName(courier.name)}
-                              </span>
-                            </div>
+                            <div className="absolute inset-0 z-[3] pointer-events-none bg-gradient-to-br from-white/75 via-white/20 to-transparent opacity-90" />
+                            <div className="absolute inset-x-3 top-1.5 z-[4] h-1/3 rounded-t-xl pointer-events-none bg-gradient-to-b from-white/70 to-transparent" />
                             {isSelected && (
                               <div className="absolute top-1.5 right-1.5 z-20 w-5 h-5 bg-white text-slate-950 border border-slate-200 flex items-center justify-center">
                                 <Check className="w-3 h-3" />
                               </div>
                             )}
                           </button>
-                          <span className="text-xs sm:text-[13px] font-mono font-bold text-slate-950 tracking-tight text-center">
-                            {formatPHP(courier.calculatedFee || 0)}
-                          </span>
+                          <div className="w-full text-center leading-tight">
+                            <span className="block truncate text-[9px] sm:text-[10px] font-heading font-black uppercase tracking-wide text-slate-900">
+                              {formatCourierName(courier.name)}
+                            </span>
+                            <span className="block text-xs sm:text-[13px] font-mono font-bold text-slate-950 tracking-tight">
+                              {formatPHP(courier.calculatedFee || 0)}
+                            </span>
+                          </div>
                         </div>
                       );
                     })}
@@ -2177,7 +2177,7 @@ export default function CheckoutModal({
                                           setIsPaymentQrModalOpen(true);
                                         }
                                       }}
-                                      className={`group w-full aspect-video rounded-none border transition-all flex items-center justify-center p-0 relative overflow-hidden select-none ${
+                                      className={`group w-full aspect-video rounded-2xl border transition-all flex items-center justify-center p-2.5 sm:p-3 relative overflow-hidden bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_18px_rgba(15,23,42,0.05),0_2px_6px_rgba(15,23,42,0.08)] select-none ${
                                         isOffline
                                           ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90"
                                           : isSelected
@@ -2190,17 +2190,18 @@ export default function CheckoutModal({
                                         <img
                                           src={method.logo}
                                           alt={method.name}
-                                          className={`absolute inset-0 w-full h-full object-cover scale-[1.03] rounded-none transition-transform duration-300 group-hover:scale-[1.08] ${
-                                            isOffline ? "filter blur-[1.5px] opacity-40 grayscale-[30%]" : ""
-                                          }`}
+                                          className={`relative z-[2] w-[68%] h-[68%] object-contain transition-transform duration-200 ${isOffline ? "filter blur-[1px] opacity-40 grayscale-[30%]" : ""}`}
                                           referrerPolicy="no-referrer"
                                         />
                                       ) : (
-                                        <CreditCard className={`w-5 h-5 text-gray-400 ${isOffline ? "filter blur-[1px] opacity-40" : ""}`} />
+                                        <CreditCard className={`relative z-[2] w-5 h-5 text-gray-400 ${isOffline ? "filter blur-[1px] opacity-40" : ""}`} />
                                       )}
 
                                       {!isOffline && (
-                                        <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-br from-white/35 via-white/5 to-transparent opacity-80" />
+                                        <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-br from-white/75 via-white/15 to-transparent opacity-90" />
+                                      )}
+                                      {!isOffline && (
+                                        <div className="absolute inset-x-3 top-1.5 z-[6] h-1/3 rounded-t-xl pointer-events-none bg-gradient-to-b from-white/70 to-transparent" />
                                       )}
 
                                       {/* Offline Overlay */}
