@@ -50,16 +50,11 @@ async function telegram(method: string, payload: Record<string, any>) {
 function buttonCallbackData(flowId: string, button: any) {
   const action = String(button?.action || '').toLowerCase();
 
-  // Existing buttons remain backward compatible.
-  if (!action || action === 'text') {
-    return ('auto:' + flowId + ':' + button.id).slice(0, 64);
-  }
-
-  if (['media', 'caption', 'markup'].includes(action)) {
-    return ('sec:' + action + ':' + flowId + ':' + button.id).slice(0, 64);
-  }
-
-  return ('auto:' + flowId + ':' + button.id).slice(0, 64);
+  // URL buttons do not need callback_data.
+  // All callback-capable Secretary buttons use one compact namespace.
+  // The persisted button configuration resolves the action after the click.
+  if (action === 'url') return '';
+  return ('sec:' + flowId + ':' + button.id).slice(0, 64);
 }
 
 function keyboard(flow: any) {
@@ -253,10 +248,12 @@ export async function POST(request: Request) {
 
       let flowId = '';
       let buttonId = '';
+      let parsedType = 'text';
 
       if (secretary) {
         flowId = secretary.flowId;
         buttonId = secretary.buttonId;
+        parsedType = secretary.type;
       } else {
         const legacyParts = data.split(':');
         flowId = legacyParts[1] || '';
@@ -271,28 +268,67 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, matched: false, reason: 'button_not_found' });
       }
 
-      if (secretary) {
-        const action = secretaryAction(button, secretary.type, message, flow);
+      // New compact Secretary callbacks resolve their action from the button
+      // configuration saved by the admin configurator.
+      const configuredAction = String(button.action || '').toLowerCase();
+      const effectiveAction =
+        parsedType === 'auto'
+          ? (['flow', 'reply', 'media', 'caption', 'markup'].includes(configuredAction)
+              ? configuredAction
+              : 'reply')
+          : parsedType;
+
+      if (effectiveAction === 'flow') {
+        const targetId = String(button.targetFlowId || '').trim();
+        const targetFlow = flows.find(item => item.id === targetId && item.active);
+
+        if (!targetFlow) {
+          return NextResponse.json({
+            ok: true,
+            matched: false,
+            reason: 'target_step_not_found',
+          });
+        }
+
         await executeSecretaryAction(
           telegram,
           { callback, connectionId, message },
-          action,
+          {
+            type: 'text',
+            text: renderTemplate(targetFlow.responseText || '', message),
+            replyMarkup: keyboard(targetFlow),
+          },
         );
 
         return NextResponse.json({
           ok: true,
           matched: true,
-          secretary: secretary.type,
+          secretary: 'flow',
+          target_flow: targetFlow.id,
         });
       }
+
+      const actionType =
+        effectiveAction === 'media' ||
+        effectiveAction === 'caption' ||
+        effectiveAction === 'markup' ||
+        effectiveAction === 'text'
+          ? effectiveAction
+          : 'text';
+
+      const action = secretaryAction(button, actionType, message, flow);
 
       await executeSecretaryAction(
         telegram,
         { callback, connectionId, message },
-        secretaryAction(button, 'text', message, flow),
+        action,
       );
 
-      return NextResponse.json({ ok: true, matched: true, secretary: 'text' });
+      return NextResponse.json({
+        ok: true,
+        matched: true,
+        secretary: actionType,
+      });
     }
 
     return NextResponse.json({ ok: true, ignored: true });
