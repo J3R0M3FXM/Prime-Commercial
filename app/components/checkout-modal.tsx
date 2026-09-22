@@ -1501,7 +1501,7 @@ export default function CheckoutModal({
                           <button
                             type="button"
                             onClick={() => setSelectedCourierId(courier.id)}
-                            className={`group w-full aspect-video rounded-2xl border transition-all flex items-center justify-center p-2.5 sm:p-3 relative overflow-hidden bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_18px_rgba(15,23,42,0.05),0_2px_6px_rgba(15,23,42,0.08)] ${
+                            className={`group w-full aspect-video rounded-2xl border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_18px_rgba(15,23,42,0.05),0_2px_6px_rgba(15,23,42,0.08)] ${
                               isSelected
                                 ? "border-slate-900 shadow-sm ring-1 ring-slate-900"
                                 : "border-gray-200 bg-white hover:border-gray-300"
@@ -1511,7 +1511,7 @@ export default function CheckoutModal({
                               <img
                                 src={courier.logo}
                                 alt={courier.name}
-                                className="relative z-[2] w-[68%] h-[68%] object-contain transition-transform duration-200"
+                                className="absolute inset-0 z-[2] w-full h-full object-fill transition-transform duration-200"
                                 referrerPolicy="no-referrer"
                               />
                             ) : (
@@ -2177,7 +2177,7 @@ export default function CheckoutModal({
                                           setIsPaymentQrModalOpen(true);
                                         }
                                       }}
-                                      className={`group w-full aspect-video rounded-2xl border transition-all flex items-center justify-center p-2.5 sm:p-3 relative overflow-hidden bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_18px_rgba(15,23,42,0.05),0_2px_6px_rgba(15,23,42,0.08)] select-none ${
+                                      className={`group w-full aspect-video rounded-2xl border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_18px_rgba(15,23,42,0.05),0_2px_6px_rgba(15,23,42,0.08)] select-none ${
                                         isOffline
                                           ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90"
                                           : isSelected
@@ -2190,7 +2190,7 @@ export default function CheckoutModal({
                                         <img
                                           src={method.logo}
                                           alt={method.name}
-                                          className={`relative z-[2] w-[68%] h-[68%] object-contain transition-transform duration-200 ${isOffline ? "filter blur-[1px] opacity-40 grayscale-[30%]" : ""}`}
+                                          className={`absolute inset-0 z-[2] w-full h-full object-fill transition-transform duration-200 ${isOffline ? "filter blur-[1px] opacity-40 grayscale-[30%]" : ""}`}
                                           referrerPolicy="no-referrer"
                                         />
                                       ) : (
