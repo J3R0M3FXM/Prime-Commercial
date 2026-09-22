@@ -82,9 +82,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Selected Maya payment method is unavailable.' }, { status: 400 });
     }
 
+    // Maya Create Checkout requires the PUBLIC key for Basic Auth.
+    // Secret keys are reserved for Maya endpoints that explicitly require them.
     const publicKey = String(method.public_key || '').trim();
     if (!publicKey) {
-      return NextResponse.json({ error: 'Maya public API key is not configured for this payment method.' }, { status: 500 });
+      return NextResponse.json({
+        error: 'Maya public API key is not configured for this payment method. Add the current public key for the same Maya environment used by PRIME.'
+      }, { status: 500 });
+    }
+
+    if (!/^pk[-_]/i.test(publicKey)) {
+      return NextResponse.json({
+        error: 'Invalid Maya public API key format. Create Checkout requires a Maya public key (pk-...) for the configured environment.'
+      }, { status: 500 });
     }
 
     const payableNow = Math.round(Number(order.payable_now) * 100) / 100;
@@ -150,7 +160,14 @@ export async function POST(request: Request) {
         response: responseBody,
       });
       return NextResponse.json(
-        { error: responseBody?.message || responseBody?.error || 'Maya Checkout could not be created.' },
+        {
+          error:
+            responseBody?.message ||
+            responseBody?.error ||
+            (response.status === 401
+              ? 'Maya rejected the public API key (K003). Verify that the configured public key is current and belongs to the same Sandbox/Production environment as PRIME.'
+              : 'Maya Checkout could not be created.')
+        },
         { status: 502 }
       );
     }
