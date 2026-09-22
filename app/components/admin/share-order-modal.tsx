@@ -87,15 +87,15 @@ ${itemsText || "• No items"}
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
-        className="bg-white border border-slate-200 rounded-2xl w-full max-w-[430px] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+        className="bg-white border border-slate-200 rounded-none w-full max-w-[430px] max-h-[90vh] flex flex-col shadow-none overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+        <div className="p-2.5 sm:p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center">
+            <div className="w-8 h-8 rounded-none bg-slate-900 text-white flex items-center justify-center">
               <Share2 className="w-4 h-4" />
             </div>
             <div>
@@ -110,7 +110,7 @@ ${itemsText || "• No items"}
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-none border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -118,13 +118,13 @@ ${itemsText || "• No items"}
         </div>
 
         {/* Modal Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+        <div className="p-2.5 sm:p-3 overflow-y-auto space-y-2.5 flex-1">
           {/* Quick Action Buttons */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={handleShareToTelegram}
-              className="px-4 py-2.5 bg-[#229ED9] hover:bg-[#1e8ec3] text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer active:scale-98"
+              className="px-3 py-2.5 bg-[#229ED9] hover:bg-[#1e8ec3] text-white rounded-none text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer active:scale-98"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Send via Telegram</span>
@@ -133,7 +133,7 @@ ${itemsText || "• No items"}
             <button
               type="button"
               onClick={() => copyToClipboard(telegramSummaryText, "summary")}
-              className="px-4 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer active:scale-98"
+              className="px-3 py-2.5 bg-slate-900 hover:bg-black text-white rounded-none text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer active:scale-98"
             >
               {copiedKey === "summary" ? (
                 <>
@@ -150,7 +150,7 @@ ${itemsText || "• No items"}
           </div>
 
           {/* Deep Link Tracker Field */}
-          <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div className="space-y-1.5 bg-slate-50 p-3 rounded-none border border-slate-200">
             <div className="flex items-center justify-between text-xs font-mono">
               <span className="font-bold text-slate-700 flex items-center gap-1.5">
                 <LinkIcon className="w-3.5 h-3.5 text-slate-500" />
@@ -174,7 +174,7 @@ ${itemsText || "• No items"}
                 )}
               </button>
             </div>
-            <p className="text-xs font-mono text-slate-600 truncate select-all bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
+            <p className="text-xs font-mono text-slate-600 truncate select-all bg-white px-2.5 py-1.5 rounded-none border border-slate-200">
               {trackingLink}
             </p>
           </div>
@@ -186,7 +186,7 @@ ${itemsText || "• No items"}
               <span className="text-[10px] font-normal text-slate-400">Ready to paste into chat or dispatch to rider</span>
             </label>
             <div className="relative">
-              <pre className="w-full bg-slate-900 text-slate-100 p-3.5 rounded-xl font-mono text-xs whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto border border-slate-800 selection:bg-blue-600 selection:text-white">
+              <pre className="w-full bg-slate-900 text-slate-100 p-3.5 rounded-none font-mono text-xs whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto border border-slate-800 selection:bg-blue-600 selection:text-white">
                 {telegramSummaryText}
               </pre>
             </div>
@@ -201,7 +201,7 @@ ${itemsText || "• No items"}
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-mono font-bold cursor-pointer"
+            className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-none text-xs font-mono font-bold cursor-pointer"
           >
             Close
           </button>
