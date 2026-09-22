@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server';
-import { parseMayaWebhookRequest, processMayaWebhook } from '@/lib/maya-webhook';
+import { processMayaWebhook } from '@/lib/maya-webhook';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  const parsed = await parseMayaWebhookRequest(request);
-  if (!parsed.ok) {
-    return NextResponse.json({ received: false, error: parsed.error }, { status: parsed.status });
+  let payload: any;
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ received: false, error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const result = await processMayaWebhook(request, parsed.payload, 'wallet');
+  const result = await processMayaWebhook(request, payload, 'wallet');
   return NextResponse.json(result.body, { status: result.status });
 }
 
