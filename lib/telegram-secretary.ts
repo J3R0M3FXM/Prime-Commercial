@@ -95,9 +95,6 @@ export async function editMessageReplyMarkup(
   });
 }
 
-/**
- * Executes one Telegram message action selected by a callback.
- */
 export async function executeSecretaryAction(
   telegram: TelegramApi,
   ctx: SecretaryContext,
@@ -116,23 +113,41 @@ export async function executeSecretaryAction(
 }
 
 /**
- * Encodes a compact callback action. Telegram callback_data is limited to
- * 1-64 bytes, so identifiers should remain short.
+ * Parses both the compact Secretary callback used by the configurator:
+ *   sec:flowId:buttonId
  *
- * Examples:
+ * and the older action-qualified form:
  *   sec:text:flowId:buttonId
  *   sec:media:flowId:buttonId
  *   sec:caption:flowId:buttonId
  *   sec:markup:flowId:buttonId
+ *
+ * Telegram callback_data is limited to 64 bytes, so identifiers should stay
+ * short. The action is resolved from persisted button configuration for the
+ * compact form.
  */
 export function parseSecretaryCallback(data: string) {
-  const parts = String(data || '').split(':');
-  if (parts.length < 4 || parts[0] !== 'sec') return null;
-  const type = parts[1];
-  if (!['text', 'media', 'caption', 'markup'].includes(type)) return null;
-  return {
-    type: type as 'text' | 'media' | 'caption' | 'markup',
-    flowId: parts[2],
-    buttonId: parts.slice(3).join(':'),
-  };
+  const value = String(data || '');
+  if (!value.startsWith('sec:')) return null;
+
+  const parts = value.slice(4).split(':');
+  const knownTypes = ['text', 'media', 'caption', 'markup'];
+
+  if (parts.length >= 3 && knownTypes.includes(parts[0])) {
+    return {
+      type: parts[0] as 'text' | 'media' | 'caption' | 'markup',
+      flowId: parts[1],
+      buttonId: parts.slice(2).join(':'),
+    };
+  }
+
+  if (parts.length >= 2) {
+    return {
+      type: 'auto' as const,
+      flowId: parts[0],
+      buttonId: parts.slice(1).join(':'),
+    };
+  }
+
+  return null;
 }
