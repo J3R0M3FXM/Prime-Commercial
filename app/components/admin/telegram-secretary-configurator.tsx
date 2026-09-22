@@ -185,7 +185,7 @@ export default function TelegramSecretaryConfigurator() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [selected?.id]);
 
   function updateSelected(patch: Partial<Flow>) {
     setSelected((current) => (current ? { ...current, ...patch } : current));
