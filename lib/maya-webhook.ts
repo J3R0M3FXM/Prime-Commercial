@@ -337,7 +337,9 @@ async function findOrder(supabase: ReturnType<typeof getSupabaseAdmin>, payload:
 }
 
 function amountsMatch(order: any, webhookAmount: number | null): boolean {
-  if (webhookAmount === null) return false;
+  // Failure/expiry/cancellation payloads may omit amount; successful and
+  // authorized events are required to provide it by validateMayaWebhookPayload.
+  if (webhookAmount === null) return true;
   const expected = Number(order?.payable_now ?? order?.total_amount ?? 0);
   if (!Number.isFinite(expected)) return false;
   return Math.abs(expected - webhookAmount) < 0.01;
