@@ -193,13 +193,13 @@ export default function DiagnosticsModule() {
   const issueCount = services.filter((s) => s.status === "degraded" || s.status === "error").length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Sub-View Navigation Tabs */}
-      <div className="flex items-center gap-2 p-1 bg-slate-200/80 border border-slate-300 rounded-xl text-xs font-heading font-normal uppercase tracking-wider w-fit">
+      <div className="flex items-center gap-2 p-1 bg-slate-200/80 border border-slate-300 rounded-none text-xs font-heading font-normal uppercase tracking-wider w-fit">
         <button
           type="button"
           onClick={() => setActiveSubView("all")}
-          className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+          className={`px-3 py-1.5 rounded-none transition-all cursor-pointer ${
             activeSubView === "all"
               ? "bg-black text-white shadow-xs"
               : "text-slate-700 hover:text-black"
@@ -211,7 +211,7 @@ export default function DiagnosticsModule() {
           type="button"
           id="tab-font-diagnostics"
           onClick={() => setActiveSubView("fonts")}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-none transition-all cursor-pointer ${
             activeSubView === "fonts"
               ? "bg-black text-white shadow-xs"
               : "text-slate-700 hover:text-black"
@@ -223,7 +223,7 @@ export default function DiagnosticsModule() {
         <button
           type="button"
           onClick={() => setActiveSubView("infrastructure")}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-none transition-all cursor-pointer ${
             activeSubView === "infrastructure"
               ? "bg-black text-white shadow-xs"
               : "text-slate-700 hover:text-black"
@@ -241,10 +241,10 @@ export default function DiagnosticsModule() {
 
       {/* 2. Core Infrastructure & API Diagnostics Module */}
       {(activeSubView === "all" || activeSubView === "infrastructure") && (
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* Top High-level Diagnostics Card */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div>
                 <div className="flex items-center gap-2">
                   <span
@@ -271,7 +271,7 @@ export default function DiagnosticsModule() {
                   id="btn-rerun-diagnostics"
                   onClick={runDiagnostics}
                   disabled={loading}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-heading font-normal uppercase tracking-wider rounded-xl hover:bg-neutral-800 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-black text-white text-xs font-heading font-normal uppercase tracking-wider rounded-none hover:bg-neutral-800 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer shadow-none"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
                   {loading ? "Testing..." : "Rerun Health Check"}
@@ -280,20 +280,20 @@ export default function DiagnosticsModule() {
             </div>
 
             {/* Quick Health Summary Ribbon */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-100">
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-4 border-t border-slate-100">
+              <div className="bg-slate-50 rounded-none p-3 border border-slate-100">
                 <p className="text-[10px] font-mono uppercase text-slate-500 font-bold">Total Monitored</p>
                 <p className="font-heading font-normal text-xl text-slate-900 mt-0.5">{services.length || 9} Systems</p>
               </div>
-              <div className="bg-emerald-50/50 rounded-xl p-3 border border-emerald-100">
+              <div className="bg-emerald-50/50 rounded-none p-3 border border-emerald-100">
                 <p className="text-[10px] font-mono uppercase text-emerald-700 font-bold">Operational</p>
                 <p className="font-heading font-normal text-xl text-emerald-700 mt-0.5">{operationalCount} Active</p>
               </div>
-              <div className="bg-amber-50/50 rounded-xl p-3 border border-amber-100">
+              <div className="bg-amber-50/50 rounded-none p-3 border border-amber-100">
                 <p className="text-[10px] font-mono uppercase text-amber-700 font-bold">Degraded / Issues</p>
                 <p className="font-heading font-normal text-xl text-amber-700 mt-0.5">{issueCount} Needs Review</p>
               </div>
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+              <div className="bg-slate-50 rounded-none p-3 border border-slate-100">
                 <p className="text-[10px] font-mono uppercase text-slate-500 font-bold">Average Latency</p>
                 <p className="font-heading font-normal text-xl text-slate-900 mt-0.5">
                   {services.length > 0
@@ -323,9 +323,9 @@ export default function DiagnosticsModule() {
                 key={tab.id}
                 id={`filter-diag-${tab.id}`}
                 onClick={() => setFilterCategory(tab.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-heading font-normal uppercase tracking-wider transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-none text-xs font-heading font-normal uppercase tracking-wider transition-all cursor-pointer ${
                   filterCategory === tab.id
-                    ? "bg-slate-900 text-white shadow-sm"
+                    ? "bg-slate-900 text-white shadow-none"
                     : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
@@ -344,12 +344,12 @@ export default function DiagnosticsModule() {
                 <div
                   key={srv.id}
                   id={`service-diag-${srv.id}`}
-                  className="bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-4 sm:p-5 shadow-sm transition-all"
+                  className="bg-white border border-slate-200 hover:border-slate-300 rounded-none p-2.5 sm:p-3 shadow-none transition-all"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     {/* Icon & Name */}
                     <div className="flex items-start gap-3.5">
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-none bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
                         {getServiceIcon(srv.id)}
                       </div>
                       <div>
@@ -406,7 +406,7 @@ export default function DiagnosticsModule() {
                           {copiedId === srv.id ? "Copied" : "Copy JSON"}
                         </button>
                       </div>
-                      <pre className="bg-slate-950 text-slate-200 p-3 rounded-lg overflow-x-auto text-[11px] leading-relaxed">
+                      <pre className="bg-slate-950 text-slate-200 p-3 rounded-none overflow-x-auto text-[11px] leading-relaxed">
                         {JSON.stringify(srv.details, null, 2)}
                       </pre>
                     </div>
@@ -416,7 +416,7 @@ export default function DiagnosticsModule() {
             })}
 
             {filteredServices.length === 0 && (
-              <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-400">
+              <div className="bg-white border border-slate-200 rounded-none p-3 text-center text-slate-400">
                 <p className="font-heading font-normal text-sm uppercase">No services match the selected filter.</p>
               </div>
             )}
@@ -425,7 +425,7 @@ export default function DiagnosticsModule() {
       )}
 
       {/* Future Services Extension Notice */}
-      <div className="p-4 bg-slate-50 border border-dashed border-slate-300 rounded-xl flex items-center justify-between text-xs text-slate-500 font-sans">
+      <div className="p-2.5 bg-slate-50 border border-dashed border-slate-300 rounded-none flex items-center justify-between text-xs text-slate-500 font-sans">
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-slate-400" />
           <span>Extensible Diagnostic Registry — includes automated Storefront Font Compliance Scanner and 9 API health telemetry probes.</span>
