@@ -399,12 +399,12 @@ export default function LogisticsModule() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Tabs */}
       <div className="flex border-b border-slate-200">
         <button
           onClick={() => setActiveTab("warehouse")}
-          className={`flex items-center gap-2 px-6 py-3 font-heading font-bold text-sm tracking-wide uppercase transition-colors border-b-2 ${
+          className={`flex items-center gap-2 px-3 py-2 font-heading font-bold text-sm tracking-wide uppercase transition-colors border-b-2 ${
             activeTab === "warehouse" ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
@@ -412,7 +412,7 @@ export default function LogisticsModule() {
         </button>
         <button
           onClick={() => setActiveTab("courier")}
-          className={`flex items-center gap-2 px-6 py-3 font-heading font-bold text-sm tracking-wide uppercase transition-colors border-b-2 ${
+          className={`flex items-center gap-2 px-3 py-2 font-heading font-bold text-sm tracking-wide uppercase transition-colors border-b-2 ${
             activeTab === "courier" ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
@@ -422,7 +422,7 @@ export default function LogisticsModule() {
 
       {/* Warehouse View */}
       {activeTab === "warehouse" && (
-        <div className="space-y-4 animate-in fade-in duration-300">
+        <div className="space-y-2.5 animate-in fade-in duration-300">
           <div className="flex justify-between items-center">
             <div>
               <h3 className="font-heading font-black text-lg text-slate-900">Fulfillment Centers</h3>
@@ -433,14 +433,14 @@ export default function LogisticsModule() {
                 resetWarehouseForm();
                 setShowWarehouseModal(true);
               }}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors"
+              className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" /> Add Warehouse
             </button>
           </div>
 
           {warehouseError && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <div className="flex items-start gap-2 rounded-none border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{warehouseError}</span>
             </div>
@@ -451,15 +451,15 @@ export default function LogisticsModule() {
               <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
             </div>
           ) : warehouses.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center shadow-none">
               <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-4" />
               <h4 className="text-slate-900 font-bold mb-2">No Warehouses Found</h4>
               <p className="text-slate-500 text-sm max-w-sm mx-auto">You haven't configured any origin locations for your deliveries yet.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {warehouses.map((wh) => (
-                <div key={wh.id} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm relative group overflow-hidden">
+                <div key={wh.id} className="bg-white border border-slate-200 rounded-none p-3 shadow-none relative group overflow-hidden">
                   {wh.isDefault && (
                     <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-bl-lg flex items-center gap-1">
                       <Star className="w-3 h-3 fill-current" /> Default Origin
@@ -477,7 +477,7 @@ export default function LogisticsModule() {
                     </div>
                   </div>
                   
-                  <div className="mt-6 flex items-center gap-2 pt-4 border-t border-slate-100">
+                  <div className="mt-3 flex items-center gap-2 pt-4 border-t border-slate-100">
                     <button
                       onClick={() => {
                         setEditingWarehouse(wh);
@@ -510,7 +510,7 @@ export default function LogisticsModule() {
 
       {/* Courier View */}
       {activeTab === "courier" && (
-        <div className="space-y-4 animate-in fade-in duration-300">
+        <div className="space-y-2.5 animate-in fade-in duration-300">
           <div className="flex justify-between items-center">
             <div>
               <h3 className="font-heading font-black text-lg text-slate-900">Courier Services</h3>
@@ -521,14 +521,14 @@ export default function LogisticsModule() {
                 resetCourierForm();
                 setShowCourierModal(true);
               }}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors"
+              className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" /> Add Courier
             </button>
           </div>
 
           {courierError && !showCourierModal && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <div className="flex items-start gap-2 rounded-none border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{courierError}</span>
             </div>
@@ -539,7 +539,7 @@ export default function LogisticsModule() {
               <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
             </div>
           ) : couriers.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center shadow-none">
               <Truck className="w-12 h-12 text-slate-300 mx-auto mb-4" />
               <h4 className="text-slate-900 font-bold mb-2">No Couriers Configured</h4>
               <p className="text-slate-500 text-sm max-w-sm mx-auto">
@@ -547,14 +547,14 @@ export default function LogisticsModule() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {couriers.map((courier) => (
-                <div key={courier.id} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm relative group overflow-hidden">
-                  <div className="flex items-center gap-4 mb-4">
+                <div key={courier.id} className="bg-white border border-slate-200 rounded-none p-3 shadow-none relative group overflow-hidden">
+                  <div className="flex items-center gap-2.5 mb-4">
                     {courier.logo ? (
-                      <img src={courier.logo} alt={courier.name} className="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 shrink-0" />
+                      <img src={courier.logo} alt={courier.name} className="w-12 h-12 rounded-none object-contain bg-slate-50 border border-slate-100 p-1 shrink-0" />
                     ) : (
-                      <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                      <div className="w-12 h-12 rounded-none bg-slate-100 flex items-center justify-center shrink-0">
                         <Truck className="w-5 h-5 text-slate-400" />
                       </div>
                     )}
@@ -568,7 +568,7 @@ export default function LogisticsModule() {
                     </div>
                   </div>
                   
-                  <div className="space-y-1.5 text-xs font-mono text-slate-600 mb-6">
+                  <div className="space-y-1.5 text-xs font-mono text-slate-600 mb-3">
                     <div className="flex justify-between">
                       <span className="text-slate-400">Base Fare:</span>
                       <span className="font-bold text-slate-900">₱{courier.baseFare}</span>
@@ -626,9 +626,9 @@ export default function LogisticsModule() {
 
       {/* Warehouse Modal */}
       {showWarehouseModal && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
+          <div className="bg-white rounded-none shadow-none w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
                 {editingWarehouse ? "Edit Warehouse" : "New Warehouse"}
               </h3>
@@ -637,9 +637,9 @@ export default function LogisticsModule() {
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-3 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Left Col: Form */}
-              <div className="space-y-4">
+              <div className="space-y-2.5">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Internal Name</label>
                   <input
@@ -647,7 +647,7 @@ export default function LogisticsModule() {
                     value={whName}
                     onChange={e => setWhName(e.target.value)}
                     placeholder="e.g. Main Distribution Center"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                   />
                 </div>
                 
@@ -660,19 +660,19 @@ export default function LogisticsModule() {
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
                       placeholder="Search location in Metro Manila..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                     />
                     {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-emerald-500" />}
                   </div>
                   
                   {/* Autocomplete Suggestions */}
                   {suggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-48 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-none shadow-none overflow-hidden max-h-48 overflow-y-auto">
                       {suggestions.map((sg, idx) => (
                         <button
                           key={idx}
                           onClick={() => handleSelectSuggestion(sg)}
-                          className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 truncate"
+                          className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 truncate"
                         >
                           <span className="font-bold">{sg.address_line1}</span>
                           <span className="text-slate-500 text-xs block truncate">{sg.address_line2}</span>
@@ -689,12 +689,12 @@ export default function LogisticsModule() {
                     onChange={e => setWhAddress(e.target.value)}
                     rows={3}
                     readOnly
-                    className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 focus:outline-none"
+                    className="w-full bg-slate-100 border border-slate-200 rounded-none px-3 py-2 text-sm text-slate-600 focus:outline-none"
                   />
                   <p className="text-[10px] font-mono text-slate-400 mt-1">Automatically populated via Map pin or Search.</p>
                 </div>
 
-                <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
+                <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-none cursor-pointer hover:bg-slate-50 transition-colors">
                   <input
                     type="checkbox"
                     checked={isDefaultWh}
@@ -711,7 +711,7 @@ export default function LogisticsModule() {
               {/* Right Col: Map */}
               <div className="flex flex-col">
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Map Location</label>
-                <div className="flex-1 min-h-[300px] rounded-xl overflow-hidden border border-slate-200 relative">
+                <div className="flex-1 min-h-[300px] rounded-none overflow-hidden border border-slate-200 relative">
                   {(whLat && whLon) ? (
                     <MapContainer 
                       center={[whLat, whLon]} 
@@ -733,24 +733,24 @@ export default function LogisticsModule() {
                       Loading Map...
                     </div>
                   )}
-                  <div className="absolute bottom-2 left-2 right-2 z-[400] bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-sm border border-slate-200 text-center pointer-events-none">
+                  <div className="absolute bottom-2 left-2 right-2 z-[400] bg-white/90 backdrop-blur-sm p-2 rounded-none shadow-none border border-slate-200 text-center pointer-events-none">
                     <span className="text-[10px] font-bold text-slate-600">CLICK MAP TO DROP PIN</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
+            <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
               <button
                 onClick={() => setShowWarehouseModal(false)}
-                className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
+                className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={saveWarehouse}
                 disabled={isSavingWh || !whName || !whAddress}
-                className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {isSavingWh ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Save Warehouse
@@ -762,9 +762,9 @@ export default function LogisticsModule() {
 
       {/* Courier Modal */}
       {showCourierModal && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
+          <div className="bg-white rounded-none shadow-none w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
                 {editingCourier ? "Edit Courier Config" : "New Courier Config"}
               </h3>
@@ -773,9 +773,9 @@ export default function LogisticsModule() {
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+            <div className="p-3 overflow-y-auto flex-1 space-y-3">
               {courierError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs flex items-center gap-2.5">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-none text-xs flex items-center gap-2.5">
                   <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
                   <span>{courierError}</span>
                 </div>
@@ -798,7 +798,7 @@ export default function LogisticsModule() {
                       key={preset.name}
                       type="button"
                       onClick={() => applyCourierPreset(preset)}
-                      className="text-[11px] font-medium bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-slate-700 px-2.5 py-1.5 rounded-lg transition-colors"
+                      className="text-[11px] font-medium bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-slate-700 px-2.5 py-1.5 rounded-none transition-colors"
                     >
                       + {preset.name}
                     </button>
@@ -806,13 +806,13 @@ export default function LogisticsModule() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-6">
+              <div className="flex items-start gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">
                     Logo <span className="text-[10px] font-normal text-slate-400 lowercase">(optional)</span>
                   </label>
                   <div 
-                    className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center cursor-pointer hover:bg-slate-50 overflow-hidden relative group"
+                    className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-none flex items-center justify-center cursor-pointer hover:bg-slate-50 overflow-hidden relative group"
                     onClick={() => courierFileInputRef.current?.click()}
                   >
                     {isCompressingLogo ? (
@@ -850,7 +850,7 @@ export default function LogisticsModule() {
                   <input type="file" accept="image/*" ref={courierFileInputRef} onChange={handleCourierLogoUpload} className="hidden" />
                 </div>
                 
-                <div className="flex-1 space-y-4">
+                <div className="flex-1 space-y-2.5">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">
                       Courier Name <span className="text-red-500">*</span>
@@ -863,7 +863,7 @@ export default function LogisticsModule() {
                         if (courierError) setCourierError(null);
                       }}
                       placeholder="e.g. Lalamove, Grab Express"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                     />
                   </div>
                   <div>
@@ -871,7 +871,7 @@ export default function LogisticsModule() {
                     <select
                       value={courierType}
                       onChange={e => setCourierType(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                     >
                       <option value="Standard">Standard</option>
                       <option value="Express">Express</option>
@@ -886,14 +886,14 @@ export default function LogisticsModule() {
                   <Settings className="w-4 h-4 text-emerald-600" /> Delivery Fee Engine
                 </h4>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Base Fare (₱)</label>
                     <input
                       type="number"
                       value={baseFare}
                       onChange={e => setBaseFare(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                   <div>
@@ -902,7 +902,7 @@ export default function LogisticsModule() {
                       type="number"
                       value={firstMile}
                       onChange={e => setFirstMile(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                   <div>
@@ -911,7 +911,7 @@ export default function LogisticsModule() {
                       type="number"
                       value={firstMileFee}
                       onChange={e => setFirstMileFee(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                   <div>
@@ -920,7 +920,7 @@ export default function LogisticsModule() {
                       type="number"
                       value={exceedingKmFee}
                       onChange={e => setExceedingKmFee(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                   <div>
@@ -929,7 +929,7 @@ export default function LogisticsModule() {
                       type="number"
                       value={surcharge}
                       onChange={e => setSurcharge(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                   <div>
@@ -938,18 +938,18 @@ export default function LogisticsModule() {
                       type="number"
                       value={nightDifferential}
                       onChange={e => setNightDifferential(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
+            <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setShowCourierModal(false)}
-                className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
+                className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
@@ -957,7 +957,7 @@ export default function LogisticsModule() {
                 type="button"
                 onClick={saveCourier}
                 disabled={isSavingCourier || isCompressingLogo || !courierName.trim()}
-                className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {isSavingCourier ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 {isSavingCourier ? "Saving..." : "Save Configuration"}
