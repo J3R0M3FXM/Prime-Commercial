@@ -339,13 +339,13 @@ export default function TelegramSecretaryConfigurator() {
     <div className="w-full space-y-1.5 text-slate-900">
       <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-1">
         <div className="min-w-0">
-          <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-slate-400">
+          <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">
             Telegram Business Secretary
           </div>
           <h1 className="text-base font-heading font-black uppercase tracking-tight">
             Inline Button Configurator
           </h1>
-          <p className="text-[8px] text-slate-500">
+          <p className="text-[10px] text-slate-500">
             One bubble · linked steps · 24h inactivity welcome.
           </p>
         </div>
@@ -353,7 +353,7 @@ export default function TelegramSecretaryConfigurator() {
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="h-7 px-2 border border-slate-200 text-[8px] font-bold uppercase flex items-center gap-1"
+            className="h-7 px-2 border border-slate-200 text-[10px] font-bold uppercase flex items-center gap-1"
           >
             <RefreshCw className="w-3 h-3" /> Reload
           </button>
@@ -364,7 +364,7 @@ export default function TelegramSecretaryConfigurator() {
               setExpandedButton("");
               setNotice("");
             }}
-            className="h-7 px-2.5 bg-slate-900 text-white text-[8px] font-bold uppercase flex items-center gap-1"
+            className="h-7 px-2.5 bg-slate-900 text-white text-[10px] font-bold uppercase flex items-center gap-1"
           >
             <Plus className="w-3 h-3" /> New Step
           </button>
@@ -372,7 +372,7 @@ export default function TelegramSecretaryConfigurator() {
       </div>
 
       {notice && (
-        <div className="border border-slate-200 bg-slate-50 px-2 py-1 text-[8px] font-mono uppercase">
+        <div className="border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-mono uppercase">
           {notice}
         </div>
       )}
@@ -381,16 +381,16 @@ export default function TelegramSecretaryConfigurator() {
         <aside className="min-w-0 border-b lg:border-b-0 lg:border-r border-slate-200">
           <div className="px-2 py-1.5 border-b border-slate-200 flex items-center justify-between">
             <div>
-              <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Hierarchy</div>
-              <div className="text-[10px] font-black uppercase">Steps</div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Hierarchy</div>
+              <div className="text-[11px] font-black uppercase">Steps</div>
             </div>
             <GitBranch className="w-3.5 h-3.5 text-slate-400" />
           </div>
 
           {loading ? (
-            <div className="p-2 text-[8px] font-mono text-slate-400">LOADING...</div>
+            <div className="p-2 text-[10px] font-mono text-slate-400">LOADING...</div>
           ) : flows.length === 0 ? (
-            <div className="p-2 text-[8px] text-slate-400">NO STEPS CONFIGURED.</div>
+            <div className="p-2 text-[10px] text-slate-400">NO STEPS CONFIGURED.</div>
           ) : (
             <div className="divide-y divide-slate-100">
               {flows.map((flow) => (
@@ -410,12 +410,12 @@ export default function TelegramSecretaryConfigurator() {
                 >
                   <div className="flex items-center gap-1">
                     <span className={`w-1.5 h-1.5 ${flow.active ? "bg-emerald-500" : "bg-slate-300"}`} />
-                    <span className="text-[10px] font-bold truncate flex-1">{flow.name}</span>
+                    <span className="text-[11px] font-bold truncate flex-1">{flow.name}</span>
                     {settings.welcomeFlowId === flow.id && (
-                      <span className="text-[7px] bg-slate-900 text-white px-1">WELCOME</span>
+                      <span className="text-[10px] bg-slate-900 text-white px-1">WELCOME</span>
                     )}
                   </div>
-                  <div className="text-[7px] font-mono text-slate-400 mt-0.5">
+                  <div className="text-[10px] font-mono text-slate-400 mt-0.5">
                     IN {flows.reduce((sum, item) => sum + item.buttons.filter((button) => button.targetFlowId === flow.id).length, 0)} · OUT {flow.buttons.filter((button) => button.targetFlowId).length}
                   </div>
                 </button>
@@ -424,13 +424,13 @@ export default function TelegramSecretaryConfigurator() {
           )}
 
           <div className="border-t border-slate-200 px-2 py-1.5">
-            <div className="text-[8px] font-bold uppercase tracking-widest text-slate-400 mb-1">Welcome</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Welcome</div>
             <select
               value={settings.welcomeFlowId}
               onChange={(event) =>
                 setSettings((current) => ({ ...current, welcomeFlowId: event.target.value }))
               }
-              className="w-full h-7 border border-slate-200 px-1.5 text-[9px] bg-white"
+              className="w-full h-7 border border-slate-200 px-1.5 text-[10px] bg-white"
             >
               <option value="">Select welcome step</option>
               {flows.filter((flow) => flow.active).map((flow) => (
@@ -446,18 +446,18 @@ export default function TelegramSecretaryConfigurator() {
               <div>
                 <MessageSquare className="w-7 h-7 mx-auto text-slate-300 mb-1" />
                 <div className="text-[10px] font-bold uppercase">Select a step</div>
-                <div className="text-[8px] text-slate-400">Create a step to build the message hierarchy.</div>
+                <div className="text-[10px] text-slate-400">Create a step to build the message hierarchy.</div>
               </div>
             </div>
           ) : (
             <div>
               <div className="px-2 py-1.5 border-b border-slate-200 flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Editor</div>
-                  <div className="text-[10px] font-bold truncate">{selected.name}</div>
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Editor</div>
+                  <div className="text-[11px] font-bold truncate">{selected.name}</div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <label className="h-7 px-1.5 border border-slate-200 flex items-center gap-1 text-[8px] uppercase font-bold">
+                  <label className="h-7 px-1.5 border border-slate-200 flex items-center gap-1 text-[10px] uppercase font-bold">
                     <input
                       type="checkbox"
                       checked={selected.active}
@@ -469,7 +469,7 @@ export default function TelegramSecretaryConfigurator() {
                     type="button"
                     onClick={() => void deleteFlow()}
                     disabled={!selected.id || busy}
-                    className="h-7 px-2 border border-red-200 text-red-600 text-[8px] font-bold uppercase flex items-center gap-1 disabled:opacity-40"
+                    className="h-7 px-2 border border-red-200 text-red-600 text-[10px] font-bold uppercase flex items-center gap-1 disabled:opacity-40"
                   >
                     <Trash2 className="w-3 h-3" /> Delete
                   </button>
@@ -503,7 +503,7 @@ export default function TelegramSecretaryConfigurator() {
                   <textarea
                     value={selected.responseText}
                     onChange={(event) => updateSelected({ responseText: event.target.value })}
-                    className="w-full min-h-[72px] border border-slate-200 px-2 py-1.5 text-[9px] outline-none resize-y focus:border-slate-900"
+                    className="w-full min-h-[72px] border border-slate-200 px-2 py-1.5 text-[10px] outline-none resize-y focus:border-slate-900"
                     placeholder="Hi {{name}}, welcome to PRIME."
                   />
                 </label>
@@ -511,13 +511,13 @@ export default function TelegramSecretaryConfigurator() {
                 <div className="border-t border-slate-200">
                   <div className="flex items-center justify-between py-1.5 gap-2">
                     <div>
-                      <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Inline buttons</div>
-                      <div className="text-[8px] text-slate-500">GO TO STEP edits this same Telegram bubble.</div>
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Inline buttons</div>
+                      <div className="text-[10px] text-slate-500">GO TO STEP edits this same Telegram bubble.</div>
                     </div>
                     <button
                       type="button"
                       onClick={addButton}
-                      className="h-7 px-2 border border-slate-200 text-[8px] font-bold uppercase flex items-center gap-1"
+                      className="h-7 px-2 border border-slate-200 text-[10px] font-bold uppercase flex items-center gap-1"
                     >
                       <Plus className="w-3 h-3" /> Add
                     </button>
@@ -525,7 +525,7 @@ export default function TelegramSecretaryConfigurator() {
 
                   <div className="border-t border-slate-200 divide-y divide-slate-200">
                     {selected.buttons.length === 0 ? (
-                      <div className="p-2 text-[8px] text-slate-400">NO BUTTONS.</div>
+                      <div className="p-2 text-[10px] text-slate-400">NO BUTTONS.</div>
                     ) : (
                       selected.buttons.map((button, index) => {
                         const open = expandedButton === button.id;
@@ -534,7 +534,7 @@ export default function TelegramSecretaryConfigurator() {
                         return (
                           <div key={button.id} className="p-1.5 bg-white">
                             <div className="grid grid-cols-[22px_minmax(0,1fr)_120px_26px] gap-1.5 items-center">
-                              <span className="text-[7px] font-mono text-slate-400 text-center">#{index + 1}</span>
+                              <span className="text-[10px] font-mono text-slate-400 text-center">#{index + 1}</span>
                               <input
                                 value={button.text}
                                 onChange={(event) => updateButton(index, { text: event.target.value })}
@@ -587,7 +587,7 @@ export default function TelegramSecretaryConfigurator() {
                                     <textarea
                                       value={button.response}
                                       onChange={(event) => updateButton(index, { response: event.target.value })}
-                                      className="w-full min-h-[54px] border border-slate-200 px-2 py-1.5 text-[9px] outline-none focus:border-slate-900"
+                                      className="w-full min-h-[54px] border border-slate-200 px-2 py-1.5 text-[10px] outline-none focus:border-slate-900"
                                       placeholder="Message after click. Same bubble is edited."
                                     />
                                   </label>
@@ -606,13 +606,13 @@ export default function TelegramSecretaryConfigurator() {
                                 )}
 
                                 <div className="flex items-center justify-between">
-                                  <span className={`text-[7px] font-mono ${bytes > 64 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                                  <span className={`text-[10px] font-mono ${bytes > 64 ? "text-red-600 font-bold" : "text-slate-400"}`}>
                                     CALLBACK {bytes}/64 BYTES
                                   </span>
                                   <button
                                     type="button"
                                     onClick={() => removeButton(index)}
-                                    className="h-6 px-1.5 border border-red-200 text-red-600 text-[7px] font-bold uppercase"
+                                    className="h-6 px-1.5 border border-red-200 text-red-600 text-[10px] font-bold uppercase"
                                   >
                                     Remove
                                   </button>
@@ -627,14 +627,14 @@ export default function TelegramSecretaryConfigurator() {
                 </div>
 
                 <div className="border-t border-slate-200 pt-1.5 flex items-center justify-between gap-2">
-                  <div className="text-[7px] font-mono text-slate-400 inline-flex items-center gap-1">
+                  <div className="text-[10px] font-mono text-slate-400 inline-flex items-center gap-1">
                     {parent ? <>FROM {parent.name}<ArrowRight className="w-2.5 h-2.5" />{selected.name}</> : "ROOT STEP"}
                   </div>
                   <button
                     type="button"
                     onClick={() => void saveFlow()}
                     disabled={busy}
-                    className="h-7 px-2.5 bg-slate-900 text-white text-[8px] font-bold uppercase tracking-widest flex items-center gap-1 disabled:opacity-50"
+                    className="h-7 px-2.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 disabled:opacity-50"
                   >
                     {busy ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                     Save
@@ -647,35 +647,35 @@ export default function TelegramSecretaryConfigurator() {
 
         <section className="min-w-0 bg-slate-50">
           <div className="px-2 py-1.5 border-b border-slate-200">
-            <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Preview</div>
-            <div className="text-[10px] font-black uppercase">Same bubble</div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Preview</div>
+            <div className="text-[11px] font-black uppercase">Same bubble</div>
           </div>
 
           <div className="p-1.5 space-y-1.5">
             <div className="border border-slate-300 bg-white p-1.5">
-              <div className="text-[7px] font-mono uppercase tracking-widest text-slate-400 mb-1">CUSTOMER VIEW</div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mb-1">CUSTOMER VIEW</div>
               <div className="bg-slate-950 text-white p-2">
-                <div className="text-[9px] whitespace-pre-wrap break-words">
+                <div className="text-[10px] whitespace-pre-wrap break-words">
                   {selected?.responseText || "Select a step to preview."}
                 </div>
                 {selected?.buttons.length ? (
                   <div className="mt-1.5 border-t border-white/10 pt-1.5 grid gap-0.5">
                     {selected.buttons.map((button) => (
-                      <div key={button.id} className="border border-white/10 px-1.5 py-1 text-[8px] flex items-center justify-between">
+                      <div key={button.id} className="border border-white/10 px-1.5 py-1 text-[10px] flex items-center justify-between">
                         <span className="truncate">{button.text}</span>
-                        <span className="text-[7px] font-mono text-slate-400">{button.action}</span>
+                        <span className="text-[10px] font-mono text-slate-400">{button.action}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-1.5 text-[7px] text-slate-500">NO INLINE BUTTONS</div>
+                  <div className="mt-1.5 text-[10px] text-slate-500">NO INLINE BUTTONS</div>
                 )}
               </div>
             </div>
 
             <div className="border border-slate-200 bg-white">
-              <div className="px-1.5 py-1 border-b border-slate-200 text-[7px] font-bold uppercase tracking-widest">Engine</div>
-              <div className="p-1.5 text-[8px] font-mono space-y-1">
+              <div className="px-1.5 py-1 border-b border-slate-200 text-[10px] font-bold uppercase tracking-widest">Engine</div>
+              <div className="p-1.5 text-[10px] font-mono space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">STATUS</span>
                   <span className={settings.enabled ? "text-emerald-700 font-bold" : "text-slate-400"}>
@@ -699,8 +699,8 @@ export default function TelegramSecretaryConfigurator() {
       <div className="grid lg:grid-cols-[1fr_1fr] border border-slate-200 bg-white">
         <section className="min-w-0 border-b lg:border-b-0 lg:border-r border-slate-200">
           <div className="px-2 py-1.5 border-b border-slate-200">
-            <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Engine</div>
-            <div className="text-[10px] font-black uppercase">Welcome + 24H cooldown</div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Engine</div>
+            <div className="text-[11px] font-black uppercase">Welcome + 24H cooldown</div>
           </div>
 
           <div className="p-1.5 space-y-1.5">
@@ -723,7 +723,7 @@ export default function TelegramSecretaryConfigurator() {
                 />
               </label>
 
-              <label className="h-7 px-1.5 border border-slate-200 flex items-center gap-1 text-[8px] uppercase font-bold">
+              <label className="h-7 px-1.5 border border-slate-200 flex items-center gap-1 text-[10px] uppercase font-bold">
                 <input
                   type="checkbox"
                   checked={settings.fallbackEnabled}
@@ -737,7 +737,7 @@ export default function TelegramSecretaryConfigurator() {
               <button
                 type="button"
                 onClick={() => setSettings((current) => ({ ...current, enabled: !current.enabled }))}
-                className={`h-7 px-2 border text-[8px] font-bold uppercase flex items-center gap-1 ${
+                className={`h-7 px-2 border text-[10px] font-bold uppercase flex items-center gap-1 ${
                   settings.enabled
                     ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                     : "border-slate-200 bg-slate-50 text-slate-500"
@@ -748,7 +748,7 @@ export default function TelegramSecretaryConfigurator() {
               </button>
             </div>
 
-            <div className="border border-slate-200 px-1.5 py-1 text-[8px] font-mono flex items-center gap-1">
+            <div className="border border-slate-200 px-1.5 py-1 text-[10px] font-mono flex items-center gap-1">
               <span className="font-bold">COOLDOWN</span>
               <span className="text-slate-400">new welcome after the customer's latest incoming message is 24h old.</span>
             </div>
@@ -757,7 +757,7 @@ export default function TelegramSecretaryConfigurator() {
               type="button"
               onClick={() => void saveSettings()}
               disabled={busy}
-              className="h-7 px-2.5 bg-slate-900 text-white text-[8px] font-bold uppercase tracking-widest flex items-center gap-1 disabled:opacity-50"
+              className="h-7 px-2.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 disabled:opacity-50"
             >
               <Save className="w-3 h-3" /> Save Engine
             </button>
@@ -766,27 +766,27 @@ export default function TelegramSecretaryConfigurator() {
 
         <section className="min-w-0">
           <div className="px-2 py-1.5 border-b border-slate-200">
-            <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Live control</div>
-            <div className="text-[10px] font-black uppercase">Per-chat pause</div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Live control</div>
+            <div className="text-[11px] font-black uppercase">Per-chat pause</div>
           </div>
 
           <div className="p-1.5">
             {chats.length === 0 ? (
-              <div className="text-[8px] text-slate-400">NO CUSTOMER CHATS YET.</div>
+              <div className="text-[10px] text-slate-400">NO CUSTOMER CHATS YET.</div>
             ) : (
               <div className="divide-y divide-slate-200 border border-slate-200">
                 {chats.map((chat) => (
                   <div key={chat.business_connection_id + ":" + chat.chat_id} className="px-1.5 py-1 flex items-center justify-between gap-2">
                     <div className="min-w-0 font-mono">
-                      <div className="text-[9px] font-bold truncate">CHAT {chat.chat_id}</div>
-                      <div className="text-[7px] text-slate-400 truncate">
+                      <div className="text-[11px] font-bold truncate">CHAT {chat.chat_id}</div>
+                      <div className="text-[10px] text-slate-400 truncate">
                         LAST CUSTOMER: {chat.last_customer_message_at ? new Date(chat.last_customer_message_at).toLocaleString() : "—"}
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => void toggleChat(chat)}
-                      className="h-6 px-1.5 border border-slate-200 text-[7px] font-bold uppercase"
+                      className="h-6 px-1.5 border border-slate-200 text-[10px] font-bold uppercase"
                     >
                       {chat.bot_paused ? "Resume" : "Pause"}
                     </button>
