@@ -452,7 +452,7 @@ export default function LogisticsModule() {
             </div>
           ) : warehouses.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center shadow-none">
-              <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-2.5" />
               <h4 className="text-slate-900 font-bold mb-2">No Warehouses Found</h4>
               <p className="text-slate-500 text-sm max-w-sm mx-auto">You haven't configured any origin locations for your deliveries yet.</p>
             </div>
@@ -477,7 +477,7 @@ export default function LogisticsModule() {
                     </div>
                   </div>
                   
-                  <div className="mt-3 flex items-center gap-2 pt-4 border-t border-slate-100">
+                  <div className="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button
                       onClick={() => {
                         setEditingWarehouse(wh);
@@ -540,7 +540,7 @@ export default function LogisticsModule() {
             </div>
           ) : couriers.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-none p-2.5 text-center shadow-none">
-              <Truck className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <Truck className="w-12 h-12 text-slate-300 mx-auto mb-2.5" />
               <h4 className="text-slate-900 font-bold mb-2">No Couriers Configured</h4>
               <p className="text-slate-500 text-sm max-w-sm mx-auto">
                 Add courier services to enable the dynamic delivery fee calculator engine.
@@ -550,7 +550,7 @@ export default function LogisticsModule() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {couriers.map((courier) => (
                 <div key={courier.id} className="bg-white border border-slate-200 rounded-none p-3 shadow-none relative group overflow-hidden">
-                  <div className="flex items-center gap-2.5 mb-4">
+                  <div className="flex items-center gap-2.5 mb-2.5">
                     {courier.logo ? (
                       <img src={courier.logo} alt={courier.name} className="w-12 h-12 rounded-none object-contain bg-slate-50 border border-slate-100 p-1 shrink-0" />
                     ) : (
@@ -591,7 +591,7 @@ export default function LogisticsModule() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button
                       onClick={() => {
                         setEditingCourier(courier);
@@ -881,8 +881,8 @@ export default function LogisticsModule() {
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-slate-100">
-                <h4 className="font-heading font-black text-sm uppercase tracking-wider text-slate-800 mb-4 flex items-center gap-2">
+              <div className="pt-3 border-t border-slate-100">
+                <h4 className="font-heading font-black text-sm uppercase tracking-wider text-slate-800 mb-2.5 flex items-center gap-2">
                   <Settings className="w-4 h-4 text-emerald-600" /> Delivery Fee Engine
                 </h4>
                 
