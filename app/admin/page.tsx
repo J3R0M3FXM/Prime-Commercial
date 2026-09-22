@@ -899,16 +899,53 @@ export default function AdminPage() {
     };
   }, [authorized, view, selectedCustomerId]);
 
-  // The Admin Panel always starts at the access-code gate.
-  // No existing admin cookie is allowed to bypass this screen.
+  // Restore the existing signed admin session before showing the access-code gate.
+  // The same-origin credential is explicitly included so this also works reliably
+  // inside installed PWAs and WebViews.
   useEffect(() => {
-    setCheckingAuth(false);
+    let cancelled = false;
+
+    const restoreAdminSession = async () => {
+      try {
+        const res = await fetch("/api/admin/auth", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!cancelled && res.ok && data?.authenticated && data?.isAdmin && data?.accessCodeVerified) {
+          setAuthorized(true);
+          setAdminUser(data.user || { id: "admin" });
+          return;
+        }
+      } catch (error) {
+        console.warn("Admin session restore failed:", error);
+      } finally {
+        if (!cancelled) setCheckingAuth(false);
+      }
+    };
+
+    void restoreAdminSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const adminFetch = useCallback((input: RequestInfo | URL, init: RequestInit = {}) => {
+    return fetch(input, {
+      ...init,
+      credentials: "include",
+      cache: init.cache ?? "no-store",
+    });
   }, []);
 
   const handleAdminAccessCodeSubmit = async (accessCode: string) => {
-    const res = await fetch("/api/admin/auth", {
+    const res = await adminFetch("/api/admin/auth", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
       body: JSON.stringify({ accessCode }),
     });
     const data = await res.json().catch(() => ({}));
