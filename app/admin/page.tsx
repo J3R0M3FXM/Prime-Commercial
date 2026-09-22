@@ -899,10 +899,38 @@ export default function AdminPage() {
     };
   }, [authorized, view, selectedCustomerId]);
 
-  // The Admin Panel always starts at the access-code gate.
-  // No existing admin cookie is allowed to bypass this screen.
+  // Restore an existing signed admin session before showing the access-code gate.
+  // This prevents the Admin Panel from losing its authenticated state on refresh,
+  // navigation, or a newly opened browser tab.
   useEffect(() => {
-    setCheckingAuth(false);
+    let cancelled = false;
+
+    const restoreAdminSession = async () => {
+      try {
+        const res = await fetch("/api/admin/auth", {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!cancelled && res.ok && data?.authenticated && data?.isAdmin && data?.accessCodeVerified) {
+          setAuthorized(true);
+          setAdminUser(data.user || { id: "admin" });
+          return;
+        }
+      } catch (error) {
+        console.warn("Admin session restore failed:", error);
+      } finally {
+        if (!cancelled) setCheckingAuth(false);
+      }
+    };
+
+    void restoreAdminSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleAdminAccessCodeSubmit = async (accessCode: string) => {
