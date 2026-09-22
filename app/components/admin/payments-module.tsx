@@ -106,11 +106,11 @@ const Base64ImageUploader = ({
         <span className="text-[9px] font-mono text-slate-400">Max 10MB</span>
       </div>
       {value ? (
-        <div className="relative border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center gap-3">
+        <div className="relative border border-slate-200 rounded-none p-3 bg-slate-50 flex items-center gap-3">
           <img
             src={value}
             alt="Uploaded Preview"
-            className="w-16 h-16 object-contain rounded-lg border border-slate-200 bg-white"
+            className="w-16 h-16 object-contain rounded-none border border-slate-200 bg-white"
           />
           <div className="flex-1 min-w-0">
             <span className="text-[9px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold uppercase">
@@ -126,7 +126,7 @@ const Base64ImageUploader = ({
               setErrorMessage("");
               onChange("");
             }}
-            className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-[9px] font-bold uppercase tracking-wider font-mono cursor-pointer transition-colors"
+            className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-none text-[9px] font-bold uppercase tracking-wider font-mono cursor-pointer transition-colors"
           >
             Remove
           </button>
@@ -138,7 +138,7 @@ const Base64ImageUploader = ({
           onDragLeave={handleDrag}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-xl p-5 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all ${
+          className={`border-2 border-dashed rounded-none p-3 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all ${
             errorMessage
               ? "border-red-300 bg-red-50/50"
               : dragActive
@@ -417,7 +417,7 @@ export default function PaymentsModule() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header and Add Action */}
       <div className="flex items-center justify-between">
         <div>
@@ -433,7 +433,7 @@ export default function PaymentsModule() {
             resetForm();
             setIsOpen(true);
           }}
-          className="px-3.5 py-2 bg-black hover:bg-slate-800 text-white font-heading font-bold text-xs uppercase tracking-wider rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+          className="px-3.5 py-2 bg-black hover:bg-slate-800 text-white font-heading font-bold text-xs uppercase tracking-wider rounded-none flex items-center gap-1.5 transition-colors cursor-pointer shadow-none"
         >
           <Plus className="w-4 h-4" />
           <span>Add Method</span>
@@ -442,12 +442,12 @@ export default function PaymentsModule() {
 
       {/* Main List & Active Panel */}
       {loading ? (
-        <div className="p-12 text-center bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 font-mono text-xs text-slate-500">
+        <div className="p-2.5 text-center bg-white border border-slate-200 rounded-none flex flex-col items-center justify-center gap-2 font-mono text-xs text-slate-500">
           <Loader2 className="w-6 h-6 animate-spin text-black" />
           <span>Syncing payment providers with Firestore...</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* List Section (Left 2/3) */}
           <div className="md:col-span-2 space-y-3">
             {methods.length > 1 && (
@@ -466,7 +466,7 @@ export default function PaymentsModule() {
             )}
 
             {methods.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-2">
+              <div className="bg-white border border-slate-200 rounded-none p-3 text-center space-y-2">
                 <CreditCard className="w-10 h-10 text-slate-300 mx-auto" />
                 <h4 className="font-heading font-bold uppercase text-slate-900 text-xs">
                   No payment methods configured
@@ -488,7 +488,7 @@ export default function PaymentsModule() {
                     onDragOver={(e) => handleDragOver(index, e)}
                     onDragEnd={handleDragEnd}
                     onDrop={(e) => handleDrop(index, e)}
-                    className={`bg-white border rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-xs hover:shadow-md transition-all cursor-move select-none ${
+                    className={`bg-white border rounded-none p-3.5 sm:p-2.5 flex items-center justify-between gap-3 shadow-xs hover:shadow-none transition-all cursor-move select-none ${
                       isDragging
                         ? "opacity-40 border-dashed border-black bg-slate-100 scale-[0.99]"
                         : isDragOver
@@ -511,10 +511,10 @@ export default function PaymentsModule() {
                         <img
                           src={method.logo}
                           alt={method.name}
-                          className="w-11 h-11 object-contain p-1 rounded-xl bg-white border border-slate-100 shrink-0"
+                          className="w-11 h-11 object-contain p-1 rounded-none bg-white border border-slate-100 shrink-0"
                         />
                       ) : (
-                        <div className="w-11 h-11 bg-slate-100 text-slate-700 flex items-center justify-center rounded-xl shrink-0 border border-slate-200">
+                        <div className="w-11 h-11 bg-slate-100 text-slate-700 flex items-center justify-center rounded-none shrink-0 border border-slate-200">
                           <CreditCard className="w-5 h-5" />
                         </div>
                       )}
@@ -600,14 +600,14 @@ export default function PaymentsModule() {
 
                       <button
                         onClick={() => handleEdit(method)}
-                        className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                        className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-none transition-colors cursor-pointer"
                         title="Edit payment method"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(method.id)}
-                        className="p-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-colors cursor-pointer"
+                        className="p-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-none transition-colors cursor-pointer"
                         title="Delete payment method"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -620,16 +620,16 @@ export default function PaymentsModule() {
           </div>
 
           {/* Quick Stats/Tip panel (Right 1/3) */}
-          <div className="bg-slate-100 border border-slate-200 rounded-2xl p-5 space-y-4">
+          <div className="bg-slate-100 border border-slate-200 rounded-none p-3 space-y-2.5">
             <h4 className="font-heading font-black text-xs uppercase text-slate-900 tracking-wider">
               Payments Overview
             </h4>
             <div className="space-y-3 font-mono text-xs">
-              <div className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-slate-200">
+              <div className="flex justify-between items-center bg-white p-2.5 rounded-none border border-slate-200">
                 <span className="text-slate-400">Total gateways:</span>
                 <span className="font-bold text-slate-900">{methods.length}</span>
               </div>
-              <div className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-slate-200">
+              <div className="flex justify-between items-center bg-white p-2.5 rounded-none border border-slate-200">
                 <span className="text-slate-400">Active gateways:</span>
                 <span className="font-bold text-slate-900">
                   {methods.filter((m) => m.isActive).length}
@@ -637,7 +637,7 @@ export default function PaymentsModule() {
               </div>
             </div>
 
-            <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-1.5">
+            <div className="p-3 bg-white rounded-none border border-slate-200 space-y-1.5">
               <p className="text-[11px] font-bold text-slate-900 uppercase tracking-wide">
                 Secure Image Rules
               </p>
@@ -651,29 +651,29 @@ export default function PaymentsModule() {
 
       {/* Add/Edit Side Sheet Modal */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white border border-slate-200 w-full max-w-[430px] h-full rounded-2xl overflow-y-auto shadow-2xl p-5 flex flex-col justify-between">
-            <div className="space-y-5">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2.5 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 w-full max-w-[430px] h-full rounded-none overflow-y-auto shadow-none p-3 flex flex-col justify-between">
+            <div className="space-y-3">
               <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
                 <h4 className="font-heading font-black uppercase text-slate-900 text-sm tracking-wide">
                   {editingId ? "Modify Gateway" : "Create Payment Gateway"}
                 </h4>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer"
+                  className="p-1 hover:bg-slate-100 rounded-none text-slate-500 cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
 
               {errorMsg && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center gap-1.5 font-mono">
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-none flex items-center gap-1.5 font-mono">
                   <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
                   <span>{errorMsg}</span>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} id="payment-gateway-form" className="space-y-4">
+              <form onSubmit={handleSubmit} id="payment-gateway-form" className="space-y-2.5">
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 font-heading">
                     Method Name <span className="text-red-500">*</span>
@@ -684,7 +684,7 @@ export default function PaymentsModule() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Lalamove Pay, GCash QR, Metamask"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-slate-900"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-none text-xs font-medium focus:outline-none focus:border-slate-900"
                   />
                 </div>
 
@@ -703,7 +703,7 @@ export default function PaymentsModule() {
                   <select
                     value={paymentType}
                     onChange={(e) => setPaymentType(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-slate-900"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-none text-xs font-medium focus:outline-none focus:border-slate-900"
                   >
                     <option value="qr_code">Static QR Code Scan</option>
                     <option value="manual_transfer">Manual Transfer (Online Banking / E-Wallet)</option>
@@ -723,7 +723,7 @@ export default function PaymentsModule() {
                 )}
 
                 {paymentType === "manual_transfer" && (
-                  <div className="space-y-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="space-y-3 p-3.5 bg-slate-50 border border-slate-200 rounded-none">
                     <div className="space-y-1">
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700 font-heading">
                         Account Name <span className="text-red-500">*</span>
@@ -734,7 +734,7 @@ export default function PaymentsModule() {
                         value={accountName}
                         onChange={(e) => setAccountName(e.target.value)}
                         placeholder="e.g. Juan Dela Cruz / Store Official"
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-slate-900"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-none text-xs font-medium focus:outline-none focus:border-slate-900"
                       />
                       <p className="text-[9px] text-slate-400 font-mono">
                         Registered name on the receiving bank account or e-wallet.
@@ -751,14 +751,14 @@ export default function PaymentsModule() {
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value)}
                         placeholder="e.g. 0917-123-4567 or 1234-5678-9012"
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-slate-900"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-none text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-slate-900"
                       />
                       <p className="text-[9px] text-slate-400 font-mono">
                         Account number or mobile number for customers to copy and transfer payment.
                       </p>
                     </div>
 
-                    <div className="p-2.5 bg-amber-50/60 border border-amber-200/60 rounded-lg">
+                    <div className="p-2.5 bg-amber-50/60 border border-amber-200/60 rounded-none">
                       <p className="text-[10px] text-amber-800 leading-snug font-mono">
                         Customers will be shown this Account Name and Account Number with one-click copy buttons at checkout to transfer payment via their online banking or e-wallet apps.
                       </p>
@@ -777,13 +777,13 @@ export default function PaymentsModule() {
                       value={walletAddress}
                       onChange={(e) => setWalletAddress(e.target.value)}
                       placeholder="e.g. 0x71C... or bc1q..."
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-slate-900"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-none text-xs font-mono focus:outline-none focus:border-slate-900"
                     />
                   </div>
                 )}
 
                 {paymentType === "api" && (
-                  <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-none">
                     <div className="space-y-1">
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 font-heading">
                         Webhook Endpoint
@@ -793,7 +793,7 @@ export default function PaymentsModule() {
                         value={webhookUrl}
                         onChange={(e) => setWebhookUrl(e.target.value)}
                         placeholder="https://api.example.com/payment/webhook"
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-slate-900"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-none text-xs font-mono focus:outline-none focus:border-slate-900"
                       />
                     </div>
                     <div className="space-y-1">
@@ -805,7 +805,7 @@ export default function PaymentsModule() {
                         value={publicKey}
                         onChange={(e) => setPublicKey(e.target.value)}
                         placeholder="pk_test_..."
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-slate-900"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-none text-xs font-mono focus:outline-none focus:border-slate-900"
                       />
                     </div>
                     <div className="space-y-1">
@@ -819,14 +819,14 @@ export default function PaymentsModule() {
                         value={secretKey}
                         onChange={(e) => setSecretKey(e.target.value)}
                         placeholder={secretKeyConfigured ? "•••••••••••••••• (leave blank to keep existing key)" : "sk_test_..."}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-slate-900"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-none text-xs font-mono focus:outline-none focus:border-slate-900"
                       />
                     </div>
                   </div>
                 )}
 
                 {/* Toggle switch for active */}
-                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-none">
                   <div>
                     <span className="text-xs font-bold uppercase text-slate-900 font-heading">
                       Gateway Status
@@ -842,7 +842,7 @@ export default function PaymentsModule() {
                       isActive ? "bg-slate-900 justify-end" : "bg-slate-200 justify-start"
                     }`}
                   >
-                    <span className="w-4 h-4 bg-white rounded-full shadow-sm" />
+                    <span className="w-4 h-4 bg-white rounded-full shadow-none" />
                   </button>
                 </div>
               </form>
@@ -852,7 +852,7 @@ export default function PaymentsModule() {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-heading font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                className="flex-1 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-heading font-bold text-xs uppercase tracking-wider rounded-none transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -860,7 +860,7 @@ export default function PaymentsModule() {
                 type="submit"
                 form="payment-gateway-form"
                 disabled={submitting}
-                className="flex-1 py-3 bg-black hover:bg-slate-800 text-white font-heading font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                className="flex-1 py-2 bg-black hover:bg-slate-800 text-white font-heading font-bold text-xs uppercase tracking-wider rounded-none transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-none"
               >
                 {submitting ? (
                   <>
