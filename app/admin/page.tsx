@@ -2070,7 +2070,7 @@ export default function AdminPage() {
                   { id: "payments", name: "Payments", icon: CreditCard, desc: "Config Payment Methods", count: "Active Methods" },
                   { id: "promos", name: "Promos", icon: Tag, desc: "Discounts & Anti-Fraud", count: "Vouchers" },
                   { id: "media", name: "Media", icon: Film, desc: "Telegram Video Gallery", count: "Videos" },
-                  { id: "automation", name: "Automation", icon: MessageSquare, desc: "Telegram Secretary", count: "Rules" }
+                  { id: "automation", name: "Secretary", icon: MessageSquare, desc: "Inline Button Flow", count: "Steps" }
                 ].map((item) => (
                   <button
                     key={item.id}
