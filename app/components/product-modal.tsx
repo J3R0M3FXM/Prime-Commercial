@@ -117,253 +117,196 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-0 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-white w-full max-w-[430px] sm:rounded-2xl rounded-t-2xl sm:rounded-b-2xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:fade-in-20 relative max-h-[90vh] flex flex-col cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close Button */}
-        <button 
-          onClick={onClose} 
-          className="absolute top-4 right-4 z-20 p-2 bg-white/90 backdrop-blur-md text-gray-900 rounded-full hover:bg-white transition-colors shadow-sm cursor-pointer border border-gray-100"
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-20 p-2 bg-white/90 backdrop-blur-md text-gray-900 rounded-full hover:bg-white transition-colors shadow-sm cursor-pointer border border-gray-100"
+          aria-label="Close product"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="sm:grid sm:grid-cols-2 flex-1 overflow-y-auto">
-          {/* Left panel: Image */}
-          <div className="relative aspect-[8/7] bg-gray-50 w-full">
-            {renderGlossyChip()}
-            <img 
-              src={selectedVariant?.imageUrl || product.imageUrl || "https://picsum.photos/seed/prime/600"} 
-              alt={product.name} 
-              className={`w-full h-full object-cover absolute inset-0 ${isOutOfStock ? 'opacity-60 grayscale' : ''}`} 
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = "https://picsum.photos/seed/prime/600";
-              }}
-            />
+        <div className="overflow-y-auto px-4 pt-5 pb-4">
+          <div className="text-left pr-10">
+            <p className="text-[9px] font-mono font-bold tracking-widest text-gray-400 uppercase leading-none">
+              {product.category || "General"}
+            </p>
+            <h2 className="mt-1 text-lg sm:text-xl font-heading font-bold text-gray-900 leading-[1.15] tracking-tight">
+              {product.name}
+            </h2>
           </div>
 
-          {/* Right panel: Details & Option selection */}
-          <div className="p-4 sm:p-5 flex flex-col justify-between space-y-4">
-            <div className="space-y-3">
-              {/* Category */}
-              <p className="text-[9px] font-mono font-bold tracking-widest text-gray-400 uppercase leading-none">
-                {product.category || "General"}
-              </p>
+          <div className="mt-4 flex justify-center">
+            <div className="relative w-full max-w-[360px] aspect-[4/3] overflow-hidden rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center">
+              {renderGlossyChip()}
+              <img
+                src={selectedVariant?.imageUrl || fallbackImage}
+                alt={selectedVariant ? `${product.name} - ${selectedVariant.name}` : product.name}
+                className={`max-w-full max-h-full w-full h-full object-contain ${isOutOfStock ? "opacity-60 grayscale" : ""}`}
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLImageElement;
+                  if (target.src !== fallbackImage) target.src = fallbackImage;
+                }}
+              />
+            </div>
+          </div>
 
-              {/* Title & Price */}
-              <div>
-                <h2 className="text-lg sm:text-xl font-heading font-bold text-gray-900 leading-[1.15] tracking-tight">
-                  {product.name}
-                </h2>
-                {selectedVariant && selectedVariant.id !== "default" && (
-                  <p className="text-xs font-semibold text-gray-500 mt-1 uppercase tracking-wide font-mono">
-                    Selected Option: <span className="text-gray-900 font-bold">{selectedVariant.name}</span>
-                  </p>
-                )}
-                
-                {/* Price */}
-                <div className="mt-1.5 flex items-baseline gap-2">
-                  <span className="text-xl sm:text-2xl font-mono font-bold text-gray-900">
-                    {formatPHP(finalPrice)}
-                  </span>
-                  {!selectedVariant && variants.length > 1 && (
-                    <span className="text-[10px] font-mono font-medium text-slate-400">
-                      (Starting Price)
+          {product.description && (
+            <p className="mt-3 mx-auto max-w-[380px] text-center text-xs text-gray-500 leading-relaxed">
+              {product.description}
+            </p>
+          )}
+
+          <div className="mt-4 text-center">
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 font-mono">
+              Select Variant
+            </label>
+            {variants.length > 1 && (
+              <span className="mt-1 block text-[9px] font-mono text-gray-400">
+                {variants.length} OPTIONS
+              </span>
+            )}
+
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+              {variants.map((v: any) => {
+                const isSelected = selectedVariant?.id === v.id;
+                const variantPrice = Number(v.price) || 0;
+
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedVariant(v);
+                      setLocalQuantity(1);
+                    }}
+                    className={"rounded-lg border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-all cursor-pointer " + (isSelected
+                      ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                      : "border-gray-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50")}
+                  >
+                    <span>{v.name || "Variant"}</span>
+                    <span className={"ml-1.5 font-mono " + (isSelected ? "text-white/80" : "text-slate-400")}>
+                      {formatPHP(variantPrice)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {selectedVariant && (
+            <>
+              <div className="mt-3 flex items-center justify-center py-2 border-y border-gray-100">
+                <div className="text-xs font-mono font-bold uppercase tracking-wider text-center">
+                  {isOutOfStock ? (
+                    <span className="text-red-500">Unavailable</span>
+                  ) : (
+                    <span className="text-gray-500">
+                      Stock: <span className="text-gray-900">{selectedVariant.stock}</span>
                     </span>
                   )}
-                  {hasBundle && currentQuantity > 1 && selectedVariant && (
-                    <span className="text-[11px] font-mono font-bold text-emerald-600 uppercase tracking-wider">
+                </div>
+              </div>
+
+              {hasBundle && !isOutOfStock && (
+                <div className="mt-3 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
+                  <p className="font-bold text-emerald-800 text-[10px] uppercase tracking-wide">
+                    Buy More, Save More
+                  </p>
+                  <p className="text-emerald-600 text-[11px] mt-0.5">
+                    Buy 2 or more to get <span className="font-bold">{product.bundleConfig.discount}% off</span>.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="mt-4">
+            {!selectedVariant ? (
+              <button disabled className="w-full bg-gray-100 text-gray-400 py-3.5 rounded-xl font-heading font-bold uppercase tracking-widest text-xs cursor-not-allowed text-center">
+                Please Select an Option First
+              </button>
+            ) : isOutOfStock ? (
+              <button disabled className="w-full bg-gray-100 text-gray-400 py-3.5 rounded-xl font-heading font-bold uppercase tracking-widest text-xs text-center">
+                Unavailable
+              </button>
+            ) : isInCart ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+                  <button
+                    className="p-3.5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors cursor-pointer"
+                    onClick={() => updateQuantity(cartItemId, cartItem.quantity - 1)}
+                    aria-label="Decrease quantity"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold">{cartItem.quantity}</span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest font-mono">In Cart</span>
+                  </div>
+                  <button
+                    className="p-3.5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-30 cursor-pointer"
+                    onClick={() => updateQuantity(cartItemId, cartItem.quantity + 1)}
+                    disabled={cartItem.quantity >= (selectedVariant.stock ?? 10)}
+                    aria-label="Increase quantity"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wide font-mono">Quantity</span>
+                  <div className="flex items-center border border-gray-200 rounded-lg bg-white">
+                    <button
+                      type="button"
+                      className="p-2 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-30 cursor-pointer"
+                      onClick={() => setLocalQuantity(Math.max(1, localQuantity - 1))}
+                      disabled={localQuantity <= 1}
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="w-10 text-center font-bold text-sm font-mono">{localQuantity}</span>
+                    <button
+                      type="button"
+                      className="p-2 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-30 cursor-pointer"
+                      onClick={() => setLocalQuantity(Math.min(selectedVariant.stock ?? 10, localQuantity + 1))}
+                      disabled={localQuantity >= (selectedVariant.stock ?? 10)}
+                      aria-label="Increase quantity"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-xl font-mono font-bold text-gray-900">
+                    {formatPHP(finalPrice * localQuantity)}
+                  </span>
+                  {hasBundle && localQuantity > 1 && (
+                    <span className="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-wider">
                       Bundle Savings Applied
                     </span>
                   )}
                 </div>
-              </div>
 
-              {/* Stocks Status */}
-              {selectedVariant && (
-                <div className="flex items-center py-2 border-y border-gray-100">
-                  <div className="text-xs font-mono font-bold uppercase tracking-wider">
-                    {isOutOfStock ? (
-                      <span className="text-red-500">Unavailable</span>
-                    ) : (
-                      <span className="text-gray-500">Stock: <span className="text-gray-900">{selectedVariant.stock}</span></span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Selection Note for Customers - automatically hidden once option is selected */}
-              {!selectedVariant && (
-                <div className="bg-amber-50 border border-amber-200/90 rounded-xl p-3 flex items-center gap-2 text-amber-900 text-xs font-mono animate-in fade-in duration-150">
-                  <Info className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Note: Please select an option or variant before adding to cart.</span>
-                </div>
-              )}
-
-              {/* Description */}
-              <p className="text-xs text-gray-500 leading-relaxed max-h-[100px] overflow-y-auto">
-                {product.description || "No description provided for this product. Premium quality guaranteed."}
-              </p>
-
-              {/* Clean one-image-per-variant selector */}
-              <div className="space-y-2 pt-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 font-mono">
-                    Select Variant
-                  </label>
-                  {variants.length > 1 && (
-                    <span className="text-[9px] font-mono text-gray-400">
-                      {variants.length} OPTIONS
-                    </span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {variants.map((v: any) => {
-                    const isSelected = selectedVariant?.id === v.id;
-                    const variantImage = v.imageUrl || fallbackImage;
-
-                    return (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedVariant(v);
-                          setLocalQuantity(1);
-                        }}
-                        className={`group relative overflow-hidden rounded-lg border text-left transition-all cursor-pointer ${isSelected
-                          ? "border-slate-900 ring-1 ring-slate-900 bg-slate-50"
-                          : "border-gray-200 bg-white hover:border-slate-400"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 p-2">
-                          <div className="w-11 h-11 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
-                            <img
-                              src={variantImage}
-                              alt={v.name || "Variant"}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                const target = e.currentTarget as HTMLImageElement;
-                                if (target.src !== fallbackImage) target.src = fallbackImage;
-                              }}
-                            />
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <span className="block truncate text-[11px] font-bold uppercase tracking-wide text-slate-900">
-                              {v.name || "Variant"}
-                            </span>
-                            <span className="block mt-0.5 text-[10px] font-mono text-slate-500">
-                              {formatPHP(Number(v.price) || 0)}
-                            </span>
-                          </div>
-
-                          {isSelected && (
-                            <Check className="w-3.5 h-3.5 shrink-0 text-slate-900" />
-                          )}
-                        </div>
-
-                        <div className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-white/80 to-transparent pointer-events-none" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Bundle discount banner */}
-              {hasBundle && selectedVariant && !isOutOfStock && (
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-start gap-2.5">
-                  <div className="mt-0.5 bg-emerald-500 text-white rounded-full p-0.5">
-                    <Check className="w-2.5 h-2.5" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-emerald-800 text-[10px] uppercase tracking-wide">Buy More, Save More</p>
-                    <p className="text-emerald-600 text-[11px] mt-0.5">
-                      Buy 2 or more to get <span className="font-bold">{product.bundleConfig.discount}% off</span>.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Bottom: Cart Control Actions */}
-            <div className="pt-4 border-t border-gray-100">
-              {!selectedVariant ? (
-                <button 
-                  disabled
-                  className="w-full bg-gray-100 text-gray-400 py-3.5 rounded-xl font-heading font-bold uppercase tracking-widest text-xs cursor-not-allowed text-center"
+                <button
+                  onClick={handleAddToCart}
+                  className="w-full px-3.5 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center"
                 >
-                  Please Select an Option First
+                  Add to Cart — {formatPHP(finalPrice * localQuantity)}
                 </button>
-              ) : isOutOfStock ? (
-                <button 
-                  disabled
-                  className="w-full bg-gray-100 text-gray-400 py-3.5 rounded-xl font-heading font-bold uppercase tracking-widest text-xs"
-                >
-                  Unavailable
-                </button>
-              ) : isInCart ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
-                    <button 
-                      className="p-3.5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => updateQuantity(cartItemId, cartItem.quantity - 1)}
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-bold">{cartItem.quantity}</span>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest font-mono">In Cart</span>
-                    </div>
-                    <button 
-                      className="p-3.5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-30 cursor-pointer"
-                      onClick={() => updateQuantity(cartItemId, cartItem.quantity + 1)}
-                      disabled={cartItem.quantity >= (selectedVariant.stock ?? 10)}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Quantity adjustment before adding to cart */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wide font-mono">Quantity</span>
-                    <div className="flex items-center border border-gray-200 rounded-lg bg-white">
-                      <button 
-                        type="button"
-                        className="p-2 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-30 cursor-pointer"
-                        onClick={() => setLocalQuantity(Math.max(1, localQuantity - 1))}
-                        disabled={localQuantity <= 1}
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="w-10 text-center font-bold text-sm font-mono">{localQuantity}</span>
-                      <button 
-                        type="button"
-                        className="p-2 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-30 cursor-pointer"
-                        onClick={() => setLocalQuantity(Math.min(selectedVariant.stock ?? 10, localQuantity + 1))}
-                        disabled={localQuantity >= (selectedVariant.stock ?? 10)}
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={handleAddToCart} 
-                    className="w-full px-3.5 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center"
-                  >
-                    <span>Add to Cart — {formatPHP(finalPrice * localQuantity)}</span>
-                  </button>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
