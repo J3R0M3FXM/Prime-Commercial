@@ -472,7 +472,10 @@ export default function CheckoutModal({
       }
     }, 60000);
 
-    // Start a Maya-hosted checkout for the selected API payment method.
+      return () => clearInterval(syncInterval);
+  }, [currentStep, completedOrder?.id, completedOrder?.orderNumber]);
+
+  // Start a Maya-hosted checkout for the selected API payment method.
   // The server owns the Maya credential and order correlation; the browser
   // receives only Maya's hosted redirect URL.
   const handleStartMayaCheckout = async () => {
@@ -522,8 +525,7 @@ export default function CheckoutModal({
       setIsStartingMayaCheckout(false);
     }
   };
-  return () => clearInterval(syncInterval);
-  }, [currentStep, completedOrder?.id, completedOrder?.orderNumber]);
+
 
   // Perform full address validation (local logic + online Geoapify verification)
   const performAddressValidation = async (targetAddr: string, unit: string, currentCoords: { lat: number; lon: number }) => {
