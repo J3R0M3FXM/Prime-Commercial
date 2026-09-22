@@ -131,16 +131,22 @@ type AdminView =
   | "automation";
 
 function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promise<void> }) {
-  const [accessCode, setAccessCode] = useState("");
+  const accessCodeRef = React.useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // Read the live DOM value so browser/password-manager autofill also works
+    // when React's change event has not fired yet.
+    const accessCode = accessCodeRef.current?.value || "";
     if (!accessCode.trim()) {
       setError("ADMIN_ACCESS_CODE is required.");
+      accessCodeRef.current?.focus();
       return;
     }
+
     setSubmitting(true);
     setError("");
     try {
@@ -167,10 +173,11 @@ function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promi
         </p>
         <label className="block mt-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">ADMIN_ACCESS_CODE</label>
         <input
+          ref={accessCodeRef}
+          name="accessCode"
           type="password"
           autoComplete="current-password"
-          value={accessCode}
-          onChange={e => setAccessCode(e.target.value)}
+          onInput={() => setError("")}
           className="mt-1.5 w-full h-11 rounded-none border border-slate-300 bg-white px-3 text-sm font-mono outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
           placeholder="Enter access code"
           disabled={submitting}
@@ -178,12 +185,11 @@ function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promi
         {error && <p className="mt-2 text-xs font-mono font-bold text-red-600">{error}</p>}
         <button
           type="submit"
-          disabled={submitting || !accessCode.trim()}
+          disabled={submitting}
           className="mt-2.5 w-full h-11 rounded-none bg-slate-900 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50"
         >
           {submitting ? "VERIFYING..." : "VERIFY ADMIN ACCESS"}
         </button>
-        
       </form>
     </div>
   );
