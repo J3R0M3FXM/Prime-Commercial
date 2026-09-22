@@ -167,7 +167,9 @@ export async function POST(request: Request) {
       const connectionId = businessMessage.business_connection_id || update?.business_connection?.id;
       const chatId = businessMessage.chat?.id;
 
-      if (!text || !connectionId || chatId === undefined) {
+      // Customer activity can be text, media, or another supported Business
+      // message. The 24h clock follows the latest incoming customer activity.
+      if (!connectionId || chatId === undefined) {
         return NextResponse.json({ ok: true, ignored: true });
       }
 
@@ -198,7 +200,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, matched: false, reason: 'within_24h' });
       }
 
-      const result = await findWelcomeResponse() || await findAutomationResponse('message', text);
+      const result = await findWelcomeResponse() || (text ? await findAutomationResponse('message', text) : null);
       if (!result) return NextResponse.json({ ok: true, matched: false });
 
       const responseText = result.flow?.responseText || result.settings.fallbackResponse;
