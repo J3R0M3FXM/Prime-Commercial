@@ -251,9 +251,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, ignored: true, reason: 'missing_business_connection' });
       }
 
-      const [, flowId, buttonId] = data.split(':').length >= 4
-        ? data.split(':').slice(1)
-        : ['', '', ''];
+      let flowId = '';
+      let buttonId = '';
+
+      if (secretary) {
+        flowId = secretary.flowId;
+        buttonId = secretary.buttonId;
+      } else {
+        const legacyParts = data.split(':');
+        flowId = legacyParts[1] || '';
+        buttonId = legacyParts.slice(2).join(':');
+      }
 
       const flows = await getAutomationFlows();
       const flow = flows.find(item => item.id === flowId && item.active);
