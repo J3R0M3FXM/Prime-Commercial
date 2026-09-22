@@ -2101,29 +2101,29 @@ export default function AdminPage() {
             <div className="mb-2.5">
               <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                 {[
-                  { id: "customers", name: "Customers", icon: Users, desc: "Profiles & Device Info", count: customers.length, iconBg: "bg-blue-50", iconColor: "text-blue-600" },
-                  { id: "orders", name: "Orders", icon: ClipboardList, desc: "Order History & Status", count: orders.length, iconBg: "bg-violet-50", iconColor: "text-violet-600" },
-                  { id: "products", name: "Products", icon: Package, desc: "Catalog Configuration", count: products.length, iconBg: "bg-amber-50", iconColor: "text-amber-600" },
-                  { id: "inventory", name: "Inventory", icon: Sliders, desc: "Stock Adjustments", count: `${products.reduce((a: any, p: any) => a + (p.stock || 0), 0)} units`, iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
-                  { id: "settings", name: "Settings", icon: Lock, desc: "Security & Access Rules", count: "Protected", iconBg: "bg-slate-100", iconColor: "text-slate-700" },
-                  { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Store & Order Insights", count: "Live", iconBg: "bg-cyan-50", iconColor: "text-cyan-600" },
-                  { id: "diagnostics", name: "Diagnostics", icon: Activity, desc: "Health, APIs & Font Audit", count: "9 Systems + DOM", iconBg: "bg-rose-50", iconColor: "text-rose-600" },
-                  { id: "logistics", name: "Logistics", icon: Truck, desc: "Warehouses & Couriers", count: "Routes", iconBg: "bg-orange-50", iconColor: "text-orange-600" },
-                  { id: "charges", name: "Charges", icon: Receipt, desc: "Global Additional Fees", count: "Config", iconBg: "bg-yellow-50", iconColor: "text-yellow-700" },
-                  { id: "payments", name: "Payments", icon: CreditCard, desc: "Config Payment Methods", count: "Active Methods", iconBg: "bg-indigo-50", iconColor: "text-indigo-600" },
-                  { id: "promos", name: "Promos", icon: Tag, desc: "Discounts & Anti-Fraud", count: "Vouchers", iconBg: "bg-pink-50", iconColor: "text-pink-600" },
-                  { id: "media", name: "Media", icon: Film, desc: "Telegram Video Gallery", count: "Videos", iconBg: "bg-fuchsia-50", iconColor: "text-fuchsia-600" },
-                  { id: "automation", name: "Secretary", icon: MessageSquare, desc: "Inline Button Flow", count: "Steps", iconBg: "bg-teal-50", iconColor: "text-teal-600" }
+                  { id: "customers", name: "Customers", icon: Users, desc: "Profiles & Device Info", count: customers.length, iconBg: "#eff6ff", iconColor: "#2563eb" },
+                  { id: "orders", name: "Orders", icon: ClipboardList, desc: "Order History & Status", count: orders.length, iconBg: "#f5f3ff", iconColor: "#7c3aed" },
+                  { id: "products", name: "Products", icon: Package, desc: "Catalog Configuration", count: products.length, iconBg: "#fffbeb", iconColor: "#d97706" },
+                  { id: "inventory", name: "Inventory", icon: Sliders, desc: "Stock Adjustments", count: `${products.reduce((a: any, p: any) => a + (p.stock || 0), 0)} units`, iconBg: "#ecfdf5", iconColor: "#059669" },
+                  { id: "settings", name: "Settings", icon: Lock, desc: "Security & Access Rules", count: "Protected", iconBg: "#f1f5f9", iconColor: "#475569" },
+                  { id: "analytics", name: "Analytics", icon: TrendingUp, desc: "Store & Order Insights", count: "Live", iconBg: "#ecfeff", iconColor: "#0891b2" },
+                  { id: "diagnostics", name: "Diagnostics", icon: Activity, desc: "Health, APIs & Font Audit", count: "9 Systems + DOM", iconBg: "#fff1f2", iconColor: "#e11d48" },
+                  { id: "logistics", name: "Logistics", icon: Truck, desc: "Warehouses & Couriers", count: "Routes", iconBg: "#fff7ed", iconColor: "#ea580c" },
+                  { id: "charges", name: "Charges", icon: Receipt, desc: "Global Additional Fees", count: "Config", iconBg: "#fefce8", iconColor: "#a16207" },
+                  { id: "payments", name: "Payments", icon: CreditCard, desc: "Config Payment Methods", count: "Active Methods", iconBg: "#eef2ff", iconColor: "#4f46e5" },
+                  { id: "promos", name: "Promos", icon: Tag, desc: "Discounts & Anti-Fraud", count: "Vouchers", iconBg: "#fdf2f8", iconColor: "#db2777" },
+                  { id: "media", name: "Media", icon: Film, desc: "Telegram Video Gallery", count: "Videos", iconBg: "#fdf4ff", iconColor: "#c026d3" },
+                  { id: "automation", name: "Secretary", icon: MessageSquare, desc: "Inline Button Flow", count: "Steps", iconBg: "#f0fdfa", iconColor: "#0f766e" }
                 ].map((item) => (
                   <button
                     key={item.id}
                     onClick={() => setView(item.id as AdminView)}
-                    className="admin-module-tile group relative h-[88px] sm:h-[96px] bg-white border border-slate-200 hover:border-slate-400 rounded-md p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-7px_14px_rgba(15,23,42,0.05),0_2px_5px_rgba(15,23,42,0.07)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-8px_16px_rgba(15,23,42,0.06),0_3px_7px_rgba(15,23,42,0.1)] transition-all duration-200 flex flex-col items-center justify-center gap-1 overflow-hidden text-center cursor-pointer"
+                    className="admin-module-tile group relative h-[88px] sm:h-[96px] bg-white border border-slate-200 hover:border-slate-400 rounded-md p-1.5 transition-all duration-200 flex flex-col items-center justify-center gap-1 overflow-hidden text-center cursor-pointer"
                   >
                     <div className="absolute inset-x-1 top-1 h-1/3 rounded-t-md bg-gradient-to-b from-white/90 to-transparent pointer-events-none" />
                     <div className="absolute inset-0 bg-gradient-to-br from-white/70 via-white/15 to-transparent pointer-events-none" />
 
-                    <div className={`relative z-[2] w-8 h-8 rounded-md ${item.iconBg} ${item.iconColor} border border-white/70 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_1px_2px_rgba(15,23,42,0.08)] group-hover:scale-[1.02] transition-transform`}>
+                    <div className="admin-module-icon relative z-[2] w-8 h-8 rounded-md border border-white/70 flex items-center justify-center group-hover:scale-[1.02] transition-transform" style={{ backgroundColor: item.iconBg, color: item.iconColor }}>
                       <item.icon className="w-4 h-4" />
                     </div>
 
