@@ -6,11 +6,13 @@ export type MayaWebhookChannel = 'card' | 'wallet' | 'unknown';
 
 const MAYA_PRODUCTION_IPS = new Set(['18.138.50.235', '3.1.207.200']);
 const MAYA_SANDBOX_IPS = new Set(['13.229.160.234', '3.1.199.75']);
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 
 const CARD_FUND_SOURCE_TYPES = new Set(['card']);
 const WALLET_FUND_SOURCE_TYPES = new Set([
   'maya-wallet',
   'paymaya',
+  'qrph',
   'gcash',
   'grabpay',
   'shopeepay',
@@ -28,14 +30,23 @@ const HANDLED_STATUSES = new Set([
 ]);
 
 function getClientIp(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  return request.headers.get('x-real-ip') || '';
+  // Vercel overwrites x-forwarded-for with the public client IP, which makes
+  // it suitable for Maya's documented IP allowlist.
+  return (
+    request.headers.get('x-vercel-forwarded-for') ||
+    request.headers.get('x-forwarded-for') ||
+    request.headers.get('x-real-ip') ||
+    ''
+  ).split(',')[0].trim();
 }
 
 export function isAllowedMayaIp(request: Request): boolean {
-  if (process.env.MAYA_WEBHOOK_ENFORCE_IP !== 'true') return true;
   const environment = (process.env.MAYA_ENVIRONMENT || 'production').toLowerCase();
+  const configured = process.env.MAYA_WEBHOOK_ENFORCE_IP;
+  const enforce = configured ? configured === 'true' : environment === 'production';
+
+  if (!enforce) return true;
+
   const allowed = environment === 'sandbox' ? MAYA_SANDBOX_IPS : MAYA_PRODUCTION_IPS;
   return allowed.has(getClientIp(request));
 }
@@ -50,16 +61,20 @@ function hasCardFundingInstrument(payload: any): boolean {
 
 export function detectMayaWebhookChannel(payload: any): MayaWebhookChannel {
   const fundSourceType = getFundSourceType(payload);
+
   if (CARD_FUND_SOURCE_TYPES.has(fundSourceType) || hasCardFundingInstrument(payload)) {
     return 'card';
   }
+
   if (WALLET_FUND_SOURCE_TYPES.has(fundSourceType)) {
     return 'wallet';
   }
+
   const scheme = String(payload?.paymentScheme || '').toLowerCase();
   if (['visa', 'master-card', 'mastercard', 'jcb', 'american-express', 'amex'].includes(scheme)) {
     return 'card';
   }
+
   return 'unknown';
 }
 
@@ -75,18 +90,21 @@ function amountFromPayload(payload: any): number | null {
   for (const candidate of candidates) {
     if (candidate && typeof candidate === 'object') continue;
     const value = Number(candidate);
-    if (Number.isFinite(value)) return Math.round(value * 100) / 100;
+    if (Number.isFinite(value) && value >= 0) return Math.round(value * 100) / 100;
   }
+
   return null;
 }
 
-function currencyFromPayload(payload: any): string {
-  return String(
+function currencyFromPayload(payload: any): string | null {
+  const raw =
     payload?.currency ||
     payload?.amount?.currency ||
-    payload?.paymentDetails?.responses?.efs?.amount?.total?.currency ||
-    'PHP'
-  ).toUpperCase();
+    payload?.totalAmount?.currency ||
+    payload?.paymentDetails?.responses?.efs?.amount?.total?.currency;
+
+  if (raw === undefined || raw === null || raw === '') return null;
+  return String(raw).trim().toUpperCase();
 }
 
 function getPaymentId(payload: any): string {
@@ -138,9 +156,110 @@ function paymentStatusLabel(status: string): {
   }
 }
 
+function paymentStatusRank(status: string): number {
+  switch (String(status || '').toLowerCase()) {
+    case 'paid':
+      return 4;
+    case 'authorized':
+      return 3;
+    case 'payment failed':
+    case 'expired':
+    case 'cancelled':
+      return 2;
+    default:
+      return 1;
+  }
+}
+
+export function shouldApplyMayaPaymentStatus(currentStatus: string, incomingStatus: string): boolean {
+  const currentRank = paymentStatusRank(currentStatus);
+  const incomingRank = paymentStatusRank(incomingStatus);
+
+  // A successful payment may legitimately follow a failed/expired/cancelled
+  // attempt when the customer retries checkout. Never let a stale lower-ranked
+  // webhook move an already stronger state backwards.
+  return incomingRank >= currentRank;
+}
+
+export function validateMayaWebhookPayload(
+  payload: any,
+  expectedChannel: Exclude<MayaWebhookChannel, 'unknown'> | null = null,
+): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return 'Invalid JSON payload';
+  }
+
+  const paymentId = getPaymentId(payload);
+  if (!paymentId || paymentId.length > 200) {
+    return 'Missing or invalid payment id';
+  }
+
+  const paymentStatus = String(payload?.paymentStatus || payload?.status || '').toUpperCase();
+  if (!HANDLED_STATUSES.has(paymentStatus)) {
+    return 'Unsupported payment status';
+  }
+
+  const channel = detectMayaWebhookChannel(payload);
+  if (expectedChannel && channel !== expectedChannel) {
+    return 'Payment channel does not match endpoint';
+  }
+
+  const amount = amountFromPayload(payload);
+  const currency = currencyFromPayload(payload);
+
+  // Maya's Checkout webhook payload represents the payment resource. For
+  // money-moving states, require an explicit amount and PHP currency rather
+  // than defaulting missing values and accidentally accepting a malformed event.
+  if (paymentStatus === 'PAYMENT_SUCCESS' || paymentStatus === 'AUTHORIZED') {
+    if (amount === null) return 'Missing or invalid payment amount';
+    if (!currency) return 'Missing payment currency';
+  }
+
+  if (currency && currency !== 'PHP') {
+    return `Unsupported currency: ${currency}`;
+  }
+
+  if (getFundSourceType(payload) === 'qrph' && !getReceiptNumber(payload)) {
+    return 'QRPH webhook is missing receiptNumber';
+  }
+
+  return null;
+}
+
+export async function parseMayaWebhookRequest(request: Request): Promise<
+  { ok: true; payload: any } | { ok: false; status: number; error: string }
+> {
+  const contentLength = request.headers.get('content-length');
+  if (contentLength && Number(contentLength) > MAX_WEBHOOK_BODY_BYTES) {
+    return { ok: false, status: 413, error: 'Webhook payload too large' };
+  }
+
+  let rawBody = '';
+  try {
+    rawBody = await request.text();
+  } catch {
+    return { ok: false, status: 400, error: 'Unable to read request body' };
+  }
+
+  if (Buffer.byteLength(rawBody, 'utf8') > MAX_WEBHOOK_BODY_BYTES) {
+    return { ok: false, status: 413, error: 'Webhook payload too large' };
+  }
+
+  try {
+    const payload = JSON.parse(rawBody);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return { ok: false, status: 400, error: 'Invalid JSON payload' };
+    }
+    return { ok: true, payload };
+  } catch {
+    return { ok: false, status: 400, error: 'Invalid JSON' };
+  }
+}
+
 async function findOrder(supabase: ReturnType<typeof getSupabaseAdmin>, payload: any) {
   const paymentId = getPaymentId(payload);
   const requestReference = getRequestReference(payload);
+  const receiptNumber = getReceiptNumber(payload);
 
   if (!supabase) return null;
 
@@ -175,6 +294,18 @@ async function findOrder(supabase: ReturnType<typeof getSupabaseAdmin>, payload:
     if (byOrderNumber) return byOrderNumber;
   }
 
+  // Maya recommends receiptNumber for QRPH reconciliation.
+  if (receiptNumber) {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('maya_receipt_number', receiptNumber)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) return data;
+  }
+
   const metadataOrderId = String(
     payload?.metadata?.orderId ||
     payload?.metadata?.order_id ||
@@ -206,7 +337,7 @@ async function findOrder(supabase: ReturnType<typeof getSupabaseAdmin>, payload:
 }
 
 function amountsMatch(order: any, webhookAmount: number | null): boolean {
-  if (webhookAmount === null) return true;
+  if (webhookAmount === null) return false;
   const expected = Number(order?.payable_now ?? order?.total_amount ?? 0);
   if (!Number.isFinite(expected)) return false;
   return Math.abs(expected - webhookAmount) < 0.01;
@@ -221,29 +352,23 @@ export async function processMayaWebhook(
     return { status: 403, body: { received: false, error: 'Source not allowed' } };
   }
 
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return { status: 400, body: { received: false, error: 'Invalid JSON payload' } };
+  const validationError = validateMayaWebhookPayload(payload, expectedChannel);
+  if (validationError) {
+    const isUnsupported = validationError === 'Unsupported payment status';
+    const isRouting = validationError === 'Payment channel does not match endpoint';
+    return {
+      status: isUnsupported || isRouting ? 200 : 400,
+      body: {
+        received: isUnsupported || isRouting,
+        ...(isUnsupported ? { ignored: true } : {}),
+        ...(isRouting ? { routed: false } : {}),
+        error: validationError,
+      },
+    };
   }
 
   const paymentStatus = String(payload?.paymentStatus || payload?.status || '').toUpperCase();
-  if (!HANDLED_STATUSES.has(paymentStatus)) {
-    return { status: 200, body: { received: true, ignored: true, reason: 'Unsupported payment status' } };
-  }
-
   const channel = detectMayaWebhookChannel(payload);
-  if (expectedChannel && channel !== expectedChannel) {
-    console.info('[MAYA WEBHOOK ROUTING]', {
-      expectedChannel,
-      detectedChannel: channel,
-      paymentStatus,
-      paymentId: getPaymentId(payload),
-      requestReference: getRequestReference(payload),
-    });
-    return {
-      status: 200,
-      body: { received: true, routed: false, reason: 'Payment channel does not match endpoint' },
-    };
-  }
 
   if (!isSupabaseConfigured()) {
     console.error('[MAYA WEBHOOK] Supabase is not configured');
@@ -259,7 +384,7 @@ export async function processMayaWebhook(
   const requestReference = getRequestReference(payload);
   const receiptNumber = getReceiptNumber(payload);
   const webhookAmount = amountFromPayload(payload);
-  const currency = currencyFromPayload(payload);
+  const currency = currencyFromPayload(payload) || 'PHP';
   const fundSourceType = getFundSourceType(payload);
   const eventKey = getEventKey(payload);
 
@@ -304,8 +429,19 @@ export async function processMayaWebhook(
       return { status: 500, body: { received: false, error: 'Webhook audit state unavailable' } };
     }
 
-    if (existingEvent.processing_status === 'PROCESSED' || existingEvent.processing_status === 'UNMATCHED' || existingEvent.processing_status === 'REJECTED') {
-      return { status: 200, body: { received: true, duplicate: true, processingStatus: existingEvent.processing_status } };
+    if (
+      existingEvent.processing_status === 'PROCESSED' ||
+      existingEvent.processing_status === 'UNMATCHED' ||
+      existingEvent.processing_status === 'REJECTED'
+    ) {
+      return {
+        status: 200,
+        body: {
+          received: true,
+          duplicate: true,
+          processingStatus: existingEvent.processing_status,
+        },
+      };
     }
 
     eventId = String(existingEvent.id);
@@ -324,6 +460,7 @@ export async function processMayaWebhook(
   if (!eventId) {
     return { status: 500, body: { received: false, error: 'Webhook audit event ID missing' } };
   }
+
   let order: any = null;
 
   try {
@@ -334,7 +471,7 @@ export async function processMayaWebhook(
         .from('maya_webhook_events')
         .update({
           processing_status: 'UNMATCHED',
-          processing_error: 'No PRIME order matched Maya payment ID or request reference.',
+          processing_error: 'No PRIME order matched Maya payment ID, request reference, receipt number, or metadata.',
           processed_at: new Date().toISOString(),
         })
         .eq('id', eventId);
@@ -342,6 +479,7 @@ export async function processMayaWebhook(
       console.warn('[MAYA WEBHOOK] Unmatched payment event', {
         paymentId,
         requestReference,
+        receiptNumber,
         paymentStatus,
         channel,
       });
@@ -365,7 +503,8 @@ export async function processMayaWebhook(
 
     if (!amountsMatch(order, webhookAmount)) {
       const expected = Number(order.payable_now ?? order.total_amount ?? 0);
-      const message = `Payment amount mismatch: expected ${expected.toFixed(2)}, received ${Number(webhookAmount).toFixed(2)}`;
+      const received = webhookAmount === null ? 'missing' : Number(webhookAmount).toFixed(2);
+      const message = `Payment amount mismatch: expected ${expected.toFixed(2)}, received ${received}`;
       await supabase
         .from('maya_webhook_events')
         .update({
@@ -381,6 +520,29 @@ export async function processMayaWebhook(
     const labels = paymentStatusLabel(paymentStatus);
     if (!labels) {
       return { status: 200, body: { received: true, ignored: true } };
+    }
+
+    if (!shouldApplyMayaPaymentStatus(String(order.payment_status || 'Unpaid'), labels.paymentStatus)) {
+      await supabase
+        .from('maya_webhook_events')
+        .update({
+          order_id: order.id,
+          processing_status: 'PROCESSED',
+          processing_error: 'Ignored stale payment status transition.',
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', eventId);
+
+      return {
+        status: 200,
+        body: {
+          received: true,
+          processed: true,
+          stale: true,
+          paymentStatus: order.payment_status,
+          channel,
+        },
+      };
     }
 
     const orderUpdate = {
@@ -433,6 +595,7 @@ export async function processMayaWebhook(
       orderId: updatedOrder.id,
       paymentId,
       requestReference,
+      receiptNumber,
       paymentStatus,
       channel,
     });
@@ -464,6 +627,7 @@ export async function processMayaWebhook(
       eventId,
       paymentId,
       requestReference,
+      receiptNumber,
       paymentStatus,
       error: message,
     });
