@@ -1047,7 +1047,7 @@ export default function MediaModule() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   disabled={uploading}
