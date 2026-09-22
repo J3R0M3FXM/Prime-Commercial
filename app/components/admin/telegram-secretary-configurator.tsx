@@ -1,32 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  ArrowRight,
-  ChevronRight,
-  GitBranch,
-  MessageSquare,
-  Plus,
-  Power,
-  RefreshCw,
-  Save,
-  Trash2,
-} from "lucide-react";
+import { ArrowRight, ChevronRight, GitBranch, MessageSquare, Plus, Power, RefreshCw, Save, Trash2 } from "lucide-react";
 
-type ButtonAction = "flow" | "reply" | "url" | "media" | "caption" | "markup";
+type Action = "flow" | "reply" | "url";
 
-type SecretaryButton = {
+type Button = {
   id: string;
   text: string;
-  action: ButtonAction;
+  action: Action;
   response: string;
   url: string;
   targetFlowId: string;
-  mediaUrl: string;
-  mediaType: string;
-  caption: string;
-  parseMode: string;
-  replyMarkup?: unknown;
 };
 
 type Flow = {
@@ -37,7 +22,7 @@ type Flow = {
   triggerValue: string;
   matchMode: "exact" | "contains" | "starts_with";
   responseText: string;
-  buttons: SecretaryButton[];
+  buttons: Button[];
   priority: number;
 };
 
@@ -61,16 +46,7 @@ const DEFAULT_SETTINGS: Settings = {
   businessUserChatId: "",
 };
 
-const ACTIONS: Array<{ value: ButtonAction; label: string }> = [
-  { value: "flow", label: "GO TO STEP" },
-  { value: "reply", label: "REPLY IN PLACE" },
-  { value: "url", label: "OPEN URL" },
-  { value: "media", label: "EDIT MEDIA" },
-  { value: "caption", label: "EDIT CAPTION" },
-  { value: "markup", label: "EDIT KEYBOARD" },
-];
-
-function newButton(index: number): SecretaryButton {
+function makeButton(index: number): Button {
   return {
     id: "b_" + Date.now().toString(36) + "_" + index,
     text: "New Button",
@@ -78,14 +54,10 @@ function newButton(index: number): SecretaryButton {
     response: "",
     url: "",
     targetFlowId: "",
-    mediaUrl: "",
-    mediaType: "photo",
-    caption: "",
-    parseMode: "",
   };
 }
 
-function newFlow(): Flow {
+function makeFlow(): Flow {
   return {
     id: "",
     name: "New Secretary Step",
@@ -99,24 +71,20 @@ function newFlow(): Flow {
   };
 }
 
-function normalizeButton(raw: any, index: number): SecretaryButton {
-  const rawAction = String(raw?.action || (raw?.url ? "url" : "reply")).toLowerCase();
-  const action = ACTIONS.some((item) => item.value === rawAction)
-    ? (rawAction as ButtonAction)
-    : "reply";
+function normalizeButton(raw: any, index: number): Button {
+  const action = raw?.url
+    ? "url"
+    : raw?.action === "flow"
+      ? "flow"
+      : "reply";
 
   return {
-    id: String(raw?.id || newButton(index).id),
+    id: String(raw?.id || makeButton(index).id),
     text: String(raw?.text || "Option"),
     action,
     response: String(raw?.response || ""),
     url: String(raw?.url || ""),
     targetFlowId: String(raw?.targetFlowId || ""),
-    mediaUrl: String(raw?.mediaUrl || ""),
-    mediaType: String(raw?.mediaType || "photo"),
-    caption: String(raw?.caption || ""),
-    parseMode: String(raw?.parseMode || ""),
-    replyMarkup: raw?.replyMarkup,
   };
 }
 
@@ -127,7 +95,7 @@ function normalizeFlow(raw: any): Flow {
     active: raw?.active !== false,
     triggerType: raw?.triggerType === "callback" ? "callback" : "message",
     triggerValue: String(raw?.triggerValue || ""),
-    matchMode: ["exact", "contains", "starts_with"].includes(raw?.matchMode)
+    matchMode: raw?.matchMode === "exact" || raw?.matchMode === "starts_with"
       ? raw.matchMode
       : "contains",
     responseText: String(raw?.responseText || ""),
@@ -138,7 +106,7 @@ function normalizeFlow(raw: any): Flow {
   };
 }
 
-function callbackLength(flowId: string, buttonId: string) {
+function callbackBytes(flowId: string, buttonId: string) {
   return new TextEncoder().encode("sec:" + flowId + ":" + buttonId).length;
 }
 
@@ -147,7 +115,7 @@ export default function TelegramSecretaryConfigurator() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [chats, setChats] = useState<any[]>([]);
   const [selected, setSelected] = useState<Flow | null>(null);
-  const [expandedButton, setExpandedButton] = useState<string>("");
+  const [expandedButton, setExpandedButton] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -156,32 +124,33 @@ export default function TelegramSecretaryConfigurator() {
     let cancelled = false;
 
     async function loadData() {
-      setLoading(true);
       try {
+        setLoading(true);
         const response = await fetch("/api/admin/automation", { cache: "no-store" });
         const data = await response.json();
         if (!response.ok) throw new Error(data?.error || "Failed to load Secretary configuration.");
         if (cancelled) return;
 
-        const loadedFlows = Array.isArray(data?.flows)
+        const loaded = Array.isArray(data?.flows)
           ? data.flows.map((flow: any) => normalizeFlow(flow))
           : [];
 
-        setFlows(loadedFlows);
+        setFlows(loaded);
         setChats(Array.isArray(data?.chats) ? data.chats : []);
         setSettings({ ...DEFAULT_SETTINGS, ...(data?.settings || {}) });
 
         if (selected?.id) {
-          setSelected(loadedFlows.find((flow: Flow) => flow.id === selected.id) || null);
+          setSelected(loaded.find((flow: Flow) => flow.id === selected.id) || null);
         }
       } catch (error: any) {
-        if (!cancelled) setNotice(error?.message || "Failed to load Secretary configuration.");
+        if (!cancelled) setNotice(error?.message || "Failed to load configuration.");
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     void loadData();
+
     return () => {
       cancelled = true;
     };
@@ -191,13 +160,13 @@ export default function TelegramSecretaryConfigurator() {
     setSelected((current) => (current ? { ...current, ...patch } : current));
   }
 
-  function updateButton(index: number, patch: Partial<SecretaryButton>) {
+  function updateButton(index: number, patch: Partial<Button>) {
     setSelected((current) => {
       if (!current) return current;
       return {
         ...current,
-        buttons: current.buttons.map((button, buttonIndex) =>
-          buttonIndex === index ? { ...button, ...patch } : button,
+        buttons: current.buttons.map((button, itemIndex) =>
+          itemIndex === index ? { ...button, ...patch } : button,
         ),
       };
     });
@@ -206,7 +175,7 @@ export default function TelegramSecretaryConfigurator() {
   function addButton() {
     setSelected((current) =>
       current
-        ? { ...current, buttons: [...current.buttons, newButton(current.buttons.length + 1)] }
+        ? { ...current, buttons: [...current.buttons, makeButton(current.buttons.length + 1)] }
         : current,
     );
   }
@@ -214,7 +183,7 @@ export default function TelegramSecretaryConfigurator() {
   function removeButton(index: number) {
     setSelected((current) =>
       current
-        ? { ...current, buttons: current.buttons.filter((_, buttonIndex) => buttonIndex !== index) }
+        ? { ...current, buttons: current.buttons.filter((_, itemIndex) => itemIndex !== index) }
         : current,
     );
   }
@@ -229,11 +198,11 @@ export default function TelegramSecretaryConfigurator() {
         body: JSON.stringify({ type: "settings", ...settings }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "Failed to save Secretary settings.");
+      if (!response.ok) throw new Error(data?.error || "Failed to save settings.");
       setSettings({ ...DEFAULT_SETTINGS, ...data });
       setNotice("ENGINE SETTINGS SAVED.");
     } catch (error: any) {
-      setNotice(error?.message || "Failed to save engine settings.");
+      setNotice(error?.message || "Failed to save settings.");
     } finally {
       setBusy(false);
     }
@@ -250,21 +219,19 @@ export default function TelegramSecretaryConfigurator() {
       return;
     }
 
-    const badTarget = selected.buttons.find(
-      (button) =>
-        button.action === "flow" &&
-        (!button.targetFlowId || button.targetFlowId === selected.id),
+    const invalidTarget = selected.buttons.find(
+      (button) => button.action === "flow" && (!button.targetFlowId || button.targetFlowId === selected.id),
     );
-    if (badTarget) {
-      setNotice("SELECT A DIFFERENT TARGET STEP FOR " + badTarget.text.toUpperCase() + ".");
+    if (invalidTarget) {
+      setNotice("SELECT A TARGET STEP FOR " + invalidTarget.text.toUpperCase() + ".");
       return;
     }
 
-    const badCallback = selected.buttons.find(
-      (button) => callbackLength(selected.id || "new", button.id) > 64,
+    const longCallback = selected.buttons.find(
+      (button) => callbackBytes(selected.id || "new", button.id) > 64,
     );
-    if (badCallback) {
-      setNotice("CALLBACK DATA IS OVER 64 BYTES FOR " + badCallback.text.toUpperCase() + ".");
+    if (longCallback) {
+      setNotice("CALLBACK DATA IS OVER 64 BYTES FOR " + longCallback.text.toUpperCase() + ".");
       return;
     }
 
@@ -290,7 +257,7 @@ export default function TelegramSecretaryConfigurator() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "Failed to save Secretary step.");
+      if (!response.ok) throw new Error(data?.error || "Failed to save step.");
 
       const saved = normalizeFlow(data);
       setFlows((current) =>
@@ -301,7 +268,7 @@ export default function TelegramSecretaryConfigurator() {
       setSelected(saved);
       setNotice("SECRETARY STEP SAVED.");
     } catch (error: any) {
-      setNotice(error?.message || "Failed to save Secretary step.");
+      setNotice(error?.message || "Failed to save step.");
     } finally {
       setBusy(false);
     }
@@ -309,7 +276,7 @@ export default function TelegramSecretaryConfigurator() {
 
   async function deleteFlow() {
     if (!selected?.id) return;
-    if (!window.confirm("DELETE SECRETARY STEP \"" + selected.name + "\"?")) return;
+    if (!window.confirm("DELETE SECRETARY STEP " + selected.name + "?")) return;
 
     setBusy(true);
     try {
@@ -321,10 +288,10 @@ export default function TelegramSecretaryConfigurator() {
       if (!response.ok) throw new Error(data?.error || "Delete failed.");
 
       setFlows((current) => current.filter((flow) => flow.id !== selected.id));
+      setSelected(null);
       if (settings.welcomeFlowId === selected.id) {
         setSettings((current) => ({ ...current, welcomeFlowId: "" }));
       }
-      setSelected(null);
       setNotice("SECRETARY STEP DELETED.");
     } catch (error: any) {
       setNotice(error?.message || "Delete failed.");
@@ -369,7 +336,7 @@ export default function TelegramSecretaryConfigurator() {
     : null;
 
   return (
-    <div className="w-full text-slate-900 space-y-1.5">
+    <div className="w-full space-y-1.5 text-slate-900">
       <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-1">
         <div className="min-w-0">
           <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-slate-400">
@@ -379,7 +346,7 @@ export default function TelegramSecretaryConfigurator() {
             Inline Button Configurator
           </h1>
           <p className="text-[8px] text-slate-500">
-            Build a linked hierarchy where button clicks edit the existing Telegram message bubble.
+            One bubble · linked steps · 24h inactivity welcome.
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -393,7 +360,7 @@ export default function TelegramSecretaryConfigurator() {
           <button
             type="button"
             onClick={() => {
-              setSelected(newFlow());
+              setSelected(makeFlow());
               setExpandedButton("");
               setNotice("");
             }}
@@ -410,11 +377,11 @@ export default function TelegramSecretaryConfigurator() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[225px_minmax(0,1fr)_260px] border border-slate-200 bg-white">
+      <div className="grid lg:grid-cols-[225px_minmax(0,1fr)_250px] border border-slate-200 bg-white">
         <aside className="min-w-0 border-b lg:border-b-0 lg:border-r border-slate-200">
           <div className="px-2 py-1.5 border-b border-slate-200 flex items-center justify-between">
             <div>
-              <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Flow tree</div>
+              <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Hierarchy</div>
               <div className="text-[10px] font-black uppercase">Steps</div>
             </div>
             <GitBranch className="w-3.5 h-3.5 text-slate-400" />
@@ -423,47 +390,54 @@ export default function TelegramSecretaryConfigurator() {
           {loading ? (
             <div className="p-2 text-[8px] font-mono text-slate-400">LOADING...</div>
           ) : flows.length === 0 ? (
-            <div className="p-2 text-[8px] text-slate-400">NO STEPS YET.</div>
+            <div className="p-2 text-[8px] text-slate-400">NO STEPS CONFIGURED.</div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {flows.map((flow) => {
-                const inbound = flows.reduce(
-                  (count, item) =>
-                    count + item.buttons.filter((button) => button.targetFlowId === flow.id).length,
-                  0,
-                );
-                const outbound = flow.buttons.filter((button) => button.targetFlowId).length;
-
-                return (
-                  <button
-                    type="button"
-                    key={flow.id}
-                    onClick={() => {
-                      setSelected(flow);
-                      setExpandedButton("");
-                      setNotice("");
-                    }}
-                    className={`w-full text-left px-2 py-1.5 border-l-2 ${
-                      selected?.id === flow.id
-                        ? "border-l-slate-900 bg-slate-50"
-                        : "border-l-transparent hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1">
-                      <span className={`w-1.5 h-1.5 ${flow.active ? "bg-emerald-500" : "bg-slate-300"}`} />
-                      <span className="text-[10px] font-bold truncate flex-1">{flow.name}</span>
-                      {settings.welcomeFlowId === flow.id && (
-                        <span className="text-[7px] bg-slate-900 text-white px-1">WELCOME</span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 text-[7px] font-mono text-slate-400">
-                      IN {inbound} · OUT {outbound} · {flow.id}
-                    </div>
-                  </button>
-                );
-              })}
+              {flows.map((flow) => (
+                <button
+                  type="button"
+                  key={flow.id}
+                  onClick={() => {
+                    setSelected(flow);
+                    setExpandedButton("");
+                    setNotice("");
+                  }}
+                  className={`w-full text-left px-2 py-1.5 border-l-2 ${
+                    selected?.id === flow.id
+                      ? "border-l-slate-900 bg-slate-50"
+                      : "border-l-transparent hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-1">
+                    <span className={`w-1.5 h-1.5 ${flow.active ? "bg-emerald-500" : "bg-slate-300"}`} />
+                    <span className="text-[10px] font-bold truncate flex-1">{flow.name}</span>
+                    {settings.welcomeFlowId === flow.id && (
+                      <span className="text-[7px] bg-slate-900 text-white px-1">WELCOME</span>
+                    )}
+                  </div>
+                  <div className="text-[7px] font-mono text-slate-400 mt-0.5">
+                    IN {flows.reduce((sum, item) => sum + item.buttons.filter((button) => button.targetFlowId === flow.id).length, 0)} · OUT {flow.buttons.filter((button) => button.targetFlowId).length}
+                  </div>
+                </button>
+              ))}
             </div>
           )}
+
+          <div className="border-t border-slate-200 px-2 py-1.5">
+            <div className="text-[8px] font-bold uppercase tracking-widest text-slate-400 mb-1">Welcome</div>
+            <select
+              value={settings.welcomeFlowId}
+              onChange={(event) =>
+                setSettings((current) => ({ ...current, welcomeFlowId: event.target.value }))
+              }
+              className="w-full h-7 border border-slate-200 px-1.5 text-[9px] bg-white"
+            >
+              <option value="">Select welcome step</option>
+              {flows.filter((flow) => flow.active).map((flow) => (
+                <option value={flow.id} key={flow.id}>{flow.name}</option>
+              ))}
+            </select>
+          </div>
         </aside>
 
         <main className="min-w-0 border-b lg:border-b-0 lg:border-r border-slate-200">
@@ -472,14 +446,14 @@ export default function TelegramSecretaryConfigurator() {
               <div>
                 <MessageSquare className="w-7 h-7 mx-auto text-slate-300 mb-1" />
                 <div className="text-[10px] font-bold uppercase">Select a step</div>
-                <div className="text-[8px] text-slate-400">Or create the first step.</div>
+                <div className="text-[8px] text-slate-400">Create a step to build the message hierarchy.</div>
               </div>
             </div>
           ) : (
             <div>
               <div className="px-2 py-1.5 border-b border-slate-200 flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Step editor</div>
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Editor</div>
                   <div className="text-[10px] font-bold truncate">{selected.name}</div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -503,7 +477,7 @@ export default function TelegramSecretaryConfigurator() {
               </div>
 
               <div className="p-2 space-y-1.5">
-                <div className="grid sm:grid-cols-[1.2fr_.8fr] gap-1.5">
+                <div className="grid sm:grid-cols-[1fr_100px] gap-1.5">
                   <label>
                     <span className="label-mini">Step name</span>
                     <input
@@ -518,50 +492,9 @@ export default function TelegramSecretaryConfigurator() {
                     <input
                       type="number"
                       value={selected.priority}
-                      onChange={(event) =>
-                        updateSelected({ priority: Number(event.target.value) || 100 })
-                      }
+                      onChange={(event) => updateSelected({ priority: Number(event.target.value) || 100 })}
                       className="control-mini"
                     />
-                  </label>
-                </div>
-
-                <div className="grid sm:grid-cols-[120px_minmax(0,1fr)_110px] gap-1.5">
-                  <label>
-                    <span className="label-mini">Trigger</span>
-                    <select
-                      value={selected.triggerType}
-                      onChange={(event) =>
-                        updateSelected({ triggerType: event.target.value as Flow["triggerType"] })
-                      }
-                      className="control-mini"
-                    >
-                      <option value="message">Message</option>
-                      <option value="callback">Callback</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span className="label-mini">Trigger value</span>
-                    <input
-                      value={selected.triggerValue}
-                      onChange={(event) => updateSelected({ triggerValue: event.target.value })}
-                      className="control-mini"
-                      placeholder="Optional for welcome"
-                    />
-                  </label>
-                  <label>
-                    <span className="label-mini">Match</span>
-                    <select
-                      value={selected.matchMode}
-                      onChange={(event) =>
-                        updateSelected({ matchMode: event.target.value as Flow["matchMode"] })
-                      }
-                      className="control-mini"
-                    >
-                      <option value="contains">Contains</option>
-                      <option value="exact">Exact</option>
-                      <option value="starts_with">Starts</option>
-                    </select>
                   </label>
                 </div>
 
@@ -573,16 +506,13 @@ export default function TelegramSecretaryConfigurator() {
                     className="w-full min-h-[72px] border border-slate-200 px-2 py-1.5 text-[9px] outline-none resize-y focus:border-slate-900"
                     placeholder="Hi {{name}}, welcome to PRIME."
                   />
-                  <span className="text-[7px] text-slate-400 font-mono">
-                    {{name}} · {{username}} · {{user_id}} · {selected.responseText.length}/4096
-                  </span>
                 </label>
 
                 <div className="border-t border-slate-200">
-                  <div className="flex items-center justify-between gap-2 py-1.5">
+                  <div className="flex items-center justify-between py-1.5 gap-2">
                     <div>
-                      <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Inline keyboard</div>
-                      <div className="text-[8px] text-slate-500">Buttons stay on this bubble; GO TO STEP swaps in the target step.</div>
+                      <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Inline buttons</div>
+                      <div className="text-[8px] text-slate-500">GO TO STEP edits this same Telegram bubble.</div>
                     </div>
                     <button
                       type="button"
@@ -599,7 +529,7 @@ export default function TelegramSecretaryConfigurator() {
                     ) : (
                       selected.buttons.map((button, index) => {
                         const open = expandedButton === button.id;
-                        const bytes = callbackLength(selected.id || "new", button.id);
+                        const bytes = callbackBytes(selected.id || "new", button.id);
 
                         return (
                           <div key={button.id} className="p-1.5 bg-white">
@@ -614,47 +544,38 @@ export default function TelegramSecretaryConfigurator() {
                               <select
                                 value={button.action}
                                 onChange={(event) =>
-                                  updateButton(index, {
-                                    action: event.target.value as ButtonAction,
-                                  })
+                                  updateButton(index, { action: event.target.value as Action })
                                 }
                                 className="control-mini"
                               >
-                                {ACTIONS.map((item) => (
-                                  <option value={item.value} key={item.value}>
-                                    {item.label}
-                                  </option>
-                                ))}
+                                <option value="flow">GO TO STEP</option>
+                                <option value="reply">REPLY IN PLACE</option>
+                                <option value="url">OPEN URL</option>
                               </select>
                               <button
                                 type="button"
                                 onClick={() => setExpandedButton(open ? "" : button.id)}
                                 className="h-7 w-7 border border-slate-200 flex items-center justify-center"
-                                title="Expand"
                               >
                                 <ChevronRight className={`w-3 h-3 ${open ? "rotate-90" : ""}`} />
                               </button>
                             </div>
 
                             {open && (
-                              <div className="pt-1.5 grid gap-1.5">
+                              <div className="pt-1.5 space-y-1.5">
                                 {button.action === "flow" && (
                                   <label>
                                     <span className="label-mini">Target step</span>
                                     <select
                                       value={button.targetFlowId}
-                                      onChange={(event) =>
-                                        updateButton(index, { targetFlowId: event.target.value })
-                                      }
+                                      onChange={(event) => updateButton(index, { targetFlowId: event.target.value })}
                                       className="control-mini"
                                     >
                                       <option value="">Select next step</option>
                                       {flows
                                         .filter((flow) => flow.id !== selected.id)
                                         .map((flow) => (
-                                          <option value={flow.id} key={flow.id}>
-                                            {flow.name}
-                                          </option>
+                                          <option value={flow.id} key={flow.id}>{flow.name}</option>
                                         ))}
                                     </select>
                                   </label>
@@ -665,11 +586,9 @@ export default function TelegramSecretaryConfigurator() {
                                     <span className="label-mini">In-place response</span>
                                     <textarea
                                       value={button.response}
-                                      onChange={(event) =>
-                                        updateButton(index, { response: event.target.value })
-                                      }
+                                      onChange={(event) => updateButton(index, { response: event.target.value })}
                                       className="w-full min-h-[54px] border border-slate-200 px-2 py-1.5 text-[9px] outline-none focus:border-slate-900"
-                                      placeholder="Message shown after click."
+                                      placeholder="Message after click. Same bubble is edited."
                                     />
                                   </label>
                                 )}
@@ -679,93 +598,23 @@ export default function TelegramSecretaryConfigurator() {
                                     <span className="label-mini">Destination URL</span>
                                     <input
                                       value={button.url}
-                                      onChange={(event) =>
-                                        updateButton(index, { url: event.target.value })
-                                      }
+                                      onChange={(event) => updateButton(index, { url: event.target.value })}
                                       className="control-mini"
                                       placeholder="https://..."
                                     />
                                   </label>
                                 )}
 
-                                {button.action === "media" && (
-                                  <div className="grid sm:grid-cols-[105px_minmax(0,1fr)] gap-1.5">
-                                    <label>
-                                      <span className="label-mini">Media type</span>
-                                      <select
-                                        value={button.mediaType}
-                                        onChange={(event) =>
-                                          updateButton(index, { mediaType: event.target.value })
-                                        }
-                                        className="control-mini"
-                                      >
-                                        <option value="photo">Photo</option>
-                                        <option value="video">Video</option>
-                                        <option value="document">Document</option>
-                                      </select>
-                                    </label>
-                                    <label>
-                                      <span className="label-mini">Media URL / file_id</span>
-                                      <input
-                                        value={button.mediaUrl}
-                                        onChange={(event) =>
-                                          updateButton(index, { mediaUrl: event.target.value })
-                                        }
-                                        className="control-mini"
-                                        placeholder="HTTPS URL or Telegram file_id"
-                                      />
-                                    </label>
-                                  </div>
-                                )}
-
-                                {button.action === "caption" && (
-                                  <label>
-                                    <span className="label-mini">Caption</span>
-                                    <textarea
-                                      value={button.caption}
-                                      onChange={(event) =>
-                                        updateButton(index, { caption: event.target.value })
-                                      }
-                                      className="w-full min-h-[54px] border border-slate-200 px-2 py-1.5 text-[9px] outline-none focus:border-slate-900"
-                                    />
-                                  </label>
-                                )}
-
-                                {button.action === "markup" && (
-                                  <label>
-                                    <span className="label-mini">Reply markup JSON</span>
-                                    <textarea
-                                      value={button.replyMarkup ? JSON.stringify(button.replyMarkup) : ""}
-                                      onChange={(event) => {
-                                        const value = event.target.value.trim();
-                                        if (!value) {
-                                          updateButton(index, { replyMarkup: undefined });
-                                          return;
-                                        }
-                                        try {
-                                          updateButton(index, { replyMarkup: JSON.parse(value) });
-                                        } catch {
-                                          setNotice("REPLY MARKUP JSON IS INVALID.");
-                                        }
-                                      }}
-                                      className="w-full min-h-[54px] border border-slate-200 px-2 py-1.5 text-[9px] font-mono outline-none focus:border-slate-900"
-                                      placeholder='{"inline_keyboard":[[{"text":"Back","callback_data":"..."}]]}'
-                                    />
-                                  </label>
-                                )}
-
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className={`text-[7px] font-mono ${
-                                    bytes > 64 ? "text-red-600 font-bold" : "text-slate-400"
-                                  }`}>
-                                    CALLBACK {bytes}/64 · {button.action.toUpperCase()}
+                                <div className="flex items-center justify-between">
+                                  <span className={`text-[7px] font-mono ${bytes > 64 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                                    CALLBACK {bytes}/64 BYTES
                                   </span>
                                   <button
                                     type="button"
                                     onClick={() => removeButton(index)}
-                                    className="h-6 px-1.5 border border-red-200 text-red-600 text-[7px] font-bold uppercase flex items-center gap-1"
+                                    className="h-6 px-1.5 border border-red-200 text-red-600 text-[7px] font-bold uppercase"
                                   >
-                                    <Trash2 className="w-3 h-3" /> Remove
+                                    Remove
                                   </button>
                                 </div>
                               </div>
@@ -778,14 +627,8 @@ export default function TelegramSecretaryConfigurator() {
                 </div>
 
                 <div className="border-t border-slate-200 pt-1.5 flex items-center justify-between gap-2">
-                  <div className="text-[7px] font-mono text-slate-400">
-                    {parent ? (
-                      <span className="inline-flex items-center gap-1">
-                        FROM {parent.name}<ArrowRight className="w-2.5 h-2.5" />{selected.name}
-                      </span>
-                    ) : (
-                      "ROOT STEP"
-                    )}
+                  <div className="text-[7px] font-mono text-slate-400 inline-flex items-center gap-1">
+                    {parent ? <>FROM {parent.name}<ArrowRight className="w-2.5 h-2.5" />{selected.name}</> : "ROOT STEP"}
                   </div>
                   <button
                     type="button"
@@ -794,7 +637,7 @@ export default function TelegramSecretaryConfigurator() {
                     className="h-7 px-2.5 bg-slate-900 text-white text-[8px] font-bold uppercase tracking-widest flex items-center gap-1 disabled:opacity-50"
                   >
                     {busy ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                    Save Step
+                    Save
                   </button>
                 </div>
               </div>
@@ -805,43 +648,22 @@ export default function TelegramSecretaryConfigurator() {
         <section className="min-w-0 bg-slate-50">
           <div className="px-2 py-1.5 border-b border-slate-200">
             <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Preview</div>
-            <div className="text-[10px] font-black uppercase">One bubble</div>
+            <div className="text-[10px] font-black uppercase">Same bubble</div>
           </div>
 
           <div className="p-1.5 space-y-1.5">
-            <div className="border border-slate-200 bg-white p-1.5">
-              <div className="text-[7px] font-mono uppercase tracking-widest text-slate-400 mb-1">PATH</div>
-              <div className="flex items-center flex-wrap gap-1 text-[8px] font-mono">
-                {parent && (
-                  <>
-                    <span className="border border-slate-200 px-1 py-0.5">{parent.name}</span>
-                    <ArrowRight className="w-2.5 h-2.5 text-slate-300" />
-                  </>
-                )}
-                <span className="border border-slate-900 bg-slate-900 text-white px-1 py-0.5">
-                  {selected?.name || "NONE"}
-                </span>
-              </div>
-            </div>
-
             <div className="border border-slate-300 bg-white p-1.5">
-              <div className="flex items-center gap-1 mb-1">
-                <MessageSquare className="w-3 h-3 text-slate-500" />
-                <span className="text-[7px] font-mono uppercase tracking-widest text-slate-400">TELEGRAM BUBBLE</span>
-              </div>
+              <div className="text-[7px] font-mono uppercase tracking-widest text-slate-400 mb-1">CUSTOMER VIEW</div>
               <div className="bg-slate-950 text-white p-2">
-                <div className="text-[9px] leading-snug whitespace-pre-wrap break-words">
+                <div className="text-[9px] whitespace-pre-wrap break-words">
                   {selected?.responseText || "Select a step to preview."}
                 </div>
                 {selected?.buttons.length ? (
-                  <div className="mt-1.5 grid gap-0.5 border-t border-white/10 pt-1.5">
+                  <div className="mt-1.5 border-t border-white/10 pt-1.5 grid gap-0.5">
                     {selected.buttons.map((button) => (
-                      <div
-                        key={button.id}
-                        className="border border-white/10 bg-white/5 px-1.5 py-1 text-[8px] flex items-center justify-between"
-                      >
+                      <div key={button.id} className="border border-white/10 px-1.5 py-1 text-[8px] flex items-center justify-between">
                         <span className="truncate">{button.text}</span>
-                        <span className="font-mono text-[7px] text-slate-400">{button.action}</span>
+                        <span className="text-[7px] font-mono text-slate-400">{button.action}</span>
                       </div>
                     ))}
                   </div>
@@ -852,9 +674,7 @@ export default function TelegramSecretaryConfigurator() {
             </div>
 
             <div className="border border-slate-200 bg-white">
-              <div className="px-1.5 py-1 border-b border-slate-200 text-[7px] font-bold uppercase tracking-widest">
-                Engine
-              </div>
+              <div className="px-1.5 py-1 border-b border-slate-200 text-[7px] font-bold uppercase tracking-widest">Engine</div>
               <div className="p-1.5 text-[8px] font-mono space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">STATUS</span>
@@ -864,9 +684,7 @@ export default function TelegramSecretaryConfigurator() {
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-slate-500">WELCOME</span>
-                  <span className="truncate">
-                    {flows.find((flow) => flow.id === settings.welcomeFlowId)?.name || "NOT SET"}
-                  </span>
+                  <span className="truncate">{flows.find((flow) => flow.id === settings.welcomeFlowId)?.name || "NOT SET"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">COOLDOWN</span>
@@ -881,48 +699,40 @@ export default function TelegramSecretaryConfigurator() {
       <div className="grid lg:grid-cols-[1fr_1fr] border border-slate-200 bg-white">
         <section className="min-w-0 border-b lg:border-b-0 lg:border-r border-slate-200">
           <div className="px-2 py-1.5 border-b border-slate-200">
-            <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Engine settings</div>
-            <div className="text-[10px] font-black uppercase">Welcome + cooldown</div>
+            <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Engine</div>
+            <div className="text-[10px] font-black uppercase">Welcome + 24H cooldown</div>
           </div>
+
           <div className="p-1.5 space-y-1.5">
             <div className="grid sm:grid-cols-3 gap-1.5">
-              <label>
-                <span className="label-mini">Business user</span>
-                <input readOnly value={settings.businessUserId || "Not connected"} className="control-mini bg-slate-50" />
-              </label>
-              <label>
-                <span className="label-mini">Connection</span>
-                <input readOnly value={settings.businessConnectionId || "Not connected"} className="control-mini bg-slate-50" />
-              </label>
-              <label>
-                <span className="label-mini">Business chat</span>
-                <input readOnly value={settings.businessUserChatId || "Not connected"} className="control-mini bg-slate-50" />
-              </label>
+              <input readOnly value={settings.businessUserId || "Not connected"} className="control-mini bg-slate-50" aria-label="Business user ID" />
+              <input readOnly value={settings.businessConnectionId || "Not connected"} className="control-mini bg-slate-50" aria-label="Business connection ID" />
+              <input readOnly value={settings.businessUserChatId || "Not connected"} className="control-mini bg-slate-50" aria-label="Business chat ID" />
             </div>
 
             <div className="grid sm:grid-cols-[1fr_auto_auto] gap-1.5 items-end">
               <label>
-                <span className="label-mini">Welcome step</span>
-                <select
-                  value={settings.welcomeFlowId}
+                <span className="label-mini">Fallback response</span>
+                <input
+                  value={settings.fallbackResponse}
                   onChange={(event) =>
-                    setSettings((current) => ({ ...current, welcomeFlowId: event.target.value }))
+                    setSettings((current) => ({ ...current, fallbackResponse: event.target.value }))
                   }
                   className="control-mini"
-                >
-                  <option value="">Select welcome</option>
-                  {flows.filter((flow) => flow.active).map((flow) => (
-                    <option value={flow.id} key={flow.id}>
-                      {flow.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Optional fallback"
+                />
               </label>
 
-              <div className="h-7 border border-slate-200 px-1.5 flex items-center gap-1 text-[8px] font-mono">
-                <span className="font-bold">24H</span>
-                <span className="text-slate-400">after last customer message</span>
-              </div>
+              <label className="h-7 px-1.5 border border-slate-200 flex items-center gap-1 text-[8px] uppercase font-bold">
+                <input
+                  type="checkbox"
+                  checked={settings.fallbackEnabled}
+                  onChange={(event) =>
+                    setSettings((current) => ({ ...current, fallbackEnabled: event.target.checked }))
+                  }
+                />
+                Fallback
+              </label>
 
               <button
                 type="button"
@@ -938,31 +748,9 @@ export default function TelegramSecretaryConfigurator() {
               </button>
             </div>
 
-            <div className="grid sm:grid-cols-[1fr_auto] gap-1.5 items-end">
-              <label>
-                <span className="label-mini">Fallback response</span>
-                <input
-                  value={settings.fallbackResponse}
-                  onChange={(event) =>
-                    setSettings((current) => ({ ...current, fallbackResponse: event.target.value }))
-                  }
-                  className="control-mini"
-                  placeholder="Optional fallback"
-                />
-              </label>
-              <label className="h-7 px-1.5 border border-slate-200 flex items-center gap-1 text-[8px] uppercase font-bold">
-                <input
-                  type="checkbox"
-                  checked={settings.fallbackEnabled}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      fallbackEnabled: event.target.checked,
-                    }))
-                  }
-                />
-                Fallback
-              </label>
+            <div className="border border-slate-200 px-1.5 py-1 text-[8px] font-mono flex items-center gap-1">
+              <span className="font-bold">COOLDOWN</span>
+              <span className="text-slate-400">new welcome after the customer's latest incoming message is 24h old.</span>
             </div>
 
             <button
@@ -981,43 +769,27 @@ export default function TelegramSecretaryConfigurator() {
             <div className="text-[8px] font-mono uppercase tracking-widest text-slate-400">Live control</div>
             <div className="text-[10px] font-black uppercase">Per-chat pause</div>
           </div>
+
           <div className="p-1.5">
             {chats.length === 0 ? (
-              <div className="text-[8px] text-slate-400">NO CHATS YET.</div>
+              <div className="text-[8px] text-slate-400">NO CUSTOMER CHATS YET.</div>
             ) : (
               <div className="divide-y divide-slate-200 border border-slate-200">
                 {chats.map((chat) => (
-                  <div
-                    key={chat.business_connection_id + ":" + chat.chat_id}
-                    className="px-1.5 py-1 flex items-center justify-between gap-2"
-                  >
+                  <div key={chat.business_connection_id + ":" + chat.chat_id} className="px-1.5 py-1 flex items-center justify-between gap-2">
                     <div className="min-w-0 font-mono">
                       <div className="text-[9px] font-bold truncate">CHAT {chat.chat_id}</div>
                       <div className="text-[7px] text-slate-400 truncate">
-                        LAST CUSTOMER:{" "}
-                        {chat.last_customer_message_at
-                          ? new Date(chat.last_customer_message_at).toLocaleString()
-                          : "—"}
+                        LAST CUSTOMER: {chat.last_customer_message_at ? new Date(chat.last_customer_message_at).toLocaleString() : "—"}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span
-                        className={`px-1 py-0.5 text-[7px] font-bold uppercase ${
-                          chat.bot_paused
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-emerald-100 text-emerald-800"
-                        }`}
-                      >
-                        {chat.bot_paused ? "PAUSED" : "ACTIVE"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => void toggleChat(chat)}
-                        className="h-6 px-1.5 border border-slate-200 text-[7px] font-bold uppercase"
-                      >
-                        {chat.bot_paused ? "Resume" : "Pause"}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void toggleChat(chat)}
+                      className="h-6 px-1.5 border border-slate-200 text-[7px] font-bold uppercase"
+                    >
+                      {chat.bot_paused ? "Resume" : "Pause"}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1025,37 +797,6 @@ export default function TelegramSecretaryConfigurator() {
           </div>
         </section>
       </div>
-
-      <div className="text-[7px] font-mono text-slate-400">
-        Callback namespace: <span className="text-slate-600">sec:FLOW_ID:BUTTON_ID</span> · Telegram limit: 64 bytes.
-      </div>
-
-      <style jsx>{`
-        .label-mini {
-          display: block;
-          margin-bottom: 2px;
-          font-size: 8px;
-          line-height: 1;
-          font-weight: 700;
-          letter-spacing: .12em;
-          text-transform: uppercase;
-          color: #64748b;
-        }
-        .control-mini {
-          width: 100%;
-          height: 28px;
-          border: 1px solid #e2e8f0;
-          padding: 0 6px;
-          border-radius: 0;
-          outline: 0;
-          background: #fff;
-          font-size: 9px;
-          color: #0f172a;
-        }
-        .control-mini:focus {
-          border-color: #0f172a;
-        }
-      `}</style>
     </div>
   );
 }
