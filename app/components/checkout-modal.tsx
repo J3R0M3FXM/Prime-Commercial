@@ -505,7 +505,7 @@ export default function CheckoutModal({
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success || !data.redirectUrl) {
-        throw new Error(data.error || "Unable to start Maya Checkout.");
+        throw new Error(data.error || "Unable to start Maya Checkout. Check the active Maya environment and configured public API key.");
       }
 
       setCompletedOrder((prev: any) => ({
@@ -2133,7 +2133,7 @@ export default function CheckoutModal({
                   <div className="space-y-2.5">
                     {/* Method Tiles Selection (5 columns per row, max 2 rows per page, swipe left/right + dot indicators) */}
                     {(() => {
-                      const itemsPerPage = 10;
+                      const itemsPerPage = 8;
                       const totalPages = Math.ceil(paymentMethods.length / itemsPerPage);
                       
                       // Safety: if the current page is out of bounds, clip it
@@ -2149,7 +2149,7 @@ export default function CheckoutModal({
                             onTouchMove={handleTouchMove}
                             onTouchEnd={() => handleTouchEnd(totalPages)}
                           >
-                            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                            <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                               {slicedMethods.map((method) => {
                                 const isOffline = method.isActive === false;
                                 const isSelected = !isOffline && selectedPaymentMethod?.id === method.id;
@@ -2173,7 +2173,7 @@ export default function CheckoutModal({
                                           setIsPaymentQrModalOpen(true);
                                         }
                                       }}
-                                      className={`w-full h-[48px] sm:h-[56px] rounded-none border-2 transition-all flex items-center justify-center p-1 relative overflow-hidden select-none ${
+                                      className={`group w-full h-[82px] sm:h-[104px] rounded-none border transition-all flex items-center justify-center p-0 relative overflow-hidden select-none ${
                                         isOffline
                                           ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90"
                                           : isSelected
@@ -2186,13 +2186,17 @@ export default function CheckoutModal({
                                         <img
                                           src={method.logo}
                                           alt={method.name}
-                                          className={`w-full h-full object-contain rounded-[8px] transition-all ${
+                                          className={`absolute inset-0 w-full h-full object-cover scale-[1.03] rounded-none transition-transform duration-300 group-hover:scale-[1.08] ${
                                             isOffline ? "filter blur-[1.5px] opacity-40 grayscale-[30%]" : ""
                                           }`}
                                           referrerPolicy="no-referrer"
                                         />
                                       ) : (
                                         <CreditCard className={`w-5 h-5 text-gray-400 ${isOffline ? "filter blur-[1px] opacity-40" : ""}`} />
+                                      )}
+
+                                      {!isOffline && (
+                                        <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-br from-white/35 via-white/5 to-transparent opacity-80" />
                                       )}
 
                                       {/* Offline Overlay */}
