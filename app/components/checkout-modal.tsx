@@ -162,7 +162,9 @@ export default function CheckoutModal({
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Dedicated physical device location state (NEVER polluted with user-entered delivery addresses)
-  const [deviceGps, setDeviceGps] = useState<{ lat: number; lon: number; accuracy?: number } | null>(null);
+  const [deviceGps, setDeviceGps] = useState<{ lat: number; lon: number; accuracy?: number; source?: string } | null>(null);
+  const [deviceGpsAddress, setDeviceGpsAddress] = useState("");
+  const [deviceGpsAddressLoading, setDeviceGpsAddressLoading] = useState(false);
 
   // Touch swipe states for payment methods carousel
   const touchStartX = useRef<number | null>(null);
@@ -327,9 +329,6 @@ export default function CheckoutModal({
                 });
               }
 
-              if (!receiverName && realName) {
-                setReceiverName(realName.toUpperCase());
-              }
             }
           })
           .catch(err => {
@@ -351,13 +350,6 @@ export default function CheckoutModal({
         }
       } catch (e) {}
 
-      // Pre-fill receiver if empty
-      if (!receiverName && resolvedName && resolvedName !== "Customer") {
-        setReceiverName(resolvedName.toUpperCase());
-      }
-      if (!receiverPhone && resolvedPhone) {
-        setReceiverPhone(formatPhoneNumber(resolvedPhone));
-      }
     }
   }, [isOpen]);
 
@@ -418,6 +410,11 @@ export default function CheckoutModal({
   useEffect(() => {
     if (!isOpen) {
       setCurrentStep(1);
+      setReceiverName("");
+      setReceiverPhone("");
+      setDeviceGps(null);
+      setDeviceGpsAddress("");
+      setDeviceGpsAddressLoading(false);
       setSelectedPaymentMethod(null);
       setSelectedCourierId("");
       setDeliveryPaymentMethod("");
@@ -638,6 +635,22 @@ export default function CheckoutModal({
     fetchCouriersForLocation(lat, lon);
   };
 
+  const reverseGeocodeDeviceGps = async (lat: number, lon: number) => {
+    try {
+      setDeviceGpsAddressLoading(true);
+      const res = await authenticatedFetch(`/api/geoapify/reverse?lat=${lat}&lon=${lon}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        const formatted = String(data?.results?.[0]?.formatted || "").trim();
+        if (formatted) setDeviceGpsAddress(formatted);
+      }
+    } catch (e) {
+      console.warn("Device GPS reverse geocode failed:", e);
+    } finally {
+      setDeviceGpsAddressLoading(false);
+    }
+  };
+
   // "Use My Location" GPS Feature
   const handleUseMyLocation = () => {
     if (!navigator.geolocation) {
@@ -652,8 +665,11 @@ export default function CheckoutModal({
         setIsLocating(false);
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
-        setDeviceGps({ lat, lon, accuracy: Math.round(pos.coords.accuracy) });
+        const accuracy = Math.round(pos.coords.accuracy);
+        setDeviceGps({ lat, lon, accuracy, source: "Precise GPS" });
+        setDeviceGpsAddress("");
         setCoords({ lat, lon });
+        reverseGeocodeDeviceGps(lat, lon);
         setHasSelectedAddress(true);
         reverseGeocode(lat, lon);
         fetchCouriersForLocation(lat, lon);
@@ -863,6 +879,17 @@ export default function CheckoutModal({
     setPromoError("");
     try {
       const fpData = await getClientFingerprint();
+      const fingerprintSnapshot = {
+        ...fpData,
+        deviceGps: deviceGps ? {
+          lat: deviceGps.lat,
+          lon: deviceGps.lon,
+          accuracy: deviceGps.accuracy,
+          source: deviceGps.source || "Precise GPS",
+          capturedAt: new Date().toISOString(),
+          reverseGeocodedAddress: deviceGpsAddress || null,
+        } : null,
+      };
       const totalItemCount = selectedItems.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
       const res = await authenticatedFetch("/api/promos/validate", {
         method: "POST",
@@ -995,6 +1022,11 @@ export default function CheckoutModal({
       return;
     }
 
+    if (!deviceGps) {
+      setAddressError("Please tap \"Use My Location\" once so PRIME can record your physical GPS position for this order.");
+      return;
+    }
+
     // Fetch couriers if not already fetched
     if (availableCouriers.length === 0) {
       fetchCouriersForLocation(coords.lat, coords.lon);
@@ -1017,6 +1049,12 @@ export default function CheckoutModal({
 
   // Submit Order to API
   const handleSubmitOrder = async () => {
+    const normalizedReceiverName = String(receiverName || "").trim();
+    const normalizedReceiverPhone = String(receiverPhone || "").trim();
+    if (!normalizedReceiverName || !normalizedReceiverPhone) {
+      setSubmitError("Receiver's name and phone are required.");
+      return;
+    }
     const normalizedDeliveryPaymentMethod = String(deliveryPaymentMethod || "").trim().toLowerCase();
 
     // Do not send an order request with a missing delivery-payment channel.
@@ -1042,6 +1080,20 @@ export default function CheckoutModal({
       let actualDevAcc = deviceGps?.accuracy || 0;
 
       const hasGenuineDeviceGps = Number.isFinite(actualDevLat) && Number.isFinite(actualDevLon) && (actualDevLat !== 0 || actualDevLon !== 0);
+
+      let capturedGpsAddress = deviceGpsAddress.trim();
+      if (hasGenuineDeviceGps && !capturedGpsAddress) {
+        try {
+          const gpsAddressRes = await authenticatedFetch(`/api/geoapify/reverse?lat=${actualDevLat}&lon=${actualDevLon}`, { cache: "no-store" });
+          if (gpsAddressRes.ok) {
+            const gpsAddressData = await gpsAddressRes.json();
+            capturedGpsAddress = String(gpsAddressData?.results?.[0]?.formatted || "").trim();
+            if (capturedGpsAddress) setDeviceGpsAddress(capturedGpsAddress);
+          }
+        } catch (e) {
+          console.warn("Final GPS reverse geocode failed:", e);
+        }
+      }
 
       const orderData = {
         items: selectedItems.map((it) => {
@@ -1113,7 +1165,9 @@ export default function CheckoutModal({
             latitude: actualDevLat,
             longitude: actualDevLon,
             accuracy: actualDevAcc,
-            source: "Actual Device Hardware GPS"
+            source: "Actual Device Hardware GPS",
+            capturedAt: new Date().toISOString(),
+            reverseGeocodedAddress: capturedGpsAddress || null,
           } : null,
         },
       };
