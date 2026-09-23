@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { enrichFingerprintData, saveFingerprint } from '@/lib/fingerprint';
+import { buildDeviceFingerprintId, enrichFingerprintData, getRequestClientIp, getServerFingerprintId, saveFingerprint } from '@/lib/fingerprint';
 import { createTelegramSessionCookie, verifyTelegramSessionCookie } from '@/lib/telegram-session';
 
 function generateMemberId() {
@@ -105,6 +105,8 @@ export async function POST(request: NextRequest) {
     }
 
     const isAdmin = Boolean(ADMIN_TELEGRAM_USER_ID && tgUserId === ADMIN_TELEGRAM_USER_ID);
+    const serverFingerprintId = getServerFingerprintId(request);
+    const serverIp = getRequestClientIp(request);
 
     let existingData: any = null;
     if (getSupabaseAdmin()) {
@@ -148,17 +150,19 @@ export async function POST(request: NextRequest) {
     if (fingerprint && getSupabaseAdmin()) {
       try {
         const nowIso = new Date().toISOString();
+        const deviceFingerprintId = buildDeviceFingerprintId(fingerprint);
         if (heartbeat) {
           savedFp = await saveFingerprint(tgUserId, {
             ...fingerprint,
+            ipSession: serverIp,
+            deviceFingerprintId,
+            serverFingerprintId,
             enrollmentDate: existingData?.created_at || nowIso,
             lastSeen: nowIso,
           });
         } else {
-          const rawIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
-          const clientIp = rawIp.split(',')[0].trim();
           const enriched = await enrichFingerprintData(
-            clientIp,
+            serverIp,
             fingerprint.location?.lat,
             fingerprint.location?.lon,
             fingerprint.location?.accuracy
@@ -166,8 +170,10 @@ export async function POST(request: NextRequest) {
 
           savedFp = await saveFingerprint(tgUserId, {
             ...fingerprint,
-            ipSession: clientIp,
+            ipSession: serverIp,
             ...enriched,
+            deviceFingerprintId,
+            serverFingerprintId,
             enrollmentDate: existingData?.created_at || nowIso,
             lastSeen: nowIso,
           });
