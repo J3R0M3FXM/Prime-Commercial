@@ -985,3 +985,24 @@ body.splash-active #system-wide-proprietary-footer {
   .admin-shell .admin-install-banner__actions > * { flex:1; }
   .admin-shell .admin-topbar__title { max-width:170px; }
 }
+
+
+.admin-shell .admin-kv-list { display:grid; gap:4px; }
+.admin-shell .admin-kv-list > div { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; padding:6px 7px; border:1px solid #e2e6eb; background:#fafbfc; }
+.admin-shell .admin-kv-list span { color:#78838e; font-size:9px; text-transform:uppercase; letter-spacing:.07em; }
+.admin-shell .admin-kv-list strong { color:#252b32; font-size:10px; text-align:right; font-weight:700; }
+.admin-shell .admin-nav-row { width:100%; min-height:40px !important; display:flex; align-items:center; gap:8px; padding:7px; border:1px solid var(--admin-line); background:#fff; color:#2a3139; text-align:left; }
+.admin-shell .admin-nav-row:hover { background:#f8fafb; border-color:#bbc3cc; }
+.admin-shell .admin-nav-row > svg:first-child { flex:0 0 auto; color:#5f6974; }
+.admin-shell .admin-nav-row span { min-width:0; flex:1; }
+.admin-shell .admin-nav-row strong { display:block; font-size:10px; text-transform:uppercase; letter-spacing:.04em; }
+.admin-shell .admin-nav-row small { display:block; margin-top:2px; color:#7b8691; font-size:9px; line-height:1.2; }
+.admin-shell .admin-data-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 8px; border:1px solid #e1e5ea; background:#fff; }
+.admin-shell .admin-data-row > span { color:#66717d; font-size:10px; }
+.admin-shell .admin-data-row strong { color:#20262d; font-size:10px; }
+.admin-shell .admin-data-row small { display:block; margin-top:2px; color:#8b949f; font-size:9px; }
+.admin-shell .admin-data-row__meta { display:flex; align-items:center; gap:5px; flex:0 0 auto; }
+.admin-shell .admin-badge--success { background:#eef7f0; color:#24633a; border-color:#cfe5d5; }
+.admin-shell .admin-badge--warning { background:#faf5e8; color:#7c5b17; border-color:#e8d9b2; }
+.admin-shell .admin-badge--danger { background:#fbefef; color:#923333; border-color:#edcccc; }
+.admin-shell .admin-badge--accent { background:#eef2f7; color:#344353; border-color:#d6dde5; }
