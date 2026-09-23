@@ -24,12 +24,44 @@ function getStatusIcon(status: string): string {
   if (normalized.includes('ship') || normalized.includes('dispatch')) return '📦';
   if (normalized.includes('process')) return '⚙️';
   if (normalized.includes('confirm') || normalized.includes('approved')) return '✅';
-  if (normalized.includes('cancel') || normalized.includes('reject')) return '❌';
+  if (normalized.includes('cancel') || normalized.includes('reject') || normalized.includes('expired')) return '❌';
   if (normalized.includes('pending')) return '⏳';
   return '🔔';
 }
 
-async function sendTelegramMessage(chatId: string | number, text: string): Promise<boolean> {
+function getOrderDetailsUrl(orderNumber: string): string {
+  const configuredBase = String(process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '');
+  const base = configuredBase || 'https://primecommerce-prime-network.vercel.app';
+  return `${base}/?openOrder=${encodeURIComponent(orderNumber)}`;
+}
+
+function buildOrderInlineKeyboard(orderNumber: string, label: string) {
+  return {
+    inline_keyboard: [[
+      {
+        text: label,
+        web_app: { url: getOrderDetailsUrl(orderNumber) },
+      },
+    ]],
+  };
+}
+
+function formatPaymentDeadline(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
+
+async function sendTelegramMessage(
+  chatId: string | number,
+  text: string,
+  replyMarkup?: Record<string, unknown>
+): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token || !chatId) {
     console.warn('Telegram notification skipped: missing TELEGRAM_BOT_TOKEN or chat ID');
@@ -47,6 +79,7 @@ async function sendTelegramMessage(chatId: string | number, text: string): Promi
           text,
           parse_mode: 'HTML',
           disable_web_page_preview: true,
+          ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
         }),
         cache: 'no-store',
       }
@@ -79,6 +112,7 @@ export type OrderNotification = {
   totalAmount?: number | null;
   payableNow?: number | null;
   paymentStatus?: string | null;
+  paymentDeadlineAt?: string | null;
   courierName?: string | null;
   trackingNumber?: string | null;
   items?: Array<{ name?: string; quantity?: number; qty?: number; price?: number }> | null;
@@ -108,12 +142,18 @@ export async function notifyOrderCreated(order: OrderNotification): Promise<bool
     `📌 <b>Status:</b> ${escapeHtml(order.status)}`,
     order.totalAmount !== undefined ? `💰 <b>Total:</b> ${money(order.totalAmount)}` : '',
     order.payableNow !== undefined ? `💳 <b>Payable now:</b> ${money(order.payableNow)}` : '',
-    items ? `\n<b>Items</b>\n${items}` : '',
+    order.paymentDeadlineAt ? `⏳ <b>Payment proof deadline:</b> ${escapeHtml(formatPaymentDeadline(order.paymentDeadlineAt))}` : '',
+    items ? `\\n<b>Items</b>\\n${items}` : '',
     '',
+    'Please submit your payment proof before the deadline so your reserved stock is not released.',
     'We will send you another Telegram notification whenever your order status changes.',
-  ].filter(Boolean).join('\n');
+  ].filter(Boolean).join('\\n');
 
-  return sendTelegramMessage(order.chatId, message);
+  return sendTelegramMessage(
+    order.chatId,
+    message,
+    buildOrderInlineKeyboard(order.orderNumber, '💳 Open Order & Upload Payment Proof')
+  );
 }
 
 export async function notifyOrderStatusChanged(order: OrderNotification): Promise<boolean> {
@@ -127,11 +167,23 @@ export async function notifyOrderStatusChanged(order: OrderNotification): Promis
     order.courierName ? `🚚 <b>Courier:</b> ${escapeHtml(order.courierName)}` : '',
     order.trackingNumber ? `🔎 <b>Tracking:</b> <code>${escapeHtml(order.trackingNumber)}</code>` : '',
     order.totalAmount !== undefined ? `💰 <b>Total:</b> ${money(order.totalAmount)}` : '',
+    order.status.toLowerCase() === 'expired'
+      ? '⚠️ Your one-hour payment proof window ended without a submitted receipt. The order has expired.'
+      : '',
     '',
     'Your order record has been updated. We will keep you informed of the next step.',
   ].filter(Boolean).join('\n');
 
-  return sendTelegramMessage(order.chatId, message);
+  return sendTelegramMessage(
+    order.chatId,
+    message,
+    buildOrderInlineKeyboard(
+      order.orderNumber,
+      order.status.toLowerCase() === 'pending' && String(order.paymentStatus || '').toLowerCase() === 'unpaid'
+        ? '💳 Open Order & Upload Payment Proof'
+        : '📄 View Order Details'
+    )
+  );
 }
 
 export async function notifyPaymentUpdated(order: OrderNotification): Promise<boolean> {
@@ -148,5 +200,9 @@ export async function notifyPaymentUpdated(order: OrderNotification): Promise<bo
     'Your payment information has been received and is being reviewed.',
   ].join('\n');
 
-  return sendTelegramMessage(order.chatId, message);
+  return sendTelegramMessage(
+    order.chatId,
+    message,
+    buildOrderInlineKeyboard(order.orderNumber, '📄 View Order Details')
+  );
 }
