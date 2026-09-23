@@ -517,7 +517,10 @@ export async function createPromoRedemptionInDb(redemptionPayload: any) {
     promo_id: redemptionPayload.promoId,
     customer_id: redemptionPayload.customerId || null,
     order_id: redemptionPayload.orderId || null,
-    device_id: redemptionPayload.deviceId || redemptionPayload.hardwareId || null,
+    device_id: redemptionPayload.deviceId || null,
+    hardware_id: redemptionPayload.hardwareId || null,
+    device_fingerprint_id: redemptionPayload.deviceFingerprintId || null,
+    server_fingerprint_id: redemptionPayload.serverFingerprintId || null,
     discount_amount: Number(redemptionPayload.discountAmount) || 0,
     used_at: redemptionPayload.usedAt || new Date().toISOString()
   };
