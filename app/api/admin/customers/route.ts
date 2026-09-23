@@ -79,6 +79,21 @@ export async function GET(request: Request) {
         .from('orders').select('*').or(filters).order('created_at', { ascending: false }).limit(100);
       if (ordersError) throw ordersError;
 
+      let referredByCustomer: any = null;
+      if (customer.referred_by_user_id) {
+        referredByCustomer = (await supabase
+          .from('customers')
+          .select('id,tg_name,tg_username,prime_member_id')
+          .eq('id', customer.referred_by_user_id)
+          .maybeSingle()).data;
+      } else if (customer.referred_by_member_id) {
+        referredByCustomer = (await supabase
+          .from('customers')
+          .select('id,tg_name,tg_username,prime_member_id')
+          .eq('prime_member_id', customer.referred_by_member_id)
+          .maybeSingle()).data;
+      }
+
       const orders = (ordersData || []).map((o: any) => ({
         id: o.id, orderNumber: o.order_number, status: o.status, totalAmount: o.total_amount,
         subTotal: o.subtotal ?? o.sub_total, promoDiscount: o.discount_amount ?? o.promo_discount,
@@ -119,6 +134,8 @@ export async function GET(request: Request) {
           points: Number(customer.points || 0), purchasingPoints: Number(customer.points || 0), referralPoints: Number(customer.referral_points || 0),
           storeCredits: Number(customer.store_credits || 0), tier: tierInfo.tier, tierInfo, fingerprints,
           ...telemetryFrom(fingerprints), sharedAccounts, sharedAccountCount: sharedAccounts.length,
+          referredByName: referredByCustomer?.tg_name || '',
+          referredByUsername: referredByCustomer?.tg_username || '',
           isPromoFraudRisk: sharedAccounts.length > 0, role: customer.role || 'customer', isPremium: Boolean(customer.is_premium),
           updatedAt: customer.updated_at, createdAt: customer.created_at,
         },
