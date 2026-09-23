@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface FingerprintPayload {
@@ -55,7 +56,7 @@ export function getServerFingerprintId(request: Request): string {
   const acceptLanguage = request.headers.get('accept-language') || '';
   const raw = [ip, userAgent, secChUa, secChUaPlatform, acceptLanguage]
     .map((value) => String(value || '').trim().toLowerCase())
-    .join('\u001f');
+    .join('|');
 
   const secret = stableFingerprintSecretMaterial();
   if (secret) {
@@ -79,7 +80,7 @@ export function buildDeviceFingerprintId(rawData: FingerprintPayload): string {
     rawData.pixelRatio,
     rawData.timezone,
     rawData.language,
-    Array.isArray(rawData.languages) ? rawData.languages.join(',') : rawData.languages,
+    Array.isArray(rawData.languages) ? JSON.stringify(rawData.languages) : rawData.languages,
     rawData.graphics,
     rawData.vendor,
     rawData.canvasHash,
