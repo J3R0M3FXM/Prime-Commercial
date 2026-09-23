@@ -445,7 +445,6 @@ export async function POST(request: Request) {
         lat: destinationLat,
         lon: destinationLon,
       },
-      coordinates: String(physicalGpsLat) + ', ' + String(physicalGpsLon),
       courierId: delivery.courier.id,
       courierName: delivery.courier.name,
       trackingNumber: '',
