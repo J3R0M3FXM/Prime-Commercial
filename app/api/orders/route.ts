@@ -257,7 +257,27 @@ export async function POST(request: Request) {
     const courierId = String(
       typeof courierInput === 'string' ? courierInput : courierInput?.id || ''
     ).trim();
-    const deliveryPaymentMethod = String(body?.deliveryPaymentMethod || '').trim().toLowerCase();
+
+    // Canonical field is deliveryPaymentMethod. Accept known legacy aliases while
+    // older cached clients roll forward, then use the already-calculated
+    // payableOnDelivery split as a compatibility fallback when the field is absent.
+    const rawDeliveryPaymentMethod =
+      body?.deliveryPaymentMethod ??
+      body?.deliveryFeePaymentMethod ??
+      body?.delivery_payment_method ??
+      body?.delivery_fee_payment_method ??
+      '';
+    let deliveryPaymentMethod = String(rawDeliveryPaymentMethod).trim().toLowerCase();
+
+    if (deliveryPaymentMethod !== 'upon_checkout' && deliveryPaymentMethod !== 'upon_delivery') {
+      const submittedPayableOnDelivery = toFiniteNumber(body?.payableOnDelivery, NaN);
+      const submittedDeliveryFee = Math.max(0, toFiniteNumber(body?.deliveryFee, 0));
+
+      if (submittedDeliveryFee > 0 && Number.isFinite(submittedPayableOnDelivery)) {
+        deliveryPaymentMethod =
+          submittedPayableOnDelivery > 0 ? 'upon_delivery' : 'upon_checkout';
+      }
+    }
 
     if (!courierId) {
       return NextResponse.json({ error: 'A courier must be selected.' }, { status: 400 });

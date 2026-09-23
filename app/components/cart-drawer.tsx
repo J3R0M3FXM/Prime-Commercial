@@ -6,7 +6,6 @@ import React, { useEffect, useState, useMemo, Component, ErrorInfo, ReactNode } 
 import { useCart } from './cart-context';
 import { ShoppingCart, X, Plus, Minus, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
-import { calculateChargesBreakdown } from "@/lib/charges";
 import CheckoutModal from './checkout-modal';
 
 // Defensive Error Boundary to ensure Cart never crashes the host page
@@ -79,14 +78,10 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const { cart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, cartTotal, cartCount, syncWithServerData } = useCart();
   const [activeCharges, setActiveCharges] = useState<any[]>([]);
   const [loadingCharges, setLoadingCharges] = useState(false);
-  const [checkoutStatus, setCheckoutStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setCheckoutStatus({ type: null, message: '' });
-
       // Sync Products
       authenticatedFetch("/api/products")
         .then(res => res.json())
@@ -119,100 +114,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     return safeCart.filter((item: any) => item && typeof item === 'object' && item.selected !== false);
   }, [safeCart]);
   
-  // Calculate Grand Total & Charges Breakdown via lib/charges.ts
-  const { totalChargesAmount, grandTotal, chargesBreakdown } = useMemo(() => {
-    const validCartTotal = Number.isFinite(cartTotal) ? Math.max(0, cartTotal) : 0;
-    
-    if (selectedItems.length === 0 || validCartTotal === 0) {
-      return { totalChargesAmount: 0, grandTotal: validCartTotal, chargesBreakdown: [] };
-    }
-    
-    try {
-      const { totalChargesAmount: computedTotal, computedCharges } = calculateChargesBreakdown(activeCharges, validCartTotal);
-      return {
-        totalChargesAmount: computedTotal,
-        grandTotal: validCartTotal + computedTotal,
-        chargesBreakdown: computedCharges.map(c => ({
-          id: c.id,
-          name: c.name,
-          computedAmount: c.computedAmount,
-          rate: c.rate,
-          type: c.type
-        }))
-      };
-    } catch (e) {
-      console.warn("Charges calculation error fallback", e);
-      return { totalChargesAmount: 0, grandTotal: validCartTotal, chargesBreakdown: [] };
-    }
-  }, [cartTotal, activeCharges, selectedItems.length]);
-
   if (!isOpen) return null;
-
-  const handleCheckout = async () => {
-    if (selectedItems.length === 0 || isSubmitting) return;
-    setIsSubmitting(true);
-    setCheckoutStatus({ type: null, message: '' });
-
-    try {
-      let storedUserId = "";
-      let storedName = "Customer";
-      let storedUsername = "";
-      let storedMemberId = "";
-
-      if (typeof window !== 'undefined') {
-        try {
-          storedUserId = sessionStorage.getItem("prime_customer_id") || localStorage.getItem("prime_customer_id") || "";
-          storedName = sessionStorage.getItem("prime_customer_name") || localStorage.getItem("prime_customer_name") || "Customer";
-          storedUsername = sessionStorage.getItem("prime_customer_username") || localStorage.getItem("prime_customer_username") || "";
-          storedMemberId = sessionStorage.getItem("prime_member_id") || localStorage.getItem("prime_member_id") || "";
-        } catch (e) {}
-      }
-      
-      const res = await authenticatedFetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: storedUserId,
-          customerName: storedName,
-          customerUsername: storedUsername,
-          primeMemberId: storedMemberId,
-          items: selectedItems,
-          subTotal: cartTotal || 0,
-          appliedCharges: chargesBreakdown || [],
-          totalAmount: grandTotal || 0,
-          notes: "Storefront Checkout Order"
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setCheckoutStatus({
-          type: 'success',
-          message: `Order #${data.orderNumber || 'COMPLETED'} placed successfully!`
-        });
-        if (typeof clearSelectedItems === 'function') {
-          clearSelectedItems();
-        }
-        setTimeout(() => {
-          onClose();
-        }, 2000);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setCheckoutStatus({
-          type: 'error',
-          message: err.error || "Failed to create order. Please try again."
-        });
-      }
-    } catch (e: any) {
-      console.error("Order checkout error", e);
-      setCheckoutStatus({
-        type: 'error',
-        message: e?.message || "Order checkout encountered an error. Please retry."
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <div className="w-full flex justify-center bg-gray-50">
@@ -232,20 +134,6 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             <X className="w-4 h-4 text-gray-600" />
           </button>
         </div>
-
-        {/* Status Notification Banner (Replaces window.alert for sandboxed iframes) */}
-        {checkoutStatus.type && (
-          <div className={`p-3 mx-3 mt-2.5 rounded-lg flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider ${
-            checkoutStatus.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
-          }`}>
-            {checkoutStatus.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-            ) : (
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-            )}
-            <span>{checkoutStatus.message}</span>
-          </div>
-        )}
 
         {/* Cart Items */}
         <div className="overflow-y-auto p-2.5 space-y-2 max-h-[calc(100vh-250px)]">
