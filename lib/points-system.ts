@@ -1,7 +1,7 @@
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface CustomerTierInfo {
-  tier: 'Titanium' | 'Platinum' | 'Gold' | 'Bronze' | 'Silver' | 'Member';
+  tier: 'Titanium' | 'Platinum' | 'Gold' | 'Bronze' | 'Silver';
   currentSpending: number;
   cycleStartDate: string;
   cycleEndDate: string;
@@ -33,21 +33,21 @@ export interface PointTransactionRecord {
 
 export function calculatePurchasingPoints(itemsSubtotal: number): number {
   const safeItems = Math.max(0, Number(itemsSubtotal) || 0);
-  return Math.floor(safeItems / 100) * 10;
+  return Math.floor(safeItems / 100) * 5;
 }
 
 export function calculateCustomerTier(
-  completedOrders: Array<{ subTotal?: number; totalAmount?: number; createdAt?: string; deliveredAt?: string }>,
+  completedOrders: Array<{ subTotal?: number; subtotal?: number; totalAmount?: number; createdAt?: string; deliveredAt?: string }>,
   now: Date = new Date()
 ): CustomerTierInfo {
   if (!completedOrders || completedOrders.length === 0) {
     return {
-      tier: 'Member',
+      tier: 'Silver',
       currentSpending: 0,
       cycleStartDate: now.toISOString(),
       cycleEndDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       daysRemainingInCycle: 30,
-      nextTier: 'Silver',
+      nextTier: 'Bronze',
       amountNeededForNextTier: 5000,
       firstCompletedOrderDate: null,
       progressPercent: 0
@@ -75,39 +75,34 @@ export function calculateCustomerTier(
   let cycleItemsSpend = 0;
   for (const ord of completedOrders) {
     const ordDate = new Date(ord.deliveredAt || ord.createdAt || 0).getTime();
-    if (ordDate >= cycleStart.getTime() && ordDate <= cycleEnd.getTime()) {
-      cycleItemsSpend += Math.max(0, Number(ord.subTotal || 0));
+    if (ordDate >= cycleStart.getTime() && ordDate < cycleEnd.getTime()) {
+      cycleItemsSpend += Math.max(0, Number(ord.subTotal ?? ord.subtotal ?? 0));
     }
   }
 
-  let tier: CustomerTierInfo['tier'] = 'Member';
-  let nextTier: string | null = 'Silver';
+  let tier: CustomerTierInfo['tier'] = 'Silver';
+  let nextTier: string | null = 'Bronze';
   let amountNeeded = 5000 - cycleItemsSpend;
   let progress = Math.min(100, Math.max(0, (cycleItemsSpend / 5000) * 100));
 
-  if (cycleItemsSpend >= 25000) {
+  if (cycleItemsSpend >= 20000) {
     tier = 'Titanium';
     nextTier = null;
     amountNeeded = 0;
     progress = 100;
-  } else if (cycleItemsSpend >= 20000) {
+  } else if (cycleItemsSpend >= 15000) {
     tier = 'Platinum';
     nextTier = 'Titanium';
-    amountNeeded = 25000 - cycleItemsSpend;
-    progress = Math.min(100, Math.max(0, ((cycleItemsSpend - 20000) / 5000) * 100));
-  } else if (cycleItemsSpend >= 15000) {
-    tier = 'Gold';
-    nextTier = 'Platinum';
     amountNeeded = 20000 - cycleItemsSpend;
     progress = Math.min(100, Math.max(0, ((cycleItemsSpend - 15000) / 5000) * 100));
   } else if (cycleItemsSpend >= 10000) {
-    tier = 'Bronze';
-    nextTier = 'Gold';
+    tier = 'Gold';
+    nextTier = 'Platinum';
     amountNeeded = 15000 - cycleItemsSpend;
     progress = Math.min(100, Math.max(0, ((cycleItemsSpend - 10000) / 5000) * 100));
   } else if (cycleItemsSpend >= 5000) {
-    tier = 'Silver';
-    nextTier = 'Bronze';
+    tier = 'Bronze';
+    nextTier = 'Gold';
     amountNeeded = 10000 - cycleItemsSpend;
     progress = Math.min(100, Math.max(0, ((cycleItemsSpend - 5000) / 5000) * 100));
   }
@@ -129,76 +124,12 @@ export async function processMaturedReferrals(): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
   const supabase = getSupabaseAdmin()!;
   try {
-    const nowIso = new Date().toISOString();
-    const { data: orders, error } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('referral_points_status', 'pending_30m');
-
-    if (error || !orders || orders.length === 0) return 0;
-
-    let processedCount = 0;
-    for (const ord of orders) {
-      const creditAfter = ord.referral_points_credit_after;
-      if (creditAfter && creditAfter <= nowIso) {
-        const refereeId = ord.referred_by_user_id;
-        const refereeMemberId = ord.referred_by_member_id;
-
-        let refereeCustomerId: string | null = refereeId || null;
-        if (!refereeCustomerId && refereeMemberId) {
-          const { data: cust } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('prime_member_id', refereeMemberId)
-            .single();
-          if (cust) refereeCustomerId = cust.id;
-        }
-
-        if (refereeCustomerId) {
-          const { data: custData } = await supabase
-            .from('customers')
-            .select('points, lifetime_referral_points')
-            .eq('id', refereeCustomerId)
-            .single();
-
-          if (custData) {
-            const currentPts = Number(custData.points || 0);
-            const lifetimeRef = Number(custData.lifetime_referral_points || 0);
-
-            await supabase
-              .from('customers')
-              .update({
-                points: currentPts + 50,
-                lifetime_referral_points: lifetimeRef + 50,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', refereeCustomerId);
-
-            await supabase.from('point_transactions').insert([{
-              id: `tx-ref-${ord.id}-${Date.now()}`,
-              user_id: refereeCustomerId,
-              type: 'referral',
-              amount: 50,
-              order_id: ord.id,
-              description: `50 Referral Points for Order #${ord.order_number}`,
-              created_at: new Date().toISOString()
-            }]);
-
-            await supabase
-              .from('orders')
-              .update({
-                referral_points_status: 'credited',
-                referral_points_credited_at: new Date().toISOString(),
-                referral_points_amount: 50
-              })
-              .eq('id', ord.id);
-
-            processedCount++;
-          }
-        }
-      }
+    const { data, error } = await supabase.rpc('process_matured_referrals');
+    if (error) {
+      console.error('Error processing matured referrals:', error);
+      return 0;
     }
-    return processedCount;
+    return Number(data?.processed || 0);
   } catch (err) {
     console.error('Error processing matured referrals:', err);
     return 0;

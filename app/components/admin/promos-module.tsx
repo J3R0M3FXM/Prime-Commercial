@@ -34,7 +34,7 @@ import {
   generatePromoCode 
 } from '@/lib/promos';
 
-const LOYALTY_TIERS = ['MEMBER', 'SILVER', 'BRONZE', 'GOLD', 'PLATINUM', 'TITANIUM'];
+const LOYALTY_TIERS = ['SILVER', 'BRONZE', 'GOLD', 'PLATINUM', 'TITANIUM'];
 const DAYS_OF_WEEK = [
   { id: 0, label: 'Sun', full: 'Sunday' },
   { id: 1, label: 'Mon', full: 'Monday' },
