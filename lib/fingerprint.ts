@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface FingerprintPayload {
@@ -30,6 +31,87 @@ export interface FingerprintPayload {
   enrollmentDate?: string | Date;
   lastSeen?: string | Date;
   [key: string]: any;
+}
+
+
+export function getRequestClientIp(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for') || '';
+  const forwardedIp = forwarded.split(',')[0]?.trim() || '';
+  return forwardedIp || request.headers.get('x-real-ip')?.trim() || '127.0.0.1';
+}
+
+export function getServerFingerprintId(request: Request): string {
+  const ip = getRequestClientIp(request);
+  const userAgent = request.headers.get('user-agent') || '';
+  const raw = [ip, userAgent]
+    .map((value) => String(value || '').trim().toLowerCase())
+    .join('|');
+
+  return `SRVFP_${crypto.createHash('sha256').update(raw).digest('hex').slice(0, 32).toUpperCase()}`;
+}
+
+export function buildDeviceFingerprintId(rawData: FingerprintPayload): string {
+  const stableValues = [
+    rawData.deviceId,
+    rawData.hardwareId,
+    rawData.browser,
+    rawData.platform,
+    rawData.screenResolution,
+    rawData.availScreen,
+    rawData.pixelRatio,
+    rawData.timezone,
+    rawData.language,
+    Array.isArray(rawData.languages) ? JSON.stringify(rawData.languages) : rawData.languages,
+    rawData.graphics,
+    rawData.vendor,
+    rawData.canvasHash,
+    rawData.hardwareConcurrency,
+    rawData.deviceMemory,
+    rawData.touchSupport,
+  ]
+    .map((value) => String(value ?? '').trim().toLowerCase())
+    .join('|');
+
+  if (!stableValues.replace(/\|/g, '')) return '';
+  return `DEVFP_${crypto.createHash('sha256').update(stableValues).digest('hex').slice(0, 32).toUpperCase()}`;
+}
+
+export function resolveTrustedFingerprint(
+  customer: any,
+  submitted: FingerprintPayload = {}
+): {
+  sessionToken: string;
+  deviceId: string;
+  hardwareId: string;
+  deviceFingerprintId: string;
+  matched: boolean;
+} {
+  const fingerprints = Array.isArray(customer?.fingerprints) ? customer.fingerprints : [];
+  const submittedSessionToken = String(submitted.sessionToken || '').trim();
+  const submittedDeviceId = String(submitted.deviceId || '').trim();
+
+  let matched: any = null;
+  if (submittedSessionToken) {
+    matched = fingerprints.find((fp: any) => String(fp?.sessionToken || '').trim() === submittedSessionToken) || null;
+  }
+  if (!matched && submittedDeviceId) {
+    matched = fingerprints.find((fp: any) => String(fp?.deviceId || '').trim() === submittedDeviceId) || null;
+  }
+
+  const source = matched || submitted;
+  const deviceId = String(source?.deviceId || '').trim();
+  const hardwareId = String(source?.hardwareId || '').trim();
+  const deviceFingerprintId =
+    String(source?.deviceFingerprintId || '').trim() ||
+    buildDeviceFingerprintId(source);
+
+  return {
+    sessionToken: String(source?.sessionToken || submittedSessionToken || '').trim(),
+    deviceId,
+    hardwareId,
+    deviceFingerprintId,
+    matched: Boolean(matched),
+  };
 }
 
 export async function enrichFingerprintData(ip: string, lat?: number, lon?: number, accuracy?: number) {

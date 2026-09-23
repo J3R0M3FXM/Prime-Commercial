@@ -89,7 +89,13 @@ export async function GET(request: Request) {
     const latestOrderDate = tierOrdersData && tierOrdersData.length > 0
       ? tierOrdersData[tierOrdersData.length - 1].created_at
       : null;
-    const latestVisitDate = customer.last_seen || customer.updated_at || new Date().toISOString();
+    const latestFingerprint = Array.isArray(customer.fingerprints)
+      ? [...customer.fingerprints].sort((a: any, b: any) =>
+          new Date(b?.lastSeen || b?.createdAt || b?.capturedAt || 0).getTime() -
+          new Date(a?.lastSeen || a?.createdAt || a?.capturedAt || 0).getTime()
+        )[0]
+      : null;
+    const latestVisitDate = latestFingerprint?.lastSeen || customer.updated_at || new Date().toISOString();
 
     let referralsList: any[] = [];
     if (finalMemberId) {
@@ -168,7 +174,7 @@ export async function GET(request: Request) {
         tgName: customer.tg_name || 'Valued Member',
         tgUsername: customer.tg_username || '',
         primeMemberId: finalMemberId,
-        phone: customer.phone || 'Not linked',
+        phone: customer.phone_number || 'Not linked',
         photoUrl: customer.photo_url || '',
         hasCustomPhoto: Boolean(customer.has_custom_photo),
         enrollmentDate: customer.created_at || new Date().toISOString(),

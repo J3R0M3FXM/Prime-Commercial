@@ -499,6 +499,10 @@ export async function getPromoRedemptionsFromDb(limitCount = 200) {
     customerId: r.customer_id,
     orderId: r.order_id,
     deviceId: r.device_id,
+    hardwareId: r.hardware_id,
+    deviceFingerprintId: r.device_fingerprint_id,
+    serverFingerprintId: r.server_fingerprint_id,
+    releasedAt: r.released_at,
     discountAmount: Number(r.discount_amount) || 0,
     usedAt: r.used_at
   })) as any[];
@@ -513,7 +517,10 @@ export async function createPromoRedemptionInDb(redemptionPayload: any) {
     promo_id: redemptionPayload.promoId,
     customer_id: redemptionPayload.customerId || null,
     order_id: redemptionPayload.orderId || null,
-    device_id: redemptionPayload.deviceId || redemptionPayload.hardwareId || null,
+    device_id: redemptionPayload.deviceId || null,
+    hardware_id: redemptionPayload.hardwareId || null,
+    device_fingerprint_id: redemptionPayload.deviceFingerprintId || null,
+    server_fingerprint_id: redemptionPayload.serverFingerprintId || null,
     discount_amount: Number(redemptionPayload.discountAmount) || 0,
     used_at: redemptionPayload.usedAt || new Date().toISOString()
   };
@@ -529,7 +536,8 @@ export async function getPromoRedemptionsForCodeFromDb(code: string) {
   const { data, error } = await supabase
     .from('promo_redemptions')
     .select('*')
-    .eq('promo_code', cleanCode);
+    .eq('promo_code', cleanCode)
+    .is('released_at', null);
     
   if (error) throw error;
   return (data || []).map(r => ({
@@ -539,6 +547,10 @@ export async function getPromoRedemptionsForCodeFromDb(code: string) {
     customerId: r.customer_id,
     orderId: r.order_id,
     deviceId: r.device_id,
+    hardwareId: r.hardware_id,
+    deviceFingerprintId: r.device_fingerprint_id,
+    serverFingerprintId: r.server_fingerprint_id,
+    releasedAt: r.released_at,
     discountAmount: Number(r.discount_amount) || 0,
     usedAt: r.used_at
   })) as any[];
