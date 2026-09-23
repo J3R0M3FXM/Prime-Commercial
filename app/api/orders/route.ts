@@ -493,9 +493,9 @@ async function hydrateCustomerOrder(order: any, supabase: any) {
   const charges = Array.isArray(rawCharges) ? rawCharges : [];
   const items = Array.isArray(order.items) ? order.items : [];
 
-  const productIds = [...new Set(items
+  const productIds = Array.from(new Set(items
     .map((item: any) => String(item?.productId || item?.product_id || '').trim())
-    .filter(Boolean))];
+    .filter(Boolean)));
 
   let productsById = new Map<string, any>();
   if (productIds.length > 0) {
