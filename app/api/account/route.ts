@@ -5,42 +5,56 @@ import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
 export const dynamic = 'force-dynamic';
 
-let lastMaturedReferralsProcessTime = 0;
-const MATURED_REFERRALS_INTERVAL_MS = 5 * 60 * 1000;
-
 export async function GET(request: Request) {
   try {
     const auth = await getAuthenticatedCustomer(request);
     if (auth.error || !auth.customer) {
-      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
+      return NextResponse.json(
+        { error: auth.error || 'Telegram authentication required' },
+        { status: 401 }
+      );
     }
+
     const customer = auth.customer;
     const supabase = getSupabaseAdmin()!;
 
-    const now = Date.now();
-    if (now - lastMaturedReferralsProcessTime > MATURED_REFERRALS_INTERVAL_MS) {
-      lastMaturedReferralsProcessTime = now;
-      processMaturedReferrals().catch(() => {});
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 503 });
     }
+
+    // Referral maturity is an atomic database operation. Running it here also
+    // keeps accounts correct even when the scheduled cron is temporarily absent.
+    await processMaturedReferrals();
 
     const userId = customer.id;
     const finalMemberId = customer.prime_member_id || '';
 
-    const { data: ordersData } = await supabase
-      .from('orders')
-      .select('*')
-      .or(`customer_id.eq.${userId},prime_member_id.eq.${finalMemberId},tg_user_id.eq.${customer.tg_user_id || ''}`)
-      .order('created_at', { ascending: false })
-      .limit(100);
+    const [{ data: ordersData, error: ordersError }, { data: tierOrdersData, error: tierOrdersError }] =
+      await Promise.all([
+        supabase
+          .from('orders')
+          .select('*')
+          .or(`customer_id.eq.${userId},prime_member_id.eq.${finalMemberId},tg_user_id.eq.${customer.tg_user_id || ''}`)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('orders')
+          .select('id,status,subtotal,total_amount,created_at,delivered_at')
+          .eq('customer_id', userId)
+          .order('created_at', { ascending: true }),
+      ]);
+
+    if (ordersError) throw ordersError;
+    if (tierOrdersError) throw tierOrdersError;
 
     const userOrders = (ordersData || []).map((o: any) => ({
       id: o.id,
       orderNumber: o.order_number,
       status: o.status,
-      totalAmount: o.total_amount,
-      subTotal: o.subtotal,
-      promoDiscount: o.promo_discount,
-      storeCreditsUsed: o.store_credits_used,
+      totalAmount: Number(o.total_amount || 0),
+      subTotal: Number(o.subtotal || 0),
+      promoDiscount: Number(o.discount_amount || o.promo_discount || 0),
+      storeCreditsUsed: Number(o.store_credits_used || 0),
       createdAt: o.created_at,
       deliveredAt: o.delivered_at,
       referredByUserId: o.referred_by_user_id,
@@ -49,72 +63,100 @@ export async function GET(request: Request) {
       customerName: o.customer_name
     }));
 
-    const completedOrders = userOrders.filter((o) => {
-      const st = String(o.status || '').toLowerCase();
-      return st === 'delivered' || st === 'completed';
-    });
+    const completedOrders = (tierOrdersData || [])
+      .filter((o: any) => ['delivered', 'completed'].includes(String(o.status || '').toLowerCase()))
+      .map((o: any) => ({
+        subTotal: Number(o.subtotal || 0),
+        subtotal: Number(o.subtotal || 0),
+        totalAmount: Number(o.total_amount || 0),
+        createdAt: o.created_at,
+        deliveredAt: o.delivered_at
+      }));
 
     const tierInfo = calculateCustomerTier(completedOrders);
 
-    const lifetimeOrderCount = userOrders.length;
+    const lifetimeOrderCount = (tierOrdersData || []).length;
     const lifetimeSuccessfulOrders = completedOrders.length;
-    const lifetimeItemSpending = completedOrders.reduce((sum, o) => sum + (Number(o.subTotal) || 0), 0);
-    const lifetimeTotalSpending = completedOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
-    const lifetimeDiscounts = userOrders.reduce((sum, o) => {
-      const pDisc = Number(o.promoDiscount || 0);
-      const cDisc = Number(o.storeCreditsUsed || 0);
+    const lifetimeItemSpending = completedOrders.reduce((sum: number, o: any) => sum + (Number(o.subTotal) || 0), 0);
+    const lifetimeTotalSpending = completedOrders.reduce((sum: number, o: any) => sum + (Number(o.totalAmount) || 0), 0);
+    const lifetimeDiscounts = (ordersData || []).reduce((sum: number, o: any) => {
+      const pDisc = Number(o.discount_amount || o.promo_discount || 0);
+      const cDisc = Number(o.store_credits_used || 0);
       return sum + pDisc + cDisc;
     }, 0);
 
-    const firstOrderDate = userOrders.length > 0 ? userOrders[userOrders.length - 1].createdAt : null;
-    const latestOrderDate = userOrders.length > 0 ? userOrders[0].createdAt : null;
+    const firstOrderDate = tierOrdersData?.[0]?.created_at || null;
+    const latestOrderDate = tierOrdersData && tierOrdersData.length > 0
+      ? tierOrdersData[tierOrdersData.length - 1].created_at
+      : null;
     const latestVisitDate = customer.last_seen || customer.updated_at || new Date().toISOString();
 
     let referralsList: any[] = [];
     if (finalMemberId) {
-      const { data: refUsers } = await supabase
+      const { data: refUsers, error: refUsersError } = await supabase
         .from('customers')
-        .select('*')
+        .select('id,tg_name,tg_username,prime_member_id,created_at')
         .eq('referred_by_member_id', finalMemberId);
 
-      if (refUsers) {
-        for (const r of refUsers) {
-          if (r.id !== userId) {
-            const hasCompleted = Boolean(r.points > 0 || r.total_spent > 0);
-            referralsList.push({
-              id: r.id,
-              name: r.tg_name || 'Member',
-              username: r.tg_username || '',
-              primeMemberId: r.prime_member_id || '',
-              enrolledAt: r.created_at || '',
-              hasDeliveredOrder: hasCompleted,
-              rewardStatus: hasCompleted ? 'Earned 50 Pts' : 'Pending Order'
-            });
-          }
-        }
+      if (refUsersError) throw refUsersError;
+
+      const referrerIds = (refUsers || []).map((r: any) => r.id).filter(Boolean);
+      const completedByReferrer = new Set<string>();
+      if (referrerIds.length > 0) {
+        const { data: refOrders, error: refOrdersError } = await supabase
+          .from('orders')
+          .select('customer_id')
+          .in('customer_id', referrerIds)
+          .in('status', ['Completed', 'Delivered']);
+        if (refOrdersError) throw refOrdersError;
+        for (const order of refOrders || []) completedByReferrer.add(order.customer_id);
       }
+
+      referralsList = (refUsers || [])
+        .filter((r: any) => r.id !== userId)
+        .map((r: any) => {
+          const hasCompleted = completedByReferrer.has(r.id);
+          return {
+            id: r.id,
+            name: r.tg_name || 'Member',
+            username: r.tg_username || '',
+            primeMemberId: r.prime_member_id || '',
+            enrolledAt: r.created_at || '',
+            hasDeliveredOrder: hasCompleted,
+            rewardStatus: hasCompleted ? 'Earned 50 Pts' : 'Pending Order'
+          };
+        });
     }
 
-    let pointTransactions: any[] = [];
-    const { data: txData } = await supabase
+    const { data: txData, error: txError } = await supabase
       .from('point_transactions')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
+    if (txError) throw txError;
 
-    if (txData) {
-      pointTransactions = txData.map((t: any) => ({
-        id: t.id,
-        userId: t.user_id,
-        type: t.type,
-        amount: t.amount,
-        orderId: t.order_id,
-        description: t.description,
-        createdAt: t.created_at
-      }));
-    }
+    const pointTransactions = (txData || []).map((t: any) => ({
+      id: t.id,
+      userId: t.user_id,
+      type: t.type,
+      amount: Number(t.amount || 0),
+      orderId: t.order_id,
+      description: t.description,
+      createdAt: t.created_at
+    }));
 
-    const pendingReferralPoints = 0;
+    const { data: pendingReferralRows, error: pendingReferralError } = await supabase
+      .from('orders')
+      .select('referral_points_amount')
+      .eq('referred_by_user_id', userId)
+      .eq('referral_points_status', 'pending_30m');
+    if (pendingReferralError) throw pendingReferralError;
+
+    const pendingReferralPoints = (pendingReferralRows || []).reduce(
+      (sum: number, row: any) => sum + Number(row.referral_points_amount || 0),
+      0
+    );
+
     const purchasingPoints = Number(customer.points || 0);
     const referralPoints = Number(customer.referral_points || 0);
     const storeCredits = Number(customer.store_credits || 0);
