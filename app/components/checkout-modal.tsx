@@ -1795,6 +1795,41 @@ export default function CheckoutModal({
                 </div>
               )}
 
+              {/* Automatic physical GPS snapshot: separate from the claimed delivery destination. */}
+              <div className="p-2.5 rounded-none border border-slate-200 bg-white space-y-1.5 text-xs font-mono">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-gray-500 uppercase text-[10px] font-bold">
+                    Precise GPS Address
+                  </span>
+                  <span
+                    className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 border ${{
+                      [true]: "text-emerald-700 bg-emerald-50 border-emerald-200",
+                      [false]: fraudGpsAddressLoading
+                        ? "text-amber-700 bg-amber-50 border-amber-200"
+                        : "text-red-700 bg-red-50 border-red-200",
+                    }[Boolean(fraudGps)]}`}
+                  >
+                    {fraudGps ? "Captured" : fraudGpsAddressLoading ? "Capturing..." : "Unavailable"}
+                  </span>
+                </div>
+                <div className="border-t border-gray-100 pt-1.5">
+                  <span className="block text-gray-900 break-words">
+                    {fraudGpsAddressLoading
+                      ? "Acquiring the physical customer location used for this order..."
+                      : fraudGpsAddress || "Precise physical GPS is required before this order can be placed."}
+                  </span>
+                  {fraudGps && (
+                    <span className="block text-[10px] text-gray-500 mt-1">
+                      Coordinates: {fraudGps.lat.toFixed(6)}, {fraudGps.lon.toFixed(6)}
+                      {Number.isFinite(Number(fraudGps.accuracy)) ? ` • ±${Math.round(Number(fraudGps.accuracy))} m` : ""}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-500 leading-relaxed">
+                  This is the customer's physical location at checkout time. It is stored separately and does not change the delivery address.
+                </p>
+              </div>
+
               {/* Delivery Information */}
               <div className="p-2.5 rounded-none border border-slate-200 bg-slate-50 space-y-2.5 text-xs font-mono">
                 <div className="flex justify-between items-start">
