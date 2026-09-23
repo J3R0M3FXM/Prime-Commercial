@@ -75,7 +75,7 @@ export function calculateCustomerTier(
   let cycleItemsSpend = 0;
   for (const ord of completedOrders) {
     const ordDate = new Date(ord.deliveredAt || ord.createdAt || 0).getTime();
-    if (ordDate >= cycleStart.getTime() && ordDate <= cycleEnd.getTime()) {
+    if (ordDate >= cycleStart.getTime() && ordDate < cycleEnd.getTime()) {
       cycleItemsSpend += Math.max(0, Number(ord.subTotal ?? ord.subtotal ?? 0));
     }
   }
