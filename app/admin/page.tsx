@@ -3984,12 +3984,12 @@ export default function AdminPage() {
                           </span>
                         </div>
                         <div 
-                          onClick={() => copyToClipboard(selectedOrder.customerName, "customerName", "TELEGRAM NAME")}
+                          onClick={() => copyToClipboard(selectedOrder.telegramName || selectedOrder.customerName, "customerName", "TELEGRAM NAME")
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Telegram Name"
                         >
                           <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
-                            {selectedOrder.customerName || "Customer"}
+                            {selectedOrder.telegramName || "Not captured"}
                           </span>
                           {copiedKey === "customerName" ? (
                             <Check className="w-3 h-3 text-emerald-600 shrink-0" />
@@ -4008,13 +4008,13 @@ export default function AdminPage() {
                           </span>
                         </div>
                         <div 
-                          onClick={() => copyToClipboard(selectedOrder.customerUsername, "customerUsername", "TELEGRAM HANDLE")}
+                          onClick={() => copyToClipboard(selectedOrder.telegramUsername, "customerUsername", "TELEGRAM HANDLE")
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Telegram Handle"
                         >
                           <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
-                            {selectedOrder.customerUsername 
-                              ? (selectedOrder.customerUsername.startsWith('@') ? selectedOrder.customerUsername : `@${selectedOrder.customerUsername}`) 
+                            {selectedOrder.telegramUsername 
+                              ? (selectedOrder.telegramUsername.startsWith('@') ? selectedOrder.telegramUsername : `@${selectedOrder.telegramUsername}`) 
                               : "None"}
                           </span>
                           {copiedKey === "customerUsername" ? (
@@ -4034,12 +4034,12 @@ export default function AdminPage() {
                           </span>
                         </div>
                         <div 
-                          onClick={() => copyToClipboard(String(selectedOrder.customerId || selectedOrder.tgUserId), "customerId", "TELEGRAM UID")}
+                          onClick={() => copyToClipboard(String(selectedOrder.telegramUserId || selectedOrder.tgUserId || ""), "customerId", "TELEGRAM UID")
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Telegram UID"
                         >
                           <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
-                            {selectedOrder.customerId || selectedOrder.tgUserId || "None"}
+                            {selectedOrder.telegramUserId || "None"}
                           </span>
                           {copiedKey === "customerId" ? (
                             <Check className="w-3 h-3 text-emerald-600 shrink-0" />
@@ -4058,12 +4058,12 @@ export default function AdminPage() {
                           </span>
                         </div>
                         <div 
-                          onClick={() => copyToClipboard(selectedOrder.primeMemberId, "primeMemberId", "PRIME MID")}
+                          onClick={() => copyToClipboard(selectedOrder.telegramPrimeMemberId || selectedOrder.primeMemberId, "primeMemberId", "PRIME MID")
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy PRIME MID"
                         >
                           <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
-                            {selectedOrder.primeMemberId || "Unassigned"}
+                            {selectedOrder.telegramPrimeMemberId || selectedOrder.primeMemberId || "Unassigned"}
                           </span>
                           {copiedKey === "primeMemberId" ? (
                             <Check className="w-3 h-3 text-emerald-600 shrink-0" />
@@ -4161,46 +4161,30 @@ export default function AdminPage() {
 
                       {/* COORDINATES */}
                       {(() => {
-                        const coords = (() => {
-                          if (selectedOrder.deviceSnapshot?.location?.latitude && selectedOrder.deviceSnapshot?.location?.longitude) {
-                            return `${selectedOrder.deviceSnapshot.location.latitude}, ${selectedOrder.deviceSnapshot.location.longitude}`;
-                          }
-                          if (selectedOrder.deviceSnapshot?.location?.lat && selectedOrder.deviceSnapshot?.location?.lon) {
-                            return `${selectedOrder.deviceSnapshot.location.lat}, ${selectedOrder.deviceSnapshot.location.lon}`;
-                          }
-                          if (selectedOrder.coordinates) {
-                            if (typeof selectedOrder.coordinates === "string" && selectedOrder.coordinates.trim()) return selectedOrder.coordinates.trim();
-                            if (typeof selectedOrder.coordinates === "object" && selectedOrder.coordinates?.lat && (selectedOrder.coordinates?.lon || selectedOrder.coordinates?.lng)) {
-                              return `${selectedOrder.coordinates.lat}, ${selectedOrder.coordinates.lon || selectedOrder.coordinates.lng}`;
-                            }
-                          }
-                          if (selectedOrder.deviceSnapshot?.coordinates) {
-                            if (typeof selectedOrder.deviceSnapshot.coordinates === "string" && selectedOrder.deviceSnapshot.coordinates.trim()) return selectedOrder.deviceSnapshot.coordinates.trim();
-                          }
-                          return "Not captured";
-                        })();
-
+                        const gps = selectedOrder.deviceSnapshot?.deviceGps
+                          || selectedOrder.fingerprintSnapshot?.deviceGps
+                          || selectedOrder.deviceSnapshot?.location
+                          || selectedOrder.fingerprintSnapshot?.location
+                          || null;
+                        const lat = Number(gps?.lat ?? gps?.latitude);
+                        const lon = Number(gps?.lon ?? gps?.longitude);
+                        const hasGps = Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0);
+                        const coords = hasGps ? `${lat.toFixed(6)}, ${lon.toFixed(6)}` : "Not captured";
                         return (
                           <div>
                             <div className="flex items-center gap-1 leading-none text-slate-400">
                               <Compass className="w-2.5 h-2.5 shrink-0 text-slate-400" />
-                              <span className="font-heading font-medium text-[9.5px] uppercase tracking-wider text-slate-400">
-                                COORDINATES
-                              </span>
+                              <span className="font-heading font-medium text-[9.5px] uppercase tracking-wider text-slate-400">COORDINATES</span>
                             </div>
-                            <div 
+                            <div
                               onClick={() => copyToClipboard(coords, "coordinates", "COORDINATES")}
                               className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
-                              title="Click to copy Coordinates"
+                              title="Coordinates captured from the customer's device GPS at order time"
                             >
                               <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
                                 {coords}
                               </span>
-                              {copiedKey === "coordinates" ? (
-                                <Check className="w-3 h-3 text-emerald-600 shrink-0" />
-                              ) : (
-                                <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                              )}
+                              {copiedKey === "coordinates" ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />}
                             </div>
                           </div>
                         );
@@ -4299,28 +4283,37 @@ export default function AdminPage() {
                       })()}
 
                       {/* PRECISE GPS ADDRESS */}
-                      <div className="col-span-2">
-                        <div className="flex items-center gap-1 leading-none text-slate-400">
-                          <MapPin className="w-2.5 h-2.5 shrink-0 text-slate-400" />
-                          <span className="font-heading font-medium text-[9.5px] uppercase tracking-wider text-slate-400">
-                            PRECISE GPS ADDRESS
-                          </span>
-                        </div>
-                        <div 
-                          onClick={() => copyToClipboard(gpsStreetAddressText, "gpsAddress", "PRECISE GPS ADDRESS")}
-                          className="mt-0.5 flex items-start gap-1 cursor-pointer group hover:text-indigo-600 transition-colors"
-                          title="Click to copy Precise GPS Address"
-                        >
-                          <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
-                            {gpsStreetAddressText}
-                          </span>
-                          {copiedKey === "gpsAddress" ? (
-                            <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
-                          ) : (
-                            <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
-                          )}
-                        </div>
-                      </div>
+                      {(() => {
+                        const gps = selectedOrder.deviceSnapshot?.deviceGps
+                          || selectedOrder.fingerprintSnapshot?.deviceGps
+                          || selectedOrder.deviceSnapshot?.location
+                          || selectedOrder.fingerprintSnapshot?.location
+                          || null;
+                        const gpsAddress = String(
+                          gps?.reverseGeocodedAddress
+                          || selectedOrder.deviceSnapshot?.reverseGeocodedAddress
+                          || selectedOrder.fingerprintSnapshot?.reverseGeocodedAddress
+                          || ""
+                        ).trim();
+                        return (
+                          <div className="col-span-2">
+                            <div className="flex items-center gap-1 leading-none text-slate-400">
+                              <MapPin className="w-2.5 h-2.5 shrink-0 text-slate-400" />
+                              <span className="font-heading font-medium text-[9.5px] uppercase tracking-wider text-slate-400">PRECISE GPS ADDRESS</span>
+                            </div>
+                            <div
+                              onClick={() => copyToClipboard(gpsAddress, "gpsAddress", "PRECISE GPS ADDRESS")}
+                              className="mt-0.5 flex items-start gap-1 cursor-pointer group hover:text-indigo-600 transition-colors"
+                              title="Reverse-geocoded from the customer's captured device GPS at order time"
+                            >
+                              <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-snug tracking-normal break-words flex-1 group-hover:text-indigo-600 transition-colors">
+                                {gpsAddress || "Not captured"}
+                              </span>
+                              {copiedKey === "gpsAddress" ? <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" /> : <Copy className="w-2.5 h-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
