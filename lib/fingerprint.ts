@@ -51,25 +51,20 @@ function stableFingerprintSecretMaterial() {
 export function getServerFingerprintId(request: Request): string {
   const ip = getRequestClientIp(request);
   const userAgent = request.headers.get('user-agent') || '';
-  const secChUa = request.headers.get('sec-ch-ua') || '';
-  const secChUaPlatform = request.headers.get('sec-ch-ua-platform') || '';
-  const acceptLanguage = request.headers.get('accept-language') || '';
-  const raw = [ip, userAgent, secChUa, secChUaPlatform, acceptLanguage]
+  const platform = request.headers.get('sec-ch-ua-platform') || '';
+  const raw = [ip, userAgent, platform]
     .map((value) => String(value || '').trim().toLowerCase())
     .join('|');
 
   const secret = stableFingerprintSecretMaterial();
   if (secret) {
-    const crypto = require('crypto') as typeof import('crypto');
     return `SRVFP_${crypto.createHmac('sha256', secret).update(raw).digest('hex').slice(0, 32).toUpperCase()}`;
   }
 
-  const crypto = require('crypto') as typeof import('crypto');
   return `SRVFP_${crypto.createHash('sha256').update(raw).digest('hex').slice(0, 32).toUpperCase()}`;
 }
 
 export function buildDeviceFingerprintId(rawData: FingerprintPayload): string {
-  const crypto = require('crypto') as typeof import('crypto');
   const stableValues = [
     rawData.deviceId,
     rawData.hardwareId,
@@ -89,9 +84,9 @@ export function buildDeviceFingerprintId(rawData: FingerprintPayload): string {
     rawData.touchSupport,
   ]
     .map((value) => String(value ?? '').trim().toLowerCase())
-    .join('\u001f');
+    .join('|');
 
-  if (!stableValues.replace(/\u001f/g, '')) return '';
+  if (!stableValues.replace(/\|/g, '')) return '';
   return `DEVFP_${crypto.createHash('sha256').update(stableValues).digest('hex').slice(0, 32).toUpperCase()}`;
 }
 
