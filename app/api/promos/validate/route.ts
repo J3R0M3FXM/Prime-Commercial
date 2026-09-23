@@ -24,7 +24,6 @@ export async function POST(request: Request) {
       itemQuantity = 0,
       totalItems = 0,
       deliveryFee = 0,
-      customerTier: _clientTier = '',
       paymentMethod = '',
       courierId = '',
       deviceId = '',
@@ -33,7 +32,6 @@ export async function POST(request: Request) {
 
     const customerId = auth.customer.id;
     const primeMemberId = auth.customer.prime_member_id || '';
-    const customerTier = '';
 
     const cleanCode = String(code || '').trim().toUpperCase();
     if (!cleanCode) {
@@ -130,7 +128,7 @@ export async function POST(request: Request) {
 
     // 6. Target Audience & Customer Eligibility
     let completedOrdersCount = 0;
-    let computedTier = (customerTier || 'SILVER').toUpperCase();
+    let computedTier = 'SILVER';
 
     if (customerId || primeMemberId) {
       try {
@@ -140,9 +138,7 @@ export async function POST(request: Request) {
           return st === 'delivered' || st === 'completed';
         });
         completedOrdersCount = completedDocs.length;
-        if (!customerTier) {
-          computedTier = calculateCustomerTier(completedDocs).tier;
-        }
+        computedTier = calculateCustomerTier(completedDocs).tier;
       } catch (err) {
         console.warn('Customer order lookup error in promo validation:', err);
       }
@@ -236,8 +232,7 @@ export async function POST(request: Request) {
 
         const otherAccountRedemptions = deviceRedemptions.filter(r => {
           const isSameCust = customerId && r.customerId === customerId;
-          const isSamePrime = primeMemberId && r.customerId === primeMemberId;
-          return !isSameCust && !isSamePrime;
+          return !isSameCust;
         });
 
         if (otherAccountRedemptions.length > 0) {
@@ -282,7 +277,8 @@ export async function POST(request: Request) {
       cashbackPoints: discCalc.cashbackPoints,
       maxDiscountAmount: promo.maxDiscountAmount || null,
       minSpend: promo.minSpend || 0,
-      minItemQuantity: promo.minItemQuantity || 0
+      minItemQuantity: promo.minItemQuantity || 0,
+      customerTier: computedTier
     });
   } catch (err: any) {
     console.error('Promo validate error:', err);
