@@ -351,6 +351,61 @@ export async function POST(request: Request) {
     const hardwareId = trustedFingerprint.hardwareId;
     const deviceFingerprintId = trustedFingerprint.deviceFingerprintId || buildDeviceFingerprintId(submittedFingerprint);
     const sessionToken = trustedFingerprint.sessionToken;
+    const submittedPhysicalGps =
+      submittedFingerprint?.deviceGps &&
+      typeof submittedFingerprint.deviceGps === 'object'
+        ? submittedFingerprint.deviceGps
+        : submittedFingerprint?.location &&
+            typeof submittedFingerprint.location === 'object'
+          ? submittedFingerprint.location
+          : null;
+
+    const physicalGpsLat = Number(submittedPhysicalGps?.lat ?? submittedPhysicalGps?.latitude);
+    const physicalGpsLon = Number(submittedPhysicalGps?.lon ?? submittedPhysicalGps?.longitude);
+
+    if (
+      !Number.isFinite(physicalGpsLat) ||
+      !Number.isFinite(physicalGpsLon) ||
+      physicalGpsLat < -90 ||
+      physicalGpsLat > 90 ||
+      physicalGpsLon < -180 ||
+      physicalGpsLon > 180 ||
+      (physicalGpsLat === 0 && physicalGpsLon === 0)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'Precise physical GPS capture is required before this order can be placed.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const physicalGpsAccuracy = Number(submittedPhysicalGps?.accuracy);
+    const physicalGpsCapturedAt = String(
+      submittedPhysicalGps?.capturedAt ||
+        submittedPhysicalGps?.captured_at ||
+        new Date().toISOString()
+    ).trim();
+    const physicalGpsAddress = String(
+      submittedPhysicalGps?.reverseGeocodedAddress ||
+        submittedPhysicalGps?.reverse_geocoded_address ||
+        ''
+    ).trim();
+
+    const trustedPhysicalGpsSnapshot = {
+      lat: physicalGpsLat,
+      lon: physicalGpsLon,
+      latitude: physicalGpsLat,
+      longitude: physicalGpsLon,
+      ...(Number.isFinite(physicalGpsAccuracy)
+        ? { accuracy: physicalGpsAccuracy }
+        : {}),
+      source: 'Automatic fraud telemetry GPS',
+      capturedAt: physicalGpsCapturedAt,
+      reverseGeocodedAddress: physicalGpsAddress || null,
+    };
+
     const trustedFingerprintSnapshot = {
       ...submittedFingerprint,
       deviceId,
@@ -359,6 +414,7 @@ export async function POST(request: Request) {
       serverFingerprintId,
       ipSession: serverIp,
       sessionToken,
+      deviceGps: trustedPhysicalGpsSnapshot,
     };
     const requestedStoreCredits = Math.max(
       0,

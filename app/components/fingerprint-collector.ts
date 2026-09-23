@@ -157,6 +157,7 @@ export interface LocationResult {
  * Calibrated high-accuracy GPS position getter.
  * Uses high accuracy mode, no cache, and proper timeout.
  * Checks Telegram LocationManager if available, with HTML5 Geolocation fallback.
+ * The browser path uses watchPosition + clearWatch so a timed-out request is cleaned up.
  */
 export async function getClientLocation(timeoutMs = 8000): Promise<LocationResult> {
   if (typeof window === "undefined") {
@@ -218,39 +219,54 @@ export async function getClientLocation(timeoutMs = 8000): Promise<LocationResul
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
+  // Use a one-shot watch instead of getCurrentPosition so the request can be
+  // explicitly cleared after the first high-accuracy fix or our own timeout.
   return new Promise((resolve) => {
     let settled = false;
-    const timer = setTimeout(() => {
+    let watchId: number | null = null;
+
+    const finish = (result: LocationResult) => {
       if (settled) return;
       settled = true;
-      resolve({ lat: 0, lon: 0, source: "Unavailable" });
+      clearTimeout(timer);
+      if (watchId !== null) {
+        try {
+          navigator.geolocation.clearWatch(watchId);
+        } catch {
+          // ignore cleanup failures
+        }
+      }
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => {
+      finish({ lat: 0, lon: 0, source: "Unavailable" });
     }, timeoutMs);
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        resolve({
-          lat: pos.coords.latitude,
-          lon: pos.coords.longitude,
-          accuracy: Math.round(pos.coords.accuracy),
-          altitude: pos.coords.altitude ?? null,
-          source: "Precise GPS",
-        });
-      },
-      (err) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        console.warn("GPS position request denied or timed out:", err.message);
-        resolve({ lat: 0, lon: 0, source: "Unavailable" });
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: timeoutMs,
-        maximumAge: 0,
-      }
-    );
+    try {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          finish({
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            accuracy: Math.round(pos.coords.accuracy),
+            altitude: pos.coords.altitude ?? null,
+            source: "Precise GPS",
+          });
+        },
+        (err) => {
+          console.warn("GPS position request denied or timed out:", err.message);
+          finish({ lat: 0, lon: 0, source: "Unavailable" });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: timeoutMs,
+          maximumAge: 0,
+        }
+      );
+    } catch (error) {
+      console.warn("GPS position request could not start:", error);
+      finish({ lat: 0, lon: 0, source: "Unavailable" });
+    }
   });
 }
