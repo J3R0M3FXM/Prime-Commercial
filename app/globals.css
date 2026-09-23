@@ -1286,3 +1286,199 @@ body.admin-mode {
     height: 52px !important;
   }
 }
+
+/* PRIME ADMIN PROFESSIONAL COMPOSITION
+   Structure by hierarchy, not by a wall of bordered tiles. */
+.admin-shell .admin-command-home {
+  padding: 0 4px 10px !important;
+  background: #f5f6f7;
+}
+.admin-shell .admin-command-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 29px;
+  padding: 0 6px;
+  border-bottom: 1px solid #ccd2d9;
+  color: #3f4852;
+  font: 700 9px/1 'Roboto Condensed', sans-serif;
+  letter-spacing: .08em;
+}
+.admin-shell .admin-command-heading {
+  padding: 13px 4px 10px;
+  border-bottom: 1px solid #cfd5dc;
+}
+.admin-shell .admin-command-heading h2 {
+  margin: 2px 0 0;
+  color: #171c22;
+  font: 700 clamp(20px, 2.6vw, 29px)/1 'Roboto Condensed', sans-serif !important;
+  letter-spacing: .01em;
+  text-transform: uppercase;
+}
+.admin-shell .admin-command-heading p {
+  margin: 5px 0 0;
+  color: #6d7782;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.admin-shell .admin-kpi-rail {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 7px 0 6px;
+  border-top: 1px solid #bcc4cc;
+  border-bottom: 1px solid #bcc4cc;
+  background: #fff;
+}
+.admin-shell .admin-kpi {
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 10px 7px;
+  border-right: 1px solid #d9dee4;
+  border-top: 2px solid #27323c;
+}
+.admin-shell .admin-kpi:last-child { border-right: 0; }
+.admin-shell .admin-kpi--accent { border-top-color: #65727f; }
+.admin-shell .admin-kpi--warning { border-top-color: #9b7330; }
+.admin-shell .admin-kpi span {
+  display: block;
+  color: #727d88;
+  font: 700 8px/1 'Roboto Condensed', sans-serif;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.admin-shell .admin-kpi strong {
+  display: block;
+  margin-top: 5px;
+  color: #171c22;
+  font: 700 21px/.95 'Roboto Condensed', sans-serif;
+}
+.admin-shell .admin-kpi small {
+  display: block;
+  margin-top: 3px;
+  color: #9099a2;
+  font-size: 8px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.admin-shell .admin-section {
+  margin-top: 6px;
+  border: 1px solid #cbd2d9;
+  background: #fff;
+}
+.admin-shell .admin-section__header {
+  min-height: 41px !important;
+  padding: 7px 9px !important;
+  background: #f8f9fa;
+  border-bottom: 1px solid #d5dae0;
+}
+.admin-shell .admin-section__header:hover { background: #f2f4f6; }
+.admin-shell .admin-section__title-wrap {
+  gap: 0;
+}
+.admin-shell .admin-section__title-wrap > .admin-icon-box { display:none; }
+.admin-shell .admin-section__title {
+  font-size: 12px;
+  letter-spacing: .06em;
+}
+.admin-shell .admin-section__description {
+  margin-top: 2px;
+  color: #78838e;
+  font-size: 9px;
+}
+.admin-shell .admin-section__body { padding: 0 !important; }
+.admin-shell .admin-command-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.admin-shell .admin-command-item {
+  display: grid;
+  grid-template-columns: 30px minmax(0,1fr) 16px;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 61px !important;
+  padding: 7px 9px !important;
+  border: 0 !important;
+  border-right: 1px solid #e0e4e8 !important;
+  border-bottom: 1px solid #e0e4e8 !important;
+  border-radius: 0 !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  text-align: left;
+}
+.admin-shell .admin-command-item:nth-child(2n) { border-right: 0 !important; }
+.admin-shell .admin-command-item:hover { background: #fafbfc !important; }
+.admin-shell .admin-command-item__icon {
+  width: 30px;
+  height: 30px;
+  display:grid;
+  place-items:center;
+  border: 1px solid #d6dce2;
+  background:#f1f3f5;
+  color:#505b66;
+}
+.admin-shell .admin-command-item__copy { min-width:0; }
+.admin-shell .admin-command-item__copy strong {
+  display:block;
+  color:#1d242b;
+  font:700 10px/1.1 'Roboto Condensed',sans-serif;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+}
+.admin-shell .admin-command-item__copy small {
+  display:block;
+  margin-top:4px;
+  color:#7d8791;
+  font:700 8px/1 'Lato Condensed',sans-serif;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.admin-shell .admin-command-item__arrow {
+  justify-self:end;
+  color:#9aa2aa;
+}
+.admin-shell .admin-command-grid--config .admin-command-item:last-child { border-bottom: 0 !important; }
+.admin-shell .admin-connection-bar {
+  display:grid;
+  grid-template-columns:7px minmax(0,1fr) auto;
+  align-items:center;
+  gap:8px;
+  margin-top:6px;
+  padding:7px 8px;
+  border-top:1px solid #cbd2d9;
+  border-bottom:1px solid #cbd2d9;
+  background:#fbfcfd;
+}
+.admin-shell .admin-connection-bar > .admin-live-dot { width:7px; height:7px; }
+.admin-shell .admin-connection-bar strong {
+  display:block;
+  color:#2a323a;
+  font:700 9px/1 'Roboto Condensed',sans-serif;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.admin-shell .admin-connection-bar span:not(.admin-live-dot) {
+  display:block;
+  margin-top:2px;
+  color:#7c8791;
+  font-size:8px;
+  line-height:1.2;
+}
+.admin-shell .admin-install-banner--compact { margin-top:6px; padding:7px 8px; }
+.admin-shell .admin-command-home .admin-module-tile { display:none !important; }
+
+@media (max-width: 429px) {
+  .admin-shell .admin-command-heading { padding:10px 3px 9px; }
+  .admin-shell .admin-command-heading h2 { font-size:21px !important; }
+  .admin-shell .admin-kpi { min-height:54px; padding:7px; }
+  .admin-shell .admin-kpi strong { font-size:18px; }
+  .admin-shell .admin-kpi small { display:none; }
+  .admin-shell .admin-command-grid { grid-template-columns:1fr; }
+  .admin-shell .admin-command-item,
+  .admin-shell .admin-command-item:nth-child(2n) { min-height:55px !important; border-right:0 !important; }
+}
+@media (min-width: 900px) {
+  .admin-shell .admin-command-grid--config { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .admin-shell .admin-command-grid--config .admin-command-item:nth-child(2n) { border-right:1px solid #e0e4e8 !important; }
+  .admin-shell .admin-command-grid--config .admin-command-item:nth-child(3n) { border-right:0 !important; }
+}
