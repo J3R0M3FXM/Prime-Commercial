@@ -368,6 +368,16 @@ export async function POST(request: Request) {
 
     cacheStore.invalidateOrders();
 
+    const { data: persistedOrderDeadline } = await supabase
+      .from('orders')
+      .select('payment_deadline_at')
+      .eq('id', createdOrder?.id || orderNumber)
+      .maybeSingle();
+
+    const paymentDeadlineAt =
+      persistedOrderDeadline?.payment_deadline_at ||
+      new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
     const authoritativeOrder = {
       success: true,
       id: createdOrder?.id || orderNumber,
@@ -401,6 +411,8 @@ export async function POST(request: Request) {
       referralCode: createdOrder?.referralCode || referrerMemberId || auth.customer.referred_by_member_id || null,
       status: 'Pending',
       paymentStatus: 'Unpaid',
+      paymentDeadlineAt,
+      paymentProofSubmittedAt: null,
       notes: orderPayload.notes,
     };
 
@@ -412,6 +424,8 @@ export async function POST(request: Request) {
       totalAmount: authoritativeOrder.totalAmount,
       payableNow: authoritativeOrder.payableNow,
       items: authoritativeOrder.items,
+      paymentDeadlineAt: authoritativeOrder.paymentDeadlineAt,
+      paymentStatus: authoritativeOrder.paymentStatus,
       event: 'created',
     });
 
@@ -502,27 +516,96 @@ export async function PUT(request: Request) {
     }
     const supabase = getSupabaseAdmin()!;
 
+    const { data: currentOrder, error: currentOrderError } = await supabase
+      .from('orders')
+      .select('id,order_number,status,payment_status,payment_proof_image,payment_deadline_at,created_at,total_amount')
+      .or(`id.eq.${orderId},order_number.eq.${orderId}`)
+      .eq('customer_id', auth.customer.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (currentOrderError) throw currentOrderError;
+    if (!currentOrder) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    if (String(currentOrder.status || '').toLowerCase() !== 'pending') {
+      return NextResponse.json(
+        { error: 'Payment proof can only be submitted while the order is Pending.' },
+        { status: 409 }
+      );
+    }
+
+    if (String(currentOrder.payment_status || '').toLowerCase() !== 'unpaid') {
+      return NextResponse.json(
+        { error: 'This order is no longer awaiting payment proof.' },
+        { status: 409 }
+      );
+    }
+
+    if (String(currentOrder.payment_proof_image || '').trim()) {
+      return NextResponse.json(
+        { error: 'Payment proof has already been submitted for this order.' },
+        { status: 409 }
+      );
+    }
+
+    const paymentDeadlineMs = currentOrder.payment_deadline_at
+      ? Date.parse(String(currentOrder.payment_deadline_at))
+      : NaN;
+
+    if (Number.isFinite(paymentDeadlineMs) && paymentDeadlineMs <= Date.now()) {
+      return NextResponse.json(
+        { error: 'This order has expired because payment proof was not submitted within one hour.' },
+        { status: 409 }
+      );
+    }
+
+    const nowIso = new Date().toISOString();
     const updatePayload: Record<string, any> = {
       payment_method_id: paymentMethodId || '',
       payment_method_name: paymentMethodName || '',
       payment_proof_image: paymentProofImage || '',
+      payment_proof_submitted_at: nowIso,
       payment_status: 'Pending Review',
       review_status: 'Pending Manual Review',
       requires_manual_review: true,
-      updated_at: new Date().toISOString()
+      updated_at: nowIso,
     };
 
     if (ocrAnalysis) {
       updatePayload.ocr_analysis = ocrAnalysis;
     }
 
-    const { error } = await supabase
+    const { data: updatedOrder, error: updateError } = await supabase
       .from('orders')
       .update(updatePayload)
-      .or(`id.eq.${orderId},order_number.eq.${orderId}`)
-      .eq('customer_id', auth.customer.id);
+      .eq('id', currentOrder.id)
+      .eq('customer_id', auth.customer.id)
+      .eq('status', 'Pending')
+      .eq('payment_status', 'Unpaid')
+      .is('expired_at', null)
+      .gt('payment_deadline_at', nowIso)
+      .select('id,order_number,payment_deadline_at,payment_proof_submitted_at')
+      .maybeSingle();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
+
+    if (!updatedOrder) {
+      return NextResponse.json(
+        { error: 'This order has expired or is no longer awaiting payment proof.' },
+        { status: 409 }
+      );
+    }
+
+    void notifyPaymentUpdated({
+      chatId: auth.customer.tg_user_id,
+      orderNumber: String(currentOrder.order_number || orderId),
+      status: 'Pending',
+      totalAmount: Number(currentOrder.total_amount) || undefined,
+      paymentStatus: 'Pending Review',
+      event: 'payment',
+    });
 
     cacheStore.invalidateOrders();
 
