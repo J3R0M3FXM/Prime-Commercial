@@ -1036,3 +1036,33 @@ body.splash-active #system-wide-proprietary-footer {
 .admin-shell .admin-redemption-row strong { color:#2c333a; font-size:10px; }
 .admin-shell .admin-redemption-row small { display:block; margin-top:2px; color:#828c97; font-size:8px; line-height:1.2; }
 @media (max-width:420px){ .admin-shell .admin-promo-card__grid { grid-template-columns:1fr 1fr; } }
+
+
+.admin-shell .admin-feature-module > div:first-child h1,
+.admin-shell .admin-feature-module > div:first-child h2 {
+  font-family:'Roboto Condensed',sans-serif !important;
+  font-weight:700 !important;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+  color:#1b2229 !important;
+}
+.admin-shell .admin-feature-module > div:first-child p { color:#76818c !important; font-size:10px !important; line-height:1.3; }
+.admin-shell .admin-feature-module button { box-shadow:none !important; }
+.admin-shell .admin-feature-module .grid { min-width:0; }
+.admin-shell .admin-feature-module [class*="sticky"] { background:rgba(255,255,255,.96) !important; backdrop-filter:blur(8px); }
+.admin-shell .admin-feature-module [class*="border-dashed"] { border-color:#cbd2da !important; }
+.admin-shell .admin-feature-module [class*="bg-emerald-50"],
+.admin-shell .admin-feature-module [class*="bg-blue-50"],
+.admin-shell .admin-feature-module [class*="bg-purple-50"],
+.admin-shell .admin-feature-module [class*="bg-indigo-50"],
+.admin-shell .admin-feature-module [class*="bg-amber-50"],
+.admin-shell .admin-feature-module [class*="bg-rose-50"] { background:#f5f7f9 !important; }
+.admin-shell .admin-feature-module [class*="border-emerald-"],
+.admin-shell .admin-feature-module [class*="border-blue-"],
+.admin-shell .admin-feature-module [class*="border-purple-"],
+.admin-shell .admin-feature-module [class*="border-indigo-"],
+.admin-shell .admin-feature-module [class*="border-amber-"],
+.admin-shell .admin-feature-module [class*="border-rose-"] { border-color:#d7dde4 !important; }
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell *, .admin-shell *::before, .admin-shell *::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
