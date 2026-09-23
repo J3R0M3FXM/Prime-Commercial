@@ -207,8 +207,9 @@ export async function getCustomerOrdersFromDb(customerId: string, primeMemberId:
   return (data || []).map(o => ({
     id: o.id,
     status: o.status,
-    subtotal: Number(o.subtotal),
-    totalAmount: Number(o.total_amount),
+    subtotal: Number(o.subtotal) || 0,
+    subTotal: Number(o.subtotal) || 0,
+    totalAmount: Number(o.total_amount) || 0,
     createdAt: o.created_at
   })) as any[];
 }
