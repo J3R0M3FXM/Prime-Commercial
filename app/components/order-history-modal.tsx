@@ -1246,7 +1246,7 @@ export default function OrderHistoryModal({
                             <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 font-heading mb-1.5">
                               Select Payment Method
                             </label>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                               {paymentMethods.map((method: any) => {
                                 const isOffline = method.isActive === false;
                                 const isSelected = !isOffline && selectedPaymentMethod?.id === method.id;
@@ -1263,20 +1263,20 @@ export default function OrderHistoryModal({
                                       setProofError("");
                                       setProofImage("");
                                     }}
-                                    className={`relative min-h-[74px] border text-left bg-white p-2.5 rounded-lg transition-colors ${isSelected ? "border-slate-900 ring-1 ring-slate-900" : "border-slate-200 hover:border-slate-500"} ${isOffline ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                    className={`group w-full aspect-video border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white select-none rounded-lg ${isSelected ? "border-slate-900 ring-1 ring-slate-900" : "border-gray-200 hover:border-gray-400"} ${isOffline ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                                   >
                                     {method.logo ? (
-                                      <img src={method.logo} alt={method.name} className="absolute right-2 top-2 w-8 h-8 object-contain" referrerPolicy="no-referrer" />
+                                      <img src={method.logo} alt={method.name} className="absolute right-2 top-2 w-7 h-7 object-contain" referrerPolicy="no-referrer" />
                                     ) : (
                                       <CreditCard className="absolute right-2 top-2 w-4 h-4 text-slate-400" />
                                     )}
-                                    <span className="block pr-9 text-[10px] font-heading font-black uppercase tracking-wide text-slate-900">
+                                    <span className="block w-full px-2 pr-9 text-[9px] font-heading font-black uppercase tracking-wide text-slate-900 text-left truncate">
                                       {method.name}
                                     </span>
-                                    <span className="block mt-3 text-[9px] font-mono text-slate-500 uppercase">
+                                    <span className="absolute left-2 bottom-1.5 right-2 text-[8px] font-mono text-slate-500 uppercase truncate">
                                       {isOffline ? "Offline" : pType.includes("qr") ? "QR Payment" : pType.replace(/_/g, " ") || "Payment"}
                                     </span>
-                                    {isSelected && <span className="absolute left-2 bottom-2 text-[8px] font-bold uppercase text-emerald-700">Selected</span>}
+                                    {isSelected && <span className="absolute left-2 bottom-1.5 text-[7px] font-bold uppercase text-emerald-700 bg-white/90 px-1">Selected</span>}
                                   </button>
                                 );
                               })}
