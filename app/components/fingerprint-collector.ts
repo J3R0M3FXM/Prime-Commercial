@@ -185,7 +185,7 @@ export async function getClientLocation(timeoutMs = 10000): Promise<LocationResu
           settled = true;
           resolve({
             data: null,
-            nativeAvailable: tgLocationManager?.isLocationAvailable !== false,
+            nativeAvailable: tgLocationManager?.isLocationAvailable === true,
           });
         }, timeoutMs);
 
@@ -201,7 +201,7 @@ export async function getClientLocation(timeoutMs = 10000): Promise<LocationResu
 
         try {
           tgLocationManager.init(() => {
-            const nativeAvailable = tgLocationManager?.isLocationAvailable !== false;
+            const nativeAvailable = tgLocationManager?.isLocationAvailable === true;
             if (!nativeAvailable) {
               finish(null);
               return;
