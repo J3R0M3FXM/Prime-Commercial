@@ -130,7 +130,7 @@ export async function POST(request: Request) {
 
     // 6. Target Audience & Customer Eligibility
     let completedOrdersCount = 0;
-    let computedTier = (customerTier || 'MEMBER').toUpperCase();
+    let computedTier = (customerTier || 'SILVER').toUpperCase();
 
     if (customerId || primeMemberId) {
       try {
