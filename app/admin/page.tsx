@@ -2169,7 +2169,12 @@ export default function AdminPage() {
                         )}
 
                         <div>
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">                          {Number(ord.storeCreditsUsed || 0) > 0 && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase border border-emerald-200 bg-emerald-50 text-emerald-700">
+                              Credits Applied {formatPHP(Number(ord.storeCreditsUsed))}
+                            </span>
+                          )}
+
                             <span className="font-heading font-black text-sm text-slate-900 group-hover:text-black">
                               {customer.tgName || "Unnamed User"}
                             </span>
@@ -4493,6 +4498,21 @@ export default function AdminPage() {
                   <div className="border border-slate-200 rounded-none divide-y divide-slate-100 overflow-hidden">
                     {(selectedOrder.items || []).map((it: any, i: number) => {
                       const isFreeItem = Boolean(it.isFree || Number(it.price) === 0);
+                      const itemProductId = String(it?.productId || it?.product_id || "").trim();
+                      const itemVariantId = String(it?.variantId || it?.variant_id || "").trim();
+                      const catalogProduct = products.find((product: any) => String(product?.id || "") === itemProductId);
+                      const catalogVariants = Array.isArray(catalogProduct?.variants)
+                        ? catalogProduct.variants
+                        : (Array.isArray(catalogProduct?.bundle_config?.variants) ? catalogProduct.bundle_config.variants : []);
+                      const catalogVariant = catalogVariants.find((variant: any) => String(variant?.id || "") === itemVariantId) || null;
+                      const humanVariantName = String(
+                        it?.selectedVariant?.name ||
+                        it?.variantName ||
+                        catalogVariant?.name ||
+                        catalogVariant?.label ||
+                        catalogVariant?.title ||
+                        ""
+                      ).trim();
                       return (
                         <div key={i} className="p-3 flex items-center justify-between text-xs font-mono">
                           <div>
@@ -4506,17 +4526,17 @@ export default function AdminPage() {
                             </div>
                             <p className="text-slate-500">
                               Qty {it.quantity} &bull; Unit {isFreeItem ? <span className="text-emerald-600 font-bold">FREE</span> : <span className="font-ibm-condensed">{formatPHP(it.price)}</span>}
-                              {(it.selectedVariant?.name || it.variantName || (it.variantId && it.variantId !== "default")) && (
-                                <span className="text-slate-400 ml-1.5">
-                                  &bull; Variant: {it.selectedVariant?.name || it.variantName || it.variantId}
-                                </span>
-                              )}
                               {it.originalPrice && it.originalPrice !== it.price && (
                                 <span className="text-slate-400 line-through ml-1.5 font-ibm-condensed">
                                   {formatPHP(it.originalPrice)}
                                 </span>
                               )}
                             </p>
+                            {humanVariantName && (
+                              <p className="mt-1 text-[10px] font-mono font-bold uppercase tracking-wide text-slate-700">
+                                Variant: {humanVariantName}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5">
                             <p className={`font-ibm-condensed font-medium text-sm ${isFreeItem ? "text-emerald-600 font-bold" : "text-slate-900"}`}>
@@ -4592,6 +4612,19 @@ export default function AdminPage() {
                           </div>
                         );
                       })}
+
+                      {/* Store Credits Applied */}
+                      {Number(selectedOrder.storeCreditsUsed || 0) > 0 && (
+                        <div className="flex justify-between items-center text-slate-600">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            <span>Store Credits Applied</span>
+                          </span>
+                          <span className="font-ibm-condensed font-bold text-emerald-700">
+                            -{formatPHP(Number(selectedOrder.storeCreditsUsed))}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Delivery Fee */}
                       {(Number(selectedOrder.deliveryFee) > 0 || selectedOrder.isDeliveryFeeFree) && (
