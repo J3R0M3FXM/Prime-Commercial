@@ -2102,6 +2102,21 @@ export default function CheckoutModal({
                 </div>
               )}
 
+              {completedOrder.paymentDeadlineAt && (
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-none text-center">
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-900">
+                    Payment Proof Deadline
+                  </p>
+                  <p className="text-xs font-mono text-amber-700 mt-0.5">
+                    Submit your payment receipt by {new Intl.DateTimeFormat("en-PH", {
+                      timeZone: "Asia/Manila",
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(completedOrder.paymentDeadlineAt))}
+                  </p>
+                </div>
+              )}
+
               {/* Settle Payment Section */}
               {Number(completedOrder.payableNow || 0) === 0 && Number(completedOrder.storeCreditsUsed || 0) > 0 ? (
                 <div className="border-t border-gray-200 pt-3">
