@@ -550,6 +550,13 @@ export async function PUT(request: Request) {
       );
     }
 
+    if (!String(paymentProofImage || '').trim()) {
+      return NextResponse.json(
+        { error: 'Payment proof image is required.' },
+        { status: 400 }
+      );
+    }
+
     const paymentDeadlineMs = currentOrder.payment_deadline_at
       ? Date.parse(String(currentOrder.payment_deadline_at))
       : NaN;
@@ -608,15 +615,6 @@ export async function PUT(request: Request) {
     });
 
     cacheStore.invalidateOrders();
-
-    void notifyPaymentUpdated({
-      chatId: auth.customer.tg_user_id,
-      orderNumber: String(orderId),
-      status: 'Pending',
-      totalAmount: Number(data.totalAmount) || undefined,
-      paymentStatus: 'Pending Review',
-      event: 'payment',
-    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
