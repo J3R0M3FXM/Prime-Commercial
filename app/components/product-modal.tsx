@@ -118,11 +118,11 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-0 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer"
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-[430px] sm:rounded-2xl rounded-t-2xl sm:rounded-b-2xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:fade-in-20 relative max-h-[90vh] flex flex-col cursor-default"
+        className="bg-white w-full max-w-[430px] rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 relative max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] flex flex-col min-h-0 cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -133,7 +133,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
           <X className="w-5 h-5" />
         </button>
 
-        <div className="overflow-y-auto px-4 pt-5 pb-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-5 pb-4 overscroll-contain">
           <div className="text-left pr-10">
             <p className="text-[9px] font-mono font-bold tracking-widest text-gray-400 uppercase leading-none">
               {product.category || "General"}
