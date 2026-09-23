@@ -4,6 +4,7 @@ import { cacheStore } from '@/lib/cache';
 import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 import { notifyOrderCreated, notifyPaymentUpdated } from '@/lib/telegram-notifications';
 import { getChargesFromDb } from '@/lib/db-adapter';
+import { buildDeviceFingerprintId, getRequestClientIp, getServerFingerprintId, resolveTrustedFingerprint } from '@/lib/fingerprint';
 import { calculateChargesBreakdown } from '@/lib/charges';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from '@/lib/delivery-fee';
 
@@ -308,7 +309,27 @@ export async function POST(request: Request) {
     }
 
     const orderNumber = getOrderNumber();
-    const deviceId = String(body?.deviceId || body?.deviceSnapshot?.deviceId || '').trim();
+    const submittedFingerprint = body?.fingerprintSnapshot && typeof body.fingerprintSnapshot === 'object'
+      ? body.fingerprintSnapshot
+      : body?.deviceSnapshot && typeof body.deviceSnapshot === 'object'
+        ? body.deviceSnapshot
+        : {};
+    const trustedFingerprint = resolveTrustedFingerprint(auth.customer, submittedFingerprint);
+    const serverFingerprintId = getServerFingerprintId(request);
+    const serverIp = getRequestClientIp(request);
+    const deviceId = trustedFingerprint.deviceId;
+    const hardwareId = trustedFingerprint.hardwareId;
+    const deviceFingerprintId = trustedFingerprint.deviceFingerprintId || buildDeviceFingerprintId(submittedFingerprint);
+    const sessionToken = trustedFingerprint.sessionToken;
+    const trustedFingerprintSnapshot = {
+      ...submittedFingerprint,
+      deviceId,
+      hardwareId,
+      deviceFingerprintId,
+      serverFingerprintId,
+      ipSession: serverIp,
+      sessionToken,
+    };
     const requestedStoreCredits = Math.max(
       0,
       toFiniteNumber(body?.storeCreditsUsed ?? body?.appliedStoreCredits, 0)
@@ -329,7 +350,10 @@ export async function POST(request: Request) {
       referrerUserId,
       referrerMemberId,
       deviceId,
-      fingerprintSnapshot: body?.fingerprintSnapshot || body?.deviceSnapshot || null,
+      hardwareId,
+      deviceFingerprintId,
+      serverFingerprintId,
+      fingerprintSnapshot: trustedFingerprintSnapshot,
       deliveryAddress: {
         ...deliveryAddress,
         lat: destinationLat,
