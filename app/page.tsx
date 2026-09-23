@@ -152,14 +152,8 @@ export default function Shopfront() {
           throw new Error("Valid Telegram WebApp session is required. Open PRIME from Telegram.");
         }
 
-        // Referral/media parameters are read only from Telegram WebApp data.
-        try {
-          const startParam = telegramWebApp.initDataUnsafe?.start_param;
-          if (startParam) {
-            localStorage.setItem("prime_referred_by", String(startParam).trim().toUpperCase());
-          }
-        } catch {}
-
+        // Media routing may use Telegram start_param, but referral codes are never
+        // written into customer referral state automatically.
         if (telegramWebApp.initDataUnsafe?.start_param === "media") {
           setIsVideoGalleryOpen(true);
           setActiveTab("media");
