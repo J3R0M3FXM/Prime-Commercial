@@ -124,76 +124,12 @@ export async function processMaturedReferrals(): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
   const supabase = getSupabaseAdmin()!;
   try {
-    const nowIso = new Date().toISOString();
-    const { data: orders, error } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('referral_points_status', 'pending_30m');
-
-    if (error || !orders || orders.length === 0) return 0;
-
-    let processedCount = 0;
-    for (const ord of orders) {
-      const creditAfter = ord.referral_points_credit_after;
-      if (creditAfter && creditAfter <= nowIso) {
-        const refereeId = ord.referred_by_user_id;
-        const refereeMemberId = ord.referred_by_member_id;
-
-        let refereeCustomerId: string | null = refereeId || null;
-        if (!refereeCustomerId && refereeMemberId) {
-          const { data: cust } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('prime_member_id', refereeMemberId)
-            .single();
-          if (cust) refereeCustomerId = cust.id;
-        }
-
-        if (refereeCustomerId) {
-          const { data: custData } = await supabase
-            .from('customers')
-            .select('points, lifetime_referral_points')
-            .eq('id', refereeCustomerId)
-            .single();
-
-          if (custData) {
-            const currentPts = Number(custData.points || 0);
-            const lifetimeRef = Number(custData.lifetime_referral_points || 0);
-
-            await supabase
-              .from('customers')
-              .update({
-                points: currentPts + 50,
-                lifetime_referral_points: lifetimeRef + 50,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', refereeCustomerId);
-
-            await supabase.from('point_transactions').insert([{
-              id: `tx-ref-${ord.id}-${Date.now()}`,
-              user_id: refereeCustomerId,
-              type: 'referral',
-              amount: 50,
-              order_id: ord.id,
-              description: `50 Referral Points for Order #${ord.order_number}`,
-              created_at: new Date().toISOString()
-            }]);
-
-            await supabase
-              .from('orders')
-              .update({
-                referral_points_status: 'credited',
-                referral_points_credited_at: new Date().toISOString(),
-                referral_points_amount: 50
-              })
-              .eq('id', ord.id);
-
-            processedCount++;
-          }
-        }
-      }
+    const { data, error } = await supabase.rpc('process_matured_referrals');
+    if (error) {
+      console.error('Error processing matured referrals:', error);
+      return 0;
     }
-    return processedCount;
+    return Number(data?.processed || 0);
   } catch (err) {
     console.error('Error processing matured referrals:', err);
     return 0;
