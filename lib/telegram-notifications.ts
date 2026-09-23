@@ -30,8 +30,8 @@ function getStatusIcon(status: string): string {
 }
 
 function getOrderDetailsUrl(orderNumber: string): string {
-  const configuredBase = String(process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '');
-  const base = configuredBase || 'https://primecommerce-prime-network.vercel.app';
+  // Customer notifications must never point at a Vercel preview/protected URL.
+  const base = 'https://primecommerce-prime-network.vercel.app';
   return `${base}/?openOrder=${encodeURIComponent(orderNumber)}`;
 }
 
