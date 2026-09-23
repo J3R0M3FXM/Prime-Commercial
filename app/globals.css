@@ -1066,3 +1066,223 @@ body.splash-active #system-wide-proprietary-footer {
 @media (prefers-reduced-motion: reduce) {
   .admin-shell *, .admin-shell *::before, .admin-shell *::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
 }
+
+
+/* ========================================================================== */
+/* PRIME ADMIN CORRECTION — full-bleed, calmer, compact dashboard              */
+/* The admin control plane must not inherit the storefront's 430px phone rail. */
+/* ========================================================================== */
+body.admin-mode {
+  background: #f3f5f7 !important;
+}
+
+#mobile-portrait-viewport.admin-viewport {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  border-inline: 0 !important;
+  box-shadow: none !important;
+  overflow-x: hidden !important;
+  background: #f3f5f7 !important;
+}
+
+#mobile-portrait-viewport.admin-viewport > :first-child {
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-shell .admin-content {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 4px 8px !important;
+}
+
+.admin-shell .admin-topbar__inner {
+  width: 100%;
+  max-width: none;
+  padding: 5px 6px;
+}
+
+.admin-shell .admin-topbar {
+  background: #ffffff;
+  border-bottom: 1px solid #cfd5dc;
+  backdrop-filter: none;
+}
+
+.admin-shell .admin-brandmark {
+  width: 25px;
+  height: 25px;
+  font-size: 12px;
+}
+
+.admin-shell .admin-icon-button {
+  width: 29px;
+  height: 29px;
+}
+
+.admin-shell .admin-page-header {
+  padding: 6px 2px;
+}
+
+.admin-shell .admin-page-description {
+  max-width: 72ch;
+}
+
+.admin-shell .admin-stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.admin-shell .admin-stat {
+  min-height: 48px;
+  padding: 5px 6px;
+  border-top-width: 1px;
+}
+
+.admin-shell .admin-stat__top {
+  font-size: 8px;
+  letter-spacing: .08em;
+}
+
+.admin-shell .admin-stat strong {
+  margin-top: 3px;
+  font-size: 18px;
+}
+
+.admin-shell .admin-stat small {
+  display: none;
+}
+
+.admin-shell .admin-section {
+  margin-top: 5px;
+  border-color: #cfd5dc;
+}
+
+.admin-shell .admin-section__header {
+  min-height: 36px !important;
+  padding: 5px 6px !important;
+}
+
+.admin-shell .admin-section__body {
+  padding: 0 4px 4px;
+}
+
+.admin-shell .admin-section__title-wrap {
+  gap: 6px;
+}
+
+.admin-shell .admin-section__title {
+  font-size: 11px;
+  letter-spacing: .035em;
+}
+
+.admin-shell .admin-section__description {
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.admin-shell .admin-icon-box,
+.admin-shell .admin-icon-box--muted {
+  width: 23px;
+  height: 23px;
+}
+
+.admin-shell .admin-module-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 4px;
+}
+
+.admin-shell .admin-module-tile {
+  min-height: 54px !important;
+  height: 54px !important;
+  padding: 5px 6px !important;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: 6px;
+  row-gap: 1px;
+  align-items: center;
+  justify-items: stretch;
+  text-align: left;
+  border: 1px solid #cdd3da !important;
+  border-top: 2px solid #1f2937 !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.admin-shell .admin-module-tile:hover {
+  background: #fbfcfd !important;
+  border-color: #b9c1ca !important;
+  transform: none !important;
+}
+
+.admin-shell .admin-module-icon {
+  width: 25px !important;
+  height: 25px !important;
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  border: 1px solid #d3d8de !important;
+  background: #f4f6f8 !important;
+  color: #4d5864 !important;
+}
+
+.admin-shell .admin-module-name {
+  grid-column: 2;
+  grid-row: 1;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap !important;
+  color: #1f252c;
+  font: 700 9px/1.05 'Roboto Condensed', sans-serif;
+  letter-spacing: .035em;
+}
+
+.admin-shell .admin-module-meta {
+  grid-column: 2;
+  grid-row: 2;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap !important;
+  color: #77818c;
+  font: 700 8px/1 'Lato Condensed', sans-serif;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.admin-shell .admin-status-strip {
+  margin-top: 5px;
+  padding: 5px 6px;
+}
+
+@media (min-width: 700px) {
+  .admin-shell .admin-content {
+    padding-inline: 8px !important;
+  }
+  .admin-shell .admin-module-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 429px) {
+  .admin-shell .admin-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .admin-shell .admin-module-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 359px) {
+  .admin-shell .admin-module-tile {
+    min-height: 52px !important;
+    height: 52px !important;
+  }
+}

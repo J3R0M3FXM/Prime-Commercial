@@ -358,6 +358,18 @@ const ImageUploadField = ({
 };
 
 export default function AdminPage() {
+  // The storefront uses a centered portrait shell, while Admin is intentionally
+  // full-bleed so the control plane can use the entire available viewport.
+  useEffect(() => {
+    const viewport = document.getElementById("mobile-portrait-viewport");
+    viewport?.classList.add("admin-viewport");
+    document.body.classList.add("admin-mode");
+    return () => {
+      viewport?.classList.remove("admin-viewport");
+      document.body.classList.remove("admin-mode");
+    };
+  }, []);
+
   const [authorized, setAuthorized] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [adminUser, setAdminUser] = useState<any>(null);
