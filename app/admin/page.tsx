@@ -2650,7 +2650,7 @@ export default function AdminPage() {
                       <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Device ID</p>
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-slate-900 font-mono text-xs truncate">
-                          {customerDetail.customer.deviceId || "DEV_STANDARD"}
+                          {customerDetail.customer.deviceId || "Not captured"}
                         </span>
                         <button
                           onClick={() => copyToClipboard(customerDetail.customer.deviceId || "DEV_STANDARD", "devId")}
@@ -2672,7 +2672,7 @@ export default function AdminPage() {
                     <div className="bg-slate-50 p-3.5 rounded-none border border-slate-100">
                       <p className="text-slate-400 uppercase text-[10px] tracking-widest font-bold mb-1">Hardware Code</p>
                       <span className="font-bold text-slate-900 font-mono text-xs truncate block">
-                        {customerDetail.customer.hardwareId || "HW_RECOGNIZED"}
+                        {customerDetail.customer.hardwareId || "Not captured"}
                       </span>
                     </div>
                   </div>
@@ -2684,10 +2684,10 @@ export default function AdminPage() {
                         <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                         <div>
                           <p className="text-xs font-bold text-red-900 uppercase tracking-wide">
-                            Promo Fraud Warning: Same Device Used by Multiple Accounts
+                            Promo Fraud Warning: Matching Device Fingerprint Used by Multiple Accounts
                           </p>
                           <p className="text-xs text-red-700 mt-0.5">
-                            This device has been used to access {customerDetail.customer.sharedAccounts.length + 1} different Telegram accounts. Please review to prevent duplicate promo code redemption:
+                            This device fingerprint has been associated with {customerDetail.customer.sharedAccounts.length + 1} different Telegram accounts. Review before allowing duplicate promo redemption:
                           </p>
                         </div>
                       </div>
