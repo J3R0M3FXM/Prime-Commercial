@@ -213,9 +213,18 @@ export default function Shopfront() {
             const customerUsername = authData.tgUsername || authData.user?.username || "";
             const memberId = authData.primeMemberId || authData.user?.primeMemberId || "";
 
-            const openOrderId = new URLSearchParams(window.location.search).get("openOrder");
+            const params = new URLSearchParams(window.location.search);
+            const queryOrderId = params.get("openOrder");
+            const telegramStartParam =
+              telegramWebApp?.initDataUnsafe?.start_param ||
+              params.get("tgWebAppStartParam") ||
+              "";
+
+            const rawOrderLink = queryOrderId || telegramStartParam;
+            const openOrderId = String(rawOrderLink || "").replace(/^order[_:-]?/i, "").trim();
+
             if (openOrderId) {
-              setInitialOrderIdFromLink(openOrderId.trim());
+              setInitialOrderIdFromLink(openOrderId);
               setActiveTab("orders");
             }
 
