@@ -36,6 +36,39 @@ interface OrderHistoryModalProps {
   initialSelectedOrderId?: string | null;
 }
 
+function normalizeOrder(raw: any) {
+  if (!raw || typeof raw !== "object") return raw;
+
+  return {
+    ...raw,
+    id: raw.id || raw.order_id || raw.orderId,
+    orderNumber: raw.orderNumber || raw.order_number || raw.id,
+    createdAt: raw.createdAt || raw.created_at || raw.updatedAt || raw.updated_at || null,
+    updatedAt: raw.updatedAt || raw.updated_at || null,
+    status: raw.status || raw.order_status || "Pending",
+    customerName: raw.customerName || raw.customer_name || "",
+    receiverName: raw.receiverName || raw.receiver_name || "",
+    receiverPhone: raw.receiverPhone || raw.receiver_phone || "",
+    deliveryAddress: raw.deliveryAddress || raw.delivery_address || {},
+    courierName: raw.courierName || raw.courier_name || "",
+    trackingNumber: raw.trackingNumber || raw.tracking_number || "",
+    trackingUrl: raw.trackingUrl || raw.tracking_url || "",
+    deliveryFee: raw.deliveryFee ?? raw.delivery_fee ?? 0,
+    deliveryFeePaymentMethod: raw.deliveryFeePaymentMethod || raw.delivery_fee_payment_method || "",
+    payableNow: raw.payableNow ?? raw.payable_now,
+    payableOnDelivery: raw.payableOnDelivery ?? raw.payable_on_delivery,
+    totalAmount: raw.totalAmount ?? raw.total_amount ?? 0,
+    subTotal: raw.subTotal ?? raw.subtotal ?? 0,
+    appliedCharges: raw.appliedCharges || raw.charges_breakdown || [],
+    paymentStatus: raw.paymentStatus || raw.payment_status || "Unpaid",
+    paymentMethodId: raw.paymentMethodId || raw.payment_method_id || "",
+    paymentMethodName: raw.paymentMethodName || raw.payment_method_name || "",
+    paymentProofImage: raw.paymentProofImage || raw.payment_proof_image || "",
+    items: Array.isArray(raw.items) ? raw.items : [],
+    notes: raw.notes || "",
+  };
+}
+
 export default function OrderHistoryModal({
   isOpen,
   onClose,
@@ -57,6 +90,10 @@ export default function OrderHistoryModal({
   const [isSubmittingProof, setIsSubmittingProof] = useState<boolean>(false);
   const [proofSuccess, setProofSuccess] = useState<boolean>(false);
   const [proofError, setProofError] = useState<string>("");
+  const [directReceiptOrderId, setDirectReceiptOrderId] = useState<string | null>(null);
+  const [isDirectReceiptUploading, setIsDirectReceiptUploading] = useState<boolean>(false);
+
+
 
   const selectedOrder = useMemo(() => {
     return orders.find(o => o.id === selectedOrderId || o.orderNumber === selectedOrderId) || null;
@@ -104,19 +141,25 @@ export default function OrderHistoryModal({
       
       // Add local first
       localOrders.forEach(o => {
-        const key = o.id || o.orderNumber;
-        if (key) orderMap.set(key, o);
+        const normalized = normalizeOrder(o);
+        const key = normalized.id || normalized.orderNumber;
+        if (key) orderMap.set(String(key), normalized);
       });
 
       // Add/overwrite with server
       serverOrders.forEach(o => {
-        const key = o.id || o.orderNumber;
-        if (key) orderMap.set(key, o);
+        const normalized = normalizeOrder(o);
+        const key = normalized.id || normalized.orderNumber;
+        if (key) orderMap.set(String(key), normalized);
       });
 
       const combined = Array.from(orderMap.values());
-      // Sort newest first
-      combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      // Always sort newest first. Prefer created_at/createdAt, with updated_at as fallback.
+      combined.sort((a, b) => {
+        const aTime = new Date(a.createdAt || a.updatedAt || 0).getTime();
+        const bTime = new Date(b.createdAt || b.updatedAt || 0).getTime();
+        return bTime - aTime;
+      });
 
       setOrders(combined);
     } catch (err: any) {
@@ -172,6 +215,11 @@ export default function OrderHistoryModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      setProofError("Please select an image receipt.");
+      return;
+    }
+
     if (file.size > 5 * 1024 * 1024) {
       setProofError("Image file size must be less than 5MB.");
       return;
@@ -182,13 +230,45 @@ export default function OrderHistoryModal({
 
     const reader = new FileReader();
     reader.onload = () => {
-      setProofImage(reader.result as string);
-      setIsUploadingProof(false);
+      const source = reader.result as string;
+      const image = new Image();
+
+      image.onload = () => {
+        try {
+          const maxDimension = 1600;
+          const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+          const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+          const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas unavailable");
+
+          ctx.drawImage(image, 0, 0, width, height);
+          const compressed = canvas.toDataURL("image/jpeg", 0.82);
+          setProofImage(compressed);
+        } catch {
+          setProofImage(source);
+        } finally {
+          setIsUploadingProof(false);
+        }
+      };
+
+      image.onerror = () => {
+        setProofError("Failed to process receipt image.");
+        setIsUploadingProof(false);
+      };
+
+      image.src = source;
     };
+
     reader.onerror = () => {
       setProofError("Failed to read image file.");
       setIsUploadingProof(false);
     };
+
     reader.readAsDataURL(file);
   };
 
@@ -262,9 +342,104 @@ export default function OrderHistoryModal({
     }
   };
 
+  const openDirectReceiptUploader = (order: any) => {
+    setDirectReceiptOrderId(order.id || order.orderNumber || null);
+    setProofImage("");
+    setProofError("");
+    setProofSuccess(false);
+
+    const existingMethodId = order.paymentMethodId || order.payment_method_id || "";
+    const existingMethodName = order.paymentMethodName || order.payment_method_name || "";
+    const existing = paymentMethods.find((m: any) => String(m.id) === String(existingMethodId));
+
+    setSelectedPaymentMethod(
+      existing ||
+      (existingMethodId || existingMethodName
+        ? { id: existingMethodId, name: existingMethodName || "Manual Payment", paymentType: "manual_transfer" }
+        : null)
+    );
+  };
+
+  const submitDirectReceipt = async (order: any) => {
+    if (!order) return;
+
+    if (!proofImage) {
+      setProofError("Please select a receipt image first.");
+      return;
+    }
+
+    setIsDirectReceiptUploading(true);
+    setProofError("");
+    setProofSuccess(false);
+
+    try {
+      const paymentMethodId = selectedPaymentMethod?.id || order.paymentMethodId || "";
+      const paymentMethodName = selectedPaymentMethod?.name || order.paymentMethodName || "Manual Payment";
+
+      const res = await authenticatedFetch("/api/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          paymentMethodId,
+          paymentMethodName,
+          paymentProofImage: proofImage,
+          totalAmount: Number(order.totalAmount || 0),
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to submit payment receipt.");
+      }
+
+      setProofSuccess(true);
+      setOrders(prev => prev.map(o =>
+        (o.id === order.id || o.orderNumber === order.orderNumber)
+          ? {
+              ...o,
+              paymentMethodId,
+              paymentMethodName,
+              paymentProofImage: proofImage,
+              paymentStatus: "Pending Review",
+            }
+          : o
+      ));
+
+      try {
+        const stored = JSON.parse(localStorage.getItem("prime_customer_orders") || "[]");
+        localStorage.setItem(
+          "prime_customer_orders",
+          JSON.stringify(
+            stored.map((o: any) =>
+              (o.id === order.id || o.orderNumber === order.orderNumber)
+                ? {
+                    ...o,
+                    paymentMethodId,
+                    paymentMethodName,
+                    paymentProofImage: proofImage,
+                    paymentStatus: "Pending Review",
+                  }
+                : o
+            )
+          )
+        );
+      } catch (e) {}
+
+      window.dispatchEvent(new Event("prime_orders_updated"));
+    } catch (err: any) {
+      console.error("Direct receipt upload error:", err);
+      setProofError(err.message || "Failed to submit payment receipt.");
+    } finally {
+      setIsDirectReceiptUploading(false);
+    }
+  };
+
   // Filtered orders for compact list
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    return [...orders]
+      .sort((a, b) => new Date(b.createdAt || b.updatedAt || 0).getTime() - new Date(a.createdAt || a.updatedAt || 0).getTime())
+      .filter(order => {
       const status = (order.status || "Pending").toUpperCase();
       const matchesFilter = 
         statusFilter === "ALL" ||
@@ -305,6 +480,7 @@ export default function OrderHistoryModal({
                   setProofSuccess(false);
                   setProofImage("");
                   setProofError("");
+                  setDirectReceiptOrderId(null);
                 }}
                 className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors cursor-pointer"
                 title="Back to compact order list"
@@ -507,12 +683,117 @@ export default function OrderHistoryModal({
                                   : (order.totalAmount || order.payableNow || 0)
                               )}
                             </span>
+                            {order.status === "Pending" && !order.paymentProofImage && directReceiptOrderId !== (order.id || order.orderNumber) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openDirectReceiptUploader(order);
+                                }}
+                                className="mb-1 text-[9px] font-mono font-bold uppercase tracking-wider text-slate-700 hover:text-black flex items-center justify-end gap-1"
+                              >
+                                <Upload className="w-3 h-3" />
+                                <span>Upload Receipt</span>
+                              </button>
+                            )}
                             <span className="text-[10px] font-mono text-slate-500 group-hover:text-black flex items-center justify-end gap-0.5 mt-0.5">
                               <span>Details</span>
                               <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                             </span>
                           </div>
                         </div>
+
+                        {/* Direct receipt uploader from order history */}
+                        {directReceiptOrderId === (order.id || order.orderNumber) && !order.paymentProofImage && order.status === "Pending" && (
+                          <div
+                            className="pt-2 border-t border-dashed border-slate-200 space-y-2.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {proofError && (
+                              <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-[10px] font-mono text-red-700 flex items-center gap-1.5">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                <span>{proofError}</span>
+                              </div>
+                            )}
+
+                            {proofSuccess ? (
+                              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <div>
+                                  <p className="text-[10px] font-mono font-bold text-emerald-900 uppercase">Receipt Submitted</p>
+                                  <p className="text-[9px] font-mono text-emerald-700">Pending manual payment review.</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {paymentMethods.length > 0 && !order.paymentMethodId && !order.paymentMethodName && (
+                                  <select
+                                    value={selectedPaymentMethod?.id || ""}
+                                    onChange={(e) => {
+                                      const m = paymentMethods.find((item: any) => String(item.id) === String(e.target.value));
+                                      setSelectedPaymentMethod(m || null);
+                                    }}
+                                    className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-mono text-slate-900 focus:outline-none focus:border-slate-900"
+                                  >
+                                    <option value="">SELECT PAYMENT METHOD</option>
+                                    {paymentMethods.map((m: any) => (
+                                      <option key={m.id} value={m.id}>{m.name}</option>
+                                    ))}
+                                  </select>
+                                )}
+
+                                <label className="flex items-center justify-center gap-2 w-full px-3 py-2 border border-dashed border-slate-300 hover:border-slate-900 rounded-lg bg-slate-50 hover:bg-white cursor-pointer transition-colors">
+                                  <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp,image/heic"
+                                    onChange={handleProofFileChange}
+                                    className="hidden"
+                                    disabled={isDirectReceiptUploading}
+                                  />
+                                  <Upload className="w-3.5 h-3.5 text-slate-500" />
+                                  <span className="text-[10px] font-mono font-bold uppercase text-slate-600">
+                                    {proofImage ? "Receipt Selected — Click to Change" : "Upload Payment Receipt"}
+                                  </span>
+                                </label>
+
+                                {proofImage && (
+                                  <div className="flex items-center gap-2">
+                                    <img src={proofImage} alt="Receipt preview" className="w-12 h-12 object-cover rounded-md border border-slate-200 bg-white" />
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const targetOrder = orders.find((o: any) => o.id === directReceiptOrderId || o.orderNumber === directReceiptOrderId);
+                                        submitDirectReceipt(targetOrder);
+                                      }}
+                                      disabled={isDirectReceiptUploading || !proofImage || (paymentMethods.length > 0 && !selectedPaymentMethod && !order.paymentMethodId && !order.paymentMethodName)}
+                                      className="flex-1 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-[10px] font-heading font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                                    >
+                                      {isDirectReceiptUploading ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      ) : (
+                                        <Check className="w-3.5 h-3.5" />
+                                      )}
+                                      {isDirectReceiptUploading ? "Uploading..." : "Submit Receipt"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDirectReceiptOrderId(null);
+                                        setProofImage("");
+                                        setProofError("");
+                                      }}
+                                      className="px-2.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[10px] font-mono font-bold"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
 
                         {/* Live Tracking Indicator Pill if present */}
                         {order.trackingUrl && (
