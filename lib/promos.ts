@@ -35,7 +35,7 @@ export interface PromoConfig {
   // Target Audience & Customer Eligibility
   customerEligibility?: PromoCustomerEligibility;
   minPreviousOrders?: number; // Minimum delivered/completed orders required
-  eligibleTiers?: string[]; // e.g., ['MEMBER', 'SILVER', 'BRONZE', 'GOLD', 'PLATINUM', 'TITANIUM']
+  eligibleTiers?: string[]; // e.g., ['SILVER', 'BRONZE', 'GOLD', 'PLATINUM', 'TITANIUM']
   
   // Channel & Payment Restrictions (Standard PH Marketplaces)
   allowedPaymentMethods?: string[]; // ['all'] or ['gcash', 'maya', 'bank_transfer', 'upon_delivery']
