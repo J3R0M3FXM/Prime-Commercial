@@ -336,7 +336,7 @@ export default function TelegramSecretaryConfigurator() {
     : null;
 
   return (
-    <div className="w-full space-y-1.5 text-slate-900">
+    <div className="admin-feature-module w-full space-y-1.5 text-slate-900">
       <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-1">
         <div className="min-w-0">
           <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">
