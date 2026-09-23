@@ -6085,137 +6085,108 @@ export default function AdminPage() {
         {view === "settings" && (
           <motion.div
             key="view-settings"
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.22 }}
-            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+            className="flex-1 min-h-screen bg-slate-50"
           >
-            <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-2 py-1 flex items-center justify-between">
-                <button
-                  onClick={() => setView("dashboard")}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
-                </button>
-                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">
-                  Admin System Settings
-                </h2>
-              </div>
-            </div>
+            <div className="admin-content">
+              <AdminPageHeader
+                title="System Settings"
+                description="Review authentication, telemetry, and administrative controls."
+                icon={Lock}
+                actions={
+                  <button type="button" className="admin-secondary-button" onClick={() => setView("dashboard")}>
+                    <ArrowLeft className="h-3.5 w-3.5 inline mr-1" /> Dashboard
+                  </button>
+                }
+              />
 
-            <div className="flex-1 w-full p-0 space-y-2">
-              <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none space-y-2.5">
-                <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
-                  Telegram Authentication Gateway
-                </h3>
-                <div className="bg-slate-50 p-2.5 rounded-none border border-slate-200 text-xs font-mono space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Authorized Master Telegram ID:</span>
-                    <span className="font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200">
-                      {adminUser?.id && adminUser.id !== "admin" ? adminUser.id : "Access Code Only (Removed from allowlist)"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Auto-Bypass Status:</span>
-                    <span className="text-emerald-700 font-bold">Enabled & Active</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Device Fingerprinting:</span>
-                    <span className="text-emerald-700 font-bold">Enforced on all sessions</span>
-                  </div>
+              <AdminSection title="Authentication Gateway" eyebrow="01" icon={ShieldCheck} description="Server-side access controls for the administrative workspace.">
+                <div className="admin-kv-list">
+                  <div><span>Admin Access</span><strong>Server-side access code</strong></div>
+                  <div><span>Authorized Session</span><strong>{adminUser?.id || "Current staff session"}</strong></div>
+                  <div><span>Telegram Session</span><strong>Signed / verified</strong></div>
                 </div>
-              </div>
+              </AdminSection>
 
-              <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none space-y-2.5">
-                <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
-                  Security & Telemetry Engine
-                </h3>
-                <p className="text-xs text-slate-600 font-mono leading-relaxed">
-                  Every user accessing the storefront or admin panel has their WebGL GPU, Canvas 2D Hash, Screen Display metrics, IP, ISP, and Geolocation fingerprinted and stored in Firestore for auditing.
-                </p>
-                <div className="flex items-center gap-2 pt-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                  <span className="text-xs font-mono font-bold text-slate-900">Hardware Telemetry Online</span>
+              <AdminSection title="Security & Telemetry" eyebrow="02" icon={Fingerprint} description="Device, server, and session telemetry used for audit and promo abuse controls.">
+                <div className="admin-kv-list">
+                  <div><span>Device fingerprint</span><strong>Collected on Telegram authentication</strong></div>
+                  <div><span>Server fingerprint</span><strong>Derived from server-observed request metadata</strong></div>
+                  <div><span>Promo enforcement</span><strong>Database-level trigger + server validation</strong></div>
+                  <div><span>Storage</span><strong>Supabase customer/order telemetry</strong></div>
                 </div>
-              </div>
+              </AdminSection>
+
+              <AdminSection title="Operational Defaults" eyebrow="03" icon={Sliders} description="Use the dedicated configuration modules for payments, logistics, promos, charges, media, and automation.">
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  <button type="button" className="admin-nav-row" onClick={() => setView("payments")}><CreditCard className="h-4 w-4" /><span><strong>Payment configuration</strong><small>Manage customer payment methods.</small></span><ChevronRight className="h-4 w-4 ml-auto" /></button>
+                  <button type="button" className="admin-nav-row" onClick={() => setView("promos")}><Tag className="h-4 w-4" /><span><strong>Promotion rules</strong><small>Voucher limits, schedules, and anti-fraud controls.</small></span><ChevronRight className="h-4 w-4 ml-auto" /></button>
+                  <button type="button" className="admin-nav-row" onClick={() => setView("logistics")}><Truck className="h-4 w-4" /><span><strong>Logistics configuration</strong><small>Warehouses and courier options.</small></span><ChevronRight className="h-4 w-4 ml-auto" /></button>
+                  <button type="button" className="admin-nav-row" onClick={() => setView("diagnostics")}><Activity className="h-4 w-4" /><span><strong>Diagnostics</strong><small>Infrastructure and service health.</small></span><ChevronRight className="h-4 w-4 ml-auto" /></button>
+                </div>
+              </AdminSection>
             </div>
           </motion.div>
         )}
-
         {/* ========================================================================= */}
         {/* 9. ANALYTICS SECTION: SEPARATE FULL PAGE                                   */}
         {/* ========================================================================= */}
         {view === "analytics" && (
           <motion.div
             key="view-analytics"
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.22 }}
-            className="flex-1 flex flex-col min-h-screen bg-slate-50"
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+            className="flex-1 min-h-screen bg-slate-50"
           >
-            <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-none">
-              <div className="w-full px-2 py-1 flex items-center justify-between">
-                <button
-                  onClick={() => setView("dashboard")}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
-                </button>
-                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">
-                  Telemetry Analytics
-                </h2>
-              </div>
-            </div>
+            <div className="admin-content">
+              <AdminPageHeader
+                title="Operations Analytics"
+                description="Compact operational telemetry for customers, orders, products, and device coverage."
+                icon={TrendingUp}
+                actions={
+                  <button type="button" className="admin-secondary-button" onClick={fetchAllData} disabled={refreshing}>
+                    <RefreshCw className={`h-3.5 w-3.5 inline mr-1 ${refreshing ? "animate-spin" : ""}`} /> Refresh
+                  </button>
+                }
+              />
 
-            <div className="flex-1 w-full mx-auto p-0 space-y-2">
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                <div className="bg-white border border-slate-200 rounded-none p-2.5 shadow-none">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Total Users</p>
-                  <p className="text-2xl font-heading font-black text-slate-900 mt-1">{customers.length}</p>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-none p-2.5 shadow-none">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Total Orders</p>
-                  <p className="text-2xl font-heading font-black text-slate-900 mt-1">{orders.length}</p>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-none p-2.5 shadow-none">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Gross Volume</p>
-                  <p className="text-2xl font-heading font-normal text-emerald-600 mt-1">
-                    {formatPHP(orders.reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0))}
-                  </p>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-none p-2.5 shadow-none">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Active Products</p>
-                  <p className="text-2xl font-heading font-black text-slate-900 mt-1">
-                    {products.filter(p => p.active !== false).length}
-                  </p>
-                </div>
+              <div className="admin-stat-grid">
+                <AdminStat label="Customers" value={customers.length} detail="Registered accounts" icon={Users} />
+                <AdminStat label="Orders" value={orders.length} detail="Operational records" icon={ClipboardList} tone="accent" />
+                <AdminStat label="Gross volume" value={formatPHP(orders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0))} detail="Order totals" icon={Receipt} tone="success" />
+                <AdminStat label="Active products" value={products.filter((product) => product.active !== false).length} detail="Catalog entries" icon={Package} />
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none">
-                <h3 className="font-heading font-black uppercase text-sm text-slate-900 tracking-wide mb-2.5">
-                  Device Hardware Distribution
-                </h3>
-                <div className="space-y-3 font-mono text-xs">
-                  {customers.map((c) => (
-                    <div key={c.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-none border border-slate-100">
-                      <div>
-                        <span className="font-bold text-slate-900">{c.tgName}</span>
-                        <span className="text-slate-400 text-[11px] ml-2">({c.primeMemberId})</span>
+              <AdminSection title="Device Signal Coverage" eyebrow="01" icon={Fingerprint} description="Current customer telemetry coverage used by audit and fraud controls.">
+                <div className="space-y-1.5">
+                  {customers.map((customer: any) => (
+                    <div key={customer.id} className="admin-data-row">
+                      <div className="min-w-0">
+                        <strong>{customer.tgName || "Customer"}</strong>
+                        <small>{customer.primeMemberId || "No PRIME ID"} · {customer.lastSeen || customer.createdAt ? new Date(customer.lastSeen || customer.createdAt).toLocaleString() : "No timestamp"}</small>
                       </div>
-                      <span className="bg-slate-200 text-slate-800 px-2 py-0.5 rounded text-[10px] font-bold">
-                        {c.latestFingerprint?.platform || "Linux / ChromeOS"}
-                      </span>
+                      <div className="admin-data-row__meta">
+                        <AdminBadge tone={customer.sharedAccountCount > 0 ? "danger" : "success"}>{customer.sharedAccountCount > 0 ? `${customer.sharedAccountCount} linked` : "Unique"}</AdminBadge>
+                        <span>{customer.latestFingerprint?.platform || "Not captured"}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              </AdminSection>
+
+              <AdminSection title="Readout" eyebrow="02" icon={Activity} description="Open dedicated modules for operational actions instead of expanding the dashboard into a long report.">
+                <div className="admin-data-row"><span>Dashboard refresh</span><strong>{refreshing ? "Running" : "Available"}</strong></div>
+                <div className="admin-data-row"><span>Order queue</span><strong>{orders.length} records</strong></div>
+                <div className="admin-data-row"><span>Catalog</span><strong>{products.length} products</strong></div>
+              </AdminSection>
             </div>
           </motion.div>
         )}
-
         {/* ========================================================================= */}
         {/* 9. DIAGNOSTICS SECTION: SYSTEM HEALTH & INTEGRATION API STATUS             */}
         {/* ========================================================================= */}
