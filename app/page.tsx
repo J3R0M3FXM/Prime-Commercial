@@ -31,6 +31,7 @@ export default function Shopfront() {
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isVideoGalleryOpen, setIsVideoGalleryOpen] = useState(false);
+  const [initialOrderIdFromLink, setInitialOrderIdFromLink] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("shop");
 
   const { cart, cartCount, addToCart, updateQuantity } = useCart();
@@ -215,6 +216,12 @@ export default function Shopfront() {
             const customerName = authData.tgName || authData.user?.name || "";
             const customerUsername = authData.tgUsername || authData.user?.username || "";
             const memberId = authData.primeMemberId || authData.user?.primeMemberId || "";
+
+            const openOrderId = new URLSearchParams(window.location.search).get("openOrder");
+            if (openOrderId) {
+              setInitialOrderIdFromLink(openOrderId.trim());
+              setActiveTab("orders");
+            }
 
             sessionStorage.setItem("prime_customer_id", customerId);
             sessionStorage.setItem("prime_customer_name", customerName);
@@ -516,7 +523,14 @@ export default function Shopfront() {
       )}
       {activeTab === "shop" && selectedProduct && <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
       {activeTab === "orders" && (
-        <OrderHistoryModal isOpen={true} onClose={() => setActiveTab("shop")} />
+        <OrderHistoryModal
+          isOpen={true}
+          initialSelectedOrderId={initialOrderIdFromLink}
+          onClose={() => {
+            setInitialOrderIdFromLink(null);
+            setActiveTab("shop");
+          }}
+        />
       )}
 
       {/* Customer Account & Points Modal */}
@@ -583,6 +597,7 @@ export default function Shopfront() {
         <button
           type="button"
           onClick={() => {
+            setInitialOrderIdFromLink(null);
             setActiveTab("orders");
             setIsOrderHistoryOpen(true);
           }}

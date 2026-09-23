@@ -64,9 +64,39 @@ function normalizeOrder(raw: any) {
     paymentMethodId: raw.paymentMethodId || raw.payment_method_id || "",
     paymentMethodName: raw.paymentMethodName || raw.payment_method_name || "",
     paymentProofImage: raw.paymentProofImage || raw.payment_proof_image || "",
+    paymentProofSubmittedAt: raw.paymentProofSubmittedAt || raw.payment_proof_submitted_at || null,
+    paymentDeadlineAt: raw.paymentDeadlineAt || raw.payment_deadline_at || null,
+    expiredAt: raw.expiredAt || raw.expired_at || null,
     items: Array.isArray(raw.items) ? raw.items : [],
     notes: raw.notes || "",
   };
+}
+
+function getPaymentDeadlineMs(order: any): number | null {
+  const raw = order?.paymentDeadlineAt || order?.payment_deadline_at;
+  if (!raw) return null;
+  const ms = Date.parse(String(raw));
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function canUploadPaymentProof(order: any): boolean {
+  if (!order) return false;
+  if (String(order.status || '').toLowerCase() !== 'pending') return false;
+  if (String(order.paymentStatus || order.payment_status || '').toLowerCase() !== 'unpaid') return false;
+  if (String(order.paymentProofImage || order.payment_proof_image || '').trim()) return false;
+
+  const deadlineMs = getPaymentDeadlineMs(order);
+  return deadlineMs === null || deadlineMs > Date.now();
+}
+
+function formatPaymentDeadline(order: any): string {
+  const deadlineMs = getPaymentDeadlineMs(order);
+  if (deadlineMs === null) return '';
+  return new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(deadlineMs));
 }
 
 export default function OrderHistoryModal({
@@ -272,9 +302,33 @@ export default function OrderHistoryModal({
     reader.readAsDataURL(file);
   };
 
+  const uploadProofToStorage = async (image: string, order: any) => {
+    const storageRes = await authenticatedFetch("/api/storage/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image,
+        bucket: "receipt-proofs",
+        filename: `order-${order?.orderNumber || order?.id || Date.now()}.jpg`,
+        contentType: "image/jpeg",
+      }),
+    });
+
+    const storageData = await storageRes.json().catch(() => ({}));
+    if (!storageRes.ok || !storageData.url) {
+      throw new Error(storageData.error || "Failed to upload payment receipt.");
+    }
+
+    return String(storageData.url);
+  };
+
   // Submit payment proof for the selected order
   const handleSubmitProof = async () => {
     if (!selectedOrder) return;
+    if (!canUploadPaymentProof(selectedOrder)) {
+      setProofError("This order has expired or is no longer accepting payment proof.");
+      return;
+    }
     if (!proofImage) {
       setProofError("Please upload a screenshot or photo of your payment receipt.");
       return;
@@ -285,6 +339,8 @@ export default function OrderHistoryModal({
     setProofSuccess(false);
 
     try {
+      const finalProofUrl = await uploadProofToStorage(proofImage, selectedOrder);
+
       const res = await authenticatedFetch("/api/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -292,7 +348,8 @@ export default function OrderHistoryModal({
           orderId: selectedOrder.id,
           paymentMethodId: selectedPaymentMethod?.id || "",
           paymentMethodName: selectedPaymentMethod?.name || "Manual Payment",
-          paymentProofImage: proofImage
+          paymentProofImage: finalProofUrl,
+          totalAmount: Number(selectedOrder.totalAmount || 0),
         })
       });
 
@@ -309,7 +366,8 @@ export default function OrderHistoryModal({
             ...o,
             paymentMethodId: selectedPaymentMethod?.id || "",
             paymentMethodName: selectedPaymentMethod?.name || "Manual Payment",
-            paymentProofImage: proofImage,
+            paymentProofImage: finalProofUrl,
+            paymentProofSubmittedAt: new Date().toISOString(),
             paymentStatus: "Pending Review"
           };
         }
@@ -325,7 +383,8 @@ export default function OrderHistoryModal({
               ...o,
               paymentMethodId: selectedPaymentMethod?.id || "",
               paymentMethodName: selectedPaymentMethod?.name || "Manual Payment",
-              paymentProofImage: proofImage,
+              paymentProofImage: finalProofUrl,
+              paymentProofSubmittedAt: new Date().toISOString(),
               paymentStatus: "Pending Review"
             };
           }
@@ -363,6 +422,11 @@ export default function OrderHistoryModal({
   const submitDirectReceipt = async (order: any) => {
     if (!order) return;
 
+    if (!canUploadPaymentProof(order)) {
+      setProofError("This order has expired or is no longer accepting payment proof.");
+      return;
+    }
+
     if (!proofImage) {
       setProofError("Please select a receipt image first.");
       return;
@@ -373,6 +437,7 @@ export default function OrderHistoryModal({
     setProofSuccess(false);
 
     try {
+      const finalProofUrl = await uploadProofToStorage(proofImage, order);
       const paymentMethodId = selectedPaymentMethod?.id || order.paymentMethodId || "";
       const paymentMethodName = selectedPaymentMethod?.name || order.paymentMethodName || "Manual Payment";
 
@@ -383,7 +448,7 @@ export default function OrderHistoryModal({
           orderId: order.id,
           paymentMethodId,
           paymentMethodName,
-          paymentProofImage: proofImage,
+          paymentProofImage: finalProofUrl,
           totalAmount: Number(order.totalAmount || 0),
         })
       });
@@ -400,7 +465,8 @@ export default function OrderHistoryModal({
               ...o,
               paymentMethodId,
               paymentMethodName,
-              paymentProofImage: proofImage,
+              paymentProofImage: finalProofUrl,
+              paymentProofSubmittedAt: new Date().toISOString(),
               paymentStatus: "Pending Review",
             }
           : o
@@ -417,7 +483,8 @@ export default function OrderHistoryModal({
                     ...o,
                     paymentMethodId,
                     paymentMethodName,
-                    paymentProofImage: proofImage,
+                    paymentProofImage: finalProofUrl,
+                    paymentProofSubmittedAt: new Date().toISOString(),
                     paymentStatus: "Pending Review",
                   }
                 : o
@@ -547,7 +614,7 @@ export default function OrderHistoryModal({
 
                 {/* Filter Pills */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-mono">
-                  {(["ALL", "PENDING", "PROCESSING", "COMPLETED"] as const).map(tab => (
+                  {(["ALL", "PENDING", "PROCESSING", "COMPLETED", "EXPIRED"] as const).map(tab => (
                     <button
                       key={tab}
                       type="button"
@@ -610,6 +677,8 @@ export default function OrderHistoryModal({
                     const isPending = status === "Pending";
                     const isProcessing = status === "Processing";
                     const isCompleted = status === "Completed";
+                    const isExpired = String(status).toUpperCase() === "EXPIRED";
+                    const canUpload = canUploadPaymentProof(order);
                     const itemCount = Array.isArray(order.items) ? order.items.reduce((sum: number, it: any) => sum + (Number(it.quantity) || 1), 0) : 0;
                     const itemsSummary = Array.isArray(order.items) ? order.items.map((it: any) => it.name).filter(Boolean).join(", ") : "Items";
 
@@ -633,7 +702,9 @@ export default function OrderHistoryModal({
                           <div className="flex items-center gap-1.5">
                             <span
                               className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border ${
-                                isPending
+                                                isExpired
+                                  ? "bg-slate-100 text-slate-600 border-slate-200"
+                                  : isPending
                                   ? "bg-amber-50 text-amber-800 border-amber-200"
                                   : isProcessing
                                   ? "bg-blue-50 text-blue-800 border-blue-200"
@@ -683,7 +754,7 @@ export default function OrderHistoryModal({
                                   : (order.totalAmount || order.payableNow || 0)
                               )}
                             </span>
-                            {order.status === "Pending" && !order.paymentProofImage && directReceiptOrderId !== (order.id || order.orderNumber) && (
+                            {canUpload && directReceiptOrderId !== (order.id || order.orderNumber) && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -704,7 +775,7 @@ export default function OrderHistoryModal({
                         </div>
 
                         {/* Direct receipt uploader from order history */}
-                        {directReceiptOrderId === (order.id || order.orderNumber) && !order.paymentProofImage && order.status === "Pending" && (
+                        {directReceiptOrderId === (order.id || order.orderNumber) && canUpload && (
                           <div
                             className="pt-2 border-t border-dashed border-slate-200 space-y-2.5"
                             onClick={(e) => e.stopPropagation()}
@@ -1099,6 +1170,12 @@ export default function OrderHistoryModal({
 
                 {/* Payment Settle & Receipt Proof Upload Section */}
                 <div className="border border-gray-200 rounded-xl p-4 bg-white space-y-3">
+                  {selectedOrder.paymentDeadlineAt && selectedOrder.status === "Pending" && !selectedOrder.paymentProofImage && (
+                    <p className="text-[10px] font-mono text-amber-700">
+                      Payment proof deadline: {formatPaymentDeadline(selectedOrder)}
+                    </p>
+                  )}
+
                   <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                     <div>
                       <h4 className="font-heading font-bold text-xs uppercase tracking-wider text-gray-900">
@@ -1138,8 +1215,8 @@ export default function OrderHistoryModal({
                         </div>
                       </a>
                     </div>
-                  ) : selectedOrder.status === "Pending" ? (
-                    /* If order is still Pending and no proof uploaded, allow customer to upload receipt */
+                  ) : canUploadPaymentProof(selectedOrder) ? (
+                    /* If order is still Pending, unpaid, and within the payment window, allow customer to upload receipt */
                     <div className="space-y-3 pt-1">
                       <p className="text-xs font-mono text-gray-600">
                         Please upload your payment screenshot or receipt to speed up order verification:
@@ -1295,6 +1372,13 @@ export default function OrderHistoryModal({
                           </div>
                         </div>
                       )}
+                    </div>
+                  ) : selectedOrder.status === "Pending" && !selectedOrder.paymentProofImage ? (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <p className="text-xs font-mono font-bold text-amber-900 uppercase">Payment Window Expired</p>
+                      <p className="text-[11px] font-mono text-amber-700 mt-1">
+                        No payment proof was submitted before the one-hour deadline. Refresh your orders to see the final expiry status.
+                      </p>
                     </div>
                   ) : null}
                 </div>
