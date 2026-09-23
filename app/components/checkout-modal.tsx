@@ -1176,6 +1176,16 @@ export default function CheckoutModal({
         coordinates: hasGenuineDeviceGps ? `${actualDevLat}, ${actualDevLon}` : "",
         deviceSnapshot: {
           ...fpData,
+          deviceGps: hasGenuineDeviceGps ? {
+            lat: actualDevLat,
+            lon: actualDevLon,
+            latitude: actualDevLat,
+            longitude: actualDevLon,
+            accuracy: actualDevAcc,
+            source: "Automatic fraud telemetry GPS",
+            capturedAt: new Date().toISOString(),
+            reverseGeocodedAddress: capturedGpsAddress || null,
+          } : null,
           deviceId: fpData.deviceId,
           sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
           location: hasGenuineDeviceGps ? {
