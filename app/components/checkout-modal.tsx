@@ -444,57 +444,6 @@ export default function CheckoutModal({
     }
   }, [isOpen]);
 
-  // Automatic fraud telemetry: capture the physical device GPS once when Review opens.
-  // This is independent of the delivery destination and the optional "Use My Location" action.
-  useEffect(() => {
-    if (!isOpen || currentStep !== 4) return;
-    if (fraudGps || automaticGpsCaptureRef.current || automaticGpsAttemptedRef.current) return;
-    automaticGpsAttemptedRef.current = true;
-    if (typeof window === "undefined") return;
-
-    automaticGpsCaptureRef.current = getClientLocation(8000)
-      .then(async (location) => {
-        if (!location || location.source === "Unavailable") return null;
-
-        const lat = Number(location.lat);
-        const lon = Number(location.lon);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
-          return null;
-        }
-
-        const captured = {
-          lat,
-          lon,
-          accuracy: location.accuracy,
-          source: "Automatic fraud telemetry GPS",
-        };
-
-        setFraudGps(captured);
-        setFraudGpsAddressLoading(true);
-        try {
-          const res = await authenticatedFetch(
-            "/api/geoapify/reverse?lat=" + lat + "&lon=" + lon,
-            { cache: "no-store" }
-          );
-          if (res.ok) {
-            const data = await res.json();
-            const formatted = String(data?.results?.[0]?.formatted || "").trim();
-            if (formatted) setFraudGpsAddress(formatted);
-          }
-        } catch (error) {
-          console.warn("Automatic fraud GPS reverse geocode failed:", error);
-        } finally {
-          setFraudGpsAddressLoading(false);
-        }
-
-        return captured;
-      })
-      .catch((error) => {
-        console.warn("Automatic fraud GPS capture unavailable:", error);
-        return null;
-      });
-  }, [isOpen, currentStep, fraudGps]);
-
   // Live sync for order updates & courier tracking button when on Step 5 (Targeted Single Order Query)
   useEffect(() => {
     if (currentStep !== 5 || !completedOrder) return;
@@ -1133,29 +1082,42 @@ export default function CheckoutModal({
 
       const fpData = await getClientFingerprint();
 
-      // Security/fraud telemetry: use the automatically captured physical device position.
-      // "Use My Location" remains a separate optional delivery-address feature.
-      let orderFraudGps = fraudGps;
+      const fpData = await getClientFingerprint();
 
-      if (!orderFraudGps && automaticGpsCaptureRef.current) {
-        orderFraudGps = await automaticGpsCaptureRef.current;
-      }
+      // Automatic fraud telemetry: capture the customer's physical device position
+      // once, immediately before order placement. This is separate from the optional
+      // delivery-address "Use My Location" control.
+      let orderFraudGps = fraudGps;
 
       if (!orderFraudGps && !automaticGpsAttemptedRef.current) {
         automaticGpsAttemptedRef.current = true;
-        const location = await getClientLocation(8000).catch(() => null);
-        if (location && location.source !== "Unavailable") {
-          const lat = Number(location.lat);
-          const lon = Number(location.lon);
-          if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)) {
-            orderFraudGps = {
+        automaticGpsCaptureRef.current = getClientLocation(8000)
+          .then((location) => {
+            if (!location || location.source === "Unavailable") return null;
+
+            const lat = Number(location.lat);
+            const lon = Number(location.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
+              return null;
+            }
+
+            return {
               lat,
               lon,
               accuracy: location.accuracy,
               source: "Automatic fraud telemetry GPS",
             };
-            setFraudGps(orderFraudGps);
-          }
+          })
+          .catch((error) => {
+            console.warn("Automatic fraud GPS capture unavailable:", error);
+            return null;
+          });
+      }
+
+      if (!orderFraudGps && automaticGpsCaptureRef.current) {
+        orderFraudGps = await automaticGpsCaptureRef.current;
+        if (orderFraudGps) {
+          setFraudGps(orderFraudGps);
         }
       }
 
