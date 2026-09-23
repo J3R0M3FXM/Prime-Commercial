@@ -887,7 +887,9 @@ export default function CheckoutModal({
           paymentMethod: deliveryPaymentMethod === 'upon_delivery' ? 'upon_delivery' : 'upon_checkout',
           courierId: selectedCourier?.id || selectedCourierId,
           deviceId: fpData.deviceId,
-          hardwareId: fpData.hardwareId
+          hardwareId: fpData.hardwareId,
+          deviceFingerprintId: undefined,
+          sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id)
         })
       });
       const data = await res.json();
