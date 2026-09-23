@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
-import { getClientFingerprint, getOrCreateSessionToken } from "./fingerprint-collector";
+import { getClientFingerprint, getClientLocation, getOrCreateSessionToken } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import { authenticatedFetch } from "./telegram-auth-client";
 
@@ -165,6 +165,7 @@ export default function CheckoutModal({
   const [deviceGps, setDeviceGps] = useState<{ lat: number; lon: number; accuracy?: number; source?: string } | null>(null);
   const [deviceGpsAddress, setDeviceGpsAddress] = useState("");
   const [deviceGpsAddressLoading, setDeviceGpsAddressLoading] = useState(false);
+  const automaticGpsCaptureRef = useRef<Promise<{ lat: number; lon: number; accuracy?: number } | null> | null>(null);
 
   // Touch swipe states for payment methods carousel
   const touchStartX = useRef<number | null>(null);
@@ -415,6 +416,7 @@ export default function CheckoutModal({
       setDeviceGps(null);
       setDeviceGpsAddress("");
       setDeviceGpsAddressLoading(false);
+      automaticGpsCaptureRef.current = null;
       setSelectedPaymentMethod(null);
       setSelectedCourierId("");
       setDeliveryPaymentMethod("");
@@ -1074,17 +1076,34 @@ export default function CheckoutModal({
 
       const fpData = await getClientFingerprint();
 
-      // Retrieve verified physical device GPS location (STRICTLY ISOLATED FROM DELIVERY DESTINATION)
-      let actualDevLat = deviceGps?.lat ? Number(deviceGps.lat) : 0;
-      let actualDevLon = deviceGps?.lon ? Number(deviceGps.lon) : 0;
-      let actualDevAcc = deviceGps?.accuracy || 0;
+      // Security/fraud telemetry: capture the physical device location once
+      // automatically at order placement. Use My Location remains optional.
+      let fraudGps = deviceGps;
+      if (!fraudGps && !automaticGpsCaptureRef.current) {
+        automaticGpsCaptureRef.current = getClientLocation(8000)
+          .then((location) => {
+            if (!location || location.source === "Unavailable") return null;
+            return { lat: location.lat, lon: location.lon, accuracy: location.accuracy };
+          })
+          .catch(() => null);
+      }
+      if (!fraudGps && automaticGpsCaptureRef.current) {
+        const captured = await automaticGpsCaptureRef.current;
+        if (captured) {
+          fraudGps = captured;
+          setDeviceGps(captured);
+        }
+      }
 
+      const actualDevLat = fraudGps?.lat ? Number(fraudGps.lat) : 0;
+      const actualDevLon = fraudGps?.lon ? Number(fraudGps.lon) : 0;
+      const actualDevAcc = fraudGps?.accuracy || 0;
       const hasGenuineDeviceGps = Number.isFinite(actualDevLat) && Number.isFinite(actualDevLon) && (actualDevLat !== 0 || actualDevLon !== 0);
 
       let capturedGpsAddress = deviceGpsAddress.trim();
       if (hasGenuineDeviceGps && !capturedGpsAddress) {
         try {
-          const gpsAddressRes = await authenticatedFetch(`/api/geoapify/reverse?lat=${actualDevLat}&lon=${actualDevLon}`, { cache: "no-store" });
+          const gpsAddressRes = await authenticatedFetch("/api/geoapify/reverse?lat=" + actualDevLat + "&lon=" + actualDevLon, { cache: "no-store" });
           if (gpsAddressRes.ok) {
             const gpsAddressData = await gpsAddressRes.json();
             capturedGpsAddress = String(gpsAddressData?.results?.[0]?.formatted || "").trim();
@@ -1157,6 +1176,16 @@ export default function CheckoutModal({
         coordinates: hasGenuineDeviceGps ? `${actualDevLat}, ${actualDevLon}` : "",
         deviceSnapshot: {
           ...fpData,
+          deviceGps: hasGenuineDeviceGps ? {
+            lat: actualDevLat,
+            lon: actualDevLon,
+            latitude: actualDevLat,
+            longitude: actualDevLon,
+            accuracy: actualDevAcc,
+            source: "Automatic fraud telemetry GPS",
+            capturedAt: new Date().toISOString(),
+            reverseGeocodedAddress: capturedGpsAddress || null,
+          } : null,
           deviceId: fpData.deviceId,
           sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
           location: hasGenuineDeviceGps ? {

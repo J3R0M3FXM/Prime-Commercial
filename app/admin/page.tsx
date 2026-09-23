@@ -4161,10 +4161,9 @@ export default function AdminPage() {
 
                       {/* COORDINATES */}
                       {(() => {
-                        const gps = selectedOrder.deviceSnapshot?.deviceGps
+                        const gps = selectedOrder.deviceGps
                           || selectedOrder.fingerprintSnapshot?.deviceGps
-                          || selectedOrder.deviceSnapshot?.location
-                          || selectedOrder.fingerprintSnapshot?.location
+                          || selectedOrder.deviceSnapshot?.deviceGps
                           || null;
                         const lat = Number(gps?.lat ?? gps?.latitude);
                         const lon = Number(gps?.lon ?? gps?.longitude);
@@ -4291,8 +4290,6 @@ export default function AdminPage() {
                           || null;
                         const gpsAddress = String(
                           gps?.reverseGeocodedAddress
-                          || selectedOrder.deviceSnapshot?.reverseGeocodedAddress
-                          || selectedOrder.fingerprintSnapshot?.reverseGeocodedAddress
                           || ""
                         ).trim();
                         return (
