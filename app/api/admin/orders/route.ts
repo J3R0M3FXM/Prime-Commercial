@@ -98,6 +98,14 @@ export async function GET(request: Request) {
       courierName: o.courier_name,
       trackingNumber: o.tracking_number,
       notes: o.notes,
+      fingerprintSnapshot: o.fingerprint_snapshot || null,
+      deviceId: o.fingerprint_snapshot?.deviceId || null,
+      hardwareId: o.fingerprint_snapshot?.hardwareId || null,
+      deviceFingerprintId: o.fingerprint_snapshot?.deviceFingerprintId || null,
+      serverFingerprintId: o.fingerprint_snapshot?.serverFingerprintId || null,
+      paymentDeadlineAt: o.payment_deadline_at || null,
+      paymentProofSubmittedAt: o.payment_proof_submitted_at || null,
+      expiredAt: o.expired_at || null,
       createdAt: o.created_at,
       updatedAt: o.updated_at
     }));
