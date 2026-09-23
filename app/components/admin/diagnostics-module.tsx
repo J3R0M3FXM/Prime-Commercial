@@ -193,7 +193,7 @@ export default function DiagnosticsModule() {
   const issueCount = services.filter((s) => s.status === "degraded" || s.status === "error").length;
 
   return (
-    <div className="space-y-3">
+    <div className="admin-feature-module space-y-3">
       {/* Sub-View Navigation Tabs */}
       <div className="flex items-center gap-2 p-1 bg-slate-200/80 border border-slate-300 rounded-none text-xs font-heading font-normal uppercase tracking-wider w-fit">
         <button

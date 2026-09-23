@@ -160,7 +160,7 @@ export default function ChargesModule() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="admin-feature-module space-y-3">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-heading font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">

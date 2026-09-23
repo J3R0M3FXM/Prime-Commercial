@@ -399,7 +399,7 @@ export default function LogisticsModule() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="admin-feature-module space-y-3">
       {/* Tabs */}
       <div className="flex border-b border-slate-200">
         <button
