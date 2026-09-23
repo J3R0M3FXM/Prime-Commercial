@@ -2169,13 +2169,7 @@ export default function AdminPage() {
                         )}
 
                         <div>
-                          <div className="flex items-center gap-2 flex-wrap">                          {Number(ord.storeCreditsUsed || 0) > 0 && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase border border-emerald-200 bg-emerald-50 text-emerald-700">
-                              Credits Applied {formatPHP(Number(ord.storeCreditsUsed))}
-                            </span>
-                          )}
-
-                            <span className="font-heading font-black text-sm text-slate-900 group-hover:text-black">
+                          <div className="flex items-center gap-2 flex-wrap">                            <span className="font-heading font-black text-sm text-slate-900 group-hover:text-black">
                               {customer.tgName || "Unnamed User"}
                             </span>
                             {customer.tgUsername && (
@@ -3256,6 +3250,12 @@ export default function AdminPage() {
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
+                          {Number(ord.storeCreditsUsed || 0) > 0 && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase border border-emerald-200 bg-emerald-50 text-emerald-700">
+                              Credits Applied {formatPHP(Number(ord.storeCreditsUsed))}
+                            </span>
+                          )}
+
                               <span className="font-mono font-black text-xs text-slate-900 tracking-tight">
                                 {ord.orderNumber?.startsWith("#") ? ord.orderNumber : `#${ord.orderNumber || ord.id}`}
                               </span>
