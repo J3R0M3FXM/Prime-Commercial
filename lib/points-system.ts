@@ -33,11 +33,11 @@ export interface PointTransactionRecord {
 
 export function calculatePurchasingPoints(itemsSubtotal: number): number {
   const safeItems = Math.max(0, Number(itemsSubtotal) || 0);
-  return Math.floor(safeItems / 100) * 10;
+  return Math.floor(safeItems / 100) * 5;
 }
 
 export function calculateCustomerTier(
-  completedOrders: Array<{ subTotal?: number; totalAmount?: number; createdAt?: string; deliveredAt?: string }>,
+  completedOrders: Array<{ subTotal?: number; subtotal?: number; totalAmount?: number; createdAt?: string; deliveredAt?: string }>,
   now: Date = new Date()
 ): CustomerTierInfo {
   if (!completedOrders || completedOrders.length === 0) {
@@ -76,7 +76,7 @@ export function calculateCustomerTier(
   for (const ord of completedOrders) {
     const ordDate = new Date(ord.deliveredAt || ord.createdAt || 0).getTime();
     if (ordDate >= cycleStart.getTime() && ordDate <= cycleEnd.getTime()) {
-      cycleItemsSpend += Math.max(0, Number(ord.subTotal || 0));
+      cycleItemsSpend += Math.max(0, Number(ord.subTotal ?? ord.subtotal ?? 0));
     }
   }
 
