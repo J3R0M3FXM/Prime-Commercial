@@ -59,7 +59,8 @@ function normalizeOrder(raw: any) {
     payableOnDelivery: raw.payableOnDelivery ?? raw.payable_on_delivery,
     totalAmount: raw.totalAmount ?? raw.total_amount ?? 0,
     subTotal: raw.subTotal ?? raw.subtotal ?? 0,
-    appliedCharges: raw.appliedCharges || raw.charges_breakdown || [],
+    appliedCharges: raw.appliedCharges || raw.chargesBreakdown || raw.charges_breakdown || raw.charges || [],
+    charges: raw.charges || raw.appliedCharges || raw.chargesBreakdown || raw.charges_breakdown || [],
     paymentStatus: raw.paymentStatus || raw.payment_status || "Unpaid",
     paymentMethodId: raw.paymentMethodId || raw.payment_method_id || "",
     paymentMethodName: raw.paymentMethodName || raw.payment_method_name || "",
@@ -1241,136 +1242,115 @@ export default function OrderHistoryModal({
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {/* Payment Method Selector if multiple */}
-                          {paymentMethods.length > 0 && (
-                            <div className="space-y-1">
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 font-heading">
-                                Payment Method Used
-                              </label>
-                              <select
-                                value={selectedPaymentMethod?.id || ""}
-                                onChange={(e) => {
-                                  const m = paymentMethods.find(p => p.id === e.target.value);
-                                  setSelectedPaymentMethod(m || null);
-                                }}
-                                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
-                              >
-                                <option value="" disabled>-- Select Payment Method --</option>
-                                {paymentMethods.map(m => (
-                                  <option key={m.id} value={m.id} disabled={m.isActive === false}>
-                                    {m.name} {m.isActive === false ? "(OFFLINE)" : ""}
-                                  </option>
-                                ))}
-                              </select>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 font-heading mb-1.5">
+                              Select Payment Method
+                            </label>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {paymentMethods.map((method: any) => {
+                                const isOffline = method.isActive === false;
+                                const isSelected = !isOffline && selectedPaymentMethod?.id === method.id;
+                                const pType = String(method.paymentType || method.type || "").toLowerCase();
+                                return (
+                                  <button
+                                    key={method.id}
+                                    type="button"
+                                    disabled={isOffline}
+                                    onClick={() => {
+                                      if (isOffline) return;
+                                      setSelectedPaymentMethod(method);
+                                      setProofSuccess(false);
+                                      setProofError("");
+                                      setProofImage("");
+                                    }}
+                                    className={`relative min-h-[74px] border text-left bg-white p-2.5 rounded-lg transition-colors ${isSelected ? "border-slate-900 ring-1 ring-slate-900" : "border-slate-200 hover:border-slate-500"} ${isOffline ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                  >
+                                    {method.logo ? (
+                                      <img src={method.logo} alt={method.name} className="absolute right-2 top-2 w-8 h-8 object-contain" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      <CreditCard className="absolute right-2 top-2 w-4 h-4 text-slate-400" />
+                                    )}
+                                    <span className="block pr-9 text-[10px] font-heading font-black uppercase tracking-wide text-slate-900">
+                                      {method.name}
+                                    </span>
+                                    <span className="block mt-3 text-[9px] font-mono text-slate-500 uppercase">
+                                      {isOffline ? "Offline" : pType.includes("qr") ? "QR Payment" : pType.replace(/_/g, " ") || "Payment"}
+                                    </span>
+                                    {isSelected && <span className="absolute left-2 bottom-2 text-[8px] font-bold uppercase text-emerald-700">Selected</span>}
+                                  </button>
+                                );
+                              })}
                             </div>
-                          )}
+                          </div>
 
-                          {/* Selected Method Details if Manual Transfer */}
-                          {selectedPaymentMethod && selectedPaymentMethod.paymentType === "manual_transfer" && (
-                            <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl space-y-2 text-left">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-900 font-heading block">
-                                Transfer Account Details
-                              </span>
-                              
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                <div className="p-2 bg-white rounded-lg border border-amber-200/50 flex items-center justify-between">
-                                  <div className="min-w-0 flex-1 mr-2">
-                                    <span className="text-[9px] uppercase text-gray-400 font-bold block">Account Name</span>
-                                    <span className="font-heading font-bold text-gray-900 truncate block text-xs">
-                                      {selectedPaymentMethod.accountName || "Official Account"}
-                                    </span>
-                                  </div>
-                                  {selectedPaymentMethod.accountName && (
-                                    <button
-                                      type="button"
-                                      onClick={() => copyToClipboard(selectedPaymentMethod.accountName, "acc_name")}
-                                      className="px-2 py-1 bg-amber-100/70 hover:bg-amber-200/70 text-amber-900 rounded text-[10px] font-mono font-bold shrink-0 transition-colors"
-                                    >
-                                      {copiedKey === "acc_name" ? "Copied!" : "Copy"}
-                                    </button>
-                                  )}
-                                </div>
-
-                                <div className="p-2 bg-white rounded-lg border border-amber-200/50 flex items-center justify-between">
-                                  <div className="min-w-0 flex-1 mr-2">
-                                    <span className="text-[9px] uppercase text-gray-400 font-bold block">Account / Mobile Number</span>
-                                    <span className="font-mono font-bold text-gray-900 truncate block text-xs">
-                                      {selectedPaymentMethod.accountNumber || "—"}
-                                    </span>
-                                  </div>
-                                  {selectedPaymentMethod.accountNumber && (
-                                    <button
-                                      type="button"
-                                      onClick={() => copyToClipboard(selectedPaymentMethod.accountNumber, "acc_num")}
-                                      className="px-2 py-1 bg-amber-100/70 hover:bg-amber-200/70 text-amber-900 rounded text-[10px] font-mono font-bold shrink-0 transition-colors"
-                                    >
-                                      {copiedKey === "acc_num" ? "Copied!" : "Copy"}
-                                    </button>
-                                  )}
-                                </div>
+                          {selectedPaymentMethod && (
+                            <div className="border border-slate-200 bg-white rounded-lg p-3 space-y-3">
+                              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                <strong className="text-[10px] font-heading font-black uppercase tracking-wider text-slate-900">{selectedPaymentMethod.name}</strong>
+                                <span className="text-[9px] font-mono uppercase text-slate-400">{String(selectedPaymentMethod.paymentType || selectedPaymentMethod.type || "payment").replace(/_/g, " ")}</span>
                               </div>
+
+                              {(selectedPaymentMethod.accountName || selectedPaymentMethod.accountNumber) && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {selectedPaymentMethod.accountName && (
+                                    <div className="border border-slate-200 p-2.5 flex items-center justify-between gap-2">
+                                      <div className="min-w-0"><span className="block text-[8px] uppercase text-slate-400 font-bold">Account Name</span><strong className="block text-[11px] truncate">{selectedPaymentMethod.accountName}</strong></div>
+                                      <button type="button" onClick={() => copyToClipboard(selectedPaymentMethod.accountName, "acc_name")} className="px-2 py-1 border border-slate-200 bg-slate-50 text-[9px] font-bold uppercase shrink-0">{copiedKey === "acc_name" ? "Copied" : "Copy"}</button>
+                                    </div>
+                                  )}
+                                  {selectedPaymentMethod.accountNumber && (
+                                    <div className="border border-slate-200 p-2.5 flex items-center justify-between gap-2">
+                                      <div className="min-w-0"><span className="block text-[8px] uppercase text-slate-400 font-bold">Account / Mobile</span><strong className="block text-[11px] truncate">{selectedPaymentMethod.accountNumber}</strong></div>
+                                      <button type="button" onClick={() => copyToClipboard(selectedPaymentMethod.accountNumber, "acc_num")} className="px-2 py-1 border border-slate-200 bg-slate-50 text-[9px] font-bold uppercase shrink-0">{copiedKey === "acc_num" ? "Copied" : "Copy"}</button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {(selectedPaymentMethod.qrCodeImage || selectedPaymentMethod.qrCode || selectedPaymentMethod.qrImage || selectedPaymentMethod.qr_code_image) && (
+                                <div className="border border-slate-200 p-2 text-center">
+                                  <span className="block text-[8px] uppercase text-slate-400 font-bold mb-2">Payment QR</span>
+                                  <img
+                                    src={selectedPaymentMethod.qrCodeImage || selectedPaymentMethod.qrCode || selectedPaymentMethod.qrImage || selectedPaymentMethod.qr_code_image}
+                                    alt={`${selectedPaymentMethod.name} QR code`}
+                                    className="mx-auto w-44 h-44 object-contain bg-white"
+                                  />
+                                </div>
+                              )}
                             </div>
                           )}
 
-                          {/* File input for proof */}
                           <div className="space-y-2">
                             <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 font-heading">
                               Upload Proof of Payment (Receipt / Screenshot)
                             </label>
-                            
-                            <label className="border-2 border-dashed border-gray-300 hover:border-black rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer bg-gray-50 transition-colors">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleProofFileChange}
-                                className="hidden"
-                              />
+                            <label className="border-2 border-dashed border-gray-300 hover:border-black rounded-lg p-4 flex flex-col items-center justify-center gap-2 cursor-pointer bg-gray-50 transition-colors">
+                              <input type="file" accept="image/*" onChange={handleProofFileChange} className="hidden" />
                               {proofImage ? (
                                 <div className="flex flex-col items-center gap-2">
-                                  <img
-                                    src={proofImage}
-                                    alt="Selected Proof"
-                                    className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-                                  />
-                                  <span className="text-[11px] font-mono text-emerald-700 font-bold">
-                                    ✓ Image Selected (Click to change)
-                                  </span>
+                                  <img src={proofImage} alt="Selected Proof" className="w-24 h-24 object-cover rounded-lg border border-gray-200" />
+                                  <span className="text-[11px] font-mono text-emerald-700 font-bold">✓ Image Selected (Click to change)</span>
                                 </div>
                               ) : (
                                 <>
                                   <Upload className="w-6 h-6 text-gray-400" />
-                                  <span className="text-xs font-mono text-gray-600 font-medium">
-                                    Click or drag to select receipt image
-                                  </span>
-                                  <span className="text-[10px] font-mono text-gray-400">
-                                    Supports JPG, PNG up to 5MB
-                                  </span>
+                                  <span className="text-xs font-mono text-gray-600 font-medium">Click or drag to select receipt image</span>
+                                  <span className="text-[10px] font-mono text-gray-400">Supports JPG, PNG up to 5MB</span>
                                 </>
                               )}
                             </label>
-
                             {proofImage && (
                               <button
                                 type="button"
                                 onClick={handleSubmitProof}
-                                disabled={isSubmittingProof}
-                                className="w-full py-2.5 bg-black hover:bg-neutral-800 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                                disabled={isSubmittingProof || !selectedPaymentMethod}
+                                className="w-full py-2.5 bg-black hover:bg-neutral-800 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs disabled:opacity-50"
                               >
-                                {isSubmittingProof ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span>Submitting Receipt...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Check className="w-4 h-4" />
-                                    <span>Submit Receipt for Verification</span>
-                                  </>
-                                )}
+                                {isSubmittingProof ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Submitting Receipt...</span></> : <><Check className="w-4 h-4" /><span>Submit Receipt for Verification</span></>}
                               </button>
                             )}
                           </div>
-                        </div>
+                        </div>                        </div>
                       )}
                     </div>
                   ) : selectedOrder.status === "Pending" && !selectedOrder.paymentProofImage ? (
