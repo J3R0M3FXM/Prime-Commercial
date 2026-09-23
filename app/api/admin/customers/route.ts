@@ -16,6 +16,9 @@ function normalizeFingerprint(raw: any, index = 0) {
     firstSeen: raw?.firstSeen || createdAt,
     lastSeen,
     deviceId,
+    hardwareId: raw?.hardwareId || raw?.hardware_id || '',
+    deviceFingerprintId: raw?.deviceFingerprintId || raw?.device_fingerprint_id || '',
+    serverFingerprintId: raw?.serverFingerprintId || raw?.server_fingerprint_id || '',
     sessionToken,
   };
 }
@@ -32,6 +35,8 @@ function telemetryFrom(fingerprints: any[]) {
     latestFingerprint: latest,
     deviceId: latest?.deviceId || '',
     hardwareId: latest?.hardwareId || '',
+    deviceFingerprintId: latest?.deviceFingerprintId || '',
+    serverFingerprintId: latest?.serverFingerprintId || '',
     appId: latest?.appId || '',
     sessionToken: latest?.sessionToken || '',
     lastSeen: latest?.lastSeen || latest?.createdAt || null,
@@ -78,19 +83,32 @@ export async function GET(request: Request) {
         id: o.id, orderNumber: o.order_number, status: o.status, totalAmount: o.total_amount,
         subTotal: o.subtotal ?? o.sub_total, promoDiscount: o.discount_amount ?? o.promo_discount,
         storeCreditsUsed: o.store_credits_used ?? o.applied_store_credits, createdAt: o.created_at, deliveredAt: o.delivered_at,
-        deviceSnapshot: o.fingerprint_snapshot || o.device_snapshot || null, customerId: o.customer_id,
+        deviceSnapshot: o.fingerprint_snapshot || o.device_snapshot || null,
+        deviceId: o.fingerprint_snapshot?.deviceId || null,
+        hardwareId: o.fingerprint_snapshot?.hardwareId || null,
+        deviceFingerprintId: o.fingerprint_snapshot?.deviceFingerprintId || null,
+        serverFingerprintId: o.fingerprint_snapshot?.serverFingerprintId || null,
+        appliedPromoCode: o.applied_promo_code || null,
+        paymentStatus: o.payment_status || null,
+        paymentDeadlineAt: o.payment_deadline_at || null,
+        expiredAt: o.expired_at || null,
+        customerId: o.customer_id,
         tgUserId: o.tg_user_id, primeMemberId: o.prime_member_id,
       }));
       const completedOrders = orders.filter((o: any) => ['delivered', 'completed'].includes(String(o.status || '').toLowerCase()));
       const tierInfo = calculateCustomerTier(completedOrders);
 
-      const identifiers = new Set(fingerprints.flatMap((fp: any) => [fp.deviceId, fp.hardwareId].filter(Boolean).map(String)));
+      const identifiers = new Set(fingerprints.flatMap((fp: any) => [
+        fp.deviceId,
+        fp.hardwareId,
+        fp.deviceFingerprintId,
+      ].filter(Boolean).map(String)));
       const { data: others, error: othersError } = await supabase
         .from('customers').select('id,tg_user_id,tg_name,tg_username,prime_member_id,phone_number,fingerprints').neq('id', customer.id);
       if (othersError) throw othersError;
       const sharedAccounts = (others || [])
         .filter((other: any) => sortFingerprints(other.fingerprints).some((fp: any) =>
-          [fp.deviceId, fp.hardwareId].filter(Boolean).some((id: any) => identifiers.has(String(id)))
+          [fp.deviceId, fp.hardwareId, fp.deviceFingerprintId].filter(Boolean).some((id: any) => identifiers.has(String(id)))
         ))
         .map((other: any) => ({ id: other.id, name: other.tg_name || '', username: other.tg_username || '', memberId: other.prime_member_id || '', tgUserId: other.tg_user_id || '' }));
 
@@ -111,7 +129,7 @@ export async function GET(request: Request) {
     const { data: customersData, error } = await supabase.from('customers').select('*').order('updated_at', { ascending: false });
     if (error) throw error;
     const { data: allOrdersData, error: ordersError } = await supabase
-      .from('orders').select('id,customer_id,tg_user_id,prime_member_id,total_amount,sub_total,status,created_at,delivered_at');
+      .from('orders').select('id,customer_id,tg_user_id,prime_member_id,total_amount,subtotal,status,created_at,delivered_at');
     if (ordersError) throw ordersError;
     const allOrders = allOrdersData || [];
 
@@ -134,7 +152,7 @@ export async function GET(request: Request) {
       const completed = customerOrders
         .filter((o: any) => ['delivered', 'completed'].includes(String(o.status || '').toLowerCase()))
         .map((o: any) => ({
-          subTotal: Number(o.sub_total ?? 0),
+          subTotal: Number(o.subtotal ?? 0),
           totalAmount: Number(o.total_amount ?? 0),
           createdAt: o.created_at,
           deliveredAt: o.delivered_at,
