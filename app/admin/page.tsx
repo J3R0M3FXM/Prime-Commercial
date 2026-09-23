@@ -3984,7 +3984,7 @@ export default function AdminPage() {
                           </span>
                         </div>
                         <div 
-                          onClick={() => copyToClipboard(selectedOrder.telegramName || selectedOrder.customerName, "customerName", "TELEGRAM NAME")
+                          onClick={() => copyToClipboard(selectedOrder.telegramName || selectedOrder.customerName, "customerName", "TELEGRAM NAME")}
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Telegram Name"
                         >
@@ -4008,7 +4008,7 @@ export default function AdminPage() {
                           </span>
                         </div>
                         <div 
-                          onClick={() => copyToClipboard(selectedOrder.telegramUsername, "customerUsername", "TELEGRAM HANDLE")
+                          onClick={() => copyToClipboard(selectedOrder.telegramUsername, "customerUsername", "TELEGRAM HANDLE")}
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Telegram Handle"
                         >
@@ -4034,7 +4034,7 @@ export default function AdminPage() {
                           </span>
                         </div>
                         <div 
-                          onClick={() => copyToClipboard(String(selectedOrder.telegramUserId || selectedOrder.tgUserId || ""), "customerId", "TELEGRAM UID")
+                          onClick={() => copyToClipboard(String(selectedOrder.telegramUserId || selectedOrder.tgUserId || ""), "customerId", "TELEGRAM UID")}
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy Telegram UID"
                         >
@@ -4058,7 +4058,7 @@ export default function AdminPage() {
                           </span>
                         </div>
                         <div 
-                          onClick={() => copyToClipboard(selectedOrder.telegramPrimeMemberId || selectedOrder.primeMemberId, "primeMemberId", "PRIME MID")
+                          onClick={() => copyToClipboard(selectedOrder.telegramPrimeMemberId || selectedOrder.primeMemberId, "primeMemberId", "PRIME MID")}
                           className="mt-0.5 flex items-center gap-1 min-w-0 cursor-pointer group hover:text-indigo-600 transition-colors"
                           title="Click to copy PRIME MID"
                         >
