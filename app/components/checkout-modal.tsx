@@ -1022,6 +1022,11 @@ export default function CheckoutModal({
       return;
     }
 
+    if (!deviceGps) {
+      setAddressError("Please tap \"Use My Location\" once so PRIME can record your physical GPS position for this order.");
+      return;
+    }
+
     // Fetch couriers if not already fetched
     if (availableCouriers.length === 0) {
       fetchCouriersForLocation(coords.lat, coords.lon);
