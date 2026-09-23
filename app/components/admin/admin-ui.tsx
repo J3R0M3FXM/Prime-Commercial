@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
+import type { ReactNode } from "react";
 
 export function AdminTopbar({
   title,
@@ -13,7 +14,7 @@ export function AdminTopbar({
   title: string;
   section?: string;
   onBack?: () => void;
-  actions?: React.ReactNode;
+  actions?: ReactNode;
 }) {
   return (
     <header className="admin-topbar sticky top-0 z-50">
@@ -47,7 +48,7 @@ export function AdminPageHeader({
   description?: string;
   icon?: LucideIcon;
   count?: string | number;
-  actions?: React.ReactNode;
+  actions?: ReactNode;
 }) {
   return (
     <div className="admin-page-header">
@@ -76,7 +77,7 @@ export function AdminSection({
   eyebrow?: string;
   description?: string;
   icon?: LucideIcon;
-  children: React.ReactNode;
+  children: ReactNode;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -128,7 +129,7 @@ export function AdminStat({
   );
 }
 
-export function AdminToolbar({ children }: { children: React.ReactNode }) {
+export function AdminToolbar({ children }: { children: ReactNode }) {
   return <div className="admin-toolbar">{children}</div>;
 }
 
@@ -139,8 +140,8 @@ export function AdminDisclosure({
   defaultOpen = false,
 }: {
   title: string;
-  meta?: React.ReactNode;
-  children: React.ReactNode;
+  meta?: ReactNode;
+  children: ReactNode;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -248,7 +249,7 @@ export function AdminEmptyState({
   title: string;
   description?: string;
   icon?: LucideIcon;
-  action?: React.ReactNode;
+  action?: ReactNode;
 }) {
   return (
     <div className="admin-empty">
@@ -260,7 +261,7 @@ export function AdminEmptyState({
   );
 }
 
-export function AdminSurface({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+export function AdminSurface({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`admin-surface ${className}`}>{children}</div>;
 }
 
@@ -268,7 +269,7 @@ export function AdminBadge({
   children,
   tone = "neutral",
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   tone?: "neutral" | "success" | "warning" | "danger" | "accent";
 }) {
   return <span className={`admin-badge admin-badge--${tone}`}>{children}</span>;
