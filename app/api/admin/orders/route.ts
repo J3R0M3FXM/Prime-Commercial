@@ -82,6 +82,7 @@ export async function GET(request: Request) {
       appliedPromoCode: o.applied_promo_code,
       pointsDiscount: Number(o.points_discount || 0),
       chargesBreakdown: o.charges_breakdown,
+      storeCreditsUsed: Number(o.store_credits_used || 0),
       totalAmount: Number(o.total_amount || 0),
       payableNow: Number(o.payable_now || 0),
       payableOnDelivery: Number(o.payable_on_delivery || 0),
@@ -175,6 +176,7 @@ async function hydrateAdminOrders(orders: any[], supabase: any) {
       appliedCharges,
       chargesBreakdown: appliedCharges,
       charges: appliedCharges,
+      storeCreditsUsed: Number(order.storeCreditsUsed ?? 0) || 0,
       deliveryFeePaymentMethod:
         Number(order.payableOnDelivery ?? 0) > 0 ? 'upon_delivery' : 'upon_checkout',
     };

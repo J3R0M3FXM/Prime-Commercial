@@ -72,6 +72,7 @@ function normalizeOrder(raw: any) {
     paymentStatus: raw.paymentStatus || raw.payment_status || "Unpaid",
     paymentMethodId: raw.paymentMethodId || raw.payment_method_id || "",
     paymentMethodName: raw.paymentMethodName || raw.payment_method_name || "",
+    storeCreditsUsed: Number(raw.storeCreditsUsed ?? raw.store_credits_used ?? 0) || 0,
     paymentProofImage: raw.paymentProofImage || raw.payment_proof_image || "",
     paymentProofSubmittedAt: raw.paymentProofSubmittedAt || raw.payment_proof_submitted_at || null,
     paymentDeadlineAt: raw.paymentDeadlineAt || raw.payment_deadline_at || null,
@@ -729,6 +730,11 @@ export default function OrderHistoryModal({
 
                           {/* Row 3: Amount and Action indicator */}
                           <div className="text-right shrink-0">
+                            {Number(order.storeCreditsUsed || 0) > 0 && (
+                              <span className="mb-1 inline-flex items-center justify-end gap-1 px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-[9px] font-mono font-bold uppercase text-emerald-700">
+                                Credits Applied
+                              </span>
+                            )}
                             <span className="font-mono font-bold text-sm text-slate-950 block">
                               {formatPHP(
                                 order.deliveryFeePaymentMethod === "upon_delivery"
@@ -1059,6 +1065,16 @@ export default function OrderHistoryModal({
                       </div>
                     );
                   })}
+
+                  {/* Store Credits Applied */}
+                  {Number(selectedOrder.storeCreditsUsed || 0) > 0 && (
+                    <div className="flex justify-between items-center text-gray-600">
+                      <span>Store Credits Applied:</span>
+                      <span className="font-semibold text-emerald-700 font-ibm-condensed">
+                        -{formatPHP(Number(selectedOrder.storeCreditsUsed))}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Delivery Fee */}
                   <div className="flex justify-between items-center text-gray-600">
