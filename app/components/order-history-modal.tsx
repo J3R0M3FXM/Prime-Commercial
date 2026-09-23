@@ -150,56 +150,26 @@ export default function OrderHistoryModal({
                      localStorage.getItem("prime_member_id") || "";
       }
 
-      // Fetch from API
+      // The authenticated server response is the source of truth for Order History.
+      // Local storage is only used as an offline fallback when the API cannot be reached.
       const url = customerId ? `/api/orders?customerId=${encodeURIComponent(customerId)}&_t=${Date.now()}` : `/api/orders?_t=${Date.now()}`;
-      const res = await fetch(url, { cache: "no-store" });
-      
-      let serverOrders: any[] = [];
+      const res = await authenticatedFetch(url, { cache: "no-store" });
+
       if (res.ok) {
-        serverOrders = await res.json();
+        const serverOrders = await res.json();
+        const authoritativeOrders = (Array.isArray(serverOrders) ? serverOrders : [])
+          .map(normalizeOrder)
+          .filter(Boolean)
+          .sort((a: any, b: any) => {
+            const aTime = Date.parse(String(a.createdAt || ""));
+            const bTime = Date.parse(String(b.createdAt || ""));
+            if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) return bTime - aTime;
+            return String(b.orderNumber || b.id || "").localeCompare(String(a.orderNumber || a.id || ""));
+          });
+        setOrders(authoritativeOrders);
+      } else {
+        throw new Error("Order history request failed (" + res.status + ")");
       }
-
-      // Merge with locally persisted orders from localStorage
-      let localOrders: any[] = [];
-      if (typeof window !== "undefined") {
-        try {
-          localOrders = JSON.parse(localStorage.getItem("prime_customer_orders") || "[]");
-        } catch (e) {}
-      }
-
-      // Map by ID/orderNumber to avoid duplicates, with server data taking precedence
-      const orderMap = new Map<string, any>();
-      
-      // Add local first
-      localOrders.forEach(o => {
-        const normalized = normalizeOrder(o);
-        const key = normalized.id || normalized.orderNumber;
-        if (key) orderMap.set(String(key), normalized);
-      });
-
-      // Add/overwrite with server
-      serverOrders.forEach(o => {
-        const normalized = normalizeOrder(o);
-        const key = normalized.id || normalized.orderNumber;
-        if (key) orderMap.set(String(key), normalized);
-      });
-
-      const combined = Array.from(orderMap.values());
-      // Always sort newest first. Prefer created_at/createdAt, with updated_at as fallback.
-      combined.sort((a, b) => {
-        const aTime = new Date(a.createdAt || a.updatedAt || 0).getTime();
-        const bTime = new Date(b.createdAt || b.updatedAt || 0).getTime();
-        return bTime - aTime;
-      });
-
-      setOrders(combined);
-    } catch (err: any) {
-      console.error("Failed to load customer orders:", err);
-      setErrorMsg("Failed to retrieve order history. Please pull to refresh.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Load payment methods for proof submission
   const loadPaymentMethods = async () => {
