@@ -135,7 +135,7 @@ export default function CheckoutModal({
     username: "",
     primeMemberId: "",
     contactNumber: "",
-    tier: "MEMBER",
+    tier: "SILVER",
   });
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
@@ -883,7 +883,7 @@ export default function CheckoutModal({
           deliveryFee: courierDeliveryFee,
           customerId: tgCustomer.id,
           primeMemberId: tgCustomer.primeMemberId,
-          customerTier: tgCustomer.tier || 'MEMBER',
+          customerTier: tgCustomer.tier || 'SILVER',
           paymentMethod: deliveryPaymentMethod === 'upon_delivery' ? 'upon_delivery' : 'upon_checkout',
           courierId: selectedCourier?.id || selectedCourierId,
           deviceId: fpData.deviceId,
@@ -895,6 +895,10 @@ export default function CheckoutModal({
         setPromoError(data.error || "Invalid promo code.");
         return;
       }
+      if (data.customerTier) {
+        setTgCustomer(prev => ({ ...prev, tier: String(data.customerTier).toUpperCase() }));
+      }
+
       setAppliedPromo({
         code: data.code,
         title: data.title || data.code,
