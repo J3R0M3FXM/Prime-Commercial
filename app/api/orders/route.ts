@@ -486,6 +486,67 @@ export async function POST(request: Request) {
   }
 }
 
+async function hydrateCustomerOrder(order: any, supabase: any) {
+  if (!order || typeof order !== 'object') return order;
+
+  const rawCharges = order.charges_breakdown ?? order.appliedCharges ?? order.charges ?? [];
+  const charges = Array.isArray(rawCharges) ? rawCharges : [];
+  const items = Array.isArray(order.items) ? order.items : [];
+
+  const productIds = Array.from(new Set(items
+    .map((item: any) => String(item?.productId || item?.product_id || '').trim())
+    .filter(Boolean)));
+
+  let productsById = new Map<string, any>();
+  if (productIds.length > 0) {
+    const { data: products } = await supabase
+      .from('products')
+      .select('id,name,bundle_config')
+      .in('id', productIds);
+
+    productsById = new Map((products || []).map((product: any) => [String(product.id), product]));
+  }
+
+  const hydratedItems = items.map((item: any) => {
+    const productId = String(item?.productId || item?.product_id || '').trim();
+    const variantId = String(item?.variantId || item?.variant_id || '').trim();
+    const product = productsById.get(productId);
+    const variants = Array.isArray(product?.bundle_config?.variants)
+      ? product.bundle_config.variants
+      : [];
+    const variant = variants.find((candidate: any) => String(candidate?.id || '') === variantId) || null;
+
+    return {
+      ...item,
+      productName: item?.productName || product?.name || item?.name || '',
+      variantId: variantId || 'default',
+      selectedVariant: variant
+        ? { id: String(variant.id || variantId), name: String(variant.name || variant.label || variant.title || variantId) }
+        : (item?.selectedVariant || (variantId && variantId !== 'default'
+          ? { id: variantId, name: variantId }
+          : null)),
+    };
+  });
+
+  return {
+    ...order,
+    id: order.id || order.order_id || order.orderId,
+    orderNumber: order.order_number || order.orderNumber || order.id,
+    items: hydratedItems,
+    appliedCharges: charges,
+    chargesBreakdown: charges,
+    charges,
+    deliveryFeePaymentMethod:
+      Number(order.payable_on_delivery ?? order.payableOnDelivery ?? 0) > 0
+        ? 'upon_delivery'
+        : 'upon_checkout',
+    payableNow: order.payable_now ?? order.payableNow ?? 0,
+    payableOnDelivery: order.payable_on_delivery ?? order.payableOnDelivery ?? 0,
+    deliveryFee: order.delivery_fee ?? order.deliveryFee ?? 0,
+    totalAmount: order.total_amount ?? order.totalAmount ?? 0,
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const auth = await getAuthenticatedCustomer(request);
@@ -515,7 +576,9 @@ export async function GET(request: Request) {
       if (error || !data) {
         return NextResponse.json({ error: 'Order not found' }, { status: 404 });
       }
-      return NextResponse.json({ id: data.id, ...data });
+      return NextResponse.json(await hydrateCustomerOrder({ id: data.id, ...data }, supabase), {
+        headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+      });
     }
 
     const { data: customerOrders, error: customerOrdersError } = await supabase
@@ -525,7 +588,10 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
       .limit(50);
     if (customerOrdersError) throw customerOrdersError;
-    return NextResponse.json(customerOrders || []);
+    const hydratedOrders = await Promise.all((customerOrders || []).map((order: any) => hydrateCustomerOrder(order, supabase)));
+    return NextResponse.json(hydratedOrders, {
+      headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+    });
 
   } catch (error: any) {
     if (cacheStore.orders) {
