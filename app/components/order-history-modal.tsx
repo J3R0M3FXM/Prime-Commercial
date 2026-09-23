@@ -1028,8 +1028,8 @@ export default function OrderHistoryModal({
                               </div>
                               <p className="text-[11px] font-mono text-gray-500">
                                 {item.quantity || 1} × {isFree ? "FREE" : formatPHP(item.price || 0)}
-                                {item.selectedVariant && (
-                                  <span className="text-gray-400"> • {item.selectedVariant.name || item.selectedVariant}</span>
+                                {(item.selectedVariant?.name || item.variantName || (item.variantId && item.variantId !== "default")) && (
+                                  <span className="text-gray-400"> • {item.selectedVariant?.name || item.variantName || item.variantId}</span>
                                 )}
                               </p>
                             </div>
@@ -1048,6 +1048,11 @@ export default function OrderHistoryModal({
                   <h4 className="font-heading font-bold uppercase tracking-wider text-gray-900 border-b border-gray-100 pb-2">
                     Payment Breakdown
                   </h4>
+                  {(selectedOrder.appliedCharges?.length ?? 0) === 0 && (
+                    <div className="text-[10px] font-mono text-gray-400 uppercase tracking-wide">
+                      No additional charges applied
+                    </div>
+                  )}
 
                   {/* Subtotal */}
                   <div className="flex justify-between items-center text-gray-600">
@@ -1253,7 +1258,6 @@ export default function OrderHistoryModal({
                                 const pType = String(method.paymentType || method.type || "").toLowerCase();
                                 return (
                                   <button
-                                    key={method.id}
                                     type="button"
                                     disabled={isOffline}
                                     onClick={() => {
@@ -1263,20 +1267,35 @@ export default function OrderHistoryModal({
                                       setProofError("");
                                       setProofImage("");
                                     }}
-                                    className={`group w-full aspect-video border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white select-none rounded-lg ${isSelected ? "border-slate-900 ring-1 ring-slate-900" : "border-gray-200 hover:border-gray-400"} ${isOffline ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                    className={`group w-full aspect-video border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white select-none rounded-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_18px_rgba(15,23,42,0.05),0_2px_6px_rgba(15,23,42,0.08)] ${isOffline ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90" : isSelected ? "border-slate-900 shadow-sm ring-1 ring-slate-900 cursor-pointer" : "border-gray-200 bg-white hover:border-gray-300 cursor-pointer"}`}
+                                    title={isOffline ? `${method.name} is currently offline` : method.name}
                                   >
                                     {method.logo ? (
-                                      <img src={method.logo} alt={method.name} className="absolute right-2 top-2 w-7 h-7 object-contain" referrerPolicy="no-referrer" />
+                                      <img
+                                        src={method.logo}
+                                        alt={method.name}
+                                        className={`absolute inset-0 z-[2] w-full h-full object-fill transition-transform duration-200 ${isOffline ? "filter blur-[1px] opacity-40 grayscale-[30%]" : ""}`}
+                                        referrerPolicy="no-referrer"
+                                      />
                                     ) : (
-                                      <CreditCard className="absolute right-2 top-2 w-4 h-4 text-slate-400" />
+                                      <CreditCard className={`relative z-[2] w-5 h-5 text-gray-400 ${isOffline ? "filter blur-[1px] opacity-40" : ""}`} />
                                     )}
-                                    <span className="block w-full px-2 pr-9 text-[9px] font-heading font-black uppercase tracking-wide text-slate-900 text-left truncate">
+                                    {!isOffline && (
+                                      <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-br from-white/75 via-white/15 to-transparent opacity-90" />
+                                    )}
+                                    {!isOffline && (
+                                      <div className="absolute inset-x-3 top-1.5 z-[6] h-1/3 rounded-t-xl pointer-events-none bg-gradient-to-b from-white/70 to-transparent" />
+                                    )}
+                                    {isOffline && (
+                                      <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-[0.5px]">
+                                        <span className="font-heading font-black text-[9px] text-red-500 uppercase tracking-widest bg-red-950/90 border border-red-500/70 px-1.5 py-0.5 rounded leading-none">
+                                          OFFLINE
+                                        </span>
+                                      </div>
+                                    )}
+                                    <span className="absolute inset-x-1 bottom-1 z-[8] px-1 text-[8px] font-heading font-bold uppercase truncate text-center text-slate-900 bg-white/85">
                                       {method.name}
                                     </span>
-                                    <span className="absolute left-2 bottom-1.5 right-2 text-[8px] font-mono text-slate-500 uppercase truncate">
-                                      {isOffline ? "Offline" : pType.includes("qr") ? "QR Payment" : pType.replace(/_/g, " ") || "Payment"}
-                                    </span>
-                                    {isSelected && <span className="absolute left-2 bottom-1.5 text-[7px] font-bold uppercase text-emerald-700 bg-white/90 px-1">Selected</span>}
                                   </button>
                                 );
                               })}
