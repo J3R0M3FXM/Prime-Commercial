@@ -1802,12 +1802,11 @@ export default function CheckoutModal({
                     Precise GPS Address
                   </span>
                   <span
-                    className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 border ${{
-                      [true]: "text-emerald-700 bg-emerald-50 border-emerald-200",
-                      [false]: fraudGpsAddressLoading
+                    className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 border ${fraudGps
+                      ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                      : fraudGpsAddressLoading
                         ? "text-amber-700 bg-amber-50 border-amber-200"
-                        : "text-red-700 bg-red-50 border-red-200",
-                    }[Boolean(fraudGps)]}`}
+                        : "text-red-700 bg-red-50 border-red-200"}`}
                   >
                     {fraudGps ? "Captured" : fraudGpsAddressLoading ? "Capturing..." : "Unavailable"}
                   </span>
