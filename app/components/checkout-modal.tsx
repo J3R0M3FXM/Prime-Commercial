@@ -433,6 +433,52 @@ export default function CheckoutModal({
     }
   }, [isOpen]);
 
+  // Security/fraud telemetry: request the customer's actual device GPS once when the
+  // checkout reaches Review. This does NOT change the delivery destination and does NOT
+  // depend on the optional "Use My Location" action.
+  useEffect(() => {
+    if (!isOpen || currentStep !== 4) return;
+    if (deviceGps || automaticGpsCaptureRef.current) return;
+    if (typeof window === "undefined" || !navigator.geolocation) return;
+
+    automaticGpsCaptureRef.current = getClientLocation(8000)
+      .then(async (location) => {
+        if (!location || location.source === "Unavailable") return null;
+
+        const captured = {
+          lat: Number(location.lat),
+          lon: Number(location.lon),
+          accuracy: location.accuracy,
+          source: "Automatic fraud telemetry GPS",
+        };
+
+        if (!Number.isFinite(captured.lat) || !Number.isFinite(captured.lon) ||
+            (captured.lat === 0 && captured.lon === 0)) {
+          return null;
+        }
+
+        setDeviceGps(captured);
+        try {
+          const res = await authenticatedFetch(
+            "/api/geoapify/reverse?lat=" + captured.lat + "&lon=" + captured.lon,
+            { cache: "no-store" }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const formatted = String(data?.results?.[0]?.formatted || "").trim();
+            if (formatted) setDeviceGpsAddress(formatted);
+          }
+        } catch (e) {
+          console.warn("Automatic fraud GPS reverse geocode failed:", e);
+        }
+        return captured;
+      })
+      .catch((error) => {
+        console.warn("Automatic fraud GPS capture unavailable:", error);
+        return null;
+      });
+  }, [isOpen, currentStep, deviceGps]);
+
   // Live sync for order updates & courier tracking button when on Step 5 (Targeted Single Order Query)
   useEffect(() => {
     if (currentStep !== 5 || !completedOrder) return;
