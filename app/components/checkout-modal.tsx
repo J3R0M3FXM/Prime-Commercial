@@ -424,9 +424,12 @@ export default function CheckoutModal({
     fetchPaymentMethods();
   }, [isOpen]);
 
-  // Reset payment states when closed
+  // Reset checkout session state when closed. This is important because the
+  // modal stays mounted inside CartDrawer; leaving currentStep at 4 while clearing
+  // deliveryPaymentMethod can reopen directly on Review with an invalid payload.
   useEffect(() => {
     if (!isOpen) {
+      setCurrentStep(1);
       setSelectedPaymentMethod(null);
       setSelectedCourierId("");
       setDeliveryPaymentMethod("");
@@ -439,6 +442,7 @@ export default function CheckoutModal({
       setZoomedPaymentMethod(null);
       setIsStartingMayaCheckout(false);
       setMayaCheckoutError("");
+      setSubmitError("");
     }
   }, [isOpen]);
 
@@ -1025,6 +1029,19 @@ export default function CheckoutModal({
 
   // Submit Order to API
   const handleSubmitOrder = async () => {
+    const normalizedDeliveryPaymentMethod = String(deliveryPaymentMethod || "").trim().toLowerCase();
+
+    // Do not send an order request with a missing delivery-payment channel.
+    // Step 4 should never be able to fall through to the API in an invalid state.
+    if (!selectedCourier) {
+      setSubmitError("Please select a courier before placing the order.");
+      return;
+    }
+    if (normalizedDeliveryPaymentMethod !== "upon_checkout" && normalizedDeliveryPaymentMethod !== "upon_delivery") {
+      setSubmitError("Please select how the delivery fee will be paid: Upon Checkout or Upon Delivery.");
+      return;
+    }
+
     try {
       setIsSubmittingOrder(true);
       setSubmitError("");
@@ -1079,7 +1096,7 @@ export default function CheckoutModal({
           type: c.type,
         })),
         deliveryFee: courierDeliveryFee,
-        deliveryFeePaymentMethod: deliveryPaymentMethod,
+        deliveryFeePaymentMethod: normalizedDeliveryPaymentMethod,
         receiverName: receiverName.trim().toUpperCase(),
         receiverPhone: receiverPhone.trim(),
         deliveryAddress: {
@@ -2759,7 +2776,7 @@ export default function CheckoutModal({
               <button
                 type="button"
                 onClick={handleNextFromStep3}
-                disabled={!selectedCourier}
+                disabled={!selectedCourier || !deliveryPaymentMethod}
                 className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span>Review Order</span>
