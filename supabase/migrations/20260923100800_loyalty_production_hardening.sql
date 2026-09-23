@@ -623,6 +623,17 @@ begin
     updated_totals := true;
   end if;
 
+  if nullif(ord.referred_by_user_id, '') is not null
+     and coalesce(ord.referral_points_status, 'none') = 'none'
+  then
+    update public.orders
+    set referral_points_status = 'pending_30m',
+        referral_points_credit_after = now_ts + interval '30 minutes',
+        referral_points_amount = 50,
+        updated_at = now_ts
+    where id = ord.id;
+  end if;
+
   return jsonb_build_object(
     'success', true, 'awarded', true, 'purchasingPoints', purchase_points,
     'cashbackPoints', cashback_points, 'aggregateUpdated', updated_totals
