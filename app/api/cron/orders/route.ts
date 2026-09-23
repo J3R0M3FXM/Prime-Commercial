@@ -23,7 +23,11 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.rpc('expire_unpaid_orders', { p_limit: 100 });
     if (error) throw error;
 
-    const expiredOrders = Array.isArray(data?.orders) ? data.orders : [];
+    const expiredOrders = [
+      ...(Array.isArray(data?.orders) ? data.orders : []),
+      ...(Array.isArray(data?.errors) ? data.errors : []),
+    ];
+
     await Promise.allSettled(
       expiredOrders
         .filter((order: any) => order?.chatId && order?.orderNumber)
