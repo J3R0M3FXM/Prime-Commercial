@@ -1081,6 +1081,20 @@ export default function CheckoutModal({
 
       const hasGenuineDeviceGps = Number.isFinite(actualDevLat) && Number.isFinite(actualDevLon) && (actualDevLat !== 0 || actualDevLon !== 0);
 
+      let capturedGpsAddress = deviceGpsAddress.trim();
+      if (hasGenuineDeviceGps && !capturedGpsAddress) {
+        try {
+          const gpsAddressRes = await authenticatedFetch(`/api/geoapify/reverse?lat=${actualDevLat}&lon=${actualDevLon}`, { cache: "no-store" });
+          if (gpsAddressRes.ok) {
+            const gpsAddressData = await gpsAddressRes.json();
+            capturedGpsAddress = String(gpsAddressData?.results?.[0]?.formatted || "").trim();
+            if (capturedGpsAddress) setDeviceGpsAddress(capturedGpsAddress);
+          }
+        } catch (e) {
+          console.warn("Final GPS reverse geocode failed:", e);
+        }
+      }
+
       const orderData = {
         items: selectedItems.map((it) => {
           const isFree = Boolean(it.isFree || Number(it.price) === 0);
@@ -1152,8 +1166,8 @@ export default function CheckoutModal({
             longitude: actualDevLon,
             accuracy: actualDevAcc,
             source: "Actual Device Hardware GPS",
-            capturedAt: deviceGps?.source ? new Date().toISOString() : null,
-            reverseGeocodedAddress: deviceGpsAddress || null,
+            capturedAt: new Date().toISOString(),
+            reverseGeocodedAddress: capturedGpsAddress || null,
           } : null,
         },
       };
