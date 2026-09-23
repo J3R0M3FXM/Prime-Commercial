@@ -1350,7 +1350,7 @@ export default function OrderHistoryModal({
                               </button>
                             )}
                           </div>
-                        </div>                        </div>
+                        </div>
                       )}
                     </div>
                   ) : selectedOrder.status === "Pending" && !selectedOrder.paymentProofImage ? (
