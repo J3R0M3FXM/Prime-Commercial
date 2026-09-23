@@ -454,17 +454,8 @@ export default function CheckoutModal({
           });
       }
 
-      // Check URL search params or local storage for referral code
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlRef = urlParams.get("ref") || urlParams.get("referral") || urlParams.get("startapp");
-        const storedRef = localStorage.getItem("prime_referred_by");
-        const initialRef = (urlRef || storedRef || "").trim().toUpperCase();
-        if (initialRef && !referralCodeInput) {
-          setReferralCodeInput(initialRef);
-        }
-      } catch (e) {}
-
+      // Referral Code is customer-entered only; never pre-fill it from URL or storage.
+      setReferralCodeInput("");
     }
   }, [isOpen]);
 
@@ -1118,9 +1109,6 @@ export default function CheckoutModal({
         referrerMemberId: data.referrerMemberId
       });
       setReferralSuccess(`Referred by ${data.referrerName} (${data.referrerMemberId})`);
-      try {
-        localStorage.setItem("prime_referred_by", data.referrerMemberId);
-      } catch (e) {}
     } catch (err: any) {
       setReferralError(err.message || "Failed to validate referral code.");
     } finally {
@@ -1133,9 +1121,6 @@ export default function CheckoutModal({
     setReferralError("");
     setReferralSuccess("");
     setReferralCodeInput("");
-    try {
-      localStorage.removeItem("prime_referred_by");
-    } catch (e) {}
   };
 
   // Step Navigations & Validations
@@ -2072,7 +2057,7 @@ export default function CheckoutModal({
                               void handleApplyReferral();
                             }
                           }}
-                          placeholder="ENTER ID"
+                          placeholder="ENTER CODE"
                           aria-label="Referral code"
                           className="min-w-0 flex-1 pl-2.5 pr-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[10px] sm:text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
                         />
