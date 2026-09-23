@@ -32,6 +32,106 @@ export interface FingerprintPayload {
   [key: string]: any;
 }
 
+
+export function getRequestClientIp(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for') || '';
+  const forwardedIp = forwarded.split(',')[0]?.trim() || '';
+  return forwardedIp || request.headers.get('x-real-ip')?.trim() || '127.0.0.1';
+}
+
+function stableFingerprintSecretMaterial() {
+  return [
+    process.env.SESSION_SECRET?.trim() || '',
+    process.env.TELEGRAM_BOT_TOKEN?.trim() || '',
+    'PRIME_SERVER_FINGERPRINT_V1',
+  ].filter(Boolean).join('|');
+}
+
+export function getServerFingerprintId(request: Request): string {
+  const ip = getRequestClientIp(request);
+  const userAgent = request.headers.get('user-agent') || '';
+  const secChUa = request.headers.get('sec-ch-ua') || '';
+  const secChUaPlatform = request.headers.get('sec-ch-ua-platform') || '';
+  const acceptLanguage = request.headers.get('accept-language') || '';
+  const raw = [ip, userAgent, secChUa, secChUaPlatform, acceptLanguage]
+    .map((value) => String(value || '').trim().toLowerCase())
+    .join('\u001f');
+
+  const secret = stableFingerprintSecretMaterial();
+  if (secret) {
+    const crypto = require('crypto') as typeof import('crypto');
+    return `SRVFP_${crypto.createHmac('sha256', secret).update(raw).digest('hex').slice(0, 32).toUpperCase()}`;
+  }
+
+  const crypto = require('crypto') as typeof import('crypto');
+  return `SRVFP_${crypto.createHash('sha256').update(raw).digest('hex').slice(0, 32).toUpperCase()}`;
+}
+
+export function buildDeviceFingerprintId(rawData: FingerprintPayload): string {
+  const crypto = require('crypto') as typeof import('crypto');
+  const stableValues = [
+    rawData.deviceId,
+    rawData.hardwareId,
+    rawData.browser,
+    rawData.platform,
+    rawData.screenResolution,
+    rawData.availScreen,
+    rawData.pixelRatio,
+    rawData.timezone,
+    rawData.language,
+    Array.isArray(rawData.languages) ? rawData.languages.join(',') : rawData.languages,
+    rawData.graphics,
+    rawData.vendor,
+    rawData.canvasHash,
+    rawData.hardwareConcurrency,
+    rawData.deviceMemory,
+    rawData.touchSupport,
+  ]
+    .map((value) => String(value ?? '').trim().toLowerCase())
+    .join('\u001f');
+
+  if (!stableValues.replace(/\u001f/g, '')) return '';
+  return `DEVFP_${crypto.createHash('sha256').update(stableValues).digest('hex').slice(0, 32).toUpperCase()}`;
+}
+
+export function resolveTrustedFingerprint(
+  customer: any,
+  submitted: FingerprintPayload = {}
+): {
+  sessionToken: string;
+  deviceId: string;
+  hardwareId: string;
+  deviceFingerprintId: string;
+  matched: boolean;
+} {
+  const fingerprints = Array.isArray(customer?.fingerprints) ? customer.fingerprints : [];
+  const submittedSessionToken = String(submitted.sessionToken || '').trim();
+  const submittedDeviceId = String(submitted.deviceId || '').trim();
+
+  let matched: any = null;
+  if (submittedSessionToken) {
+    matched = fingerprints.find((fp: any) => String(fp?.sessionToken || '').trim() === submittedSessionToken) || null;
+  }
+  if (!matched && submittedDeviceId) {
+    matched = fingerprints.find((fp: any) => String(fp?.deviceId || '').trim() === submittedDeviceId) || null;
+  }
+
+  const source = matched || submitted;
+  const deviceId = String(source?.deviceId || '').trim();
+  const hardwareId = String(source?.hardwareId || '').trim();
+  const deviceFingerprintId =
+    String(source?.deviceFingerprintId || '').trim() ||
+    buildDeviceFingerprintId(source);
+
+  return {
+    sessionToken: String(source?.sessionToken || submittedSessionToken || '').trim(),
+    deviceId,
+    hardwareId,
+    deviceFingerprintId,
+    matched: Boolean(matched),
+  };
+}
+
 export async function enrichFingerprintData(ip: string, lat?: number, lon?: number, accuracy?: number) {
   const isLocalIp = !ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('172.16.');
   
