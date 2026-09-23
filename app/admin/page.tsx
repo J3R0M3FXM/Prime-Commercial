@@ -2025,182 +2025,32 @@ export default function AdminPage() {
         {/* 1. DASHBOARD HUB VIEW (Glossy Tiles, Stats, Header)                       */}
         {/* ========================================================================= */}
         {view === "dashboard" && (
-          <motion.div
-            key="view-dashboard"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18 }}
-            className="flex-1 w-full mx-auto flex flex-col"
-          >
-            <AdminTopbar
-              title="Control Center"
-              section="PRIME ADMIN"
-              actions={
-                <>
-                  <span className="admin-live-indicator">
-                    <span className="admin-live-dot" />
-                    {isSilentSyncing ? "Syncing" : "Live"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsSoundSettingsModalOpen(true)}
-                    className="admin-icon-button"
-                    title="Notification sound settings"
-                    aria-label="Notification sound settings"
-                  >
-                    {soundSettings.master ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={fetchAllData}
-                    disabled={refreshing}
-                    className="admin-icon-button"
-                    title="Refresh data"
-                    aria-label="Refresh data"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try { await adminFetch("/api/admin/auth", { method: "DELETE" }); }
-                      finally { setAuthorized(false); setAdminUser(null); }
-                    }}
-                    className="admin-icon-button admin-icon-button--danger"
-                    title="Lock admin panel"
-                    aria-label="Lock admin panel"
-                  >
-                    <Lock className="h-4 w-4" />
-                  </button>
-                </>
-              }
-            />
-
-            <div className="admin-content">
-              {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (
-                <AdminSurface className="admin-install-banner">
-                  <div className="admin-install-banner__copy">
-                    <div className="admin-eyebrow">OPTIONAL</div>
-                    <strong>Install PRIME Admin</strong>
-                    <p>Use the portrait-optimized admin workspace as an app for faster staff access.</p>
-                  </div>
-                  <div className="admin-install-banner__actions">
-                    {deferredPrompt ? (
-                      <button type="button" className="admin-primary-button" onClick={handleInstallPWA}>Install</button>
-                    ) : null}
-                    {isIOSDevice ? (
-                      <button type="button" className="admin-secondary-button" onClick={() => setShowIOSGuide(true)}>iOS Guide</button>
-                    ) : null}
-                  </div>
-                </AdminSurface>
-              )}
-
-              <AdminPageHeader
-                title="Operations Overview"
-                description="A compact command center for daily commerce operations, configuration, and system health."
-              />
-
-              <div className="admin-stat-grid">
-                <AdminStat label="Customers" value={customers.length} detail="Registered accounts" icon={Users} />
-                <AdminStat label="Orders" value={orders.length} detail="Recent operational queue" tone="accent" icon={ClipboardList} />
-                <AdminStat
-                  label="Stock Units"
-                  value={products.reduce((sum: number, product: any) => sum + (Number(product.stock) || 0), 0)}
-                  detail="Across active catalog"
-                  tone="success"
-                  icon={Boxes}
-                />
-                <AdminStat
-                  label="Attention"
-                  value={orders.filter((order: any) => ["pending", "pending review"].includes(String(order.status || "").toLowerCase()) || String(order.paymentStatus || "").toLowerCase() === "pending review").length}
-                  detail="Orders needing review"
-                  tone="warning"
-                  icon={AlertTriangle}
-                />
-              </div>
-
-              <AdminSection title="Operations" eyebrow="01" icon={Activity} description="Daily customer, order, catalog, and inventory actions.">
-                <div className="admin-module-grid">
-                  {[
-                    { id: "customers", name: "Customers", icon: Users, count: customers.length, tone: "blue" },
-                    { id: "orders", name: "Orders", icon: ClipboardList, count: orders.length, tone: "violet" },
-                    { id: "products", name: "Products", icon: Package, count: products.length, tone: "amber" },
-                    { id: "inventory", name: "Inventory", icon: Sliders, count: `${products.reduce((a: number, p: any) => a + (Number(p.stock) || 0), 0)} units`, tone: "emerald" },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setView(item.id as AdminView)}
-                      className={`admin-module-tile admin-module-tile-${item.tone} group`}
-                    >
-                      <div className="admin-module-icon"><item.icon className="h-4 w-4" /></div>
-                      <span className="admin-module-name">{item.name}</span>
-                      <span className="admin-module-meta">{item.count}</span>
-                    </button>
-                  ))}
-                </div>
-              </AdminSection>
-
-              <AdminSection title="Configuration" eyebrow="02" icon={Sliders} description="Business rules, payments, promotions, media, and automation.">
-                <div className="admin-module-grid">
-                  {[
-                    { id: "settings", name: "Settings", icon: Lock, count: "Protected", tone: "slate" },
-                    { id: "logistics", name: "Logistics", icon: Truck, count: "Routes", tone: "orange" },
-                    { id: "charges", name: "Charges", icon: Receipt, count: "Rules", tone: "yellow" },
-                    { id: "payments", name: "Payments", icon: CreditCard, count: "Methods", tone: "indigo" },
-                    { id: "promos", name: "Promos", icon: Tag, count: "Vouchers", tone: "pink" },
-                    { id: "media", name: "Media", icon: Film, count: "Gallery", tone: "fuchsia" },
-                    { id: "automation", name: "Secretary", icon: MessageSquare, count: "Flows", tone: "teal" },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setView(item.id as AdminView)}
-                      className={`admin-module-tile admin-module-tile-${item.tone} group`}
-                    >
-                      <div className="admin-module-icon"><item.icon className="h-4 w-4" /></div>
-                      <span className="admin-module-name">{item.name}</span>
-                      <span className="admin-module-meta">{item.count}</span>
-                    </button>
-                  ))}
-                </div>
-              </AdminSection>
-
-              <AdminSection title="Observability" eyebrow="03" icon={Activity} description="Telemetry, diagnostics, and live service checks.">
-                <div className="admin-module-grid">
-                  {[
-                    { id: "analytics", name: "Analytics", icon: TrendingUp, count: "Live", tone: "cyan" },
-                    { id: "diagnostics", name: "Diagnostics", icon: Activity, count: "Health", tone: "rose" },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setView(item.id as AdminView)}
-                      className={`admin-module-tile admin-module-tile-${item.tone} group`}
-                    >
-                      <div className="admin-module-icon"><item.icon className="h-4 w-4" /></div>
-                      <span className="admin-module-name">{item.name}</span>
-                      <span className="admin-module-meta">{item.count}</span>
-                    </button>
-                  ))}
-                </div>
-              </AdminSection>
-
-              <div className="admin-status-strip">
-                <span className="admin-live-dot" />
-                <div>
-                  <strong>Live operations channel</strong>
-                  <span>Background sync refreshes customer telemetry and order activity without creating a horizontal workspace.</span>
-                </div>
-                <AdminBadge tone="success">{isSilentSyncing ? "SYNCING" : "CONNECTED"}</AdminBadge>
-              </div>
+          <motion.div key="view-dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} className="flex-1 w-full flex flex-col">
+            <AdminTopbar title="Control Center" section="PRIME ADMIN" actions={
+              <>
+                <span className="admin-command-live"><span className="admin-live-dot" />{isSilentSyncing ? "SYNC" : "LIVE"}</span>
+                <button type="button" onClick={() => setIsSoundSettingsModalOpen(true)} className="admin-icon-button" title="Notification sound settings" aria-label="Notification sound settings">{soundSettings.master ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}</button>
+                <button type="button" onClick={fetchAllData} disabled={refreshing} className="admin-icon-button" title="Refresh data" aria-label="Refresh data"><RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} /></button>
+                <button type="button" onClick={async () => { try { await adminFetch("/api/admin/auth", { method: "DELETE" }); } finally { setAuthorized(false); setAdminUser(null); } }} className="admin-icon-button" title="Lock admin panel" aria-label="Lock admin panel"><Lock className="h-4 w-4" /></button>
+              </>
+            } />
+            <div className="admin-content admin-command-home">
+              {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (<AdminSurface className="admin-install-banner admin-install-banner--compact"><div className="admin-install-banner__copy"><div className="admin-eyebrow">WORKSPACE</div><strong>Install PRIME Admin</strong><p>Optional app-style access for staff devices.</p></div><div className="admin-install-banner__actions">{deferredPrompt ? <button type="button" className="admin-primary-button" onClick={handleInstallPWA}>Install</button> : null}{isIOSDevice ? <button type="button" className="admin-secondary-button" onClick={() => setShowIOSGuide(true)}>iOS Guide</button> : null}</div></AdminSurface>)}
+              <div className="admin-command-heading"><div><div className="admin-eyebrow">COMMAND / OVERVIEW</div><h2>Operations Overview</h2><p>Daily commerce operations, configuration, and service visibility.</p></div></div>
+              <div className="admin-kpi-rail"><div className="admin-kpi"><span>Customers</span><strong>{customers.length}</strong><small>Accounts</small></div><div className="admin-kpi"><span>Orders</span><strong>{orders.length}</strong><small>Queue</small></div><div className="admin-kpi admin-kpi--accent"><span>Stock Units</span><strong>{products.reduce((sum: number, product: any) => sum + (Number(product.stock) || 0), 0)}</strong><small>Catalog</small></div><div className="admin-kpi admin-kpi--warning"><span>Attention</span><strong>{orders.filter((order: any) => ["pending", "pending review"].includes(String(order.status || "").toLowerCase()) || String(order.paymentStatus || "").toLowerCase() === "pending review").length}</strong><small>Review</small></div></div>
+              <AdminSection title="Operations" eyebrow="01" description="Customers, orders, catalog, and inventory."><div className="admin-command-grid">{[
+                { id: "customers", name: "Customers", count: customers.length, icon: Users }, { id: "orders", name: "Orders", count: orders.length, icon: ClipboardList }, { id: "products", name: "Products", count: products.length, icon: Package }, { id: "inventory", name: "Inventory", count: `${products.reduce((a: number, p: any) => a + (Number(p.stock) || 0), 0)} units`, icon: Sliders },
+              ].map((item) => (<button key={item.id} type="button" onClick={() => setView(item.id as AdminView)} className="admin-command-item"><span className="admin-command-item__icon"><item.icon className="h-4 w-4" /></span><span className="admin-command-item__copy"><strong>{item.name}</strong><small>{item.count}</small></span><ChevronRight className="admin-command-item__arrow h-4 w-4" /></button>))}</div></AdminSection>
+              <AdminSection title="Configuration" eyebrow="02" description="Business rules, payments, promotions, media, and automation."><div className="admin-command-grid admin-command-grid--config">{[
+                { id: "settings", name: "Settings", meta: "Protected", icon: Lock }, { id: "logistics", name: "Logistics", meta: "Routes", icon: Truck }, { id: "charges", name: "Charges", meta: "Rules", icon: Receipt }, { id: "payments", name: "Payments", meta: "Methods", icon: CreditCard }, { id: "promos", name: "Promos", meta: "Vouchers", icon: Tag }, { id: "media", name: "Media", meta: "Gallery", icon: Film }, { id: "automation", name: "Secretary", meta: "Flows", icon: MessageSquare },
+              ].map((item) => (<button key={item.id} type="button" onClick={() => setView(item.id as AdminView)} className="admin-command-item"><span className="admin-command-item__icon"><item.icon className="h-4 w-4" /></span><span className="admin-command-item__copy"><strong>{item.name}</strong><small>{item.meta}</small></span><ChevronRight className="admin-command-item__arrow h-4 w-4" /></button>))}</div></AdminSection>
+              <AdminSection title="Observability" eyebrow="03" description="Telemetry, diagnostics, and live service checks."><div className="admin-command-grid admin-command-grid--observability">{[
+                { id: "analytics", name: "Analytics", meta: "Live", icon: TrendingUp }, { id: "diagnostics", name: "Diagnostics", meta: "Health", icon: Activity },
+              ].map((item) => (<button key={item.id} type="button" onClick={() => setView(item.id as AdminView)} className="admin-command-item"><span className="admin-command-item__icon"><item.icon className="h-4 w-4" /></span><span className="admin-command-item__copy"><strong>{item.name}</strong><small>{item.meta}</small></span><ChevronRight className="admin-command-item__arrow h-4 w-4" /></button>))}</div></AdminSection>
+              <div className="admin-connection-bar"><span className="admin-live-dot" /><div><strong>Live operations channel</strong><span>Customer telemetry and order activity sync in the background.</span></div><AdminBadge tone="success">{isSilentSyncing ? "SYNCING" : "CONNECTED"}</AdminBadge></div>
             </div>
           </motion.div>
         )}
-        {/* ========================================================================= */}
-        {/* 2. CUSTOMERS SECTION: COMPACT LIST WITH STICKY NON-SCROLLING SEARCH BAR    */}
-        {/* ========================================================================= */}
         {view === "customers" && (
           <motion.div
             key="view-customers"
