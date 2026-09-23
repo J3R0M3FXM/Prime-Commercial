@@ -416,6 +416,7 @@ export default function CheckoutModal({
       setDeviceGps(null);
       setDeviceGpsAddress("");
       setDeviceGpsAddressLoading(false);
+      automaticGpsCaptureRef.current = null;
       setSelectedPaymentMethod(null);
       setSelectedCourierId("");
       setDeliveryPaymentMethod("");
