@@ -487,7 +487,7 @@ export default function MediaModule() {
   const totalPublished = videos.filter((v) => v.isPublished !== false).length;
 
   return (
-    <div className="space-y-3">
+    <div className="admin-feature-module space-y-3">
       {/* Toast Alert */}
       {successMsg && (
         <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-none flex items-center justify-between text-xs font-mono animate-in fade-in slide-in-from-top-2 duration-200">
