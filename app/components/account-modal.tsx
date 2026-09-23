@@ -305,10 +305,10 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
     Gold: { bg: 'bg-amber-950', text: 'text-amber-200', border: 'border-amber-700', pill: 'bg-amber-900 text-amber-100' },
     Bronze: { bg: 'bg-orange-950', text: 'text-orange-200', border: 'border-orange-800', pill: 'bg-orange-900 text-orange-100' },
     Silver: { bg: 'bg-slate-800', text: 'text-slate-200', border: 'border-slate-600', pill: 'bg-slate-700 text-slate-100' },
-    Member: { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300', pill: 'bg-gray-200 text-gray-700' }
   };
 
-  const activeTierTheme = tierColors[tier?.tier || 'Member'] || tierColors.Member;
+  const activeTier = tier?.tier || 'Silver';
+  const activeTierTheme = tierColors[activeTier] || tierColors.Silver;
 
   return (
     <div id="account-modal-overlay" className="w-full bg-gray-50 flex justify-center py-3 sm:py-5">
@@ -412,7 +412,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                   <div className="flex sm:flex-col items-start sm:items-end justify-between border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-200">
                     <div className="text-[10px] font-mono uppercase text-gray-500">Membership Tier</div>
                     <div className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider rounded-md ${activeTierTheme.pill} mt-0.5`}>
-                      ★ {tier?.tier || 'Member'}
+                      ★ {activeTier}
                     </div>
                   </div>
                 </div>
