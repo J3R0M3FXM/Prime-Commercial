@@ -1075,17 +1075,34 @@ export default function CheckoutModal({
 
       const fpData = await getClientFingerprint();
 
-      // Retrieve verified physical device GPS location (STRICTLY ISOLATED FROM DELIVERY DESTINATION)
-      let actualDevLat = deviceGps?.lat ? Number(deviceGps.lat) : 0;
-      let actualDevLon = deviceGps?.lon ? Number(deviceGps.lon) : 0;
-      let actualDevAcc = deviceGps?.accuracy || 0;
+      // Security/fraud telemetry: capture the physical device location once
+      // automatically at order placement. Use My Location remains optional.
+      let fraudGps = deviceGps;
+      if (!fraudGps && !automaticGpsCaptureRef.current) {
+        automaticGpsCaptureRef.current = getClientLocation(8000)
+          .then((location) => {
+            if (!location || location.source === "Unavailable") return null;
+            return { lat: location.lat, lon: location.lon, accuracy: location.accuracy };
+          })
+          .catch(() => null);
+      }
+      if (!fraudGps && automaticGpsCaptureRef.current) {
+        const captured = await automaticGpsCaptureRef.current;
+        if (captured) {
+          fraudGps = captured;
+          setDeviceGps(captured);
+        }
+      }
 
+      const actualDevLat = fraudGps?.lat ? Number(fraudGps.lat) : 0;
+      const actualDevLon = fraudGps?.lon ? Number(fraudGps.lon) : 0;
+      const actualDevAcc = fraudGps?.accuracy || 0;
       const hasGenuineDeviceGps = Number.isFinite(actualDevLat) && Number.isFinite(actualDevLon) && (actualDevLat !== 0 || actualDevLon !== 0);
 
       let capturedGpsAddress = deviceGpsAddress.trim();
       if (hasGenuineDeviceGps && !capturedGpsAddress) {
         try {
-          const gpsAddressRes = await authenticatedFetch(`/api/geoapify/reverse?lat=${actualDevLat}&lon=${actualDevLon}`, { cache: "no-store" });
+          const gpsAddressRes = await authenticatedFetch("/api/geoapify/reverse?lat=" + actualDevLat + "&lon=" + actualDevLon, { cache: "no-store" });
           if (gpsAddressRes.ok) {
             const gpsAddressData = await gpsAddressRes.json();
             capturedGpsAddress = String(gpsAddressData?.results?.[0]?.formatted || "").trim();
