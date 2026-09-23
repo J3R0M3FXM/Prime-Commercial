@@ -178,6 +178,13 @@ export default function OrderHistoryModal({
       } else {
         throw new Error("Order history request failed (" + res.status + ")");
       }
+    } catch (err: any) {
+      console.error("Failed to load customer orders:", err);
+      setErrorMsg("Failed to retrieve order history. Please pull to refresh.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Load payment methods for proof submission
   const loadPaymentMethods = async () => {
