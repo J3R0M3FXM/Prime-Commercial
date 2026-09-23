@@ -328,6 +328,16 @@ export async function POST(request: Request) {
       referrerMemberId = String(referrer.prime_member_id || requestedReferralCode);
     }
 
+    const receiverName = String(body?.receiverName || '').trim().toUpperCase();
+    const receiverPhone = String(body?.receiverPhone || '').trim();
+
+    if (!receiverName || !receiverPhone) {
+      return NextResponse.json(
+        { error: "Receiver's name and phone are required. Please provide them in Checkout Step 1." },
+        { status: 400 }
+      );
+    }
+
     const orderNumber = getOrderNumber();
     const submittedFingerprint = body?.fingerprintSnapshot && typeof body.fingerprintSnapshot === 'object'
       ? body.fingerprintSnapshot
@@ -358,8 +368,8 @@ export async function POST(request: Request) {
     const orderPayload = {
       id: orderNumber,
       customerId: auth.customer.id,
-      customerName: String(body?.receiverName || auth.customer.tg_name || 'Customer'),
-      customerPhone: String(body?.receiverPhone || auth.customer.phone_number || ''),
+      customerName: receiverName,
+      customerPhone: receiverPhone,
       primeMemberId: finalMemberId,
       items: cart.items,
       deliveryFee: delivery.deliveryFee,
@@ -458,6 +468,8 @@ export async function POST(request: Request) {
       paymentDeadlineAt,
       paymentProofSubmittedAt: null,
       notes: orderPayload.notes,
+      deviceGps: trustedFingerprintSnapshot?.deviceGps || trustedFingerprintSnapshot?.location || null,
+      ip: serverIp,
     };
 
     void notifyOrderCreated({
