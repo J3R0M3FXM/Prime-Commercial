@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getClientFingerprint, getClientLocation } from "./components/fingerprint-collector";
+import { getClientFingerprint } from "./components/fingerprint-collector";
 import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
@@ -166,7 +166,6 @@ export default function Shopfront() {
         }
 
         const fingerprintData = await getClientFingerprint();
-        const locationData = await getClientLocation();
         
         const response = await fetch("/api/auth/telegram/validate", {
           method: "POST",
@@ -175,10 +174,7 @@ export default function Shopfront() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             initData: initDataRaw,
-            fingerprint: {
-              ...fingerprintData,
-              location: locationData
-            }
+            fingerprint: fingerprintData
           }),
         });
 
