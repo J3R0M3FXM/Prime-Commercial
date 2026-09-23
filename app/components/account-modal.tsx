@@ -563,7 +563,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                         {c?.purchasingPoints || 0}
                       </div>
                       <div className="text-[11px] text-gray-500 mt-1">
-                        Earn 10 pts per ₱100 item spend
+                        Earn 5 pts per ₱100 item spend
                       </div>
                     </div>
 
