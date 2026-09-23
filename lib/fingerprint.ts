@@ -43,8 +43,7 @@ export function getRequestClientIp(request: Request): string {
 export function getServerFingerprintId(request: Request): string {
   const ip = getRequestClientIp(request);
   const userAgent = request.headers.get('user-agent') || '';
-  const platform = request.headers.get('sec-ch-ua-platform') || '';
-  const raw = [ip, userAgent, platform]
+  const raw = [ip, userAgent]
     .map((value) => String(value || '').trim().toLowerCase())
     .join('|');
 
