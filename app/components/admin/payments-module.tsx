@@ -98,7 +98,7 @@ const Base64ImageUploader = ({
   };
 
   return (
-    <div className="space-y-1">
+    <div className="admin-feature-module space-y-1">
       <div className="flex items-center justify-between">
         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 font-heading">
           {label} {required && <span className="text-red-500">*</span>}
