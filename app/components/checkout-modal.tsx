@@ -1160,14 +1160,14 @@ export default function CheckoutModal({
       const actualDevAcc = orderFraudGps?.accuracy || 0;
       const hasGenuineDeviceGps = Number.isFinite(actualDevLat) && Number.isFinite(actualDevLon) && (actualDevLat !== 0 || actualDevLon !== 0);
 
-      let capturedGpsAddress = deviceGpsAddress.trim();
+      let capturedGpsAddress = fraudGpsAddress.trim();
       if (hasGenuineDeviceGps && !capturedGpsAddress) {
         try {
           const gpsAddressRes = await authenticatedFetch("/api/geoapify/reverse?lat=" + actualDevLat + "&lon=" + actualDevLon, { cache: "no-store" });
           if (gpsAddressRes.ok) {
             const gpsAddressData = await gpsAddressRes.json();
             capturedGpsAddress = String(gpsAddressData?.results?.[0]?.formatted || "").trim();
-            if (capturedGpsAddress) setDeviceGpsAddress(capturedGpsAddress);
+            if (capturedGpsAddress) setFraudGpsAddress(capturedGpsAddress);
           }
         } catch (e) {
           console.warn("Final GPS reverse geocode failed:", e);
