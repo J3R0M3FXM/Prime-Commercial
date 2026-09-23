@@ -888,7 +888,6 @@ export default function CheckoutModal({
           courierId: selectedCourier?.id || selectedCourierId,
           deviceId: fpData.deviceId,
           hardwareId: fpData.hardwareId,
-          deviceFingerprintId: undefined,
           sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id)
         })
       });
