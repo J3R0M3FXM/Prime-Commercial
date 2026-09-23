@@ -99,6 +99,7 @@ export async function GET(request: Request) {
       trackingNumber: o.tracking_number,
       notes: o.notes,
       fingerprintSnapshot: o.fingerprint_snapshot || null,
+      ip: o.fingerprint_snapshot?.ipSession || null,
       deviceId: o.fingerprint_snapshot?.deviceId || null,
       hardwareId: o.fingerprint_snapshot?.hardwareId || null,
       deviceFingerprintId: o.fingerprint_snapshot?.deviceFingerprintId || null,
