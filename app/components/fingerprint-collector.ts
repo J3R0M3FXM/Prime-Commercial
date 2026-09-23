@@ -159,59 +159,93 @@ export interface LocationResult {
  * Checks Telegram LocationManager if available, with HTML5 Geolocation fallback.
  * The browser path uses watchPosition + clearWatch so a timed-out request is cleaned up.
  */
-export async function getClientLocation(timeoutMs = 8000): Promise<LocationResult> {
+export async function getClientLocation(timeoutMs = 10000): Promise<LocationResult> {
   if (typeof window === "undefined") {
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  // In Telegram Mini App, use Telegram's native LocationManager as the sole
-  // capture/permission source for this attempt. Do not fall through to browser
-  // geolocation afterward, which can create a second permission flow.
-  const tgLocationManager = (window as any)?.Telegram?.WebApp?.LocationManager;
-  if (tgLocationManager && typeof tgLocationManager.getLocation === "function") {
+  const telegramWebApp = (window as any)?.Telegram?.WebApp;
+  const tgLocationManager = telegramWebApp?.LocationManager;
+
+  // Telegram Mini Apps expose a native LocationManager on supported clients.
+  // Use it first when it is actually available on the current device. If the
+  // manager reports that the platform cannot provide location, fall back to the
+  // browser geolocation API. This handles desktop/embedded clients where the
+  // LocationManager object may exist but native location is unavailable.
+  if (
+    tgLocationManager &&
+    typeof tgLocationManager.init === "function" &&
+    typeof tgLocationManager.getLocation === "function"
+  ) {
     try {
-      const tgLoc = await new Promise<any>((resolve) => {
+      const nativeResult = await new Promise<{ data: any; nativeAvailable: boolean }>((resolve) => {
         let settled = false;
-        const finish = (value: any) => {
+        const timer = setTimeout(() => {
           if (settled) return;
           settled = true;
-          resolve(value);
+          resolve({
+            data: null,
+            nativeAvailable: tgLocationManager?.isLocationAvailable === true,
+          });
+        }, timeoutMs);
+
+        const finish = (data: any) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve({
+            data,
+            nativeAvailable: tgLocationManager?.isLocationAvailable !== false,
+          });
         };
-        const timeout = setTimeout(() => finish(null), timeoutMs);
 
         try {
           tgLocationManager.init(() => {
+            const nativeAvailable = tgLocationManager?.isLocationAvailable === true;
+            if (!nativeAvailable) {
+              finish(null);
+              return;
+            }
+
             try {
-              tgLocationManager.getLocation((data: any) => {
-                clearTimeout(timeout);
-                finish(data);
-              });
-            } catch {
-              clearTimeout(timeout);
+              tgLocationManager.getLocation((data: any) => finish(data));
+            } catch (error) {
+              console.warn("Telegram LocationManager request failed:", error);
               finish(null);
             }
           });
-        } catch {
-          clearTimeout(timeout);
-          finish(null);
+        } catch (error) {
+          clearTimeout(timer);
+          console.warn("Telegram LocationManager initialization failed:", error);
+          resolve({
+            data: null,
+            nativeAvailable: false,
+          });
         }
       });
 
-      const lat = Number(tgLoc?.latitude);
-      const lon = Number(tgLoc?.longitude);
+      const lat = Number(nativeResult.data?.latitude);
+      const lon = Number(nativeResult.data?.longitude);
       if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)) {
         return {
           lat,
           lon,
-          accuracy: Number(tgLoc?.horizontal_accuracy ?? tgLoc?.accuracy ?? 10) || undefined,
+          accuracy: Number(
+            nativeResult.data?.horizontal_accuracy ??
+            nativeResult.data?.accuracy
+          ) || undefined,
+          altitude: nativeResult.data?.altitude ?? null,
           source: "Precise GPS",
         };
       }
 
-      return { lat: 0, lon: 0, source: "Unavailable" };
+      // A supported Telegram client that has just denied the native request
+      // should not immediately receive a second browser permission prompt.
+      if (nativeResult.nativeAvailable) {
+        return { lat: 0, lon: 0, source: "Unavailable" };
+      }
     } catch (error) {
-      console.warn("Telegram LocationManager capture failed:", error);
-      return { lat: 0, lon: 0, source: "Unavailable" };
+      console.warn("Telegram native GPS handling failed:", error);
     }
   }
 
@@ -219,8 +253,8 @@ export async function getClientLocation(timeoutMs = 8000): Promise<LocationResul
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  // Use a one-shot watch instead of getCurrentPosition so the request can be
-  // explicitly cleared after the first high-accuracy fix or our own timeout.
+  // Browser fallback. Use a one-shot watch so it can be explicitly cleaned up
+  // after the first high-accuracy position or our own timeout.
   return new Promise((resolve) => {
     let settled = false;
     let watchId: number | null = null;
@@ -255,7 +289,7 @@ export async function getClientLocation(timeoutMs = 8000): Promise<LocationResul
           });
         },
         (err) => {
-          console.warn("GPS position request denied or timed out:", err.message);
+          console.warn("Browser GPS request denied or timed out:", err.message);
           finish({ lat: 0, lon: 0, source: "Unavailable" });
         },
         {
@@ -265,7 +299,7 @@ export async function getClientLocation(timeoutMs = 8000): Promise<LocationResul
         }
       );
     } catch (error) {
-      console.warn("GPS position request could not start:", error);
+      console.warn("Browser GPS request could not start:", error);
       finish({ lat: 0, lon: 0, source: "Unavailable" });
     }
   });
