@@ -59,8 +59,16 @@ function normalizeOrder(raw: any) {
     payableOnDelivery: raw.payableOnDelivery ?? raw.payable_on_delivery,
     totalAmount: raw.totalAmount ?? raw.total_amount ?? 0,
     subTotal: raw.subTotal ?? raw.subtotal ?? 0,
-    appliedCharges: raw.appliedCharges || raw.chargesBreakdown || raw.charges_breakdown || raw.charges || [],
-    charges: raw.charges || raw.appliedCharges || raw.chargesBreakdown || raw.charges_breakdown || [],
+    appliedCharges: (raw.appliedCharges || raw.chargesBreakdown || raw.charges_breakdown || raw.charges || []).map((charge: any) => ({
+      ...charge,
+      amount: Number(charge?.computedAmount ?? charge?.amount ?? 0),
+      computedAmount: Number(charge?.computedAmount ?? charge?.amount ?? 0),
+    })),
+    charges: (raw.charges || raw.appliedCharges || raw.chargesBreakdown || raw.charges_breakdown || []).map((charge: any) => ({
+      ...charge,
+      amount: Number(charge?.computedAmount ?? charge?.amount ?? 0),
+      computedAmount: Number(charge?.computedAmount ?? charge?.amount ?? 0),
+    })),
     paymentStatus: raw.paymentStatus || raw.payment_status || "Unpaid",
     paymentMethodId: raw.paymentMethodId || raw.payment_method_id || "",
     paymentMethodName: raw.paymentMethodName || raw.payment_method_name || "",
