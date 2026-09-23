@@ -4506,6 +4506,11 @@ export default function AdminPage() {
                             </div>
                             <p className="text-slate-500">
                               Qty {it.quantity} &bull; Unit {isFreeItem ? <span className="text-emerald-600 font-bold">FREE</span> : <span className="font-ibm-condensed">{formatPHP(it.price)}</span>}
+                              {(it.selectedVariant?.name || it.variantName || (it.variantId && it.variantId !== "default")) && (
+                                <span className="text-slate-400 ml-1.5">
+                                  &bull; Variant: {it.selectedVariant?.name || it.variantName || it.variantId}
+                                </span>
+                              )}
                               {it.originalPrice && it.originalPrice !== it.price && (
                                 <span className="text-slate-400 line-through ml-1.5 font-ibm-condensed">
                                   {formatPHP(it.originalPrice)}
