@@ -52,7 +52,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const forceFresh = searchParams.has('_fresh');
     if (!forceFresh && cacheStore.adminOrders && (now - cacheStore.lastAdminOrdersFetchTime < 60000)) {
-      return NextResponse.json(cacheStore.adminOrders);
+      return NextResponse.json(cacheStore.adminOrders, {
+        headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+      });
     }
 
     if (!isSupabaseConfigured()) {
@@ -112,7 +114,33 @@ export async function GET(request: Request) {
       updatedAt: o.updated_at
     }));
 
-    const hydratedOrders = await hydrateAdminOrders(orders, supabase);
+    const customerIds = Array.from(new Set(orders.map((order: any) => String(order.customerId || '').trim()).filter(Boolean)));
+    const customerIdentity = new Map<string, any>();
+    if (customerIds.length > 0) {
+      const { data: customers, error: customerError } = await supabase
+        .from('customers')
+        .select('id,tg_name,tg_username,tg_user_id,prime_member_id')
+        .in('id', customerIds);
+      if (!customerError) {
+        (customers || []).forEach((customer: any) => {
+          customerIdentity.set(String(customer.id), customer);
+        });
+      }
+    }
+
+    const ordersWithIdentity = orders.map((order: any) => {
+      const customer = customerIdentity.get(String(order.customerId || ''));
+      return {
+        ...order,
+        telegramName: customer?.tg_name || '',
+        telegramUsername: customer?.tg_username || '',
+        telegramUserId: customer?.tg_user_id || order.tgUserId || '',
+        telegramPrimeMemberId: customer?.prime_member_id || order.primeMemberId || '',
+        deviceSnapshot: order.fingerprintSnapshot || null,
+      };
+    });
+
+    const hydratedOrders = await hydrateAdminOrders(ordersWithIdentity, supabase);
     cacheStore.adminOrders = hydratedOrders;
     cacheStore.lastAdminOrdersFetchTime = now;
 
@@ -121,7 +149,9 @@ export async function GET(request: Request) {
     });
   } catch (error: any) {
     if (cacheStore.adminOrders) {
-      return NextResponse.json(cacheStore.adminOrders);
+      return NextResponse.json(cacheStore.adminOrders, {
+        headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+      });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
