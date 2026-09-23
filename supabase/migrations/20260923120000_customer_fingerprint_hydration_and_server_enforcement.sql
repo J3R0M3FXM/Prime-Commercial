@@ -141,27 +141,43 @@ set search_path = public
 as $$
 declare
   snapshot jsonb;
-  v_device_id text;
-  v_hardware_id text;
-  v_device_fingerprint_id text;
-  v_server_fingerprint_id text;
+  order_customer_id text;
+  order_promo_code text;
+  snapshot_device_id text;
+  snapshot_hardware_id text;
+  snapshot_device_fingerprint_id text;
+  snapshot_server_fingerprint_id text;
 begin
   if new.order_id is not null then
-    select fingerprint_snapshot
-      into snapshot
+    select customer_id, applied_promo_code, fingerprint_snapshot
+      into order_customer_id, order_promo_code, snapshot
     from public.orders
     where id = new.order_id;
 
-    if jsonb_typeof(snapshot) = 'object' then
-      v_device_id := nullif(trim(coalesce(snapshot->>'deviceId','')), '');
-      v_hardware_id := nullif(trim(coalesce(snapshot->>'hardwareId','')), '');
-      v_device_fingerprint_id := nullif(trim(coalesce(snapshot->>'deviceFingerprintId','')), '');
-      v_server_fingerprint_id := nullif(trim(coalesce(snapshot->>'serverFingerprintId','')), '');
+    if order_customer_id is not null then
+      new.customer_id := order_customer_id;
+    end if;
 
-      new.device_id := coalesce(nullif(trim(new.device_id), ''), v_device_id);
-      new.hardware_id := coalesce(nullif(trim(new.hardware_id), ''), v_hardware_id);
-      new.device_fingerprint_id := coalesce(nullif(trim(new.device_fingerprint_id), ''), v_device_fingerprint_id);
-      new.server_fingerprint_id := coalesce(nullif(trim(new.server_fingerprint_id), ''), v_server_fingerprint_id);
+    if nullif(trim(coalesce(order_promo_code,'')), '') is not null then
+      new.promo_code := upper(trim(order_promo_code));
+      select id into new.promo_id
+      from public.promos
+      where upper(code)=upper(trim(order_promo_code))
+      limit 1;
+    elsif new.promo_code is null or nullif(trim(new.promo_code), '') is null then
+      raise exception 'Promo redemption must reference an order with a promo code' using errcode='P0001';
+    end if;
+
+    if jsonb_typeof(snapshot)='object' then
+      snapshot_device_id := nullif(trim(coalesce(snapshot->>'deviceId','')), '');
+      snapshot_hardware_id := nullif(trim(coalesce(snapshot->>'hardwareId','')), '');
+      snapshot_device_fingerprint_id := nullif(trim(coalesce(snapshot->>'deviceFingerprintId','')), '');
+      snapshot_server_fingerprint_id := nullif(trim(coalesce(snapshot->>'serverFingerprintId','')), '');
+
+      new.device_id := coalesce(snapshot_device_id, nullif(trim(new.device_id), ''));
+      new.hardware_id := coalesce(snapshot_hardware_id, nullif(trim(new.hardware_id), ''));
+      new.device_fingerprint_id := coalesce(snapshot_device_fingerprint_id, nullif(trim(new.device_fingerprint_id), ''));
+      new.server_fingerprint_id := coalesce(snapshot_server_fingerprint_id, nullif(trim(new.server_fingerprint_id), ''));
     end if;
   end if;
 
@@ -186,7 +202,7 @@ begin
         )
     ) then
       raise exception 'Promo abuse detected: this promo code has already been claimed from the same device fingerprint'
-        using errcode = 'P0001';
+        using errcode='P0001';
     end if;
   end if;
 
