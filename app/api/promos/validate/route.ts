@@ -7,6 +7,7 @@ import {
 import { calculatePromoDiscount, type PromoConfig } from '@/lib/promos';
 import { calculateCustomerTier } from '@/lib/points-system';
 import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
+import { getServerFingerprintId, resolveTrustedFingerprint } from '@/lib/fingerprint';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,11 +28,23 @@ export async function POST(request: Request) {
       paymentMethod = '',
       courierId = '',
       deviceId = '',
-      hardwareId = ''
+      hardwareId = '',
+      deviceFingerprintId = '',
+      sessionToken = ''
     } = body;
 
     const customerId = auth.customer.id;
     const primeMemberId = auth.customer.prime_member_id || '';
+    const trustedFingerprint = resolveTrustedFingerprint(auth.customer, {
+      deviceId,
+      hardwareId,
+      deviceFingerprintId,
+      sessionToken,
+    });
+    const cleanDevId = trustedFingerprint.deviceId;
+    const cleanHwId = trustedFingerprint.hardwareId;
+    const cleanDeviceFingerprintId = trustedFingerprint.deviceFingerprintId;
+    const serverFingerprintId = getServerFingerprintId(request);
 
     const cleanCode = String(code || '').trim().toUpperCase();
     if (!cleanCode) {
@@ -215,46 +228,50 @@ export async function POST(request: Request) {
     }
 
     // 10. Device Fingerprinting Anti-Fraud & Per-Customer Usage Limit:
-    const cleanDevId = String(deviceId || '').trim();
-    const cleanHwId = String(hardwareId || '').trim();
-
-    if (cleanDevId || cleanHwId || customerId || primeMemberId) {
-      // Query redemptions for this promo code using unified database adapter
+    if (cleanDevId || cleanHwId || cleanDeviceFingerprintId || serverFingerprintId || customerId) {
       const redemptions = await getPromoRedemptionsForCodeFromDb(cleanCode);
 
-      // Check device fraud
-      if (cleanDevId || cleanHwId) {
-        const deviceRedemptions = redemptions.filter(r => {
-          const matchesDev = cleanDevId && r.deviceId && String(r.deviceId).trim() === cleanDevId;
-          const matchesHw = cleanHwId && r.deviceId && String(r.deviceId).trim() === cleanHwId;
-          return matchesDev || matchesHw;
-        });
+      const deviceRedemptions = redemptions.filter(r => {
+        const matchesDev = cleanDevId && r.deviceId && String(r.deviceId).trim() === cleanDevId;
+        const matchesHw = cleanHwId && r.hardwareId && String(r.hardwareId).trim() === cleanHwId;
+        const matchesDeviceFp =
+          cleanDeviceFingerprintId &&
+          r.deviceFingerprintId &&
+          String(r.deviceFingerprintId).trim() === cleanDeviceFingerprintId;
+        return matchesDev || matchesHw || matchesDeviceFp;
+      });
 
-        const otherAccountRedemptions = deviceRedemptions.filter(r => {
-          const isSameCust = customerId && r.customerId === customerId;
-          return !isSameCust;
+      const otherAccountRedemptions = deviceRedemptions.filter(r => r.customerId !== customerId);
+      if (otherAccountRedemptions.length > 0) {
+        return NextResponse.json({
+          valid: false,
+          error: 'Promo abuse detected: This promo code has already been claimed from the same device fingerprint under another account.'
         });
+      }
 
-        if (otherAccountRedemptions.length > 0) {
-          return NextResponse.json({ 
-            valid: false, 
-            error: 'Promo abuse detected: This promo code has already been claimed on this device under another account.' 
+      // Server fingerprint is a corroborating fallback only when device-level
+      // identifiers are unavailable, because multiple people can share an IP.
+      if (!cleanDevId && !cleanHwId && !cleanDeviceFingerprintId && serverFingerprintId) {
+        const serverMatches = redemptions.filter(r =>
+          r.customerId !== customerId &&
+          r.serverFingerprintId &&
+          String(r.serverFingerprintId).trim() === serverFingerprintId
+        );
+        if (serverMatches.length > 0) {
+          return NextResponse.json({
+            valid: false,
+            error: 'Promo abuse detected: this promo code was previously claimed from this session/network fingerprint.'
           });
         }
       }
 
-      // Check per-customer usage limit
       const perCustomerLimit = Number(promo.usageLimitPerCustomer) || 1;
-      const customerRedemptions = redemptions.filter(r => {
-        return (customerId && r.customerId === customerId) || 
-               (primeMemberId && r.customerId === primeMemberId) ||
-               (cleanDevId && r.deviceId === cleanDevId);
-      });
+      const customerRedemptions = redemptions.filter(r => r.customerId === customerId);
 
       if (customerRedemptions.length >= perCustomerLimit) {
-        return NextResponse.json({ 
-          valid: false, 
-          error: `You have already redeemed this promo code (Limit: ${perCustomerLimit} use${perCustomerLimit > 1 ? 's' : ''} per customer).` 
+        return NextResponse.json({
+          valid: false,
+          error: `You have already redeemed this promo code (Limit: ${perCustomerLimit} use${perCustomerLimit > 1 ? 's' : ''} per customer).`
         });
       }
     }
