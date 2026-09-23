@@ -1,7 +1,7 @@
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface CustomerTierInfo {
-  tier: 'Titanium' | 'Platinum' | 'Gold' | 'Bronze' | 'Silver' | 'Member';
+  tier: 'Titanium' | 'Platinum' | 'Gold' | 'Bronze' | 'Silver';
   currentSpending: number;
   cycleStartDate: string;
   cycleEndDate: string;
@@ -42,12 +42,12 @@ export function calculateCustomerTier(
 ): CustomerTierInfo {
   if (!completedOrders || completedOrders.length === 0) {
     return {
-      tier: 'Member',
+      tier: 'Silver',
       currentSpending: 0,
       cycleStartDate: now.toISOString(),
       cycleEndDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       daysRemainingInCycle: 30,
-      nextTier: 'Silver',
+      nextTier: 'Bronze',
       amountNeededForNextTier: 5000,
       firstCompletedOrderDate: null,
       progressPercent: 0
@@ -80,34 +80,29 @@ export function calculateCustomerTier(
     }
   }
 
-  let tier: CustomerTierInfo['tier'] = 'Member';
-  let nextTier: string | null = 'Silver';
+  let tier: CustomerTierInfo['tier'] = 'Silver';
+  let nextTier: string | null = 'Bronze';
   let amountNeeded = 5000 - cycleItemsSpend;
   let progress = Math.min(100, Math.max(0, (cycleItemsSpend / 5000) * 100));
 
-  if (cycleItemsSpend >= 25000) {
+  if (cycleItemsSpend >= 20000) {
     tier = 'Titanium';
     nextTier = null;
     amountNeeded = 0;
     progress = 100;
-  } else if (cycleItemsSpend >= 20000) {
+  } else if (cycleItemsSpend >= 15000) {
     tier = 'Platinum';
     nextTier = 'Titanium';
-    amountNeeded = 25000 - cycleItemsSpend;
-    progress = Math.min(100, Math.max(0, ((cycleItemsSpend - 20000) / 5000) * 100));
-  } else if (cycleItemsSpend >= 15000) {
-    tier = 'Gold';
-    nextTier = 'Platinum';
     amountNeeded = 20000 - cycleItemsSpend;
     progress = Math.min(100, Math.max(0, ((cycleItemsSpend - 15000) / 5000) * 100));
   } else if (cycleItemsSpend >= 10000) {
-    tier = 'Bronze';
-    nextTier = 'Gold';
+    tier = 'Gold';
+    nextTier = 'Platinum';
     amountNeeded = 15000 - cycleItemsSpend;
     progress = Math.min(100, Math.max(0, ((cycleItemsSpend - 10000) / 5000) * 100));
   } else if (cycleItemsSpend >= 5000) {
-    tier = 'Silver';
-    nextTier = 'Bronze';
+    tier = 'Bronze';
+    nextTier = 'Gold';
     amountNeeded = 10000 - cycleItemsSpend;
     progress = Math.min(100, Math.max(0, ((cycleItemsSpend - 5000) / 5000) * 100));
   }
