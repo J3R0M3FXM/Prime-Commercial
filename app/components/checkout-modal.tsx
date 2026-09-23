@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
-import { getClientFingerprint, getClientLocation, getOrCreateSessionToken } from "./fingerprint-collector";
+import { getClientFingerprint, getOrCreateSessionToken } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import { authenticatedFetch } from "./telegram-auth-client";
 
@@ -163,18 +163,6 @@ export default function CheckoutModal({
 
   // Dedicated physical device location state (NEVER polluted with user-entered delivery addresses)
   const [deviceGps, setDeviceGps] = useState<{ lat: number; lon: number; accuracy?: number } | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    // Attempt background acquisition of genuine customer device GPS for telemetry
-    getClientLocation(4000).then((loc) => {
-      if (loc && Number(loc.lat) && Number(loc.lon) && (Number(loc.lat) !== 0 || Number(loc.lon) !== 0)) {
-        setDeviceGps({ lat: Number(loc.lat), lon: Number(loc.lon), accuracy: loc.accuracy });
-      }
-    }).catch((err) => {
-      console.warn("Telemetry device location capture skipped:", err);
-    });
-  }, [isOpen]);
 
   // Touch swipe states for payment methods carousel
   const touchStartX = useRef<number | null>(null);
@@ -1052,19 +1040,6 @@ export default function CheckoutModal({
       let actualDevLat = deviceGps?.lat ? Number(deviceGps.lat) : 0;
       let actualDevLon = deviceGps?.lon ? Number(deviceGps.lon) : 0;
       let actualDevAcc = deviceGps?.accuracy || 0;
-
-      if (!actualDevLat || !actualDevLon) {
-        try {
-          const freshLoc = await getClientLocation(2500);
-          if (freshLoc && Number(freshLoc.lat) && Number(freshLoc.lon) && (Number(freshLoc.lat) !== 0 || Number(freshLoc.lon) !== 0)) {
-            actualDevLat = Number(freshLoc.lat);
-            actualDevLon = Number(freshLoc.lon);
-            actualDevAcc = freshLoc.accuracy || 0;
-          }
-        } catch (e) {
-          console.warn("Telemetry device GPS capture skipped:", e);
-        }
-      }
 
       const hasGenuineDeviceGps = Number.isFinite(actualDevLat) && Number.isFinite(actualDevLon) && (actualDevLat !== 0 || actualDevLon !== 0);
 
