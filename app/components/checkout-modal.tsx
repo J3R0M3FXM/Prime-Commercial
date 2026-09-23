@@ -1158,7 +1158,6 @@ export default function CheckoutModal({
       const actualDevLat = orderFraudGps?.lat ? Number(orderFraudGps.lat) : 0;
       const actualDevLon = orderFraudGps?.lon ? Number(orderFraudGps.lon) : 0;
       const actualDevAcc = orderFraudGps?.accuracy || 0;
- fraudGps?.accuracy || 0;
       const hasGenuineDeviceGps = Number.isFinite(actualDevLat) && Number.isFinite(actualDevLon) && (actualDevLat !== 0 || actualDevLon !== 0);
 
       let capturedGpsAddress = deviceGpsAddress.trim();
