@@ -1258,6 +1258,7 @@ export default function OrderHistoryModal({
                                 const pType = String(method.paymentType || method.type || "").toLowerCase();
                                 return (
                                   <button
+                                    key={method.id}
                                     type="button"
                                     disabled={isOffline}
                                     onClick={() => {
