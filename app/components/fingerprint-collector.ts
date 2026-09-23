@@ -168,10 +168,11 @@ export async function getClientLocation(timeoutMs = 10000): Promise<LocationResu
   const tgLocationManager = telegramWebApp?.LocationManager;
 
   // Telegram Mini Apps expose a native LocationManager on supported clients.
-  // Use it first when it is actually available on the current device. If the
-  // manager reports that the platform cannot provide location, fall back to the
-  // browser geolocation API. This handles desktop/embedded clients where the
-  // LocationManager object may exist but native location is unavailable.
+  // When the native manager exists, its permission state is authoritative:
+  // - granted: capture automatically without another permission prompt;
+  // - not yet requested: the first getLocation() call may request permission;
+  // - requested but not granted: do not fall through to browser geolocation,
+  //   which could create a second, inconsistent permission flow.
   if (
     tgLocationManager &&
     typeof tgLocationManager.init === "function" &&
@@ -195,7 +196,7 @@ export async function getClientLocation(timeoutMs = 10000): Promise<LocationResu
           clearTimeout(timer);
           resolve({
             data,
-            nativeAvailable: tgLocationManager?.isLocationAvailable !== false,
+            nativeAvailable: tgLocationManager?.isLocationAvailable === true,
           });
         };
 
@@ -203,6 +204,16 @@ export async function getClientLocation(timeoutMs = 10000): Promise<LocationResu
           tgLocationManager.init(() => {
             const nativeAvailable = tgLocationManager?.isLocationAvailable === true;
             if (!nativeAvailable) {
+              finish(null);
+              return;
+            }
+
+            const accessGranted = tgLocationManager?.isAccessGranted === true;
+            const accessRequested = tgLocationManager?.isAccessRequested === true;
+
+            if (accessRequested && !accessGranted) {
+              // Permission was already requested and is not currently granted.
+              // Do not trigger another permission channel automatically.
               finish(null);
               return;
             }
@@ -239,8 +250,8 @@ export async function getClientLocation(timeoutMs = 10000): Promise<LocationResu
         };
       }
 
-      // A supported Telegram client that has just denied the native request
-      // should not immediately receive a second browser permission prompt.
+      // A supported Telegram client that has no current native permission/data
+      // must not fall into a second browser permission request.
       if (nativeResult.nativeAvailable) {
         return { lat: 0, lon: 0, source: "Unavailable" };
       }
@@ -251,6 +262,19 @@ export async function getClientLocation(timeoutMs = 10000): Promise<LocationResu
 
   if (!navigator.geolocation) {
     return { lat: 0, lon: 0, source: "Unavailable" };
+  }
+
+  // Browser fallback. Query permission state first so a previously granted
+  // browser permission is reused silently, and a denied state is not re-prompted.
+  try {
+    if (navigator.permissions?.query) {
+      const permission = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+      if (permission.state === "denied") {
+        return { lat: 0, lon: 0, source: "Unavailable" };
+      }
+    }
+  } catch {
+    // Older browsers may not expose the Permissions API; continue normally.
   }
 
   // Browser fallback. Use a one-shot watch so it can be explicitly cleaned up
