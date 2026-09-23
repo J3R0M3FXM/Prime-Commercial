@@ -135,20 +135,6 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           </button>
         </div>
 
-        {/* Status Notification Banner (Replaces window.alert for sandboxed iframes) */}
-        {checkoutStatus.type && (
-          <div className={`p-3 mx-3 mt-2.5 rounded-lg flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider ${
-            checkoutStatus.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
-          }`}>
-            {checkoutStatus.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-            ) : (
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-            )}
-            <span>{checkoutStatus.message}</span>
-          </div>
-        )}
-
         {/* Cart Items */}
         <div className="overflow-y-auto p-2.5 space-y-2 max-h-[calc(100vh-250px)]">
           {safeCart.length === 0 ? (
