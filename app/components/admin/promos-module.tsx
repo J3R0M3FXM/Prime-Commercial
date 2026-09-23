@@ -367,198 +367,57 @@ export default function PromosModule() {
         </div>
       ) : (
         <div className="bg-white border border-gray-200 overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-[11px] font-mono text-gray-500 uppercase tracking-wider">
-                <th className="py-2 px-3">Code & Type</th>
-                <th className="py-2 px-3">Reward Value</th>
-                <th className="py-2 px-3">Eligibility & Channel</th>
-                <th className="py-2 px-3">Spend & Min Qty</th>
-                <th className="py-2 px-3">Schedule & Flash</th>
-                <th className="py-2 px-3">Usage & Fraud</th>
-                <th className="py-2 px-3 text-center">Status</th>
-                <th className="py-2 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-sm">
+          <div className="space-y-1.5">
               {filteredPromos.map((p) => {
                 const isFraudAlert = (p.fraudFlagsCount || 0) > 0;
+                const usage = Number(p.usageCount || 0);
+                const usageLimit = Number(p.totalUsageLimit || 0);
+                const usageLabel = usageLimit > 0 ? `${usage} / ${usageLimit}` : `${usage} claimed`;
+                const reward =
+                  p.discountType === 'fixed' ? `₱${Number(p.discountValue || 0).toLocaleString()} OFF` :
+                  p.discountType === 'percentage' ? `${p.discountValue}% OFF` :
+                  p.discountType === 'free_shipping' ? '100% Free Delivery' :
+                  p.discountType === 'shipping_discount' ? `Up to ₱${Number(p.cappedShippingDiscount || p.discountValue || 0).toLocaleString()} delivery subsidy` :
+                  `${p.discountValue}% points cashback`;
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                    {/* Code & Type */}
-                    <td className="py-2.5 px-3">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono font-bold text-gray-900 bg-gray-100 px-2 py-0.5 border border-gray-300 text-xs">
-                          {p.code}
-                        </span>
-                        {p.voucherType === 'shipping_voucher' && (
-                          <span className="text-[10px] font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 border border-blue-200">
-                            FREE SHIPPING
-                          </span>
-                        )}
-                        {p.voucherType === 'new_buyer_voucher' && (
-                          <span className="text-[10px] font-mono bg-amber-50 text-amber-700 px-1.5 py-0.5 border border-amber-200">
-                            NEW BUYER
-                          </span>
-                        )}
-                        {p.voucherType === 'cashback_voucher' && (
-                          <span className="text-[10px] font-mono bg-purple-50 text-purple-700 px-1.5 py-0.5 border border-purple-200">
-                            CASHBACK
-                          </span>
-                        )}
-                        {p.isPaydayOnly && (
-                          <span className="text-[10px] font-mono bg-red-50 text-red-700 px-1.5 py-0.5 border border-red-200">
-                            PAYDAY
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs font-medium text-gray-800 mt-1">{p.title}</div>
-                      {p.description && (
-                        <div className="text-[11px] text-gray-500 truncate max-w-xs">{p.description}</div>
-                      )}
-                    </td>
-
-                    {/* Reward Value */}
-                    <td className="py-2.5 px-3 font-mono text-xs">
-                      {p.discountType === 'fixed' && (
-                        <span className="text-emerald-700 font-bold">₱{Number(p.discountValue).toLocaleString()} OFF</span>
-                      )}
-                      {p.discountType === 'percentage' && (
-                        <div>
-                          <span className="text-indigo-700 font-bold">{p.discountValue}% OFF</span>
-                          {p.maxDiscountAmount && (
-                            <span className="text-[10px] text-gray-500 block">Cap: ₱{Number(p.maxDiscountAmount).toLocaleString()}</span>
-                          )}
+                  <article key={p.id} className={`admin-promo-card ${p.isActive === false ? "is-disabled" : ""}`}>
+                    <div className="admin-promo-card__main">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="admin-code-chip">{p.code}</span>
+                          <span className="admin-mini-label">{String(p.voucherType || 'voucher').replaceAll('_', ' ')}</span>
+                          {p.isPaydayOnly ? <span className="admin-mini-label">Payday</span> : null}
                         </div>
-                      )}
-                      {p.discountType === 'free_shipping' && (
-                        <span className="text-blue-700 font-bold">100% Free Delivery</span>
-                      )}
-                      {p.discountType === 'shipping_discount' && (
-                        <span className="text-blue-700 font-bold">Up to ₱{Number(p.cappedShippingDiscount || p.discountValue).toLocaleString()} Delivery Subsidy</span>
-                      )}
-                      {p.discountType === 'coins_cashback' && (
-                        <div>
-                          <span className="text-purple-700 font-bold">{p.discountValue}% Coins Cashback</span>
-                          {p.maxDiscountAmount && (
-                            <span className="text-[10px] text-gray-500 block">Cap: ₱{Number(p.maxDiscountAmount).toLocaleString()}</span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Eligibility & Channel */}
-                    <td className="py-2.5 px-3 font-mono text-xs text-gray-600">
-                      <div>
-                        {p.customerEligibility === 'new_customer' ? (
-                          <span className="text-amber-700 font-semibold">New Customers Only</span>
-                        ) : p.customerEligibility === 'min_orders' ? (
-                          <span>Min {p.minPreviousOrders || 1}+ Prior Orders</span>
-                        ) : p.customerEligibility === 'tier_restricted' ? (
-                          <span className="text-indigo-700">Tiers: {p.eligibleTiers?.join(', ') || 'All'}</span>
-                        ) : (
-                          <span className="text-gray-500">All Buyers</span>
-                        )}
+                        <strong className="admin-promo-card__title">{p.title || p.code}</strong>
+                        {p.description ? <p className="admin-promo-card__desc">{p.description}</p> : null}
                       </div>
-                      <div className="text-[10px] text-gray-400 mt-0.5">
-                        {Array.isArray(p.allowedPaymentMethods) && !p.allowedPaymentMethods.includes('all') ? (
-                          <span>PM: {p.allowedPaymentMethods.join(', ')}</span>
-                        ) : (
-                          <span>All Payment Channels</span>
-                        )}
+                      <div className="admin-promo-card__actions">
+                        <button type="button" onClick={() => handleToggleActive(p)} className="admin-card-action">{p.isActive !== false ? 'On' : 'Off'}</button>
+                        <button type="button" onClick={() => setAuditPromo(p)} className="admin-card-action" title="Audit redemptions"><Eye className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => openEditModal(p)} className="admin-card-action" title="Edit promo"><Edit3 className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => handleDelete(p.id, p.code)} className="admin-card-action admin-card-action--danger" title="Delete promo"><Trash2 className="h-3.5 w-3.5" /></button>
                       </div>
-                    </td>
+                    </div>
 
-                    {/* Spend & Min Qty */}
-                    <td className="py-2.5 px-3 font-mono text-xs text-gray-600">
-                      <div>Min Spend: <span className="font-semibold text-gray-800">{p.minSpend ? `₱${Number(p.minSpend).toLocaleString()}` : '₱0'}</span></div>
-                      {p.minItemQuantity && (
-                        <div className="text-[11px] text-gray-500">Min Items: {p.minItemQuantity} pcs</div>
-                      )}
-                      <div className="text-[10px] text-gray-400">Limit: {p.usageLimitPerCustomer || 1}x/user</div>
-                    </td>
+                    <div className="admin-promo-card__grid">
+                      <div><span>Reward</span><strong>{reward}</strong>{p.maxDiscountAmount ? <small>Cap ₱{Number(p.maxDiscountAmount).toLocaleString()}</small> : null}</div>
+                      <div><span>Eligibility</span><strong>{p.customerEligibility === 'new_customer' ? 'New customers' : p.customerEligibility === 'min_orders' ? `Min ${p.minPreviousOrders || 1} prior orders` : p.customerEligibility === 'tier_restricted' ? (p.eligibleTiers || []).join(', ') || 'Tier restricted' : 'All buyers'}</strong><small>{Array.isArray(p.allowedPaymentMethods) && !p.allowedPaymentMethods.includes('all') ? p.allowedPaymentMethods.join(', ') : 'All payment channels'}</small></div>
+                      <div><span>Basket</span><strong>Min ₱{Number(p.minSpend || 0).toLocaleString()}</strong><small>{p.minItemQuantity ? `Min ${p.minItemQuantity} items · ` : ''}${p.usageLimitPerCustomer || 1}x / customer</small></div>
+                      <div><span>Schedule</span><strong>{p.startDate ? new Date(p.startDate).toLocaleDateString() : 'Immediate'}</strong><small>{p.endDate ? `Ends ${new Date(p.endDate).toLocaleDateString()}` : 'No end date'}{p.flashHourStart !== undefined && p.flashHourStart !== null ? ` · Flash ${String(p.flashHourStart).padStart(2,'0')}:00-${String(p.flashHourEnd || 24).padStart(2,'0')}:00` : ''}</small></div>
+                    </div>
 
-                    {/* Schedule & Flash */}
-                    <td className="py-2.5 px-3 font-mono text-[11px] text-gray-500">
-                      {p.flashHourStart !== undefined && p.flashHourStart !== null && (
-                        <div className="text-amber-700 font-bold">
-                          Flash: {String(p.flashHourStart).padStart(2, '0')}:00 - {String(p.flashHourEnd || 24).padStart(2, '0')}:00 PHT
-                        </div>
-                      )}
-                      {p.startDate || p.endDate ? (
-                        <div>
-                          <div>Start: {p.startDate ? new Date(p.startDate).toLocaleDateString() : 'Immediate'}</div>
-                          <div>End: {p.endDate ? new Date(p.endDate).toLocaleDateString() : 'No expiry'}</div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">Ongoing</span>
-                      )}
-                    </td>
-
-                    {/* Usage & Fraud */}
-                    <td className="py-2.5 px-3 font-mono text-xs">
-                      <div className="flex items-center gap-1.5 text-gray-800 font-semibold">
-                        <Users className="w-3.5 h-3.5 text-gray-400" />
-                        {p.usageCount || 0} {p.totalUsageLimit ? `/ ${p.totalUsageLimit}` : 'claimed'}
-                      </div>
+                    <div className="admin-promo-card__footer">
+                      <span className="admin-usage"><Users className="h-3.5 w-3.5" /> {usageLabel}</span>
                       {isFraudAlert ? (
-                        <button
-                          onClick={() => setAuditPromo(p)}
-                          className="mt-1 flex items-center gap-1 text-[10px] bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 hover:bg-red-100 cursor-pointer"
-                        >
-                          <ShieldAlert className="w-3 h-3 text-red-600" />
-                          {p.fraudFlagsCount} Device Abuse
-                        </button>
+                        <button type="button" onClick={() => setAuditPromo(p)} className="admin-fraud-flag"><ShieldAlert className="h-3.5 w-3.5" /> {p.fraudFlagsCount} device alerts</button>
                       ) : (
-                        <span className="text-[10px] text-emerald-600 mt-1 block">Hardware verified</span>
+                        <span className="admin-clean-flag"><CheckCircle2 className="h-3.5 w-3.5" /> fingerprint checks active</span>
                       )}
-                    </td>
-
-                    {/* Status Toggle */}
-                    <td className="py-2.5 px-3 text-center">
-                      <button
-                        onClick={() => handleToggleActive(p)}
-                        className={`inline-flex items-center px-2.5 py-1 text-xs font-mono font-medium border transition-colors cursor-pointer ${
-                          p.isActive !== false
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                            : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200'
-                        }`}
-                      >
-                        {p.isActive !== false ? 'Active' : 'Disabled'}
-                      </button>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="py-2.5 px-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setAuditPromo(p)}
-                          className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
-                          title="View Redemptions & Fraud Logs"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => openEditModal(p)}
-                          className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
-                          title="Edit Promo"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(p.id, p.code)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                          title="Delete Promo"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </article>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
         </div>
       )}
 
@@ -1452,34 +1311,21 @@ export default function PromosModule() {
                   </div>
                 ) : (
                   <div className="border border-gray-200 overflow-x-auto">
-                    <table className="w-full text-left text-xs font-mono">
-                      <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase border-b border-gray-200">
-                        <tr>
-                          <th className="p-2.5">Order #</th>
-                          <th className="p-2.5">Member ID</th>
-                          <th className="p-2.5">Device Fingerprint</th>
-                          <th className="p-2.5">Discount</th>
-                          <th className="p-2.5">Timestamp</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
+                    <div className="space-y-1.5">
                         {auditPromo.redemptions.map((r: any, idx: number) => (
-                          <tr key={r.id || idx} className="hover:bg-gray-50">
-                            <td className="p-2.5 font-bold text-gray-900">#{r.orderId}</td>
-                            <td className="p-2.5 text-gray-700">{r.primeMemberId || r.customerId || 'Guest'}</td>
-                            <td className="p-2.5 text-gray-500 truncate max-w-[120px]">
-                              {r.deviceId || r.hardwareId || 'N/A'}
-                            </td>
-                            <td className="p-2.5 text-emerald-700 font-semibold">
-                              ₱{Number(r.discountAmount || 0).toLocaleString()}
-                            </td>
-                            <td className="p-2.5 text-gray-400 text-[10px]">
-                              {r.usedAt ? new Date(r.usedAt).toLocaleString() : 'N/A'}
-                            </td>
-                          </tr>
+                          <div key={r.id || idx} className="admin-redemption-row">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <strong>#{r.orderId || "—"}</strong>
+                                <span className="admin-mini-label">{r.primeMemberId || r.customerId || "Guest"}</span>
+                                {r.releasedAt ? <span className="admin-mini-label">Released</span> : null}
+                              </div>
+                              <small>{r.deviceFingerprintId || r.hardwareId || r.deviceId || "No device fingerprint"} · {r.usedAt ? new Date(r.usedAt).toLocaleString() : "No timestamp"}</small>
+                            </div>
+                            <strong>₱{Number(r.discountAmount || 0).toLocaleString()}</strong>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
                   </div>
                 )}
               </div>
