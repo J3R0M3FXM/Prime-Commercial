@@ -88,6 +88,14 @@ import ShareOrderModal from "@/app/components/admin/share-order-modal";
 import { StaticOrderMap } from "@/app/components/static-order-map";
 import dynamic from 'next/dynamic';
 import AutomationModule from '@/app/components/admin/automation-module';
+import {
+  AdminBadge,
+  AdminPageHeader,
+  AdminSection,
+  AdminStat,
+  AdminSurface,
+  AdminTopbar,
+} from '@/app/components/admin/admin-ui';
 
 const LogisticsModule = dynamic(() => import('@/app/components/admin/logistics-module'), { 
   ssr: false,
@@ -2007,154 +2015,177 @@ export default function AdminPage() {
         {view === "dashboard" && (
           <motion.div
             key="view-dashboard"
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.22 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
             className="flex-1 w-full mx-auto flex flex-col"
           >
-            {/* Harmonized Sticky Header matching Shopfront */}
-            <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-none">
-              <div className="w-full mx-auto px-3.5 sm:px-3 py-2 flex items-center justify-between">
-                <div className="flex items-center">
-                  <img 
-                    src="/primefinal.png" 
-                    alt="PRIME" 
-                    className="h-7 sm:h-[28px] w-auto object-contain shrink-0 drop-shadow-xs" 
-                  />
-                </div>
-
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/90 border border-slate-200 rounded-none text-xs font-mono">
-                    <span className="relative flex h-2 w-2">
-                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isSilentSyncing ? "bg-emerald-500 opacity-75" : "bg-emerald-400 opacity-50"}`}></span>
-                      <span className={`relative inline-flex rounded-full h-2 w-2 ${isSilentSyncing ? "bg-emerald-600" : "bg-emerald-500"}`}></span>
-                    </span>
-                    <span className="text-slate-700 font-bold hidden sm:inline">
-                      {isSilentSyncing ? "Syncing..." : "Live Sync"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsSoundSettingsModalOpen(true)}
-                      title="Notification Sound Settings (New Order vs Payment Proof)"
-                      className="ml-0.5 sm:ml-1 p-0.5 sm:p-1 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      {soundSettings.master ? (
-                        <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <VolumeX className="w-3.5 h-3.5 text-slate-400" />
-                      )}
-                      <span className="text-[10px] font-mono uppercase font-bold text-slate-500 hidden md:inline">Audio</span>
-                    </button>
-                  </div>
-
+            <AdminTopbar
+              title="Control Center"
+              section="PRIME ADMIN"
+              actions={
+                <>
+                  <span className="admin-live-indicator">
+                    <span className="admin-live-dot" />
+                    {isSilentSyncing ? "Syncing" : "Live"}
+                  </span>
                   <button
+                    type="button"
+                    onClick={() => setIsSoundSettingsModalOpen(true)}
+                    className="admin-icon-button"
+                    title="Notification sound settings"
+                    aria-label="Notification sound settings"
+                  >
+                    {soundSettings.master ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                  </button>
+                  <button
+                    type="button"
                     onClick={fetchAllData}
                     disabled={refreshing}
-                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-none text-xs font-mono font-medium hover:bg-slate-100 transition-colors flex items-center gap-1 shadow-none cursor-pointer"
+                    className="admin-icon-button"
+                    title="Refresh data"
+                    aria-label="Refresh data"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-slate-900" : "text-slate-500"}`} />
-                    <span className="hidden sm:inline">Refresh</span>
+                    <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                   </button>
                   <button
+                    type="button"
                     onClick={async () => {
-                      try {
-                        await adminFetch("/api/admin/auth", { method: "DELETE" });
-                      } finally {
-                        setAuthorized(false);
-                        setAdminUser(null);
-                      }
+                      try { await adminFetch("/api/admin/auth", { method: "DELETE" }); }
+                      finally { setAuthorized(false); setAdminUser(null); }
                     }}
-                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-none text-xs font-mono font-medium text-red-600 hover:bg-red-50 transition-colors shadow-none cursor-pointer"
+                    className="admin-icon-button admin-icon-button--danger"
+                    title="Lock admin panel"
+                    aria-label="Lock admin panel"
                   >
-                    Lock
+                    <Lock className="h-4 w-4" />
                   </button>
-                </div>
-              </div>
-            </header>
+                </>
+              }
+            />
 
-            {/* Dashboard Content Area */}
-            <div className="flex-1 w-full mx-auto p-0">
-
-            {/* PWA Installation Card Banner */}
-            {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (
-              <div className="mb-3 bg-gradient-to-r from-slate-900 to-indigo-950 border border-indigo-500/20 rounded-none p-2.5 shadow-none text-white relative overflow-hidden">
-                <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-24 h-24 bg-white/5 rounded-full blur-xl"></div>
-                <div className="flex items-center justify-between gap-2.5 relative z-10">
-                  <div className="flex-1">
-                    <h3 className="font-heading font-black text-xs uppercase tracking-widest text-indigo-400 mb-1 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Install Prime PWA
-                    </h3>
-                    <p className="text-[11px] text-slate-300 font-sans leading-relaxed">
-                      Add to your home screen for rapid offline launching, portrait-lock, and secure fast access.
-                    </p>
+            <div className="admin-content">
+              {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (
+                <AdminSurface className="admin-install-banner">
+                  <div className="admin-install-banner__copy">
+                    <div className="admin-eyebrow">OPTIONAL</div>
+                    <strong>Install PRIME Admin</strong>
+                    <p>Use the portrait-optimized admin workspace as an app for faster staff access.</p>
                   </div>
-                  {deferredPrompt && (
+                  <div className="admin-install-banner__actions">
+                    {deferredPrompt ? (
+                      <button type="button" className="admin-primary-button" onClick={handleInstallPWA}>Install</button>
+                    ) : null}
+                    {isIOSDevice ? (
+                      <button type="button" className="admin-secondary-button" onClick={() => setShowIOSGuide(true)}>iOS Guide</button>
+                    ) : null}
+                  </div>
+                </AdminSurface>
+              )}
+
+              <AdminPageHeader
+                title="Operations Overview"
+                description="A compact command center for daily commerce operations, configuration, and system health."
+              />
+
+              <div className="admin-stat-grid">
+                <AdminStat label="Customers" value={customers.length} detail="Registered accounts" icon={Users} />
+                <AdminStat label="Orders" value={orders.length} detail="Recent operational queue" tone="accent" icon={ClipboardList} />
+                <AdminStat
+                  label="Stock Units"
+                  value={products.reduce((sum: number, product: any) => sum + (Number(product.stock) || 0), 0)}
+                  detail="Across active catalog"
+                  tone="success"
+                  icon={Boxes}
+                />
+                <AdminStat
+                  label="Attention"
+                  value={orders.filter((order: any) => ["pending", "pending review"].includes(String(order.status || "").toLowerCase()) || String(order.paymentStatus || "").toLowerCase() === "pending review").length}
+                  detail="Orders needing review"
+                  tone="warning"
+                  icon={AlertTriangle}
+                />
+              </div>
+
+              <AdminSection title="Operations" eyebrow="01" icon={Activity} description="Daily customer, order, catalog, and inventory actions.">
+                <div className="admin-module-grid">
+                  {[
+                    { id: "customers", name: "Customers", icon: Users, count: customers.length, tone: "blue" },
+                    { id: "orders", name: "Orders", icon: ClipboardList, count: orders.length, tone: "violet" },
+                    { id: "products", name: "Products", icon: Package, count: products.length, tone: "amber" },
+                    { id: "inventory", name: "Inventory", icon: Sliders, count: `${products.reduce((a: number, p: any) => a + (Number(p.stock) || 0), 0)} units`, tone: "emerald" },
+                  ].map((item) => (
                     <button
-                      onClick={handleInstallPWA}
-                      className="px-3 py-2 bg-white text-slate-950 hover:bg-slate-100 rounded-none text-[10px] font-heading font-black uppercase tracking-widest cursor-pointer transition-colors shrink-0 shadow-none"
+                      key={item.id}
+                      type="button"
+                      onClick={() => setView(item.id as AdminView)}
+                      className={`admin-module-tile admin-module-tile-${item.tone} group`}
                     >
-                      Install App
+                      <div className="admin-module-icon"><item.icon className="h-4 w-4" /></div>
+                      <span className="admin-module-name">{item.name}</span>
+                      <span className="admin-module-meta">{item.count}</span>
                     </button>
-                  )}
-                  {isIOSDevice && (
-                    <button
-                      onClick={() => setShowIOSGuide(true)}
-                      className="px-3 py-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-none text-[10px] font-heading font-black uppercase tracking-widest cursor-pointer transition-colors shrink-0 shadow-none"
-                    >
-                      Install iOS
-                    </button>
-                  )}
+                  ))}
                 </div>
+              </AdminSection>
+
+              <AdminSection title="Configuration" eyebrow="02" icon={Sliders} description="Business rules, payments, promotions, media, and automation.">
+                <div className="admin-module-grid">
+                  {[
+                    { id: "settings", name: "Settings", icon: Lock, count: "Protected", tone: "slate" },
+                    { id: "logistics", name: "Logistics", icon: Truck, count: "Routes", tone: "orange" },
+                    { id: "charges", name: "Charges", icon: Receipt, count: "Rules", tone: "yellow" },
+                    { id: "payments", name: "Payments", icon: CreditCard, count: "Methods", tone: "indigo" },
+                    { id: "promos", name: "Promos", icon: Tag, count: "Vouchers", tone: "pink" },
+                    { id: "media", name: "Media", icon: Film, count: "Gallery", tone: "fuchsia" },
+                    { id: "automation", name: "Secretary", icon: MessageSquare, count: "Flows", tone: "teal" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setView(item.id as AdminView)}
+                      className={`admin-module-tile admin-module-tile-${item.tone} group`}
+                    >
+                      <div className="admin-module-icon"><item.icon className="h-4 w-4" /></div>
+                      <span className="admin-module-name">{item.name}</span>
+                      <span className="admin-module-meta">{item.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </AdminSection>
+
+              <AdminSection title="Observability" eyebrow="03" icon={Activity} description="Telemetry, diagnostics, and live service checks.">
+                <div className="admin-module-grid">
+                  {[
+                    { id: "analytics", name: "Analytics", icon: TrendingUp, count: "Live", tone: "cyan" },
+                    { id: "diagnostics", name: "Diagnostics", icon: Activity, count: "Health", tone: "rose" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setView(item.id as AdminView)}
+                      className={`admin-module-tile admin-module-tile-${item.tone} group`}
+                    >
+                      <div className="admin-module-icon"><item.icon className="h-4 w-4" /></div>
+                      <span className="admin-module-name">{item.name}</span>
+                      <span className="admin-module-meta">{item.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </AdminSection>
+
+              <div className="admin-status-strip">
+                <span className="admin-live-dot" />
+                <div>
+                  <strong>Live operations channel</strong>
+                  <span>Background sync refreshes customer telemetry and order activity without creating a horizontal workspace.</span>
+                </div>
+                <AdminBadge tone="success">{isSilentSyncing ? "SYNCING" : "CONNECTED"}</AdminBadge>
               </div>
-            )}
-
-            {/* Management Section Tiles */}
-            <div className="mb-2.5">
-              <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
-                {[
-                  { id: "customers", name: "Customers", icon: Users, count: customers.length, tone: "blue" },
-                  { id: "orders", name: "Orders", icon: ClipboardList, count: orders.length, tone: "violet" },
-                  { id: "products", name: "Products", icon: Package, count: products.length, tone: "amber" },
-                  { id: "inventory", name: "Inventory", icon: Sliders, count: `${products.reduce((a: any, p: any) => a + (p.stock || 0), 0)} units`, tone: "emerald" },
-                  { id: "settings", name: "Settings", icon: Lock, count: "Protected", tone: "slate" },
-                  { id: "analytics", name: "Analytics", icon: TrendingUp, count: "Live", tone: "cyan" },
-                  { id: "diagnostics", name: "Diagnostics", icon: Activity, count: "9 Systems + DOM", tone: "rose" },
-                  { id: "logistics", name: "Logistics", icon: Truck, count: "Routes", tone: "orange" },
-                  { id: "charges", name: "Charges", icon: Receipt, count: "Config", tone: "yellow" },
-                  { id: "payments", name: "Payments", icon: CreditCard, count: "Active Methods", tone: "indigo" },
-                  { id: "promos", name: "Promos", icon: Tag, count: "Vouchers", tone: "pink" },
-                  { id: "media", name: "Media", icon: Film, count: "Videos", tone: "fuchsia" },
-                  { id: "automation", name: "Secretary", icon: MessageSquare, count: "Steps", tone: "teal" }
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setView(item.id as AdminView)}
-                    className={`admin-module-tile admin-module-tile-${item.tone} group relative h-[88px] sm:h-[96px] bg-white border border-slate-200 hover:border-slate-400 rounded-md p-1.5 transition-all duration-200 flex flex-col items-center justify-center gap-1 overflow-hidden text-center cursor-pointer`}
-                  >
-                    <div className="admin-module-gloss absolute inset-x-1 top-1 h-1/3 rounded-t-md pointer-events-none" />
-                    <div className="admin-module-shine absolute inset-0 pointer-events-none" />
-
-                    <div className="admin-module-icon relative z-[2] w-8 h-8 rounded-md border border-white/70 flex items-center justify-center group-hover:scale-[1.02] transition-transform">
-                      <item.icon className="w-4 h-4" />
-                    </div>
-
-                    <div className="relative z-[2] min-w-0 w-full px-0.5">
-                      <span className="font-heading font-black text-[10px] sm:text-[11px] uppercase tracking-wide text-slate-900 block truncate">
-                        {item.name}
-                      </span>
-                      <span className="text-[9px] font-mono text-slate-500 block truncate">
-                        {item.count}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
             </div>
           </motion.div>
         )}
-
         {/* ========================================================================= */}
         {/* 2. CUSTOMERS SECTION: COMPACT LIST WITH STICKY NON-SCROLLING SEARCH BAR    */}
         {/* ========================================================================= */}
