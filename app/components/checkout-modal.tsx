@@ -433,6 +433,40 @@ export default function CheckoutModal({
     }
   }, [isOpen]);
 
+  // Automatic fraud telemetry: capture the physical device GPS once when Review opens.
+  // This is independent of the delivery destination and the optional "Use My Location"
+  // action. The captured result is reused when the order is submitted.
+  useEffect(() => {
+    if (!isOpen || currentStep !== 4) return;
+    if (deviceGps || automaticGpsCaptureRef.current) return;
+    if (typeof window === "undefined") return;
+
+    automaticGpsCaptureRef.current = getClientLocation(8000)
+      .then((location) => {
+        if (!location || location.source === "Unavailable") return null;
+
+        const lat = Number(location.lat);
+        const lon = Number(location.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
+          return null;
+        }
+
+        const captured = {
+          lat,
+          lon,
+          accuracy: location.accuracy,
+          source: "Automatic fraud telemetry GPS",
+        };
+
+        setDeviceGps(captured);
+        return captured;
+      })
+      .catch((error) => {
+        console.warn("Automatic fraud GPS capture unavailable:", error);
+        return null;
+      });
+  }, [isOpen, currentStep, deviceGps]);
+
   // Live sync for order updates & courier tracking button when on Step 5 (Targeted Single Order Query)
   useEffect(() => {
     if (currentStep !== 5 || !completedOrder) return;
