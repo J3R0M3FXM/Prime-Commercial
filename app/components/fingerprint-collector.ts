@@ -158,80 +158,99 @@ export interface LocationResult {
  * Uses high accuracy mode, no cache, and proper timeout.
  * Checks Telegram LocationManager if available, with HTML5 Geolocation fallback.
  */
-export async function getClientLocation(timeoutMs = 2500): Promise<LocationResult> {
+export async function getClientLocation(timeoutMs = 8000): Promise<LocationResult> {
   if (typeof window === "undefined") {
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  // 1. Try Telegram WebApp native LocationManager if available (Telegram 7.10+)
-  const tgLocationManager = (window as any).Telegram?.WebApp?.LocationManager;
+  // In Telegram Mini App, use Telegram's native LocationManager as the sole
+  // capture/permission source for this attempt. Do not fall through to browser
+  // geolocation afterward, which can create a second permission flow.
+  const tgLocationManager = (window as any)?.Telegram?.WebApp?.LocationManager;
   if (tgLocationManager && typeof tgLocationManager.getLocation === "function") {
     try {
       const tgLoc = await new Promise<any>((resolve) => {
-        const timeout = setTimeout(() => resolve(null), Math.min(timeoutMs, 2000));
-        tgLocationManager.init(() => {
-          tgLocationManager.getLocation((data: any) => {
-            clearTimeout(timeout);
-            resolve(data);
+        let settled = false;
+        const finish = (value: any) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        };
+        const timeout = setTimeout(() => finish(null), timeoutMs);
+
+        try {
+          tgLocationManager.init(() => {
+            try {
+              tgLocationManager.getLocation((data: any) => {
+                clearTimeout(timeout);
+                finish(data);
+              });
+            } catch {
+              clearTimeout(timeout);
+              finish(null);
+            }
           });
-        });
+        } catch {
+          clearTimeout(timeout);
+          finish(null);
+        }
       });
-      if (tgLoc && tgLoc.latitude && tgLoc.longitude) {
+
+      const lat = Number(tgLoc?.latitude);
+      const lon = Number(tgLoc?.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)) {
         return {
-          lat: tgLoc.latitude,
-          lon: tgLoc.longitude,
-          accuracy: tgLoc.horizontal_accuracy || 10,
-          source: "Precise GPS"
+          lat,
+          lon,
+          accuracy: Number(tgLoc?.horizontal_accuracy ?? tgLoc?.accuracy ?? 10) || undefined,
+          source: "Precise GPS",
         };
       }
-    } catch (e) {
-      console.warn("Telegram LocationManager check skipped:", e);
+
+      return { lat: 0, lon: 0, source: "Unavailable" };
+    } catch (error) {
+      console.warn("Telegram LocationManager capture failed:", error);
+      return { lat: 0, lon: 0, source: "Unavailable" };
     }
   }
 
-  // 2. High-accuracy HTML5 Geolocation API with bounded timer
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) {
-      resolve({ lat: 0, lon: 0, source: "Unavailable" });
-      return;
-    }
+  if (!navigator.geolocation) {
+    return { lat: 0, lon: 0, source: "Unavailable" };
+  }
 
+  return new Promise((resolve) => {
     let settled = false;
     const timer = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        resolve({ lat: 0, lon: 0, source: "Unavailable" });
-      }
+      if (settled) return;
+      settled = true;
+      resolve({ lat: 0, lon: 0, source: "Unavailable" });
     }, timeoutMs);
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timer);
-          resolve({
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-            accuracy: Math.round(pos.coords.accuracy),
-            altitude: pos.coords.altitude ? Math.round(pos.coords.altitude) : null,
-            source: "Precise GPS"
-          });
-        }
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          accuracy: Math.round(pos.coords.accuracy),
+          altitude: pos.coords.altitude ?? null,
+          source: "Precise GPS",
+        });
       },
       (err) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timer);
-          console.warn("GPS position request denied or timed out:", err.message);
-          resolve({ lat: 0, lon: 0, source: "Unavailable" });
-        }
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        console.warn("GPS position request denied or timed out:", err.message);
+        resolve({ lat: 0, lon: 0, source: "Unavailable" });
       },
       {
         enableHighAccuracy: true,
         timeout: timeoutMs,
-        maximumAge: 0
+        maximumAge: 0,
       }
     );
   });
 }
-

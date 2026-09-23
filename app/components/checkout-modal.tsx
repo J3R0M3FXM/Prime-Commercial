@@ -161,11 +161,18 @@ export default function CheckoutModal({
   const [isValidatingAddress, setIsValidatingAddress] = useState<boolean>(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Dedicated physical device location state (NEVER polluted with user-entered delivery addresses)
+  // Optional delivery-location GPS. Only populated by "Use My Location".
   const [deviceGps, setDeviceGps] = useState<{ lat: number; lon: number; accuracy?: number; source?: string } | null>(null);
   const [deviceGpsAddress, setDeviceGpsAddress] = useState("");
   const [deviceGpsAddressLoading, setDeviceGpsAddressLoading] = useState(false);
+
+  // Automatic fraud telemetry GPS: the physical customer position at order time.
+  // Never used to choose or overwrite the delivery destination.
+  const [fraudGps, setFraudGps] = useState<{ lat: number; lon: number; accuracy?: number; source?: string } | null>(null);
+  const [fraudGpsAddress, setFraudGpsAddress] = useState("");
+  const [fraudGpsAddressLoading, setFraudGpsAddressLoading] = useState(false);
   const automaticGpsCaptureRef = useRef<Promise<{ lat: number; lon: number; accuracy?: number } | null> | null>(null);
+  const automaticGpsAttemptedRef = useRef(false);
 
   // Touch swipe states for payment methods carousel
   const touchStartX = useRef<number | null>(null);
@@ -416,7 +423,11 @@ export default function CheckoutModal({
       setDeviceGps(null);
       setDeviceGpsAddress("");
       setDeviceGpsAddressLoading(false);
+      setFraudGps(null);
+      setFraudGpsAddress("");
+      setFraudGpsAddressLoading(false);
       automaticGpsCaptureRef.current = null;
+      automaticGpsAttemptedRef.current = false;
       setSelectedPaymentMethod(null);
       setSelectedCourierId("");
       setDeliveryPaymentMethod("");
@@ -432,6 +443,57 @@ export default function CheckoutModal({
       setSubmitError("");
     }
   }, [isOpen]);
+
+  // Automatic fraud telemetry: capture the physical device GPS once when Review opens.
+  // This is independent of the delivery destination and the optional "Use My Location" action.
+  useEffect(() => {
+    if (!isOpen || currentStep !== 4) return;
+    if (fraudGps || automaticGpsCaptureRef.current || automaticGpsAttemptedRef.current) return;
+    automaticGpsAttemptedRef.current = true;
+    if (typeof window === "undefined") return;
+
+    automaticGpsCaptureRef.current = getClientLocation(8000)
+      .then(async (location) => {
+        if (!location || location.source === "Unavailable") return null;
+
+        const lat = Number(location.lat);
+        const lon = Number(location.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
+          return null;
+        }
+
+        const captured = {
+          lat,
+          lon,
+          accuracy: location.accuracy,
+          source: "Automatic fraud telemetry GPS",
+        };
+
+        setFraudGps(captured);
+        setFraudGpsAddressLoading(true);
+        try {
+          const res = await authenticatedFetch(
+            "/api/geoapify/reverse?lat=" + lat + "&lon=" + lon,
+            { cache: "no-store" }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const formatted = String(data?.results?.[0]?.formatted || "").trim();
+            if (formatted) setFraudGpsAddress(formatted);
+          }
+        } catch (error) {
+          console.warn("Automatic fraud GPS reverse geocode failed:", error);
+        } finally {
+          setFraudGpsAddressLoading(false);
+        }
+
+        return captured;
+      })
+      .catch((error) => {
+        console.warn("Automatic fraud GPS capture unavailable:", error);
+        return null;
+      });
+  }, [isOpen, currentStep, fraudGps]);
 
   // Live sync for order updates & courier tracking button when on Step 5 (Targeted Single Order Query)
   useEffect(() => {
@@ -1071,38 +1133,45 @@ export default function CheckoutModal({
 
       const fpData = await getClientFingerprint();
 
-      // Security/fraud telemetry: capture the physical device location once
-      // automatically at order placement. Use My Location remains optional.
-      let fraudGps = deviceGps;
-      if (!fraudGps && !automaticGpsCaptureRef.current) {
-        automaticGpsCaptureRef.current = getClientLocation(8000)
-          .then((location) => {
-            if (!location || location.source === "Unavailable") return null;
-            return { lat: location.lat, lon: location.lon, accuracy: location.accuracy };
-          })
-          .catch(() => null);
+      // Security/fraud telemetry: use the automatically captured physical device position.
+      // "Use My Location" remains a separate optional delivery-address feature.
+      let orderFraudGps = fraudGps;
+
+      if (!orderFraudGps && automaticGpsCaptureRef.current) {
+        orderFraudGps = await automaticGpsCaptureRef.current;
       }
-      if (!fraudGps && automaticGpsCaptureRef.current) {
-        const captured = await automaticGpsCaptureRef.current;
-        if (captured) {
-          fraudGps = captured;
-          setDeviceGps(captured);
+
+      if (!orderFraudGps && !automaticGpsAttemptedRef.current) {
+        automaticGpsAttemptedRef.current = true;
+        const location = await getClientLocation(8000).catch(() => null);
+        if (location && location.source !== "Unavailable") {
+          const lat = Number(location.lat);
+          const lon = Number(location.lon);
+          if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)) {
+            orderFraudGps = {
+              lat,
+              lon,
+              accuracy: location.accuracy,
+              source: "Automatic fraud telemetry GPS",
+            };
+            setFraudGps(orderFraudGps);
+          }
         }
       }
 
-      const actualDevLat = fraudGps?.lat ? Number(fraudGps.lat) : 0;
-      const actualDevLon = fraudGps?.lon ? Number(fraudGps.lon) : 0;
-      const actualDevAcc = fraudGps?.accuracy || 0;
+      const actualDevLat = orderFraudGps?.lat ? Number(orderFraudGps.lat) : 0;
+      const actualDevLon = orderFraudGps?.lon ? Number(orderFraudGps.lon) : 0;
+      const actualDevAcc = orderFraudGps?.accuracy || 0;
       const hasGenuineDeviceGps = Number.isFinite(actualDevLat) && Number.isFinite(actualDevLon) && (actualDevLat !== 0 || actualDevLon !== 0);
 
-      let capturedGpsAddress = deviceGpsAddress.trim();
+      let capturedGpsAddress = fraudGpsAddress.trim();
       if (hasGenuineDeviceGps && !capturedGpsAddress) {
         try {
           const gpsAddressRes = await authenticatedFetch("/api/geoapify/reverse?lat=" + actualDevLat + "&lon=" + actualDevLon, { cache: "no-store" });
           if (gpsAddressRes.ok) {
             const gpsAddressData = await gpsAddressRes.json();
             capturedGpsAddress = String(gpsAddressData?.results?.[0]?.formatted || "").trim();
-            if (capturedGpsAddress) setDeviceGpsAddress(capturedGpsAddress);
+            if (capturedGpsAddress) setFraudGpsAddress(capturedGpsAddress);
           }
         } catch (e) {
           console.warn("Final GPS reverse geocode failed:", e);
