@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
-import { getClientFingerprint, getOrCreateSessionToken } from "./fingerprint-collector";
+import { getClientFingerprint, getClientLocation, getOrCreateSessionToken } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import { authenticatedFetch } from "./telegram-auth-client";
 
@@ -165,6 +165,7 @@ export default function CheckoutModal({
   const [deviceGps, setDeviceGps] = useState<{ lat: number; lon: number; accuracy?: number; source?: string } | null>(null);
   const [deviceGpsAddress, setDeviceGpsAddress] = useState("");
   const [deviceGpsAddressLoading, setDeviceGpsAddressLoading] = useState(false);
+  const automaticGpsCaptureRef = useRef<Promise<{ lat: number; lon: number; accuracy?: number } | null> | null>(null);
 
   // Touch swipe states for payment methods carousel
   const touchStartX = useRef<number | null>(null);
