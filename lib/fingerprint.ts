@@ -40,14 +40,6 @@ export function getRequestClientIp(request: Request): string {
   return forwardedIp || request.headers.get('x-real-ip')?.trim() || '127.0.0.1';
 }
 
-function stableFingerprintSecretMaterial() {
-  return [
-    process.env.SESSION_SECRET?.trim() || '',
-    process.env.TELEGRAM_BOT_TOKEN?.trim() || '',
-    'PRIME_SERVER_FINGERPRINT_V1',
-  ].filter(Boolean).join('|');
-}
-
 export function getServerFingerprintId(request: Request): string {
   const ip = getRequestClientIp(request);
   const userAgent = request.headers.get('user-agent') || '';
@@ -55,11 +47,6 @@ export function getServerFingerprintId(request: Request): string {
   const raw = [ip, userAgent, platform]
     .map((value) => String(value || '').trim().toLowerCase())
     .join('|');
-
-  const secret = stableFingerprintSecretMaterial();
-  if (secret) {
-    return `SRVFP_${crypto.createHmac('sha256', secret).update(raw).digest('hex').slice(0, 32).toUpperCase()}`;
-  }
 
   return `SRVFP_${crypto.createHash('sha256').update(raw).digest('hex').slice(0, 32).toUpperCase()}`;
 }
