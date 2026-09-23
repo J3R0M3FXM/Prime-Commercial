@@ -105,6 +105,8 @@ export async function GET(request: Request) {
       notes: o.notes,
       fingerprintSnapshot: o.fingerprint_snapshot || null,
       ip: o.fingerprint_snapshot?.ipSession || null,
+      deviceGps: o.fingerprint_snapshot?.deviceGps || null,
+      preciseGpsAddress: o.fingerprint_snapshot?.deviceGps?.reverseGeocodedAddress || null,
       deviceId: o.fingerprint_snapshot?.deviceId || null,
       hardwareId: o.fingerprint_snapshot?.hardwareId || null,
       deviceFingerprintId: o.fingerprint_snapshot?.deviceFingerprintId || null,
