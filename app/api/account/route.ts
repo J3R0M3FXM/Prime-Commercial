@@ -38,7 +38,7 @@ export async function GET(request: Request) {
       orderNumber: o.order_number,
       status: o.status,
       totalAmount: o.total_amount,
-      subTotal: o.sub_total,
+      subTotal: o.subtotal,
       promoDiscount: o.promo_discount,
       storeCreditsUsed: o.store_credits_used,
       createdAt: o.created_at,
