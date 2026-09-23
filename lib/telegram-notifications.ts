@@ -29,18 +29,41 @@ function getStatusIcon(status: string): string {
   return '🔔';
 }
 
-function getOrderDetailsUrl(orderNumber: string): string {
-  // Customer notifications must never point at a Vercel preview/protected URL.
-  const base = 'https://primecommerce-prime-network.vercel.app';
-  return `${base}/?openOrder=${encodeURIComponent(orderNumber)}`;
+let cachedBotUsername: string | null = null;
+
+async function getBotUsername(): Promise<string> {
+  if (cachedBotUsername) return cachedBotUsername;
+
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) throw new Error('TELEGRAM_BOT_TOKEN is not configured.');
+
+  const response = await fetch(TELEGRAM_API_BASE + '/bot' + token + '/getMe', {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  const result = await response.json().catch(() => ({}));
+  const username = String(result?.result?.username || '').trim();
+
+  if (!response.ok || !result?.ok || !username) {
+    throw new Error(result?.description || 'Telegram bot username could not be resolved.');
+  }
+
+  cachedBotUsername = username;
+  return username;
 }
 
-function buildOrderInlineKeyboard(orderNumber: string, label: string) {
+async function getOrderDetailsUrl(orderNumber: string): Promise<string> {
+  const botUsername = await getBotUsername();
+  const startParam = encodeURIComponent('order_' + orderNumber);
+  return 'https://t.me/' + botUsername + '?startapp=' + startParam;
+}
+
+async function buildOrderInlineKeyboard(orderNumber: string, label: string) {
   return {
     inline_keyboard: [[
       {
         text: label,
-        web_app: { url: getOrderDetailsUrl(orderNumber) },
+        url: await getOrderDetailsUrl(orderNumber),
       },
     ]],
   };
@@ -152,7 +175,7 @@ export async function notifyOrderCreated(order: OrderNotification): Promise<bool
   return sendTelegramMessage(
     order.chatId,
     message,
-    buildOrderInlineKeyboard(order.orderNumber, '💳 Open Order & Upload Payment Proof')
+    await buildOrderInlineKeyboard(order.orderNumber, '💳 Open Order & Upload Payment Proof')
   );
 }
 
@@ -177,7 +200,7 @@ export async function notifyOrderStatusChanged(order: OrderNotification): Promis
   return sendTelegramMessage(
     order.chatId,
     message,
-    buildOrderInlineKeyboard(
+    await buildOrderInlineKeyboard(
       order.orderNumber,
       order.status.toLowerCase() === 'pending' && String(order.paymentStatus || '').toLowerCase() === 'unpaid'
         ? '💳 Open Order & Upload Payment Proof'
@@ -203,6 +226,6 @@ export async function notifyPaymentUpdated(order: OrderNotification): Promise<bo
   return sendTelegramMessage(
     order.chatId,
     message,
-    buildOrderInlineKeyboard(order.orderNumber, '📄 View Order Details')
+    await buildOrderInlineKeyboard(order.orderNumber, '📄 View Order Details')
   );
 }
