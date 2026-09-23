@@ -99,6 +99,7 @@ export async function GET(request: Request) {
         subTotal: o.subtotal ?? o.sub_total, promoDiscount: o.discount_amount ?? o.promo_discount,
         storeCreditsUsed: o.store_credits_used ?? o.applied_store_credits, createdAt: o.created_at, deliveredAt: o.delivered_at,
         deviceSnapshot: o.fingerprint_snapshot || o.device_snapshot || null,
+        ip: o.fingerprint_snapshot?.ipSession || null,
         deviceId: o.fingerprint_snapshot?.deviceId || null,
         hardwareId: o.fingerprint_snapshot?.hardwareId || null,
         deviceFingerprintId: o.fingerprint_snapshot?.deviceFingerprintId || null,
