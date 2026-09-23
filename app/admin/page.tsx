@@ -1895,7 +1895,11 @@ export default function AdminPage() {
     if (!order) return "Not captured";
 
     // 1. Extract genuine hardware coordinates of customer device at order time
-    const loc = order.deviceSnapshot?.location;
+    const loc =
+      order.deviceGps ||
+      order.deviceSnapshot?.deviceGps ||
+      order.deviceSnapshot?.location ||
+      null;
     let devLat = Number(loc?.lat ?? loc?.latitude);
     let devLon = Number(loc?.lon ?? loc?.longitude);
 
@@ -1928,7 +1932,21 @@ export default function AdminPage() {
       }
     }
 
-    // 3. Check primary gpsStreetAddress on order document
+    // 3. Prefer the immutable reverse-geocoded address captured with the physical GPS snapshot.
+    if (order.deviceGps?.reverseGeocodedAddress && typeof order.deviceGps.reverseGeocodedAddress === "string") {
+      const cand = order.deviceGps.reverseGeocodedAddress.trim();
+      if (cand && !isRawCoordStr(cand)) return cand;
+    }
+    if (order.deviceSnapshot?.deviceGps?.reverseGeocodedAddress && typeof order.deviceSnapshot.deviceGps.reverseGeocodedAddress === "string") {
+      const cand = order.deviceSnapshot.deviceGps.reverseGeocodedAddress.trim();
+      if (cand && !isRawCoordStr(cand)) return cand;
+    }
+    if (order.preciseGpsAddress && typeof order.preciseGpsAddress === "string") {
+      const cand = order.preciseGpsAddress.trim();
+      if (cand && !isRawCoordStr(cand)) return cand;
+    }
+
+    // 4. Check primary gpsStreetAddress on order document
     if (order.gpsStreetAddress && typeof order.gpsStreetAddress === "string" && order.gpsStreetAddress.trim()) {
       const cand = order.gpsStreetAddress.trim();
       if (!isRawCoordStr(cand)) {
@@ -1949,8 +1967,12 @@ export default function AdminPage() {
     if (!selectedOrder) return;
     const orderId = selectedOrder.id;
 
-    // Extract device lat/lon
-    const loc = selectedOrder.deviceSnapshot?.location;
+    // Extract physical device GPS captured at order placement, never the delivery destination.
+    const loc =
+      selectedOrder.deviceGps ||
+      selectedOrder.deviceSnapshot?.deviceGps ||
+      selectedOrder.deviceSnapshot?.location ||
+      null;
     let devLat = Number(loc?.lat ?? loc?.latitude);
     let devLon = Number(loc?.lon ?? loc?.longitude);
 
@@ -4149,7 +4171,7 @@ export default function AdminPage() {
                           title="Click to copy IP Address"
                         >
                           <span className="font-ibm-condensed font-normal text-slate-700 text-[12.5px] leading-tight tracking-normal truncate group-hover:text-indigo-600 transition-colors">
-                            {selectedOrder.ip || selectedOrder.deviceSnapshot?.ip || "000.00.000.000"}
+                            {selectedOrder.ip || selectedOrder.deviceSnapshot?.ipSession || selectedOrder.deviceSnapshot?.serverIp || "Not captured"}
                           </span>
                           {copiedKey === "ipAddress" ? (
                             <Check className="w-3 h-3 text-emerald-600 shrink-0" />
