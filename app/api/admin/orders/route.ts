@@ -75,6 +75,8 @@ export async function GET(request: Request) {
       customerId: o.customer_id,
       customerName: o.customer_name,
       customerPhone: o.customer_phone,
+      receiverName: o.customer_name,
+      receiverPhone: o.customer_phone,
       tgUserId: o.tg_user_id,
       primeMemberId: o.prime_member_id,
       items: o.items,
