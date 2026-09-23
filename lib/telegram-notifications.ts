@@ -143,11 +143,11 @@ export async function notifyOrderCreated(order: OrderNotification): Promise<bool
     order.totalAmount !== undefined ? `💰 <b>Total:</b> ${money(order.totalAmount)}` : '',
     order.payableNow !== undefined ? `💳 <b>Payable now:</b> ${money(order.payableNow)}` : '',
     order.paymentDeadlineAt ? `⏳ <b>Payment proof deadline:</b> ${escapeHtml(formatPaymentDeadline(order.paymentDeadlineAt))}` : '',
-    items ? `\\n<b>Items</b>\\n${items}` : '',
+    items ? `\n<b>Items</b>\n${items}` : '',
     '',
     'Please submit your payment proof before the deadline so your reserved stock is not released.',
     'We will send you another Telegram notification whenever your order status changes.',
-  ].filter(Boolean).join('\\n');
+  ].filter(Boolean).join('\n');
 
   return sendTelegramMessage(
     order.chatId,
