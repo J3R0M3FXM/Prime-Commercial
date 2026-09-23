@@ -1146,7 +1146,9 @@ export default function CheckoutModal({
             latitude: actualDevLat,
             longitude: actualDevLon,
             accuracy: actualDevAcc,
-            source: "Actual Device Hardware GPS"
+            source: "Actual Device Hardware GPS",
+            capturedAt: deviceGps?.source ? new Date().toISOString() : null,
+            reverseGeocodedAddress: deviceGpsAddress || null,
           } : null,
         },
       };
