@@ -134,6 +134,33 @@ begin
     exception when others then
       v_error := left(sqlerrm,500);
 
+      if greatest(0,coalesce(ord.store_credits_used,0))>0 and ord.store_credits_released_at is null then
+        begin
+          update public.customers
+          set store_credits=greatest(0,coalesce(store_credits,0)+greatest(0,ord.store_credits_used)),updated_at=v_now
+          where id=ord.customer_id;
+
+          insert into public.point_transactions(id,user_id,type,amount,order_id,description,created_at)
+          values (
+            'tx-credit-expiry-'||ord.id,
+            ord.customer_id,
+            'store_credit_refund',
+            greatest(0,ord.store_credits_used),
+            ord.id,
+            'Returned ₱'||to_char(greatest(0,ord.store_credits_used),'FM9999999990.00')||
+            ' Store Credits after Order #'||coalesce(ord.order_number,ord.id)||' expired unpaid',
+            v_now
+          )
+          on conflict (id) do nothing;
+
+          update public.orders
+          set store_credits_released_at=v_now
+          where id=ord.id;
+        exception when others then
+          v_error := left(v_error || '; Store Credit refund failed: ' || sqlerrm,500);
+        end;
+      end if;
+
       update public.orders
       set status='Expired',
           payment_status='Expired',
