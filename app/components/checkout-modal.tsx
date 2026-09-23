@@ -172,6 +172,7 @@ export default function CheckoutModal({
   const [fraudGpsAddress, setFraudGpsAddress] = useState("");
   const [fraudGpsAddressLoading, setFraudGpsAddressLoading] = useState(false);
   const automaticGpsCaptureRef = useRef<Promise<{ lat: number; lon: number; accuracy?: number } | null> | null>(null);
+  const automaticGpsAttemptedRef = useRef(false);
 
   // Touch swipe states for payment methods carousel
   const touchStartX = useRef<number | null>(null);
@@ -426,6 +427,7 @@ export default function CheckoutModal({
       setFraudGpsAddress("");
       setFraudGpsAddressLoading(false);
       automaticGpsCaptureRef.current = null;
+      automaticGpsAttemptedRef.current = false;
       setSelectedPaymentMethod(null);
       setSelectedCourierId("");
       setDeliveryPaymentMethod("");
@@ -446,7 +448,8 @@ export default function CheckoutModal({
   // This is independent of the delivery destination and the optional "Use My Location" action.
   useEffect(() => {
     if (!isOpen || currentStep !== 4) return;
-    if (fraudGps || automaticGpsCaptureRef.current) return;
+    if (fraudGps || automaticGpsCaptureRef.current || automaticGpsAttemptedRef.current) return;
+    automaticGpsAttemptedRef.current = true;
     if (typeof window === "undefined") return;
 
     automaticGpsCaptureRef.current = getClientLocation(8000)
@@ -1138,7 +1141,8 @@ export default function CheckoutModal({
         orderFraudGps = await automaticGpsCaptureRef.current;
       }
 
-      if (!orderFraudGps) {
+      if (!orderFraudGps && !automaticGpsAttemptedRef.current) {
+        automaticGpsAttemptedRef.current = true;
         const location = await getClientLocation(8000).catch(() => null);
         if (location && location.source !== "Unavailable") {
           const lat = Number(location.lat);
