@@ -339,8 +339,8 @@ export default function Shopfront() {
       )}
       
       {/* Sticky Header */}
-      <header className="sticky top-0 z-45 bg-white border-b border-gray-100 shadow-sm">
-        <div className="px-4 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-45 h-[38px] bg-white border-b border-gray-100 shadow-sm">
+        <div className="h-full px-2 flex items-center justify-between">
           <div className="flex items-center">
             <img 
               src="/primefinal.png" 
@@ -367,7 +367,7 @@ export default function Shopfront() {
       </header>
 
       {/* Search & Filter Controls (Below Header, matching the thin footer style/height) */}
-      <div className={`${activeTab !== "shop" ? "hidden" : ""} px-4 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[53px]`}>
+      <div className={`${activeTab !== "shop" ? "hidden" : ""} px-4 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[38px]`}>
         <div className="relative flex-[5] flex items-center">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input 
