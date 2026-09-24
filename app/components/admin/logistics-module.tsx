@@ -382,16 +382,16 @@ export default function LogisticsModule() {
     <div className="admin-feature-module space-y-3">
       {/* Tabs */}
       <div className="flex border-b border-slate-200">
-        <button type="button"
-              onClick={() => setActiveTab("warehouse")}
+        <button
+          onClick={() => setActiveTab("warehouse")}
           className={`flex items-center gap-2 px-3 py-2 font-heading font-bold text-sm tracking-wide uppercase transition-colors border-b-2 ${
             activeTab === "warehouse" ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
           <Building2 className="w-4 h-4" /> Warehouses
         </button>
-        <button type="button"
-              onClick={() => setActiveTab("courier")}
+        <button
+          onClick={() => setActiveTab("courier")}
           className={`flex items-center gap-2 px-3 py-2 font-heading font-bold text-sm tracking-wide uppercase transition-colors border-b-2 ${
             activeTab === "courier" ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
@@ -408,12 +408,7 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg text-slate-900">Fulfillment Centers</h3>
               <p className="text-xs font-mono text-slate-500 mt-1">Manage physical locations where deliveries originate.</p>
             </div>
-            <button type="button"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                resetWarehouseForm();
-                setShowWarehouseModal(true);
-              }}
+            <button
               onClick={() => {
                 resetWarehouseForm();
                 setShowWarehouseModal(true);
@@ -463,17 +458,7 @@ export default function LogisticsModule() {
                   </div>
                   
                   <div className="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
-                    <button type="button"
-              onPointerDown={(e) => {
-                        e.preventDefault();
-                        setEditingWarehouse(wh);
-                        setWhName(wh.name);
-                        setWhAddress(wh.address);
-                        setWhLat(wh.lat);
-                        setWhLon(wh.lon);
-                        setIsDefaultWh(wh.isDefault);
-                        setShowWarehouseModal(true);
-                      }}
+                    <button
                       onClick={() => {
                         setEditingWarehouse(wh);
                         setWhName(wh.name);
@@ -488,8 +473,8 @@ export default function LogisticsModule() {
                       Edit Details
                     </button>
                     {!wh.isDefault && (
-                      <button type="button"
-              onClick={() => deleteWarehouse(wh.id)}
+                      <button
+                        onClick={() => deleteWarehouse(wh.id)}
                         className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
                       >
                         Remove
@@ -511,12 +496,7 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg text-slate-900">Courier Services</h3>
               <p className="text-xs font-mono text-slate-500 mt-1">Configure logistics partners and delivery fee calculators.</p>
             </div>
-            <button type="button"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                resetCourierForm();
-                setShowCourierModal(true);
-              }}
+            <button
               onClick={() => {
                 resetCourierForm();
                 setShowCourierModal(true);
@@ -592,21 +572,7 @@ export default function LogisticsModule() {
                   </div>
                   
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                    <button type="button"
-              onPointerDown={(e) => {
-                        e.preventDefault();
-                        setEditingCourier(courier);
-                        setCourierName(courier.name);
-                        setCourierLogo(courier.logo || "");
-                        setCourierType(courier.type);
-                        setBaseFare(courier.baseFare);
-                        setFirstMile(courier.firstMile);
-                        setFirstMileFee(courier.firstMileFee);
-                        setExceedingKmFee(courier.exceedingKmFee);
-                        setSurcharge(courier.surcharge);
-                        setNightDifferential(courier.nightDifferential);
-                        setShowCourierModal(true);
-                      }}
+                    <button
                       onClick={() => {
                         setEditingCourier(courier);
                         setCourierName(courier.name);
@@ -624,8 +590,8 @@ export default function LogisticsModule() {
                     >
                       Edit Config
                     </button>
-                    <button type="button"
-              onClick={() => deleteCourier(courier.id)}
+                    <button
+                      onClick={() => deleteCourier(courier.id)}
                       className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
                     >
                       Remove
@@ -646,8 +612,7 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
                 {editingWarehouse ? "Edit Warehouse" : "New Warehouse"}
               </h3>
-              <button type="button"
-              onClick={() => setShowWarehouseModal(false)} className="text-slate-400 hover:text-slate-700">
+              <button onClick={() => setShowWarehouseModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -684,7 +649,7 @@ export default function LogisticsModule() {
                   {suggestions.length > 0 && (
                     <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-none shadow-none overflow-hidden max-h-48 overflow-y-auto">
                       {suggestions.map((sg, idx) => (
-                        <button type="button"
+                        <button
                           key={idx}
                           onClick={() => handleSelectSuggestion(sg)}
                           className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 truncate"
@@ -746,14 +711,14 @@ export default function LogisticsModule() {
             </div>
 
             <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
-              <button type="button"
-              onClick={() => setShowWarehouseModal(false)}
+              <button
+                onClick={() => setShowWarehouseModal(false)}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
-              <button type="button"
-              onClick={saveWarehouse}
+              <button
+                onClick={saveWarehouse}
                 disabled={isSavingWh || !whName || !whAddress}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
               >
@@ -773,8 +738,7 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
                 {editingCourier ? "Edit Courier Config" : "New Courier Config"}
               </h3>
-              <button type="button"
-              onClick={() => setShowCourierModal(false)} className="text-slate-400 hover:text-slate-700">
+              <button onClick={() => setShowCourierModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -800,8 +764,9 @@ export default function LogisticsModule() {
                     { name: "J&T Express", type: "Standard", baseFare: 80, firstMile: 5, firstMileFee: 15, exceedingKmFee: 15, surcharge: 0, nightDifferential: 0 },
                     { name: "Standard In-House", type: "Standard", baseFare: 45, firstMile: 2, firstMileFee: 5, exceedingKmFee: 8, surcharge: 0, nightDifferential: 0 },
                   ].map((preset) => (
-                    <button type="button"
-                          key={preset.name}
+                    <button
+                      key={preset.name}
+                      type="button"
                       onClick={() => applyCourierPreset(preset)}
                       className="text-[11px] font-medium bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-slate-700 px-2.5 py-1.5 rounded-none transition-colors"
                     >
@@ -840,7 +805,8 @@ export default function LogisticsModule() {
                     )}
                   </div>
                   {courierLogo && (
-                    <button type="button"
+                    <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setCourierLogo("");
@@ -950,13 +916,15 @@ export default function LogisticsModule() {
             </div>
 
             <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
-              <button type="button"
+              <button
+                type="button"
                 onClick={() => setShowCourierModal(false)}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
-              <button type="button"
+              <button
+                type="button"
                 onClick={saveCourier}
                 disabled={isSavingCourier || isCompressingLogo || !courierName.trim()}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
