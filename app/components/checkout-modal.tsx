@@ -186,7 +186,6 @@ export default function CheckoutModal({
   // This prevents duplicate permission prompts and overlapping geolocation requests.
   const automaticGpsCaptureRef = useRef<Promise<PhysicalGpsSnapshot | null> | null>(null);
   const automaticGpsSnapshotRef = useRef<PhysicalGpsSnapshot | null>(null);
-  const automaticGpsAttemptedRef = useRef(false);
   const automaticGpsSessionRef = useRef(0);
 
   const captureAutomaticPhysicalGps = async (
@@ -203,12 +202,8 @@ export default function CheckoutModal({
     }
 
     let capturePromise = automaticGpsCaptureRef.current;
-    if (!capturePromise && automaticGpsAttemptedRef.current) {
-      return null;
-    }
 
     if (!capturePromise) {
-      automaticGpsAttemptedRef.current = true;
       capturePromise = getClientLocation(10000)
         .then(async (location) => {
           if (!location || location.source === "Unavailable") return null;
@@ -526,9 +521,6 @@ export default function CheckoutModal({
       setFraudGpsAddressLoading(false);
       automaticGpsSessionRef.current += 1;
       automaticGpsSnapshotRef.current = null;
-      if (!automaticGpsCaptureRef.current) {
-        automaticGpsAttemptedRef.current = false;
-      }
       setSelectedPaymentMethod(null);
       setSelectedCourierId("");
       setDeliveryPaymentMethod("");
@@ -783,6 +775,8 @@ export default function CheckoutModal({
     setAddressError("");
 
     try {
+      // The initial automatic checkout capture may have requested permission.
+      // Manual delivery-location reuse is always a silent retry.
       const snapshot = await captureAutomaticPhysicalGps(sessionId);
       if (sessionId !== automaticGpsSessionRef.current || !isOpen) return;
       if (!snapshot) {
