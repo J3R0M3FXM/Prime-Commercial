@@ -384,7 +384,7 @@ export default function LogisticsModule() {
       <div className="flex border-b border-slate-200">
         <button
           type="button"
-onClick={() => setActiveTab("warehouse")}
+              onClick={() => setActiveTab("warehouse")}
           className={`flex items-center gap-2 px-3 py-2 font-heading font-bold text-sm tracking-wide uppercase transition-colors border-b-2 ${
             activeTab === "warehouse" ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
@@ -393,7 +393,7 @@ onClick={() => setActiveTab("warehouse")}
         </button>
         <button
           type="button"
-onClick={() => setActiveTab("courier")}
+              onClick={() => setActiveTab("courier")}
           className={`flex items-center gap-2 px-3 py-2 font-heading font-bold text-sm tracking-wide uppercase transition-colors border-b-2 ${
             activeTab === "courier" ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
@@ -412,7 +412,7 @@ onClick={() => setActiveTab("courier")}
             </div>
             <button
               type="button"
-onClick={() => {
+              onClick={() => {
                 resetWarehouseForm();
                 setShowWarehouseModal(true);
               }}
@@ -463,7 +463,7 @@ onClick={() => {
                   <div className="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button
                       type="button"
-onClick={() => {
+              onClick={() => {
                         setEditingWarehouse(wh);
                         setWhName(wh.name);
                         setWhAddress(wh.address);
@@ -479,7 +479,7 @@ onClick={() => {
                     {!wh.isDefault && (
                       <button
                         type="button"
-onClick={() => deleteWarehouse(wh.id)}
+              onClick={() => deleteWarehouse(wh.id)}
                         className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
                       >
                         Remove
@@ -503,7 +503,7 @@ onClick={() => deleteWarehouse(wh.id)}
             </div>
             <button
               type="button"
-onClick={() => {
+              onClick={() => {
                 resetCourierForm();
                 setShowCourierModal(true);
               }}
@@ -580,7 +580,7 @@ onClick={() => {
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button
                       type="button"
-onClick={() => {
+              onClick={() => {
                         setEditingCourier(courier);
                         setCourierName(courier.name);
                         setCourierLogo(courier.logo || "");
@@ -599,7 +599,7 @@ onClick={() => {
                     </button>
                     <button
                       type="button"
-onClick={() => deleteCourier(courier.id)}
+              onClick={() => deleteCourier(courier.id)}
                       className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
                     >
                       Remove
@@ -621,7 +621,7 @@ onClick={() => deleteCourier(courier.id)}
                 {editingWarehouse ? "Edit Warehouse" : "New Warehouse"}
               </h3>
               <button type="button"
-onClick={() => setShowWarehouseModal(false)} className="text-slate-400 hover:text-slate-700">
+              onClick={() => setShowWarehouseModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -660,7 +660,7 @@ onClick={() => setShowWarehouseModal(false)} className="text-slate-400 hover:tex
                       {suggestions.map((sg, idx) => (
                         <button
                           type="button"
-key={idx}
+                          key={idx}
                           onClick={() => handleSelectSuggestion(sg)}
                           className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 truncate"
                         >
@@ -723,14 +723,14 @@ key={idx}
             <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
               <button
                 type="button"
-onClick={() => setShowWarehouseModal(false)}
+              onClick={() => setShowWarehouseModal(false)}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
-onClick={saveWarehouse}
+              onClick={saveWarehouse}
                 disabled={isSavingWh || !whName || !whAddress}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
               >
@@ -751,7 +751,7 @@ onClick={saveWarehouse}
                 {editingCourier ? "Edit Courier Config" : "New Courier Config"}
               </h3>
               <button type="button"
-onClick={() => setShowCourierModal(false)} className="text-slate-400 hover:text-slate-700">
+              onClick={() => setShowCourierModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -779,7 +779,7 @@ onClick={() => setShowCourierModal(false)} className="text-slate-400 hover:text-
                   ].map((preset) => (
                     <button
                       type="button"
-key={preset.name}
+                          key={preset.name}
                       type="button"
                       onClick={() => applyCourierPreset(preset)}
                       className="text-[11px] font-medium bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-slate-700 px-2.5 py-1.5 rounded-none transition-colors"
@@ -821,7 +821,6 @@ key={preset.name}
                   {courierLogo && (
                     <button
                      type="button"
- type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setCourierLogo("");
@@ -933,7 +932,6 @@ key={preset.name}
             <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
               <button
                type="button"
- type="button"
                 onClick={() => setShowCourierModal(false)}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
               >
@@ -941,7 +939,6 @@ key={preset.name}
               </button>
               <button
                type="button"
- type="button"
                 onClick={saveCourier}
                 disabled={isSavingCourier || isCompressingLogo || !courierName.trim()}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
