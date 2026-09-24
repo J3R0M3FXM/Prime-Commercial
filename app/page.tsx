@@ -391,7 +391,7 @@ export default function Shopfront() {
       </div>
 
       {/* Main Content */}
-      <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 p-3 sm:p-3.5 w-full`}>
+      <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 px-3 sm:px-3.5 pt-[4.8px] pb-[4.8px] sm:pt-[5.6px] sm:pb-[5.6px] w-full`}>
         
         {/* Product Grid */}
         {products.length === 0 ? (
@@ -493,7 +493,7 @@ export default function Shopfront() {
       </main>
 
       {activeTab === "notifications" && (
-        <div className="w-full bg-gray-50 flex justify-center py-3">
+        <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
           <section className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-4 sm:p-6">
           <div className="border-b border-gray-100 pb-4 mb-5">
             <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Customer Center</p>
@@ -508,7 +508,7 @@ export default function Shopfront() {
         </div>
       )}
       {activeTab === "support" && (
-        <div className="w-full bg-gray-50 flex justify-center py-3">
+        <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
           <section className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-4 sm:p-6">
           <div className="border-b border-gray-100 pb-4 mb-5">
             <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Customer Center</p>
