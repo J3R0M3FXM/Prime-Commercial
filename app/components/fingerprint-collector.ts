@@ -401,27 +401,31 @@ export async function getClientLocation(
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  // First initialize Telegram's native location path and keep retrying long
-  // enough to survive Android's location refresh latency.
-  const telegramLocation = await getTelegramPreciseLocation(
-    Math.min(timeoutMs, 45000),
-    allowPermissionPrompt,
-  );
-  if (telegramLocation?.source === "Precise GPS") {
-    return telegramLocation;
-  }
-
-  // If Telegram native location did not provide coordinates, use the WebView
-  // geolocation channel for the remaining acquisition window. Silent retries
-  // can only use a browser permission already known to be granted.
-  const remaining = Math.max(5000, timeoutMs - 45000);
+  // IMPORTANT: Start the Android/WebView geolocation flow immediately.
+  // This is the permission channel surfaced by the embedded client. Do not
+  // wait on Telegram's native helper before initiating it, or the first
+  // permission dialog can be deferred until Step 4.
   const browserLocation = await getBrowserPreciseLocation(
-    remaining,
+    Math.min(timeoutMs, 30000),
     allowPermissionPrompt,
   );
+
   if (browserLocation?.source === "Precise GPS") {
     return browserLocation;
   }
 
+  // Telegram native fallback uses the already-existing helper and only runs
+  // after the direct WebView path had an opportunity to acquire a coordinate.
+  const remaining = Math.max(10000, timeoutMs - 30000);
+  const telegramLocation = await getTelegramPreciseLocation(
+    remaining,
+    allowPermissionPrompt,
+  );
+
+  if (telegramLocation?.source === "Precise GPS") {
+    return telegramLocation;
+  }
+
   return { lat: 0, lon: 0, source: "Unavailable" };
 }
+
