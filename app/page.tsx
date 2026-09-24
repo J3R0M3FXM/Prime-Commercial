@@ -304,7 +304,7 @@ export default function Shopfront() {
     return <SplashScreen title="ADMIN CREDENTIALS VERIFIED" subtitle="ROUTING TO SECURE ADMIN CONSOLE..." />;
   }
 
-  if (checking) return <SplashScreen title="VERIFYING SECURE SESSION" subtitle="ESTABLISHING ENCRYPTED TELEGRAM LINK..." />;
+  if (checking) return <SplashScreen title="CONNECTING TO PRIME PRIVATE SERVERS" subtitle="ESTABLISHING ENCRYPTED TELEGRAM LINK..." />;
 
   if (!authorized) {
     return (
