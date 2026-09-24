@@ -159,7 +159,7 @@ export interface LocationResult {
  * Checks Telegram LocationManager if available, with HTML5 Geolocation fallback.
  * The browser path uses watchPosition + clearWatch so a timed-out request is cleaned up.
  */
-export let telegramLocationInitPromise: Promise<any | null> | null = null;
+let telegramLocationInitPromise: Promise<any | null> | null = null;
 
 async function getTelegramLocationManager(): Promise<any | null> {
   if (typeof window === "undefined") return null;
@@ -221,6 +221,8 @@ async function getTelegramLocation(
 
   return new Promise((resolve) => {
     let settled = false;
+    let timer: number;
+    let onLocationRequested = (_event: any) => {};
 
     const finish = (locationData: any) => {
       if (settled) return;
@@ -256,11 +258,11 @@ async function getTelegramLocation(
       });
     };
 
-    const onLocationRequested = (event: any) => {
+    onLocationRequested = (event: any) => {
       finish(event?.locationData ?? event);
     };
 
-    const timer = window.setTimeout(() => {
+    timer = window.setTimeout(() => {
       if (settled) return;
       settled = true;
       try {
