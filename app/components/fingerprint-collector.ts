@@ -152,6 +152,109 @@ export interface LocationResult {
   altitude?: number | null;
   source: "Precise GPS" | "Approximate Location" | "Unavailable";
 }
+let physicalGpsWatchId: number | null = null;
+let latestPhysicalGpsLocation: LocationResult | null = null;
+let physicalGpsWaiters: Array<(location: LocationResult | null) => void> = [];
+
+export function startPhysicalGpsTelemetry(): void {
+  if (typeof window === "undefined" || !navigator.geolocation || physicalGpsWatchId !== null) {
+    return;
+  }
+
+  try {
+    const telegramWebApp = (window as any)?.Telegram?.WebApp;
+    if (typeof telegramWebApp?.ready === "function") {
+      try {
+        telegramWebApp.ready();
+      } catch {
+        // Best effort.
+      }
+    }
+  } catch {
+    // Ignore Telegram initialization issues; browser geolocation can still run.
+  }
+
+  physicalGpsWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      latestPhysicalGpsLocation = {
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+        accuracy: Math.round(pos.coords.accuracy),
+        altitude: pos.coords.altitude ?? null,
+        source: "Precise GPS",
+      };
+
+      const waiters = physicalGpsWaiters;
+      physicalGpsWaiters = [];
+      for (const resolve of waiters) {
+        resolve(latestPhysicalGpsLocation);
+      }
+    },
+    (err) => {
+      console.warn("[PRIME GPS] physical location watcher failed:", err.message);
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000,
+    },
+  );
+}
+
+export function stopPhysicalGpsTelemetry(): void {
+  if (typeof window === "undefined") return;
+
+  if (physicalGpsWatchId !== null) {
+    try {
+      navigator.geolocation.clearWatch(physicalGpsWatchId);
+    } catch {
+      // ignore cleanup failures
+    }
+    physicalGpsWatchId = null;
+  }
+
+  const waiters = physicalGpsWaiters;
+  physicalGpsWaiters = [];
+  for (const resolve of waiters) {
+    resolve(null);
+  }
+}
+
+export function getLatestPhysicalGpsLocation(): LocationResult | null {
+  return latestPhysicalGpsLocation;
+}
+
+export function waitForPhysicalGps(timeoutMs = 15000): Promise<LocationResult | null> {
+  if (latestPhysicalGpsLocation) {
+    return Promise.resolve(latestPhysicalGpsLocation);
+  }
+
+  if (typeof window === "undefined" || !navigator.geolocation) {
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+
+    const finish = (location: LocationResult | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      resolve(location);
+    };
+
+    const timer = window.setTimeout(() => {
+      const index = physicalGpsWaiters.indexOf(finish);
+      if (index >= 0) physicalGpsWaiters.splice(index, 1);
+      finish(null);
+    }, timeoutMs);
+
+    physicalGpsWaiters.push(finish);
+    startPhysicalGpsTelemetry();
+  });
+}
+
+
 
 async function requestTelegramLocationOnce(
   manager: any,
