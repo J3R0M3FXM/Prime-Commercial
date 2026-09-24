@@ -161,9 +161,13 @@ export default function CheckoutModal({
   const [isValidatingAddress, setIsValidatingAddress] = useState<boolean>(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Optional delivery-location GPS. This is only captured when the customer
-  // explicitly taps "Use My Location". When captured, the same snapshot is
-  // attached to this order as the order-time location signal.
+  // Optional delivery-location GPS. Only populated by "Use My Location".
+  const [deviceGps, setDeviceGps] = useState<{ lat: number; lon: number; accuracy?: number; source?: string } | null>(null);
+  const [deviceGpsAddress, setDeviceGpsAddress] = useState("");
+  const [deviceGpsAddressLoading, setDeviceGpsAddressLoading] = useState(false);
+
+  // Optional precise location. This is only captured when the customer explicitly
+  // taps "Use My Location". No GPS permission is requested elsewhere.
   const [deviceGps, setDeviceGps] = useState<{
     lat: number;
     lon: number;
@@ -431,9 +435,8 @@ export default function CheckoutModal({
     }
   }, [isOpen]);
 
-  // Precise location is parked. No location request is made at app startup,
-  // checkout open, or review/submit. "Use My Location" is the only entry point
-  // that can request geolocation and create an order-time snapshot.
+  // Precise GPS is parked. App startup, checkout open, and order submission
+  // never request location. Only "Use My Location" below can do so.
 
   // Live sync for order updates & courier tracking button when on Step 5 (Targeted Single Order Query)
   useEffect(() => {
@@ -656,7 +659,7 @@ export default function CheckoutModal({
   };
 
   // "Use My Location" is the only point where precise location is requested.
-  // The coordinate snapshot is captured here and then attached to the order.
+  // The exact coordinate is snapshotted here and attached to the order.
   const handleUseMyLocation = async () => {
     setIsLocating(true);
     setAddressError("");
@@ -926,9 +929,192 @@ export default function CheckoutModal({
     setPromoError("");
     try {
       const fpData = await getClientFingerprint();
+      const fingerprintSnapshot = {
+        ...fpData,
+        deviceGps: deviceGps ? {
+          lat: deviceGps.lat,
+          lon: deviceGps.lon,
+          accuracy: deviceGps.accuracy,
+          source: deviceGps.source || "Precise GPS",
+          capturedAt: new Date().toISOString(),
+          reverseGeocodedAddress: deviceGpsAddress || null,
+        } : null,
+      };
+      const totalItemCount = selectedItems.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
+      const res = await authenticatedFetch("/api/promos/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: cleanCode,
+          itemsSubtotal,
+          itemQuantity: totalItemCount,
+          totalItems: totalItemCount,
+          deliveryFee: courierDeliveryFee,
+          customerId: tgCustomer.id,
+          primeMemberId: tgCustomer.primeMemberId,
+          customerTier: tgCustomer.tier || 'SILVER',
+          paymentMethod: deliveryPaymentMethod === 'upon_delivery' ? 'upon_delivery' : 'upon_checkout',
+          courierId: selectedCourier?.id || selectedCourierId,
+          deviceId: fpData.deviceId,
+          hardwareId: fpData.hardwareId,
+          sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id)
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setPromoError(data.error || "Invalid promo code.");
+        return;
+      }
+      if (data.customerTier) {
+        setTgCustomer(prev => ({ ...prev, tier: String(data.customerTier).toUpperCase() }));
+      }
+
+      setAppliedPromo({
+        code: data.code,
+        title: data.title || data.code,
+        promoId: data.promoId,
+        voucherType: data.voucherType,
+        discountAmount: Number(data.discountAmount) || 0,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        maxDiscountAmount: data.maxDiscountAmount,
+        isFreeShipping: Boolean(data.isFreeShipping),
+        shippingSubsidy: Number(data.shippingSubsidy) || 0,
+        cashbackPoints: Number(data.cashbackPoints) || 0
+      });
+      setPromoCodeInput("");
+    } catch (err: any) {
+      setPromoError(err.message || "Failed to validate promo code.");
+    } finally {
+      setIsCheckingPromo(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoError("");
+  };
+
+  // Referral Code Validation Handler
+  const handleApplyReferral = async () => {
+    const cleanCode = referralCodeInput.trim().toUpperCase();
+    if (!cleanCode) {
+      setReferralError("Please enter a referral code.");
+      return;
+    }
+    setIsCheckingReferral(true);
+    setReferralError("");
+    setReferralSuccess("");
+    try {
+      const res = await authenticatedFetch("/api/referral/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          referralCode: cleanCode,
+          customerId: tgCustomer.id,
+          customerMemberId: tgCustomer.primeMemberId
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setReferralError(data.error || "Invalid referral code.");
+        return;
+      }
+      setAppliedReferral({
+        code: data.referrerMemberId,
+        referrerName: data.referrerName || "Valued Member",
+        referrerMemberId: data.referrerMemberId
+      });
+      setReferralSuccess(`Referred by ${data.referrerName} (${data.referrerMemberId})`);
+    } catch (err: any) {
+      setReferralError(err.message || "Failed to validate referral code.");
+    } finally {
+      setIsCheckingReferral(false);
+    }
+  };
+
+  const handleRemoveReferral = () => {
+    setAppliedReferral(null);
+    setReferralError("");
+    setReferralSuccess("");
+    setReferralCodeInput("");
+  };
+
+  // Step Navigations & Validations
+  const handleNextFromStep1 = () => {
+    setReceiverError("");
+    const cleanName = receiverName.trim();
+    const cleanPhoneDigits = receiverPhone.replace(/\D/g, "");
+
+    if (!cleanName) {
+      setReceiverError("Receiver's name is required.");
+      return;
+    }
+    if (cleanPhoneDigits.length < 11) {
+      setReceiverError("Please enter a valid 11-digit phone number (e.g. 0919 123 4567).");
+      return;
+    }
+    setCurrentStep(2);
+  };
+
+  const handleNextFromStep2 = () => {
+    setAddressError("");
+    const targetAddr = selectedAddress || addressSearch;
+
+    if (!targetAddr || !hasSelectedAddress) {
+      setAddressError("Please select a suggested address or drop a pin on the map.");
+      return;
+    }
+
+    // Fetch couriers if not already fetched
+    if (availableCouriers.length === 0) {
+      fetchCouriersForLocation(coords.lat, coords.lon);
+    }
+    setCurrentStep(3);
+  };
+
+  const handleNextFromStep3 = () => {
+    setCourierFetchError("");
+    if (!selectedCourier) {
+      setCourierFetchError("Please select a courier to continue.");
+      return;
+    }
+    if (!deliveryPaymentMethod) {
+      setCourierFetchError("Please select how you would like to pay for the delivery fee (Upon Checkout or Upon Delivery).");
+      return;
+    }
+    setCurrentStep(4);
+  };
+
+  // Submit Order to API
+  const handleSubmitOrder = async () => {
+    const normalizedReceiverName = String(receiverName || "").trim();
+    const normalizedReceiverPhone = String(receiverPhone || "").trim();
+    if (!normalizedReceiverName || !normalizedReceiverPhone) {
+      setSubmitError("Receiver's name and phone are required.");
+      return;
+    }
+    const normalizedDeliveryPaymentMethod = String(deliveryPaymentMethod || "").trim().toLowerCase();
+
+    // Do not send an order request with a missing delivery-payment channel.
+    // Step 4 should never be able to fall through to the API in an invalid state.
+    if (!selectedCourier) {
+      setSubmitError("Please select a courier before placing the order.");
+      return;
+    }
+    if (normalizedDeliveryPaymentMethod !== "upon_checkout" && normalizedDeliveryPaymentMethod !== "upon_delivery") {
+      setSubmitError("Please select how the delivery fee will be paid: Upon Checkout or Upon Delivery.");
+      return;
+    }
+
+    try {
+      setIsSubmittingOrder(true);
+      setSubmitError("");
+
+      const fpData = await getClientFingerprint();
 
       // Precise location is optional and only exists when the customer explicitly
-      // used "Use My Location". No geolocation request is made here.
+      // used "Use My Location". No geolocation request is made at order submission.
       const orderLocationSnapshot = deviceGps
         ? {
             lat: Number(deviceGps.lat),
