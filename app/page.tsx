@@ -7,7 +7,6 @@ import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
 import AccountModal from "./components/account-modal";
-import VideoGalleryModal from "./components/video-gallery-modal";
 import { useCart } from "./components/cart-context";
 import LiveHeaderClock from "./components/live-header-clock";
 import SplashScreen from "./components/splash-screen";
@@ -32,7 +31,6 @@ export default function Shopfront() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [isVideoGalleryOpen, setIsVideoGalleryOpen] = useState(false);
   const [initialOrderIdFromLink, setInitialOrderIdFromLink] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("shop");
 
@@ -154,11 +152,10 @@ export default function Shopfront() {
           throw new Error("Valid Telegram WebApp session is required. Open PRIME from Telegram.");
         }
 
-        // Media routing may use Telegram start_param, but referral codes are never
-        // written into customer referral state automatically.
+        // Media is temporarily locked while database, storage, and security setup is completed.
+        // Keep the deep-link from opening the unavailable Media vault.
         if (telegramWebApp.initDataUnsafe?.start_param === "media") {
-          setIsVideoGalleryOpen(true);
-          setActiveTab("media");
+          setActiveTab("shop");
         }
 
         const fingerprintData = await getClientFingerprint();
@@ -548,14 +545,27 @@ export default function Shopfront() {
         }}
       />}
 
-      {/* Free Video Gallery Modal (Telegram Cloud) */}
-      {activeTab === "media" && <VideoGalleryModal
-        isOpen={true}
-        onClose={() => {
-          setIsVideoGalleryOpen(false);
-          setActiveTab("shop");
-        }}
-      />}
+      {/* Media — temporarily locked during database/storage/security setup */}
+      {activeTab === "media" && (
+        <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
+          <section
+            className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-5 sm:p-8 flex items-center justify-center"
+            aria-label="Media availability announcement"
+          >
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center shadow-sm">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-amber-200 bg-amber-50">
+                <Film className="h-5 w-5 text-amber-600" />
+              </div>
+              <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">Media Vault</p>
+              <h1 className="mt-1 text-xl font-heading font-black uppercase tracking-tight text-slate-900">Available Soon</h1>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                Media is currently under database and storage configuration, with additional security setup in progress.
+                This page will be available soon.
+              </p>
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Fixed Non-Scrolling Bottom Navigation Bar (sitting right above system footer) */}
       <nav className="fixed bottom-[20px] left-0 right-0 max-w-[430px] mx-auto z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/90 shadow-lg px-0.5 py-1.5 flex items-center justify-between font-['Roboto_Condensed'] select-none">
@@ -624,18 +634,13 @@ export default function Shopfront() {
           <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">NOTIFICATIONS</span>
         </button>
 
-        {/* 5. MEDIA */}
+        {/* 5. MEDIA — TEMPORARILY LOCKED */}
         <button
           type="button"
-          onClick={() => {
-            setActiveTab("media");
-            setIsVideoGalleryOpen(true);
-          }}
-          className={`flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors cursor-pointer ${
-            activeTab === "media" || isVideoGalleryOpen
-              ? "text-emerald-700 font-normal"
-              : "text-gray-500 hover:text-gray-900 font-light"
-          }`}
+          disabled
+          aria-disabled="true"
+          title="Media is temporarily unavailable"
+          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center text-gray-300 cursor-not-allowed"
         >
           <Film className="w-4 h-4 mb-0.5 shrink-0" />
           <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">MEDIA</span>
