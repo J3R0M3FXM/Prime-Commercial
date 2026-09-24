@@ -1,15 +1,5 @@
 "use client";
 
-import {
-  init as initTelegramSdk,
-  isLocationManagerSupported,
-  isLocationManagerAccessGranted,
-  isLocationManagerAccessRequested,
-  mountLocationManager,
-  isLocationManagerAvailable,
-  requestLocation as requestTelegramLocation,
-} from "@telegram-apps/sdk";
-
 export interface DeviceData {
   appId: string;
   deviceId: string;
@@ -171,20 +161,37 @@ export interface LocationResult {
  */
 export let telegramSdkInitialized = false;
 
-function ensureTelegramSdkInitialized(): boolean {
-  if (telegramSdkInitialized) return true;
-  if (typeof window === "undefined") return false;
+let telegramSdkModulePromise: Promise<any> | null = null;
 
-  const webApp = (window as any)?.Telegram?.WebApp;
-  if (!webApp) return false;
+async function getTelegramSdkModule(): Promise<any | null> {
+  if (typeof window === "undefined") return null;
+  if (!(window as any)?.Telegram?.WebApp) return null;
+
+  if (!telegramSdkModulePromise) {
+    telegramSdkModulePromise = import("@telegram-apps/sdk")
+      .then((module) => module as any)
+      .catch((error) => {
+        telegramSdkModulePromise = null;
+        console.warn("Telegram Mini App SDK loading failed:", error);
+        return null;
+      });
+  }
+
+  return telegramSdkModulePromise;
+}
+
+async function ensureTelegramSdkInitialized(): Promise<any | null> {
+  const sdk = await getTelegramSdkModule();
+  if (!sdk) return null;
+  if (telegramSdkInitialized) return sdk;
 
   try {
-    initTelegramSdk({ acceptCustomStyles: false });
+    sdk.init({ acceptCustomStyles: false });
     telegramSdkInitialized = true;
-    return true;
+    return sdk;
   } catch (error) {
     console.warn("Telegram Mini App SDK initialization failed:", error);
-    return false;
+    return null;
   }
 }
 
@@ -192,13 +199,16 @@ async function getTelegramSdkLocation(
   timeoutMs: number,
   allowPermissionPrompt: boolean,
 ): Promise<LocationResult | null> {
-  if (!ensureTelegramSdkInitialized()) return null;
+  const sdk = await ensureTelegramSdkInitialized();
+  if (!sdk) return null;
 
   try {
-    if (!isLocationManagerSupported()) return null;
+    if (typeof sdk.isLocationManagerSupported !== "function" || !sdk.isLocationManagerSupported()) {
+      return null;
+    }
 
     await Promise.race([
-      mountLocationManager(),
+      sdk.mountLocationManager(),
       new Promise((_, reject) => {
         window.setTimeout(
           () => reject(new Error("Telegram LocationManager mount timed out")),
@@ -207,11 +217,11 @@ async function getTelegramSdkLocation(
       }),
     ]);
 
-    if (!isLocationManagerAvailable()) {
+    if (!sdk.isLocationManagerAvailable()) {
       return { lat: 0, lon: 0, source: "Unavailable" };
     }
 
-    const accessGranted = isLocationManagerAccessGranted();
+    const accessGranted = sdk.isLocationManagerAccessGranted();
     if (!allowPermissionPrompt && !accessGranted) {
       return { lat: 0, lon: 0, source: "Unavailable" };
     }
@@ -219,12 +229,12 @@ async function getTelegramSdkLocation(
     // requestLocation() uses Telegram's web_app_request_location bridge.
     // Telegram does not show another permission prompt when the Mini App
     // already has an allowed or denied location state.
-    if (isLocationManagerAccessRequested() && !accessGranted && !allowPermissionPrompt) {
+    if (sdk.isLocationManagerAccessRequested() && !accessGranted && !allowPermissionPrompt) {
       return { lat: 0, lon: 0, source: "Unavailable" };
     }
 
     const location = await Promise.race([
-      requestTelegramLocation(),
+      sdk.requestLocation(),
       new Promise<null>((resolve) => {
         window.setTimeout(() => resolve(null), timeoutMs);
       }),
