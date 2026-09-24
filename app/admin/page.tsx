@@ -236,11 +236,37 @@ const ImageUploadField = ({
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        onChange(e.target.result as string);
-      }
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+
+      const img = new Image();
+      img.onload = () => {
+        const sourceSize = Math.min(img.naturalWidth, img.naturalHeight);
+        const sourceX = Math.max(0, (img.naturalWidth - sourceSize) / 2);
+        const sourceY = Math.max(0, (img.naturalHeight - sourceSize) / 2);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = 600;
+        canvas.height = 600;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          setErrorMessage("Unable to process image. Please try another file.");
+          return;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 600, 600);
+
+        const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
+        const quality = outputType === "image/jpeg" ? 0.92 : undefined;
+        onChange(canvas.toDataURL(outputType, quality));
+      };
+      img.onerror = () => setErrorMessage("Unable to read image. Please try another file.");
+      img.src = reader.result;
     };
+    reader.onerror = () => setErrorMessage("Unable to read image. Please try another file.");
     reader.readAsDataURL(file);
   };
 
@@ -275,7 +301,7 @@ const ImageUploadField = ({
         <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest">
           {label}
         </label>
-        <span className="text-[9px] font-mono text-slate-400">Max 10MB</span>
+        <span className="text-[9px] font-mono text-slate-400">600 × 600 PX · 1:1 · MAX 10MB</span>
       </div>
       
       {value ? (
@@ -290,7 +316,7 @@ const ImageUploadField = ({
           />
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider font-mono">Image Selected</p>
-            <p className="text-[9px] text-slate-400 font-mono truncate max-w-[200px]">Base64 Data String</p>
+            <p className="text-[9px] text-slate-400 font-mono truncate max-w-[200px]">Normalized to 600 × 600 px · 1:1</p>
           </div>
           <button
             type="button"
