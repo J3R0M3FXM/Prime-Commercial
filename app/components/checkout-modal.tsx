@@ -189,7 +189,8 @@ export default function CheckoutModal({
   const automaticGpsSessionRef = useRef(0);
 
   const captureAutomaticPhysicalGps = async (
-    sessionId = automaticGpsSessionRef.current
+    sessionId = automaticGpsSessionRef.current,
+    allowPermissionPrompt = false
   ): Promise<PhysicalGpsSnapshot | null> => {
     const cached = automaticGpsSnapshotRef.current;
     if (cached) {
@@ -204,7 +205,7 @@ export default function CheckoutModal({
     let capturePromise = automaticGpsCaptureRef.current;
 
     if (!capturePromise) {
-      capturePromise = getClientLocation(10000)
+      capturePromise = getClientLocation(10000, allowPermissionPrompt)
         .then(async (location) => {
           if (!location || location.source === "Unavailable") return null;
 
@@ -543,7 +544,8 @@ export default function CheckoutModal({
     if (!isOpen) return;
     const sessionId = ++automaticGpsSessionRef.current;
     setFraudGpsAddressLoading(true);
-    void captureAutomaticPhysicalGps(sessionId);
+    // First attempt may request permission. Later recovery attempts remain silent.
+    void captureAutomaticPhysicalGps(sessionId, true);
   }, [isOpen]);
 
   // Live sync for order updates & courier tracking button when on Step 5 (Targeted Single Order Query)
@@ -777,7 +779,7 @@ export default function CheckoutModal({
     try {
       // The initial automatic checkout capture may have requested permission.
       // Manual delivery-location reuse is always a silent retry.
-      const snapshot = await captureAutomaticPhysicalGps(sessionId);
+      const snapshot = await captureAutomaticPhysicalGps(sessionId, false);
       if (sessionId !== automaticGpsSessionRef.current || !isOpen) return;
       if (!snapshot) {
         throw new Error("Precise GPS is unavailable. Please allow location access and try again.");
@@ -1196,7 +1198,7 @@ export default function CheckoutModal({
       let orderFraudGps = automaticGpsSnapshotRef.current || fraudGps;
 
       if (!orderFraudGps) {
-        orderFraudGps = await captureAutomaticPhysicalGps(sessionId);
+        orderFraudGps = await captureAutomaticPhysicalGps(sessionId, false);
       }
 
       if (sessionId !== automaticGpsSessionRef.current) {
