@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
-import { getLatestPhysicalGpsLocation, waitForPhysicalGps } from "./fingerprint-collector";
+import { getClientFingerprint, getLatestPhysicalGpsLocation, waitForPhysicalGps } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import { authenticatedFetch } from "./telegram-auth-client";
 
