@@ -67,7 +67,7 @@ export default function SplashScreen({
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-mono tracking-[0.2em] uppercase mb-1 animate-pulse">
               AUTHENTICATING
             </div>
-            <h1 className="font-heading text-base sm:text-lg font-bold uppercase tracking-wider text-slate-900">
+            <h1 className="font-heading text-base sm:text-lg font-bold uppercase tracking-wider text-slate-900 whitespace-nowrap">
               {title}
             </h1>
             <p
@@ -100,7 +100,7 @@ export default function SplashScreen({
             <div>© 2026 | PRIME HOLDINGS PTY. LTD.</div>
             <div>All Rights Reserved</div>
             <div>DEVELOPED AND MAINTAINED BY</div>
-            <div>@PRIMOYELO</div>
+            <div>P R I M O</div>
           </div>
         </div>
 
