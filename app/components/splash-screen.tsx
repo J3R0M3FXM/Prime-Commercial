@@ -91,7 +91,7 @@ export default function SplashScreen({
             <div>© 2026 | PRIME HOLDINGS PTY. LTD.</div>
             <div>All Rights Reserved</div>
             <div>DEVELOPED AND MAINTAINED BY</div>
-            <div>Codespace Business System Solutions</div>
+            <div>PRIMO</div>
           </div>
         </div>
 
