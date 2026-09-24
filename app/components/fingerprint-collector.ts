@@ -155,7 +155,7 @@ export interface LocationResult {
 
 export async function getClientLocation(
   timeoutMs = 10000,
-  allowPermissionPrompt = true,
+  _allowPermissionPrompt = true,
 ): Promise<LocationResult> {
   if (typeof window === "undefined") {
     return { lat: 0, lon: 0, source: "Unavailable" };
@@ -164,10 +164,10 @@ export async function getClientLocation(
   const webApp = (window as any)?.Telegram?.WebApp;
   const tgLocationManager = webApp?.LocationManager;
 
-  // Telegram Mini Apps: use the native LocationManager as the primary source.
-  // We deliberately do not gate getLocation() on cached permission flags.
-  // Telegram owns the actual permission state and guarantees that an already
-  // allowed/denied Mini App does not receive a repeated permission prompt.
+  // Primary Telegram Mini App path.
+  // Telegram owns the permission state. Do not reject a request just because
+  // cached access flags say something different; getLocation() is the native
+  // source of truth and returns null when access is unavailable.
   if (
     tgLocationManager &&
     typeof tgLocationManager.init === "function" &&
@@ -176,11 +176,14 @@ export async function getClientLocation(
     try {
       const nativeResult = await new Promise<any>((resolve) => {
         let settled = false;
-        let timer: number;
+        let timer: number | null = null;
         let onLocationRequested = (_event: any) => {};
 
         const cleanup = () => {
-          window.clearTimeout(timer);
+          if (timer !== null) {
+            window.clearTimeout(timer);
+            timer = null;
+          }
           try {
             if (typeof webApp.offEvent === "function") {
               webApp.offEvent("locationRequested", onLocationRequested);
@@ -201,16 +204,14 @@ export async function getClientLocation(
           finish(event?.locationData ?? event);
         };
 
-        timer = window.setTimeout(() => {
-          finish(null);
-        }, timeoutMs);
+        timer = window.setTimeout(() => finish(null), timeoutMs);
 
         try {
           if (typeof webApp.onEvent === "function") {
             webApp.onEvent("locationRequested", onLocationRequested);
           }
         } catch {
-          // The getLocation callback below remains the primary completion path.
+          // getLocation callback remains the primary native path.
         }
 
         try {
@@ -249,56 +250,25 @@ export async function getClientLocation(
           source: "Precise GPS",
         };
       }
-
-      // A Telegram LocationManager is present, so do not switch to a second
-      // browser permission channel inside the embedded client.
-      return { lat: 0, lon: 0, source: "Unavailable" };
     } catch (error) {
       console.warn("Telegram native GPS handling failed:", error);
-      return { lat: 0, lon: 0, source: "Unavailable" };
     }
   }
 
+  // Browser/WebView fallback. Do not use navigator.permissions as a hard
+  // prerequisite: embedded Android WebViews can expose a stale "prompt" state
+  // even while the host application already has location access.
   if (!navigator.geolocation) {
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  // Browser fallback only when Telegram native location is unavailable.
-  try {
-    if (navigator.permissions?.query) {
-      const permission = await navigator.permissions.query({
-        name: "geolocation" as PermissionName,
-      });
-      if (
-        permission.state === "denied" ||
-        (!allowPermissionPrompt && permission.state !== "granted")
-      ) {
-        return { lat: 0, lon: 0, source: "Unavailable" };
-      }
-    } else if (!allowPermissionPrompt) {
-      return { lat: 0, lon: 0, source: "Unavailable" };
-    }
-  } catch {
-    if (!allowPermissionPrompt) {
-      return { lat: 0, lon: 0, source: "Unavailable" };
-    }
-  }
-
   return new Promise((resolve) => {
     let settled = false;
-    let watchId: number | null = null;
 
     const finish = (result: LocationResult) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
-      if (watchId !== null) {
-        try {
-          navigator.geolocation.clearWatch(watchId);
-        } catch {
-          // ignore cleanup failures
-        }
-      }
       resolve(result);
     };
 
@@ -307,7 +277,7 @@ export async function getClientLocation(
     }, timeoutMs);
 
     try {
-      watchId = navigator.geolocation.watchPosition(
+      navigator.geolocation.getCurrentPosition(
         (pos) => {
           finish({
             lat: pos.coords.latitude,
