@@ -35,21 +35,30 @@ export default function LiveHeaderClock() {
       if (!timeEl || !secureEl) return;
 
       const targetWidth = timeEl.getBoundingClientRect().width;
-      const secureWidth = secureEl.getBoundingClientRect().width;
-      const textLength = secureEl.textContent?.trim().length || 1;
-      const extraSpacing = Math.max(0, targetWidth - secureWidth) / Math.max(1, textLength - 1);
+      const secureText = secureEl.textContent?.trim() || "";
+      if (!secureText) return;
 
-      setSecureLetterSpacing(`${0.14 + extraSpacing / 16}px`);
+      const probe = secureEl.cloneNode(true) as HTMLDivElement;
+      probe.style.position = "absolute";
+      probe.style.visibility = "hidden";
+      probe.style.pointerEvents = "none";
+      probe.style.width = "max-content";
+      probe.style.display = "inline-block";
+      probe.style.letterSpacing = "0px";
+      document.body.appendChild(probe);
+
+      const naturalWidth = probe.getBoundingClientRect().width;
+      probe.remove();
+
+      const spacingPx = Math.max(0, targetWidth - naturalWidth) / Math.max(1, secureText.length - 1);
+      setSecureLetterSpacing(`${spacingPx}px`);
     };
 
     syncSecureWidth();
     const observer = typeof ResizeObserver !== "undefined"
       ? new ResizeObserver(syncSecureWidth)
       : null;
-    if (observer) {
-      if (timeRef.current) observer.observe(timeRef.current);
-      if (secureRef.current) observer.observe(secureRef.current);
-    }
+    if (observer && timeRef.current) observer.observe(timeRef.current);
     window.addEventListener("resize", syncSecureWidth);
     return () => {
       observer?.disconnect();
@@ -70,10 +79,10 @@ export default function LiveHeaderClock() {
 
   return (
     <div className="flex flex-col justify-center h-7 sm:h-[28px] text-center select-none shrink-0" id="live-clock-container">
-      <div ref={timeRef} className="w-full text-center text-[12.5px] sm:text-[13.5px] font-mono font-bold text-slate-800 tracking-tight leading-none mb-0.5 whitespace-nowrap underline decoration-[1px] underline-offset-2">
+      <div ref={timeRef} className="inline-block text-[12.5px] sm:text-[13.5px] font-mono font-bold text-slate-800 tracking-tight leading-none mb-0.5 whitespace-nowrap underline decoration-[1px] underline-offset-2">
         {timeStr}
       </div>
-      <div ref={secureRef} style={{ letterSpacing: secureLetterSpacing }} className="w-full text-center text-[8.5px] sm:text-[9px] font-mono font-bold text-emerald-600 leading-none whitespace-nowrap">
+      <div ref={secureRef} style={{ letterSpacing: secureLetterSpacing }} className="inline-block text-[8.5px] sm:text-[9px] font-mono font-bold text-emerald-600 leading-none whitespace-nowrap">
         SECURED CUSTOMER ACCESS
       </div>
     </div>
