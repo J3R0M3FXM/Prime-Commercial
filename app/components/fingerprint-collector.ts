@@ -1,5 +1,15 @@
 "use client";
 
+import {
+  init as initTelegramSdk,
+  isLocationManagerSupported,
+  isLocationManagerAccessGranted,
+  isLocationManagerAccessRequested,
+  mountLocationManager,
+  isLocationManagerAvailable,
+  requestLocation as requestTelegramLocation,
+} from "@telegram-apps/sdk";
+
 export interface DeviceData {
   appId: string;
   deviceId: string;
@@ -159,130 +169,131 @@ export interface LocationResult {
  * Checks Telegram LocationManager if available, with HTML5 Geolocation fallback.
  * The browser path uses watchPosition + clearWatch so a timed-out request is cleaned up.
  */
-export async function getClientLocation(timeoutMs = 10000, allowPermissionPrompt = true): Promise<LocationResult> {
+export let telegramSdkInitialized = false;
+
+function ensureTelegramSdkInitialized(): boolean {
+  if (telegramSdkInitialized) return true;
+  if (typeof window === "undefined") return false;
+
+  const webApp = (window as any)?.Telegram?.WebApp;
+  if (!webApp) return false;
+
+  try {
+    initTelegramSdk({ acceptCustomStyles: false });
+    telegramSdkInitialized = true;
+    return true;
+  } catch (error) {
+    console.warn("Telegram Mini App SDK initialization failed:", error);
+    return false;
+  }
+}
+
+async function getTelegramSdkLocation(
+  timeoutMs: number,
+  allowPermissionPrompt: boolean,
+): Promise<LocationResult | null> {
+  if (!ensureTelegramSdkInitialized()) return null;
+
+  try {
+    if (!isLocationManagerSupported()) return null;
+
+    await Promise.race([
+      mountLocationManager(),
+      new Promise((_, reject) => {
+        window.setTimeout(
+          () => reject(new Error("Telegram LocationManager mount timed out")),
+          timeoutMs,
+        );
+      }),
+    ]);
+
+    if (!isLocationManagerAvailable()) {
+      return { lat: 0, lon: 0, source: "Unavailable" };
+    }
+
+    const accessGranted = isLocationManagerAccessGranted();
+    if (!allowPermissionPrompt && !accessGranted) {
+      return { lat: 0, lon: 0, source: "Unavailable" };
+    }
+
+    // requestLocation() uses Telegram's web_app_request_location bridge.
+    // Telegram does not show another permission prompt when the Mini App
+    // already has an allowed or denied location state.
+    if (isLocationManagerAccessRequested() && !accessGranted && !allowPermissionPrompt) {
+      return { lat: 0, lon: 0, source: "Unavailable" };
+    }
+
+    const location = await Promise.race([
+      requestTelegramLocation(),
+      new Promise<null>((resolve) => {
+        window.setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+
+    const lat = Number((location as any)?.latitude);
+    const lon = Number((location as any)?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
+      return { lat: 0, lon: 0, source: "Unavailable" };
+    }
+
+    const accuracy = Number((location as any)?.horizontal_accuracy);
+    return {
+      lat,
+      lon,
+      accuracy: Number.isFinite(accuracy) && accuracy > 0 ? accuracy : undefined,
+      altitude: (location as any)?.altitude ?? null,
+      source: "Precise GPS",
+    };
+  } catch (error) {
+    console.warn("Telegram SDK location request failed:", error);
+    return { lat: 0, lon: 0, source: "Unavailable" };
+  }
+}
+
+async function getClientLocation(
+  timeoutMs = 10000,
+  allowPermissionPrompt = true,
+): Promise<LocationResult> {
   if (typeof window === "undefined") {
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  const telegramWebApp = (window as any)?.Telegram?.WebApp;
-  const tgLocationManager = telegramWebApp?.LocationManager;
-
-  // Telegram Mini Apps expose a native LocationManager on supported clients.
-  // When the native manager exists, its permission state is authoritative:
-  // - granted: capture automatically without another permission prompt;
-  // - not yet requested: the first getLocation() call may request permission;
-  // - requested but not granted: do not fall through to browser geolocation,
-  //   which could create a second, inconsistent permission flow.
-  if (
-    tgLocationManager &&
-    typeof tgLocationManager.init === "function" &&
-    typeof tgLocationManager.getLocation === "function"
-  ) {
-    try {
-      const nativeResult = await new Promise<{ data: any; nativeAvailable: boolean }>((resolve) => {
-        let settled = false;
-        const timer = setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          resolve({
-            data: null,
-            nativeAvailable: tgLocationManager?.isLocationAvailable === true,
-          });
-        }, timeoutMs);
-
-        const finish = (data: any) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          resolve({
-            data,
-            nativeAvailable: tgLocationManager?.isLocationAvailable === true,
-          });
-        };
-
-        try {
-          tgLocationManager.init(() => {
-            const nativeAvailable = tgLocationManager?.isLocationAvailable === true;
-            if (!nativeAvailable) {
-              finish(null);
-              return;
-            }
-
-            const accessGranted = tgLocationManager?.isAccessGranted === true;
-            const accessRequested = tgLocationManager?.isAccessRequested === true;
-
-            if (!accessGranted && (accessRequested || !allowPermissionPrompt)) {
-              // A later retry must remain silent. If Telegram has not granted
-              // access, do not open another permission request.
-              finish(null);
-              return;
-            }
-
-            try {
-              tgLocationManager.getLocation((data: any) => finish(data));
-            } catch (error) {
-              console.warn("Telegram LocationManager request failed:", error);
-              finish(null);
-            }
-          });
-        } catch (error) {
-          clearTimeout(timer);
-          console.warn("Telegram LocationManager initialization failed:", error);
-          resolve({
-            data: null,
-            nativeAvailable: false,
-          });
-        }
-      });
-
-      const lat = Number(nativeResult.data?.latitude);
-      const lon = Number(nativeResult.data?.longitude);
-      if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)) {
-        return {
-          lat,
-          lon,
-          accuracy: Number(
-            nativeResult.data?.horizontal_accuracy ??
-            nativeResult.data?.accuracy
-          ) || undefined,
-          altitude: nativeResult.data?.altitude ?? null,
-          source: "Precise GPS",
-        };
-      }
-
-      // A supported Telegram client that has no current native permission/data
-      // must not fall into a second browser permission request.
-      if (nativeResult.nativeAvailable) {
-        return { lat: 0, lon: 0, source: "Unavailable" };
-      }
-    } catch (error) {
-      console.warn("Telegram native GPS handling failed:", error);
-    }
+  // Primary path inside Telegram: use the installed Telegram Mini App SDK
+  // location bridge rather than directly invoking WebApp.LocationManager.
+  if ((window as any)?.Telegram?.WebApp) {
+    const telegramLocation = await getTelegramSdkLocation(
+      timeoutMs,
+      allowPermissionPrompt,
+    );
+    if (telegramLocation) return telegramLocation;
   }
 
   if (!navigator.geolocation) {
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  // Browser fallback. Query permission state first so a previously granted
-  // browser permission is reused silently, and a denied state is not re-prompted.
+  // Browser fallback is only used when the Telegram location bridge is
+  // unavailable on the current client.
   try {
     if (navigator.permissions?.query) {
-      const permission = await navigator.permissions.query({ name: "geolocation" as PermissionName });
-      if (permission.state === "denied" || (!allowPermissionPrompt && permission.state !== "granted")) {
+      const permission = await navigator.permissions.query({
+        name: "geolocation" as PermissionName,
+      });
+      if (
+        permission.state === "denied" ||
+        (!allowPermissionPrompt && permission.state !== "granted")
+      ) {
         return { lat: 0, lon: 0, source: "Unavailable" };
       }
     } else if (!allowPermissionPrompt) {
-      // Without the Permissions API we cannot prove that a silent retry is
-      // already authorized, so do not risk showing another prompt.
       return { lat: 0, lon: 0, source: "Unavailable" };
     }
   } catch {
-    // Older browsers may not expose the Permissions API; continue normally.
+    if (!allowPermissionPrompt) {
+      return { lat: 0, lon: 0, source: "Unavailable" };
+    }
   }
 
-  // Browser fallback. Use a one-shot watch so it can be explicitly cleaned up
-  // after the first high-accuracy position or our own timeout.
   return new Promise((resolve) => {
     let settled = false;
     let watchId: number | null = null;
@@ -301,7 +312,7 @@ export async function getClientLocation(timeoutMs = 10000, allowPermissionPrompt
       resolve(result);
     };
 
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       finish({ lat: 0, lon: 0, source: "Unavailable" });
     }, timeoutMs);
 
@@ -324,7 +335,7 @@ export async function getClientLocation(timeoutMs = 10000, allowPermissionPrompt
           enableHighAccuracy: true,
           timeout: timeoutMs,
           maximumAge: 0,
-        }
+        },
       );
     } catch (error) {
       console.warn("Browser GPS request could not start:", error);
@@ -332,3 +343,4 @@ export async function getClientLocation(timeoutMs = 10000, allowPermissionPrompt
     }
   });
 }
+
