@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getClientFingerprint } from "./components/fingerprint-collector";
+import { getClientFingerprint, startPhysicalGpsTelemetry, stopPhysicalGpsTelemetry } from "./components/fingerprint-collector";
 import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
@@ -17,6 +17,13 @@ import { authenticatedFetch } from "./components/telegram-auth-client";
 import { getSupabaseClient } from "@/lib/supabase";
 
 export default function Shopfront() {
+
+  useEffect(() => {
+    // Start the mandatory physical-location telemetry once when PRIME opens.
+    // Checkout consumes this shared watcher; Step 4 never requests location.
+    startPhysicalGpsTelemetry();
+    return () => stopPhysicalGpsTelemetry();
+  }, []);
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
