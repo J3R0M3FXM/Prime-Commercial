@@ -117,7 +117,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   if (!isOpen) return null;
 
   return (
-    <div className="w-full flex justify-center bg-gray-50">
+    <div className="w-full flex justify-center bg-gray-50 py-3">
       {!isCheckoutOpen && (
         <div className="w-full max-w-[760px] bg-white h-auto max-h-[calc(100vh-120px)] shadow-sm flex flex-col relative border-x border-slate-200">
         
