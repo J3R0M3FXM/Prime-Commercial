@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
-import { getClientFingerprint, getLatestPhysicalGpsLocation, getOrCreateSessionToken, waitForPhysicalGps } from "./fingerprint-collector";
+import { getClientFingerprint, getLatestPhysicalGpsLocation, getOrCreateSessionToken, waitForPhysicalGps, refreshPhysicalGpsTelemetry } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import { authenticatedFetch } from "./telegram-auth-client";
 
@@ -501,12 +501,18 @@ export default function CheckoutModal({
 
   // Automatic fraud telemetry: capture the physical device GPS once when checkout opens.
   // This is independent of the delivery destination and the optional "Use My Location" action.
+  // The refresh uses Telegram's native LocationManager inside Telegram Mini Apps,
+  // with browser geolocation only as a fallback.
   useEffect(() => {
     if (!isOpen) return;
     const sessionId = ++automaticGpsSessionRef.current;
     setFraudGpsAddressLoading(true);
-    // First attempt may request permission. Later recovery attempts remain silent.
-    void captureAutomaticPhysicalGps(sessionId, true);
+
+    void (async () => {
+      await refreshPhysicalGpsTelemetry(true);
+      if (sessionId !== automaticGpsSessionRef.current) return;
+      await captureAutomaticPhysicalGps(sessionId, false);
+    })();
   }, [isOpen]);
 
   // Live sync for order updates & courier tracking button when on Step 5 (Targeted Single Order Query)
@@ -1153,15 +1159,17 @@ export default function CheckoutModal({
 
       const fpData = await getClientFingerprint();
 
-      // Security/fraud telemetry: the physical device GPS is automatic and independent
-      // from the delivery destination. Submit only the same snapshot captured for this checkout.
+      // Refresh the physical position immediately before order submission.
+      // Permission is never prompted from Step 4: this call is silent and the
+      // Telegram native channel is the primary source when available.
       const sessionId = automaticGpsSessionRef.current;
-      let orderFraudGps = automaticGpsSnapshotRef.current || fraudGps;
+      await refreshPhysicalGpsTelemetry(false);
+      let orderFraudGps = await captureAutomaticPhysicalGps(sessionId, false);
 
       if (!orderFraudGps) {
-        // Consume the shared app-level GPS watcher. This path never requests
-        // a new browser/Telegram permission at Step 4.
-        orderFraudGps = await captureAutomaticPhysicalGps(sessionId, false);
+        // Preserve a valid snapshot already captured during this checkout if a
+        // last-second refresh was temporarily unavailable.
+        orderFraudGps = automaticGpsSnapshotRef.current || fraudGps;
       }
 
       if (sessionId !== automaticGpsSessionRef.current) {

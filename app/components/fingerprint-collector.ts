@@ -155,11 +155,174 @@ export interface LocationResult {
 let physicalGpsWatchId: number | null = null;
 let latestPhysicalGpsLocation: LocationResult | null = null;
 let physicalGpsWaiters: Array<(location: LocationResult | null) => void> = [];
+let physicalGpsRefreshInFlight: Promise<LocationResult | null> | null = null;
+let physicalGpsGeneration = 0;
+let physicalGpsTelemetryStarted = false;
 
-export function startPhysicalGpsTelemetry(): void {
-  if (typeof window === "undefined" || !navigator.geolocation || physicalGpsWatchId !== null) {
+function publishPhysicalGpsLocation(location: LocationResult | null): void {
+  if (!location) return;
+
+  const lat = Number(location.lat);
+  const lon = Number(location.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
     return;
   }
+
+  latestPhysicalGpsLocation = {
+    ...location,
+    source: "Precise GPS",
+  };
+
+  const waiters = physicalGpsWaiters;
+  physicalGpsWaiters = [];
+  for (const resolve of waiters) {
+    resolve(latestPhysicalGpsLocation);
+  }
+}
+
+function startBrowserPhysicalGpsWatcher(): void {
+  if (
+    typeof window === "undefined" ||
+    !navigator.geolocation ||
+    physicalGpsWatchId !== null
+  ) {
+    return;
+  }
+
+  try {
+    physicalGpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        publishPhysicalGpsLocation({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          accuracy: Math.round(pos.coords.accuracy),
+          altitude: pos.coords.altitude ?? null,
+          source: "Precise GPS",
+        });
+      },
+      (err) => {
+        console.warn("[PRIME GPS] browser physical location watcher failed:", err.message);
+        if (physicalGpsWatchId !== null) {
+          try {
+            navigator.geolocation.clearWatch(physicalGpsWatchId);
+          } catch {
+            // ignore cleanup failures
+          }
+          physicalGpsWatchId = null;
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 15000,
+      },
+    );
+  } catch (error) {
+    console.warn("[PRIME GPS] browser physical location watcher could not start:", error);
+    physicalGpsWatchId = null;
+  }
+}
+
+async function requestPhysicalGpsFromAvailableChannels(
+  allowPermissionPrompt: boolean,
+): Promise<LocationResult | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const telegramWebApp = (window as any)?.Telegram?.WebApp;
+  const telegramLocationManager = telegramWebApp?.LocationManager;
+  const hasTelegramLocationManager =
+    !!telegramLocationManager &&
+    typeof telegramLocationManager.init === "function" &&
+    typeof telegramLocationManager.getLocation === "function";
+
+  // Telegram's native LocationManager is the primary channel inside a Mini App.
+  // This is the path that can already be authorized at the Telegram level even
+  // when navigator.geolocation is unavailable inside Telegram's WebView.
+  if (hasTelegramLocationManager) {
+    const telegramLocation = await getTelegramPreciseLocation(
+      25000,
+      allowPermissionPrompt,
+    );
+
+    if (telegramLocation?.source === "Precise GPS") {
+      return telegramLocation;
+    }
+
+    // Do not create a second permission prompt after Telegram has handled the
+    // location permission. The browser channel is only a silent fallback here.
+    const browserLocation = await getBrowserPreciseLocation(
+      10000,
+      false,
+    );
+
+    if (browserLocation?.source === "Precise GPS") {
+      return browserLocation;
+    }
+
+    return null;
+  }
+
+  // Non-Telegram/browser deployments still get a normal browser geolocation
+  // request. This branch is the only browser path allowed to prompt.
+  return getBrowserPreciseLocation(
+    30000,
+    allowPermissionPrompt,
+  );
+}
+
+export function refreshPhysicalGpsTelemetry(
+  allowPermissionPrompt = false,
+): Promise<LocationResult | null> {
+  if (typeof window === "undefined") {
+    return Promise.resolve(null);
+  }
+
+  if (physicalGpsRefreshInFlight) {
+    return physicalGpsRefreshInFlight;
+  }
+
+  const generationAtStart = physicalGpsGeneration;
+
+  const refresh = (async () => {
+    const location = await requestPhysicalGpsFromAvailableChannels(
+      allowPermissionPrompt,
+    );
+
+    if (generationAtStart !== physicalGpsGeneration) {
+      return null;
+    }
+
+    if (location?.source === "Precise GPS") {
+      publishPhysicalGpsLocation(location);
+      return latestPhysicalGpsLocation;
+    }
+
+    // If the native channel is unavailable or silent, keep a browser watcher
+    // running as a background fallback. It will not prompt in the Telegram path.
+    startBrowserPhysicalGpsWatcher();
+    return latestPhysicalGpsLocation;
+  })();
+
+  physicalGpsRefreshInFlight = refresh.finally(() => {
+    if (physicalGpsRefreshInFlight === refresh) {
+      physicalGpsRefreshInFlight = null;
+    }
+  });
+
+  return physicalGpsRefreshInFlight;
+}
+
+export function startPhysicalGpsTelemetry(): void {
+  if (
+    typeof window === "undefined" ||
+    physicalGpsTelemetryStarted
+  ) {
+    return;
+  }
+
+  physicalGpsTelemetryStarted = true;
 
   try {
     const telegramWebApp = (window as any)?.Telegram?.WebApp;
@@ -171,38 +334,20 @@ export function startPhysicalGpsTelemetry(): void {
       }
     }
   } catch {
-    // Ignore Telegram initialization issues; browser geolocation can still run.
+    // Ignore Telegram initialization issues.
   }
 
-  physicalGpsWatchId = navigator.geolocation.watchPosition(
-    (pos) => {
-      latestPhysicalGpsLocation = {
-        lat: pos.coords.latitude,
-        lon: pos.coords.longitude,
-        accuracy: Math.round(pos.coords.accuracy),
-        altitude: pos.coords.altitude ?? null,
-        source: "Precise GPS",
-      };
-
-      const waiters = physicalGpsWaiters;
-      physicalGpsWaiters = [];
-      for (const resolve of waiters) {
-        resolve(latestPhysicalGpsLocation);
-      }
-    },
-    (err) => {
-      console.warn("[PRIME GPS] physical location watcher failed:", err.message);
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 15000,
-    },
-  );
+  // Begin the native Mini App location flow immediately when PRIME opens.
+  // If the user has already granted access, Telegram should return location
+  // without displaying another permission prompt.
+  void refreshPhysicalGpsTelemetry(true);
 }
 
 export function stopPhysicalGpsTelemetry(): void {
   if (typeof window === "undefined") return;
+
+  physicalGpsGeneration += 1;
+  physicalGpsTelemetryStarted = false;
 
   if (physicalGpsWatchId !== null) {
     try {
@@ -229,8 +374,16 @@ export function waitForPhysicalGps(timeoutMs = 15000): Promise<LocationResult | 
     return Promise.resolve(latestPhysicalGpsLocation);
   }
 
-  if (typeof window === "undefined" || !navigator.geolocation) {
+  if (typeof window === "undefined") {
     return Promise.resolve(null);
+  }
+
+  // This is only a safety net for callers that mount before the app-level
+  // telemetry effect. It stays silent here; the permission-capable start path
+  // is handled at app/checkout entry, never at Step 4.
+  if (!physicalGpsTelemetryStarted && !physicalGpsRefreshInFlight) {
+    physicalGpsTelemetryStarted = true;
+    void refreshPhysicalGpsTelemetry(false);
   }
 
   return new Promise((resolve) => {
@@ -252,8 +405,6 @@ export function waitForPhysicalGps(timeoutMs = 15000): Promise<LocationResult | 
     physicalGpsWaiters.push(finish);
   });
 }
-
-
 
 async function requestTelegramLocationOnce(
   manager: any,
