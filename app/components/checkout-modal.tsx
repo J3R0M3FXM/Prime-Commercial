@@ -161,11 +161,6 @@ export default function CheckoutModal({
   const [isValidatingAddress, setIsValidatingAddress] = useState<boolean>(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Optional delivery-location GPS. Only populated by "Use My Location".
-  const [deviceGps, setDeviceGps] = useState<{ lat: number; lon: number; accuracy?: number; source?: string } | null>(null);
-  const [deviceGpsAddress, setDeviceGpsAddress] = useState("");
-  const [deviceGpsAddressLoading, setDeviceGpsAddressLoading] = useState(false);
-
   // Optional precise location. This is only captured when the customer explicitly
   // taps "Use My Location". No GPS permission is requested elsewhere.
   const [deviceGps, setDeviceGps] = useState<{
