@@ -87,11 +87,11 @@ export default function SplashScreen({
             />
           </div>
 
-          <div className="text-center font-mono uppercase tracking-[0.14em] text-[8px] sm:text-[9px] leading-relaxed text-slate-400">
+          <div className="text-center font-mono uppercase tracking-[0.14em] text-[9.5px] sm:text-[10.5px] leading-relaxed text-slate-500">
             <div>© 2026 | PRIME HOLDINGS PTY. LTD.</div>
             <div>All Rights Reserved</div>
             <div>DEVELOPED AND MAINTAINED BY</div>
-            <div>Codespace Business System Solutions</div>
+            <div>PRIMO</div>
           </div>
         </div>
 
