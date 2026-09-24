@@ -23,56 +23,65 @@ export default function SplashScreen({
         
         {/* Top Section: Animation + Title/Subtitle */}
         <div className="flex flex-col items-center justify-center pt-4">
-          {/* Moving / Pulsing Concentric Loading Circles & Mobile Device */}
+          {/* Four-circle configuration animation + static mobile device */}
           <div className="relative w-44 h-44 sm:w-52 sm:h-52 flex items-center justify-center mb-6">
-            {/* Outer Ring 1 - Rotating clockwise */}
-            <div className="absolute inset-0 rounded-full border border-sky-500/20 animate-[spin_10s_linear_infinite]" />
-            {/* Outer Ring 2 - Rotating counter-clockwise with dash */}
-            <div className="absolute inset-2 rounded-full border-2 border-dashed border-indigo-500/30 animate-[spin_15s_linear_infinite_reverse]" />
-            {/* Middle Pulse Ring */}
-            <div className="absolute inset-6 rounded-full bg-gradient-to-tr from-sky-400/15 via-indigo-400/15 to-purple-400/15 animate-pulse blur-sm" />
-            {/* Inner Ring 3 */}
-            <div className="absolute inset-10 rounded-full border border-sky-500/40 animate-[spin_8s_linear_infinite]" />
-            
-            {/* Center Mobile Device Container with Floating Animation */}
-            <div className="relative z-10 w-16 h-28 sm:w-20 sm:h-36 bg-slate-900 border-2 border-sky-400/80 rounded-2xl shadow-xl shadow-sky-500/20 flex flex-col items-center p-2 animate-[bounce_3s_ease-in-out_infinite]">
+            <div
+              className="absolute w-40 h-40 sm:w-48 sm:h-48 rounded-full border border-sky-500/20 animate-pulse"
+              style={{ animationDelay: "0s" }}
+            />
+            <div
+              className="absolute w-32 h-32 sm:w-40 sm:h-40 rounded-full border-2 border-indigo-500/25 animate-pulse"
+              style={{ animationDelay: "0.25s" }}
+            />
+            <div
+              className="absolute w-24 h-24 sm:w-32 sm:h-32 rounded-full border border-violet-500/30 animate-pulse"
+              style={{ animationDelay: "0.5s" }}
+            />
+            <div
+              className="absolute w-16 h-16 sm:w-24 sm:h-24 rounded-full border-2 border-sky-500/35 animate-pulse"
+              style={{ animationDelay: "0.75s" }}
+            />
+
+            {/* Center Mobile Device Container — static */}
+            <div className="relative z-10 w-16 h-28 sm:w-20 sm:h-36 bg-slate-900 border-2 border-sky-400/80 rounded-2xl shadow-xl shadow-sky-500/20 flex flex-col items-center p-2">
               {/* Speaker / Notch */}
               <div className="w-5 h-1 bg-slate-700 rounded-full mb-1.5" />
-              
+
               {/* Screen Content */}
               <div className="flex-1 w-full bg-slate-950 rounded-lg flex flex-col items-center justify-center p-1 overflow-hidden relative">
-                <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-sky-400 to-transparent animate-[pulse_1.5s_ease-in-out_infinite]" />
+                <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-sky-400 to-transparent animate-pulse" />
                 <div className="w-7 h-7 rounded-full bg-sky-500/20 flex items-center justify-center mb-1 border border-sky-400/40">
-                  <Smartphone className="w-3.5 h-3.5 text-sky-400 animate-pulse" />
+                  <Smartphone className="w-3.5 h-3.5 text-sky-400" />
                 </div>
                 <div className="w-8 h-1 bg-sky-400/80 rounded-full mb-1 animate-pulse" />
                 <div className="w-5 h-1 bg-slate-700 rounded-full" />
               </div>
-              
+
               {/* Home indicator bar */}
               <div className="w-6 h-0.5 bg-slate-600 rounded-full mt-1.5" />
-            </div>
-
-            {/* Orbiting particle dots */}
-            <div className="absolute inset-0 animate-[spin_6s_linear_infinite]">
-              <div className="w-2.5 h-2.5 bg-sky-500 rounded-full shadow-[0_0_10px_#0ea5e9] absolute -top-1 left-1/2 -translate-x-1/2" />
-            </div>
-            <div className="absolute inset-0 animate-[spin_9s_linear_infinite_reverse]">
-              <div className="w-2 h-2 bg-indigo-500 rounded-full shadow-[0_0_8px_#6366f1] absolute bottom-0 left-1/4" />
             </div>
           </div>
 
           {/* Branding & Title */}
           <div className="text-center space-y-1.5 z-10 px-4">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-600 text-[10px] font-mono tracking-[0.2em] uppercase mb-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
-              SECURE TELEGRAM GATEWAY
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-mono tracking-[0.2em] uppercase mb-1 animate-pulse">
+              AUTHENTICATING
             </div>
             <h1 className="font-heading text-base sm:text-lg font-bold uppercase tracking-wider text-slate-900">
               {title}
             </h1>
-            <p className="font-mono text-[11px] text-slate-500 tracking-wider">
-              {subtitle}
+            <p
+              className="font-mono text-[11px] text-slate-500 tracking-wider"
+              aria-label={subtitle}
+            >
+              {subtitle.replace(/\.\.\.$/, "")}
+              {subtitle.endsWith("...") && (
+                <>
+                  <span className="animate-pulse" style={{ animationDelay: "0s" }}>.</span>
+                  <span className="animate-pulse" style={{ animationDelay: "0.3s" }}>.</span>
+                  <span className="animate-pulse" style={{ animationDelay: "0.6s" }}>.</span>
+                </>
+              )}
             </p>
           </div>
         </div>
