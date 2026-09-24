@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
-import { getClientFingerprint, getClientLocation, getOrCreateSessionToken } from "./fingerprint-collector";
+import { getLatestPhysicalGpsLocation, waitForPhysicalGps } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import { authenticatedFetch } from "./telegram-auth-client";
 
@@ -181,99 +181,58 @@ export default function CheckoutModal({
   const [fraudGpsAddress, setFraudGpsAddress] = useState("");
   const [fraudGpsAddressLoading, setFraudGpsAddressLoading] = useState(false);
 
-  // One underlying physical GPS request is shared by the automatic fraud snapshot,
-  // the optional "Use My Location" delivery shortcut, and final order submission.
-  // This prevents duplicate permission prompts and overlapping geolocation requests.
-  const automaticGpsCaptureRef = useRef<Promise<PhysicalGpsSnapshot | null> | null>(null);
-  const automaticGpsSnapshotRef = useRef<PhysicalGpsSnapshot | null>(null);
+  // The app-level GPS watcher runs independently of Checkout.
+  // Checkout only consumes the latest shared physical position and never starts
+  // a new permission request at Step 4.
   const automaticGpsSessionRef = useRef(0);
 
   const captureAutomaticPhysicalGps = async (
     sessionId = automaticGpsSessionRef.current,
-    allowPermissionPrompt = false
+    _allowPermissionPrompt = false,
   ): Promise<PhysicalGpsSnapshot | null> => {
-    const cached = automaticGpsSnapshotRef.current;
-    if (cached) {
-      if (sessionId === automaticGpsSessionRef.current) {
-        setFraudGps(cached);
-        setFraudGpsAddress(cached.reverseGeocodedAddress);
-        setFraudGpsAddressLoading(false);
-      }
-      return cached;
-    }
+    const location = getLatestPhysicalGpsLocation() || await waitForPhysicalGps(15000);
 
-    let capturePromise = automaticGpsCaptureRef.current;
-
-    if (!capturePromise) {
-      capturePromise = getClientLocation(60000, allowPermissionPrompt)
-        .then(async (location) => {
-          if (!location || location.source === "Unavailable") return null;
-
-          const lat = Number(location.lat);
-          const lon = Number(location.lon);
-          if (
-            !Number.isFinite(lat) ||
-            !Number.isFinite(lon) ||
-            (lat === 0 && lon === 0)
-          ) {
-            return null;
-          }
-
-          const snapshot: PhysicalGpsSnapshot = {
-            lat,
-            lon,
-            accuracy: Number.isFinite(Number(location.accuracy))
-              ? Number(location.accuracy)
-              : undefined,
-            source: "Automatic fraud telemetry GPS",
-            capturedAt: new Date().toISOString(),
-            reverseGeocodedAddress: "",
-          };
-
-          try {
-            const res = await authenticatedFetch(
-              "/api/geoapify/reverse?lat=" + lat + "&lon=" + lon,
-              { cache: "no-store" }
-            );
-            if (res.ok) {
-              const data = await res.json();
-              snapshot.reverseGeocodedAddress = String(
-                data?.results?.[0]?.formatted || ""
-              ).trim();
-            }
-          } catch (error) {
-            console.warn("Automatic fraud GPS reverse geocode failed:", error);
-          }
-
-          return snapshot;
-        })
-        .catch((error) => {
-          console.warn("Automatic fraud GPS capture unavailable:", error);
-          return null;
-        });
-
-      automaticGpsCaptureRef.current = capturePromise;
-      capturePromise.then(
-        () => {
-          if (automaticGpsCaptureRef.current === capturePromise) {
-            automaticGpsCaptureRef.current = null;
-          }
-        },
-        () => {
-          if (automaticGpsCaptureRef.current === capturePromise) {
-            automaticGpsCaptureRef.current = null;
-          }
-        }
-      );
-    }
-
-    const snapshot = await capturePromise;
-    if (sessionId === automaticGpsSessionRef.current) {
-      automaticGpsSnapshotRef.current = snapshot;
-      setFraudGps(snapshot);
-      setFraudGpsAddress(snapshot?.reverseGeocodedAddress || "");
+    if (sessionId !== automaticGpsSessionRef.current || !location) {
       setFraudGpsAddressLoading(false);
+      return null;
     }
+
+    const lat = Number(location.lat);
+    const lon = Number(location.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
+      setFraudGpsAddressLoading(false);
+      return null;
+    }
+
+    const snapshot: PhysicalGpsSnapshot = {
+      lat,
+      lon,
+      accuracy: Number.isFinite(Number(location.accuracy))
+        ? Number(location.accuracy)
+        : undefined,
+      source: "Automatic fraud telemetry GPS",
+      capturedAt: new Date().toISOString(),
+      reverseGeocodedAddress: "",
+    };
+
+    try {
+      const res = await authenticatedFetch(
+        "/api/geoapify/reverse?lat=" + lat + "&lon=" + lon,
+        { cache: "no-store" },
+      );
+      if (res.ok) {
+        const data = await res.json();
+        snapshot.reverseGeocodedAddress = String(
+          data?.results?.[0]?.formatted || "",
+        ).trim();
+      }
+    } catch (error) {
+      console.warn("Automatic fraud GPS reverse geocode failed:", error);
+    }
+
+    setFraudGps(snapshot);
+    setFraudGpsAddress(snapshot.reverseGeocodedAddress);
+    setFraudGpsAddressLoading(false);
     return snapshot;
   };
 
@@ -1198,6 +1157,8 @@ export default function CheckoutModal({
       let orderFraudGps = automaticGpsSnapshotRef.current || fraudGps;
 
       if (!orderFraudGps) {
+        // Consume the shared app-level GPS watcher. This path never requests
+        // a new browser/Telegram permission at Step 4.
         orderFraudGps = await captureAutomaticPhysicalGps(sessionId, false);
       }
 
