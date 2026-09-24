@@ -7,7 +7,6 @@ import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
 import AccountModal from "./components/account-modal";
-import VideoGalleryModal from "./components/video-gallery-modal";
 import { useCart } from "./components/cart-context";
 import LiveHeaderClock from "./components/live-header-clock";
 import SplashScreen from "./components/splash-screen";
@@ -32,7 +31,6 @@ export default function Shopfront() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [isVideoGalleryOpen, setIsVideoGalleryOpen] = useState(false);
   const [initialOrderIdFromLink, setInitialOrderIdFromLink] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("shop");
 
@@ -154,11 +152,10 @@ export default function Shopfront() {
           throw new Error("Valid Telegram WebApp session is required. Open PRIME from Telegram.");
         }
 
-        // Media routing may use Telegram start_param, but referral codes are never
-        // written into customer referral state automatically.
+        // Media is temporarily locked while database, storage, and security setup is completed.
+        // Keep the deep-link from opening the unavailable Media vault.
         if (telegramWebApp.initDataUnsafe?.start_param === "media") {
-          setIsVideoGalleryOpen(true);
-          setActiveTab("media");
+          setActiveTab("shop");
         }
 
         const fingerprintData = await getClientFingerprint();
