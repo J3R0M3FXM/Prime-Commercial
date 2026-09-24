@@ -575,7 +575,7 @@ export default function OrderHistoryModal({
         </div>
 
         {/* ================= MODAL BODY ================= */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+        <div className="p-3 sm:p-3.5 overflow-y-auto flex-1 space-y-4">
           {/* ----------------- VIEW 1: COMPACT ORDER LIST ----------------- */}
           {!selectedOrderId ? (
             <div className="space-y-4">
