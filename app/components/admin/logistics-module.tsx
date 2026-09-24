@@ -409,11 +409,6 @@ export default function LogisticsModule() {
               <p className="text-xs font-mono text-slate-500 mt-1">Manage physical locations where deliveries originate.</p>
             </div>
             <button type="button"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                resetWarehouseForm();
-                setShowWarehouseModal(true);
-              }}
               onClick={() => {
                 resetWarehouseForm();
                 setShowWarehouseModal(true);
@@ -464,9 +459,7 @@ export default function LogisticsModule() {
                   
                   <div className="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button type="button"
-              onPointerDown={(e) => {
-                        e.preventDefault();
-                        setEditingWarehouse(wh);
+              setEditingWarehouse(wh);
                         setWhName(wh.name);
                         setWhAddress(wh.address);
                         setWhLat(wh.lat);
@@ -512,9 +505,7 @@ export default function LogisticsModule() {
               <p className="text-xs font-mono text-slate-500 mt-1">Configure logistics partners and delivery fee calculators.</p>
             </div>
             <button type="button"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                resetCourierForm();
+              resetCourierForm();
                 setShowCourierModal(true);
               }}
               onClick={() => {
@@ -593,9 +584,7 @@ export default function LogisticsModule() {
                   
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button type="button"
-              onPointerDown={(e) => {
-                        e.preventDefault();
-                        setEditingCourier(courier);
+              setEditingCourier(courier);
                         setCourierName(courier.name);
                         setCourierLogo(courier.logo || "");
                         setCourierType(courier.type);
