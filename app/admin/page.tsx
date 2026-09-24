@@ -88,7 +88,6 @@ import ShareOrderModal from "@/app/components/admin/share-order-modal";
 import { StaticOrderMap } from "@/app/components/static-order-map";
 import dynamic from 'next/dynamic';
 import AutomationModule from '@/app/components/admin/automation-module';
-import LogisticsModule from "@/app/components/admin/logistics-module";
 import {
   AdminBadge,
   AdminPageHeader,
@@ -97,6 +96,11 @@ import {
   AdminSurface,
   AdminTopbar,
 } from '@/app/components/admin/admin-ui';
+
+const LogisticsModule = dynamic(() => import('@/app/components/admin/logistics-module'), {
+  ssr: false,
+  loading: () => <div className="p-3 text-center text-slate-500 font-mono text-sm">Loading Logistics...</div>
+});
 
 const ChargesModule = dynamic(() => import('@/app/components/admin/charges-module'), { ssr: false });
 
