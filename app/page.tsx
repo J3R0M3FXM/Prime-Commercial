@@ -549,7 +549,7 @@ export default function Shopfront() {
       {activeTab === "media" && (
         <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
           <section
-            className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-5 sm:p-8 flex items-center justify-center"
+            className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-3 sm:p-3.5 flex items-center justify-center"
             aria-label="Media availability announcement"
           >
             <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center shadow-sm">
