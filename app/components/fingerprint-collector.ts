@@ -153,6 +153,101 @@ export interface LocationResult {
   source: "Precise GPS" | "Approximate Location" | "Unavailable";
 }
 
+async function getTelegramPreciseLocation(
+  timeoutMs: number,
+  allowPermissionPrompt: boolean,
+): Promise<LocationResult | null> {
+  const webApp = (window as any)?.Telegram?.WebApp;
+  const manager = webApp?.LocationManager;
+
+  if (
+    !webApp ||
+    !manager ||
+    typeof manager.init !== "function" ||
+    typeof manager.getLocation !== "function"
+  ) {
+    return null;
+  }
+
+  try {
+    if (typeof webApp.ready === "function") {
+      try {
+        webApp.ready();
+      } catch {
+        // Best effort.
+      }
+    }
+
+    await new Promise<void>((resolve) => {
+      if (manager.isInited === true) {
+        resolve();
+        return;
+      }
+
+      let settled = false;
+      const timer = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      }, 5000);
+
+      try {
+        manager.init(() => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timer);
+          resolve();
+        });
+      } catch (error) {
+        window.clearTimeout(timer);
+        console.warn("Telegram LocationManager initialization failed:", error);
+        resolve();
+      }
+    });
+
+    const startedAt = Date.now();
+    let lastState = "";
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const available = manager.isLocationAvailable !== false;
+      const accessRequested = manager.isAccessRequested === true;
+      const accessGranted = manager.isAccessGranted === true;
+      const stateKey = `${available}:${accessRequested}:${accessGranted}`;
+
+      if (stateKey !== lastState) {
+        lastState = stateKey;
+        console.info("[PRIME GPS] Telegram location state", {
+          available,
+          accessRequested,
+          accessGranted,
+        });
+      }
+
+      if (!allowPermissionPrompt && !accessGranted) {
+        return { lat: 0, lon: 0, source: "Unavailable" };
+      }
+      if (!available) {
+        return { lat: 0, lon: 0, source: "Unavailable" };
+      }
+
+      const slice = Math.min(8000, timeoutMs - (Date.now() - startedAt));
+      if (slice <= 0) break;
+
+      const result = await requestTelegramLocationOnce(manager, webApp, slice);
+      if (result) return result;
+
+      if (Date.now() - startedAt < timeoutMs) {
+        await new Promise((resolve) => window.setTimeout(resolve, 750));
+      }
+    }
+
+    return { lat: 0, lon: 0, source: "Unavailable" };
+  } catch (error) {
+    console.warn("Telegram precise GPS acquisition failed:", error);
+    return { lat: 0, lon: 0, source: "Unavailable" };
+  }
+}
+
 async function getBrowserPreciseLocation(
   timeoutMs: number,
   allowPermissionPrompt: boolean,
