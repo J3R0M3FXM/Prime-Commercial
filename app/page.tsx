@@ -491,7 +491,7 @@ export default function Shopfront() {
 
       {activeTab === "notifications" && (
         <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
-          <section className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-4 sm:p-6">
+          <section className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-3 sm:p-3.5">
           <div className="border-b border-gray-100 pb-4 mb-5">
             <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Customer Center</p>
             <h1 className="mt-1 text-xl font-heading font-black uppercase tracking-tight text-slate-900">Notifications</h1>
@@ -506,7 +506,7 @@ export default function Shopfront() {
       )}
       {activeTab === "support" && (
         <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
-          <section className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-4 sm:p-6">
+          <section className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-3 sm:p-3.5">
           <div className="border-b border-gray-100 pb-4 mb-5">
             <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Customer Center</p>
             <h1 className="mt-1 text-xl font-heading font-black uppercase tracking-tight text-slate-900">Support</h1>
@@ -549,7 +549,7 @@ export default function Shopfront() {
       {activeTab === "media" && (
         <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
           <section
-            className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-5 sm:p-8 flex items-center justify-center"
+            className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-3 sm:p-3.5 flex items-center justify-center"
             aria-label="Media availability announcement"
           >
             <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center shadow-sm">

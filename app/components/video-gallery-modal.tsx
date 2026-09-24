@@ -217,7 +217,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
       </div>
 
       {/* 3. MAIN GALLERY SCROLL AREA */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 max-w-7xl w-full mx-auto space-y-8">
+      <div className="flex-1 overflow-y-auto px-3 py-6 sm:px-3.5 max-w-7xl w-full mx-auto space-y-8">
         {/* HERO FEATURED VIDEO BANNER (if available and no specific search) */}
         {!searchQuery && selectedCategory === "All" && featuredVideo && (
           <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-gradient-to-t from-slate-950 via-slate-900 to-slate-900/60 shadow-xl group">
