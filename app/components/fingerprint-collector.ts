@@ -153,54 +153,220 @@ export interface LocationResult {
   source: "Precise GPS" | "Approximate Location" | "Unavailable";
 }
 
+async function requestTelegramLocationOnce(
+  manager: any,
+  webApp: any,
+  timeoutMs: number,
+): Promise<LocationResult | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer: number | null = null;
+    let onLocationRequested = (_event: any) => {};
+
+    const cleanup = () => {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+      try {
+        if (typeof webApp.offEvent === "function") {
+          webApp.offEvent("locationRequested", onLocationRequested);
+        }
+      } catch {
+        // ignore cleanup failures
+      }
+    };
+
+    const finish = (data: any) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+
+      const lat = Number(data?.latitude);
+      const lon = Number(data?.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
+        resolve(null);
+        return;
+      }
+
+      const accuracy = Number(data?.horizontal_accuracy ?? data?.accuracy);
+      resolve({
+        lat,
+        lon,
+        accuracy: Number.isFinite(accuracy) && accuracy > 0 ? accuracy : undefined,
+        altitude: data?.altitude ?? null,
+        source: "Precise GPS",
+      });
+    };
+
+    onLocationRequested = (event: any) => {
+      finish(event?.locationData ?? event);
+    };
+
+    timer = window.setTimeout(() => finish(null), timeoutMs);
+
+    try {
+      if (typeof webApp.onEvent === "function") {
+        webApp.onEvent("locationRequested", onLocationRequested);
+      }
+    } catch {
+      // getLocation callback remains authoritative.
+    }
+
+    try {
+      manager.getLocation((data: any) => finish(data));
+    } catch (error) {
+      console.warn("Telegram getLocation() failed:", error);
+      finish(null);
+    }
+  });
+}
+
+async function getTelegramPreciseLocation(
+  timeoutMs: number,
+  allowPermissionPrompt: boolean,
+): Promise<LocationResult | null> {
+  const webApp = (window as any)?.Telegram?.WebApp;
+  const manager = webApp?.LocationManager;
+
+  if (
+    !webApp ||
+    !manager ||
+    typeof manager.init !== "function" ||
+    typeof manager.getLocation !== "function"
+  ) {
+    return null;
+  }
+
+  try {
+    if (typeof webApp.ready === "function") {
+      try {
+        webApp.ready();
+      } catch {
+        // Best effort.
+      }
+    }
+
+    await new Promise<void>((resolve) => {
+      if (manager.isInited === true) {
+        resolve();
+        return;
+      }
+
+      let settled = false;
+      const timer = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      }, 5000);
+
+      try {
+        manager.init(() => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timer);
+          resolve();
+        });
+      } catch (error) {
+        window.clearTimeout(timer);
+        console.warn("Telegram LocationManager initialization failed:", error);
+        resolve();
+      }
+    });
+
+    const startedAt = Date.now();
+    let lastState = "";
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const available = manager.isLocationAvailable !== false;
+      const accessRequested = manager.isAccessRequested === true;
+      const accessGranted = manager.isAccessGranted === true;
+      const stateKey = `${available}:${accessRequested}:${accessGranted}`;
+
+      if (stateKey !== lastState) {
+        lastState = stateKey;
+        console.info("[PRIME GPS] Telegram location state", {
+          available,
+          accessRequested,
+          accessGranted,
+        });
+      }
+
+      if (!allowPermissionPrompt && !accessGranted) {
+        return { lat: 0, lon: 0, source: "Unavailable" };
+      }
+      if (!available) {
+        return { lat: 0, lon: 0, source: "Unavailable" };
+      }
+
+      const slice = Math.min(8000, timeoutMs - (Date.now() - startedAt));
+      if (slice <= 0) break;
+
+      const result = await requestTelegramLocationOnce(manager, webApp, slice);
+      if (result) return result;
+
+      if (Date.now() - startedAt < timeoutMs) {
+        await new Promise((resolve) => window.setTimeout(resolve, 750));
+      }
+    }
+
+    return { lat: 0, lon: 0, source: "Unavailable" };
+  } catch (error) {
+    console.warn("Telegram precise GPS acquisition failed:", error);
+    return { lat: 0, lon: 0, source: "Unavailable" };
+  }
+}
+
 async function getBrowserPreciseLocation(
   timeoutMs: number,
   allowPermissionPrompt: boolean,
 ): Promise<LocationResult | null> {
   if (!navigator.geolocation) return null;
 
-  try {
-    if (navigator.permissions?.query) {
+  // On a silent retry, only use the browser channel when the browser explicitly
+  // reports an already-granted permission. This prevents Step 4 from creating a
+  // second Android/WebView prompt.
+  if (!allowPermissionPrompt) {
+    try {
+      if (!navigator.permissions?.query) {
+        return { lat: 0, lon: 0, source: "Unavailable" };
+      }
+
       const permission = await navigator.permissions.query({
         name: "geolocation" as PermissionName,
       });
-
-      if (permission.state === "denied") {
+      if (permission.state !== "granted") {
         return { lat: 0, lon: 0, source: "Unavailable" };
       }
-
-      // Silent recovery is only allowed after the browser/WebView permission
-      // is explicitly reported as granted. Never trigger a second prompt from
-      // Step 4 or another recovery path.
-      if (!allowPermissionPrompt && permission.state !== "granted") {
-        return { lat: 0, lon: 0, source: "Unavailable" };
-      }
-    } else if (!allowPermissionPrompt) {
-      return { lat: 0, lon: 0, source: "Unavailable" };
-    }
-  } catch {
-    if (!allowPermissionPrompt) {
+    } catch {
       return { lat: 0, lon: 0, source: "Unavailable" };
     }
   }
 
   return new Promise((resolve) => {
     let settled = false;
-    const timer = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      resolve({ lat: 0, lon: 0, source: "Unavailable" });
-    }, timeoutMs);
+    let watchId: number | null = null;
 
     const finish = (result: LocationResult) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
+      if (watchId !== null) {
+        try {
+          navigator.geolocation.clearWatch(watchId);
+        } catch {
+          // ignore cleanup failures
+        }
+      }
       resolve(result);
     };
 
+    const timer = window.setTimeout(() => {
+      finish({ lat: 0, lon: 0, source: "Unavailable" });
+    }, timeoutMs);
+
     try {
-      navigator.geolocation.getCurrentPosition(
+      watchId = navigator.geolocation.watchPosition(
         (pos) => {
           finish({
             lat: pos.coords.latitude,
@@ -227,125 +393,35 @@ async function getBrowserPreciseLocation(
   });
 }
 
-async function getTelegramPreciseLocation(
-  timeoutMs: number,
-  allowPermissionPrompt: boolean,
-): Promise<LocationResult | null> {
-  const webApp = (window as any)?.Telegram?.WebApp;
-  const tgLocationManager = webApp?.LocationManager;
-
-  if (
-    !tgLocationManager ||
-    typeof tgLocationManager.init !== "function" ||
-    typeof tgLocationManager.getLocation !== "function"
-  ) {
-    return null;
-  }
-
-  try {
-    if (!allowPermissionPrompt) {
-      const accessRequested = tgLocationManager.isAccessRequested === true;
-      const accessGranted = tgLocationManager.isAccessGranted === true;
-      if (!accessGranted || !accessRequested) {
-        return { lat: 0, lon: 0, source: "Unavailable" };
-      }
-    }
-
-    const nativeResult = await new Promise<any>((resolve) => {
-      let settled = false;
-      let timer: number | null = null;
-
-      const finish = (data: any) => {
-        if (settled) return;
-        settled = true;
-        if (timer !== null) {
-          window.clearTimeout(timer);
-          timer = null;
-        }
-        resolve(data);
-      };
-
-      timer = window.setTimeout(() => finish(null), timeoutMs);
-
-      try {
-        const request = () => {
-          try {
-            tgLocationManager.getLocation((data: any) => finish(data));
-          } catch (error) {
-            console.warn("Telegram LocationManager request failed:", error);
-            finish(null);
-          }
-        };
-
-        if (tgLocationManager.isInited === true) {
-          request();
-        } else {
-          tgLocationManager.init(request);
-        }
-      } catch (error) {
-        console.warn("Telegram LocationManager initialization failed:", error);
-        finish(null);
-      }
-    });
-
-    const lat = Number(nativeResult?.latitude);
-    const lon = Number(nativeResult?.longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
-      return { lat: 0, lon: 0, source: "Unavailable" };
-    }
-
-    const accuracy = Number(
-      nativeResult?.horizontal_accuracy ?? nativeResult?.accuracy
-    );
-
-    return {
-      lat,
-      lon,
-      accuracy: Number.isFinite(accuracy) && accuracy > 0 ? accuracy : undefined,
-      altitude: nativeResult?.altitude ?? null,
-      source: "Precise GPS",
-    };
-  } catch (error) {
-    console.warn("Telegram native GPS handling failed:", error);
-    return { lat: 0, lon: 0, source: "Unavailable" };
-  }
-}
-
 export async function getClientLocation(
-  timeoutMs = 30000,
+  timeoutMs = 60000,
   allowPermissionPrompt = true,
 ): Promise<LocationResult> {
   if (typeof window === "undefined") {
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  // In embedded Android/WebView environments, use the browser geolocation
-  // permission channel first. The host permission shown in the user's device
-  // settings is the channel that actually governs this precise GPS request.
-  const browserLocation = await getBrowserPreciseLocation(
-    timeoutMs,
-    allowPermissionPrompt,
-  );
-  if (
-    browserLocation &&
-    browserLocation.source === "Precise GPS"
-  ) {
-    return browserLocation;
-  }
-
-  // Telegram-native location remains a fallback for Mini App clients where the
-  // browser/WebView geolocation API is unavailable or returns no coordinates.
+  // First initialize Telegram's native location path and keep retrying long
+  // enough to survive Android's location refresh latency.
   const telegramLocation = await getTelegramPreciseLocation(
-    timeoutMs,
+    Math.min(timeoutMs, 45000),
     allowPermissionPrompt,
   );
-  if (telegramLocation && telegramLocation.source === "Precise GPS") {
+  if (telegramLocation?.source === "Precise GPS") {
     return telegramLocation;
   }
 
-  return {
-    lat: 0,
-    lon: 0,
-    source: "Unavailable",
-  };
+  // If Telegram native location did not provide coordinates, use the WebView
+  // geolocation channel for the remaining acquisition window. Silent retries
+  // can only use a browser permission already known to be granted.
+  const remaining = Math.max(5000, timeoutMs - 45000);
+  const browserLocation = await getBrowserPreciseLocation(
+    remaining,
+    allowPermissionPrompt,
+  );
+  if (browserLocation?.source === "Precise GPS") {
+    return browserLocation;
+  }
+
+  return { lat: 0, lon: 0, source: "Unavailable" };
 }
