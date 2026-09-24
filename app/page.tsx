@@ -152,10 +152,10 @@ export default function Shopfront() {
           throw new Error("Valid Telegram WebApp session is required. Open PRIME from Telegram.");
         }
 
-        // Media is temporarily locked while database, storage, and security setup is completed.
-        // Keep the deep-link from opening the unavailable Media vault.
+        // Media remains locked for content access, but the tab and deep-link open the
+        // customer-facing availability announcement.
         if (telegramWebApp.initDataUnsafe?.start_param === "media") {
-          setActiveTab("shop");
+          setActiveTab("media");
         }
 
         const fingerprintData = await getClientFingerprint();
@@ -559,8 +559,8 @@ export default function Shopfront() {
               <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">Media Vault</p>
               <h1 className="mt-1 text-xl font-heading font-black uppercase tracking-tight text-slate-900">Available Soon</h1>
               <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                Media is currently under database and storage configuration, with additional security setup in progress.
-                This page will be available soon.
+                Media is still under database and storage configuration and security setup.
+                It will be available soon.
               </p>
             </div>
           </section>
@@ -634,13 +634,18 @@ export default function Shopfront() {
           <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">NOTIFICATIONS</span>
         </button>
 
-        {/* 5. MEDIA — TEMPORARILY LOCKED */}
+        {/* 5. MEDIA — CLICKABLE, CONTENT TEMPORARILY LOCKED */}
         <button
           type="button"
-          disabled
-          aria-disabled="true"
-          title="Media is temporarily unavailable"
-          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center text-gray-300 cursor-not-allowed"
+          onClick={() => {
+            setActiveTab("media");
+          }}
+          title="Media availability announcement"
+          className={`flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors cursor-pointer ${
+            activeTab === "media"
+              ? "text-emerald-700 font-normal"
+              : "text-gray-500 hover:text-gray-900 font-light"
+          }`}
         >
           <Film className="w-4 h-4 mb-0.5 shrink-0" />
           <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">MEDIA</span>
