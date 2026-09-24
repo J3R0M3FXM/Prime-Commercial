@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
-import { getClientFingerprint, getLatestPhysicalGpsLocation, getOrCreateSessionToken, waitForPhysicalGps, refreshPhysicalGpsTelemetry } from "./fingerprint-collector";
+import { getClientFingerprint, getOrCreateSessionToken, getClientLocation } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import { authenticatedFetch } from "./telegram-auth-client";
 
@@ -166,77 +166,19 @@ export default function CheckoutModal({
   const [deviceGpsAddress, setDeviceGpsAddress] = useState("");
   const [deviceGpsAddressLoading, setDeviceGpsAddressLoading] = useState(false);
 
-  // Automatic fraud telemetry GPS: the physical customer position at order time.
-  // Never used to choose or overwrite the delivery destination.
-  type PhysicalGpsSnapshot = {
+  // Optional delivery-location GPS. This is only captured when the customer
+  // explicitly taps "Use My Location". When captured, the same snapshot is
+  // attached to this order as the order-time location signal.
+  const [deviceGps, setDeviceGps] = useState<{
     lat: number;
     lon: number;
     accuracy?: number;
-    source: "Automatic fraud telemetry GPS";
-    capturedAt: string;
-    reverseGeocodedAddress: string;
-  };
-
-  const [fraudGps, setFraudGps] = useState<PhysicalGpsSnapshot | null>(null);
-  const [fraudGpsAddress, setFraudGpsAddress] = useState("");
-  const [fraudGpsAddressLoading, setFraudGpsAddressLoading] = useState(false);
-
-  // The app-level GPS watcher runs independently of Checkout.
-  // Checkout only consumes the latest shared physical position and never starts
-  // a new permission request at Step 4.
-  const automaticGpsSessionRef = useRef(0);
-  const automaticGpsSnapshotRef = useRef<PhysicalGpsSnapshot | null>(null);
-
-  const captureAutomaticPhysicalGps = async (
-    sessionId = automaticGpsSessionRef.current,
-    _allowPermissionPrompt = false,
-  ): Promise<PhysicalGpsSnapshot | null> => {
-    const location = getLatestPhysicalGpsLocation() || await waitForPhysicalGps(15000);
-
-    if (sessionId !== automaticGpsSessionRef.current || !location) {
-      setFraudGpsAddressLoading(false);
-      return null;
-    }
-
-    const lat = Number(location.lat);
-    const lon = Number(location.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
-      setFraudGpsAddressLoading(false);
-      return null;
-    }
-
-    const snapshot: PhysicalGpsSnapshot = {
-      lat,
-      lon,
-      accuracy: Number.isFinite(Number(location.accuracy))
-        ? Number(location.accuracy)
-        : undefined,
-      source: "Automatic fraud telemetry GPS",
-      capturedAt: new Date().toISOString(),
-      reverseGeocodedAddress: "",
-    };
-
-    try {
-      const res = await authenticatedFetch(
-        "/api/geoapify/reverse?lat=" + lat + "&lon=" + lon,
-        { cache: "no-store" },
-      );
-      if (res.ok) {
-        const data = await res.json();
-        snapshot.reverseGeocodedAddress = String(
-          data?.results?.[0]?.formatted || "",
-        ).trim();
-      }
-    } catch (error) {
-      console.warn("Automatic fraud GPS reverse geocode failed:", error);
-    }
-
-    automaticGpsSnapshotRef.current = snapshot;
-    setFraudGps(snapshot);
-    setFraudGpsAddress(snapshot.reverseGeocodedAddress);
-    setFraudGpsAddressLoading(false);
-    return snapshot;
-  };
+    source?: string;
+    capturedAt?: string;
+    reverseGeocodedAddress?: string;
+  } | null>(null);
+  const [deviceGpsAddress, setDeviceGpsAddress] = useState("");
+  const [deviceGpsAddressLoading, setDeviceGpsAddressLoading] = useState(false);
 
   // Touch swipe states for payment methods carousel
   const touchStartX = useRef<number | null>(null);
@@ -478,11 +420,6 @@ export default function CheckoutModal({
       setDeviceGps(null);
       setDeviceGpsAddress("");
       setDeviceGpsAddressLoading(false);
-      setFraudGps(null);
-      setFraudGpsAddress("");
-      setFraudGpsAddressLoading(false);
-      automaticGpsSessionRef.current += 1;
-      automaticGpsSnapshotRef.current = null;
       setSelectedPaymentMethod(null);
       setSelectedCourierId("");
       setDeliveryPaymentMethod("");
@@ -499,21 +436,9 @@ export default function CheckoutModal({
     }
   }, [isOpen]);
 
-  // Automatic fraud telemetry: capture the physical device GPS once when checkout opens.
-  // This is independent of the delivery destination and the optional "Use My Location" action.
-  // The refresh uses Telegram's native LocationManager inside Telegram Mini Apps,
-  // with browser geolocation only as a fallback.
-  useEffect(() => {
-    if (!isOpen) return;
-    const sessionId = ++automaticGpsSessionRef.current;
-    setFraudGpsAddressLoading(true);
-
-    void (async () => {
-      await refreshPhysicalGpsTelemetry(true);
-      if (sessionId !== automaticGpsSessionRef.current) return;
-      await captureAutomaticPhysicalGps(sessionId, false);
-    })();
-  }, [isOpen]);
+  // Precise location is parked. No location request is made at app startup,
+  // checkout open, or review/submit. "Use My Location" is the only entry point
+  // that can request geolocation and create an order-time snapshot.
 
   // Live sync for order updates & courier tracking button when on Step 5 (Targeted Single Order Query)
   useEffect(() => {
@@ -735,46 +660,77 @@ export default function CheckoutModal({
     }
   };
 
-  // "Use My Location" is delivery-address convenience only.
-  // Reuse the already-running automatic physical GPS capture instead of starting
-  // a second browser permission flow.
+  // "Use My Location" is the only point where precise location is requested.
+  // The coordinate snapshot is captured here and then attached to the order.
   const handleUseMyLocation = async () => {
-    const sessionId = automaticGpsSessionRef.current;
     setIsLocating(true);
     setAddressError("");
 
     try {
-      // The initial automatic checkout capture may have requested permission.
-      // Manual delivery-location reuse is always a silent retry.
-      const snapshot = await captureAutomaticPhysicalGps(sessionId, false);
-      if (sessionId !== automaticGpsSessionRef.current || !isOpen) return;
-      if (!snapshot) {
-        throw new Error("Precise GPS is unavailable. Please allow location access and try again.");
+      const location = await getClientLocation(60000, true);
+      const lat = Number(location?.lat);
+      const lon = Number(location?.lon);
+
+      if (
+        location?.source !== "Precise GPS" ||
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lon) ||
+        (lat === 0 && lon === 0)
+      ) {
+        throw new Error("Unable to retrieve your precise location. Please allow location access and try again.");
       }
 
-      const lat = snapshot.lat;
-      const lon = snapshot.lon;
-      const accuracy = snapshot.accuracy;
-      setDeviceGps({ lat, lon, accuracy, source: "Precise GPS" });
-      setDeviceGpsAddress(snapshot.reverseGeocodedAddress || "");
+      const capturedAt = new Date().toISOString();
+      let reverseGeocodedAddress = "";
+
+      try {
+        setDeviceGpsAddressLoading(true);
+        const res = await authenticatedFetch(
+          `/api/geoapify/reverse?lat=${lat}&lon=${lon}`,
+          { cache: "no-store" },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          reverseGeocodedAddress = String(data?.results?.[0]?.formatted || "").trim();
+        }
+      } catch (error) {
+        console.warn("Use My Location reverse geocode failed:", error);
+      } finally {
+        setDeviceGpsAddressLoading(false);
+      }
+
+      const snapshot = {
+        lat,
+        lon,
+        accuracy: Number.isFinite(Number(location.accuracy))
+          ? Number(location.accuracy)
+          : undefined,
+        source: "Use My Location snapshot",
+        capturedAt,
+        reverseGeocodedAddress,
+      };
+
+      setDeviceGps(snapshot);
+      setDeviceGpsAddress(reverseGeocodedAddress);
       setCoords({ lat, lon });
       setHasSelectedAddress(true);
 
-      if (snapshot.reverseGeocodedAddress) {
-        setSelectedAddress(snapshot.reverseGeocodedAddress);
-        setAddressSearch(snapshot.reverseGeocodedAddress);
+      if (reverseGeocodedAddress) {
+        setSelectedAddress(reverseGeocodedAddress);
+        setAddressSearch(reverseGeocodedAddress);
       } else {
         await reverseGeocode(lat, lon);
       }
 
       fetchCouriersForLocation(lat, lon);
     } catch (error: any) {
-      console.warn("Delivery GPS shortcut failed:", error);
-      setAddressError(error?.message || "Unable to retrieve GPS location. Please allow location access or type your address.");
+      console.warn("Use My Location failed:", error);
+      setAddressError(
+        error?.message ||
+        "Unable to retrieve your location. Please allow location access or type your address.",
+      );
     } finally {
-      if (sessionId === automaticGpsSessionRef.current) {
-        setIsLocating(false);
-      }
+      setIsLocating(false);
     }
   };
 
@@ -975,224 +931,24 @@ export default function CheckoutModal({
     setPromoError("");
     try {
       const fpData = await getClientFingerprint();
-      const fingerprintSnapshot = {
-        ...fpData,
-        deviceGps: deviceGps ? {
-          lat: deviceGps.lat,
-          lon: deviceGps.lon,
-          accuracy: deviceGps.accuracy,
-          source: deviceGps.source || "Precise GPS",
-          capturedAt: new Date().toISOString(),
-          reverseGeocodedAddress: deviceGpsAddress || null,
-        } : null,
-      };
-      const totalItemCount = selectedItems.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
-      const res = await authenticatedFetch("/api/promos/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: cleanCode,
-          itemsSubtotal,
-          itemQuantity: totalItemCount,
-          totalItems: totalItemCount,
-          deliveryFee: courierDeliveryFee,
-          customerId: tgCustomer.id,
-          primeMemberId: tgCustomer.primeMemberId,
-          customerTier: tgCustomer.tier || 'SILVER',
-          paymentMethod: deliveryPaymentMethod === 'upon_delivery' ? 'upon_delivery' : 'upon_checkout',
-          courierId: selectedCourier?.id || selectedCourierId,
-          deviceId: fpData.deviceId,
-          hardwareId: fpData.hardwareId,
-          sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id)
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.valid) {
-        setPromoError(data.error || "Invalid promo code.");
-        return;
-      }
-      if (data.customerTier) {
-        setTgCustomer(prev => ({ ...prev, tier: String(data.customerTier).toUpperCase() }));
-      }
 
-      setAppliedPromo({
-        code: data.code,
-        title: data.title || data.code,
-        promoId: data.promoId,
-        voucherType: data.voucherType,
-        discountAmount: Number(data.discountAmount) || 0,
-        discountType: data.discountType,
-        discountValue: data.discountValue,
-        maxDiscountAmount: data.maxDiscountAmount,
-        isFreeShipping: Boolean(data.isFreeShipping),
-        shippingSubsidy: Number(data.shippingSubsidy) || 0,
-        cashbackPoints: Number(data.cashbackPoints) || 0
-      });
-      setPromoCodeInput("");
-    } catch (err: any) {
-      setPromoError(err.message || "Failed to validate promo code.");
-    } finally {
-      setIsCheckingPromo(false);
-    }
-  };
-
-  const handleRemovePromo = () => {
-    setAppliedPromo(null);
-    setPromoError("");
-  };
-
-  // Referral Code Validation Handler
-  const handleApplyReferral = async () => {
-    const cleanCode = referralCodeInput.trim().toUpperCase();
-    if (!cleanCode) {
-      setReferralError("Please enter a referral code.");
-      return;
-    }
-    setIsCheckingReferral(true);
-    setReferralError("");
-    setReferralSuccess("");
-    try {
-      const res = await authenticatedFetch("/api/referral/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          referralCode: cleanCode,
-          customerId: tgCustomer.id,
-          customerMemberId: tgCustomer.primeMemberId
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.valid) {
-        setReferralError(data.error || "Invalid referral code.");
-        return;
-      }
-      setAppliedReferral({
-        code: data.referrerMemberId,
-        referrerName: data.referrerName || "Valued Member",
-        referrerMemberId: data.referrerMemberId
-      });
-      setReferralSuccess(`Referred by ${data.referrerName} (${data.referrerMemberId})`);
-    } catch (err: any) {
-      setReferralError(err.message || "Failed to validate referral code.");
-    } finally {
-      setIsCheckingReferral(false);
-    }
-  };
-
-  const handleRemoveReferral = () => {
-    setAppliedReferral(null);
-    setReferralError("");
-    setReferralSuccess("");
-    setReferralCodeInput("");
-  };
-
-  // Step Navigations & Validations
-  const handleNextFromStep1 = () => {
-    setReceiverError("");
-    const cleanName = receiverName.trim();
-    const cleanPhoneDigits = receiverPhone.replace(/\D/g, "");
-
-    if (!cleanName) {
-      setReceiverError("Receiver's name is required.");
-      return;
-    }
-    if (cleanPhoneDigits.length < 11) {
-      setReceiverError("Please enter a valid 11-digit phone number (e.g. 0919 123 4567).");
-      return;
-    }
-    setCurrentStep(2);
-  };
-
-  const handleNextFromStep2 = () => {
-    setAddressError("");
-    const targetAddr = selectedAddress || addressSearch;
-
-    if (!targetAddr || !hasSelectedAddress) {
-      setAddressError("Please select a suggested address or drop a pin on the map.");
-      return;
-    }
-
-    // Fetch couriers if not already fetched
-    if (availableCouriers.length === 0) {
-      fetchCouriersForLocation(coords.lat, coords.lon);
-    }
-    setCurrentStep(3);
-  };
-
-  const handleNextFromStep3 = () => {
-    setCourierFetchError("");
-    if (!selectedCourier) {
-      setCourierFetchError("Please select a courier to continue.");
-      return;
-    }
-    if (!deliveryPaymentMethod) {
-      setCourierFetchError("Please select how you would like to pay for the delivery fee (Upon Checkout or Upon Delivery).");
-      return;
-    }
-    setCurrentStep(4);
-  };
-
-  // Submit Order to API
-  const handleSubmitOrder = async () => {
-    const normalizedReceiverName = String(receiverName || "").trim();
-    const normalizedReceiverPhone = String(receiverPhone || "").trim();
-    if (!normalizedReceiverName || !normalizedReceiverPhone) {
-      setSubmitError("Receiver's name and phone are required.");
-      return;
-    }
-    const normalizedDeliveryPaymentMethod = String(deliveryPaymentMethod || "").trim().toLowerCase();
-
-    // Do not send an order request with a missing delivery-payment channel.
-    // Step 4 should never be able to fall through to the API in an invalid state.
-    if (!selectedCourier) {
-      setSubmitError("Please select a courier before placing the order.");
-      return;
-    }
-    if (normalizedDeliveryPaymentMethod !== "upon_checkout" && normalizedDeliveryPaymentMethod !== "upon_delivery") {
-      setSubmitError("Please select how the delivery fee will be paid: Upon Checkout or Upon Delivery.");
-      return;
-    }
-
-    try {
-      setIsSubmittingOrder(true);
-      setSubmitError("");
-
-      const fpData = await getClientFingerprint();
-
-      // Refresh the physical position immediately before order submission.
-      // Permission is never prompted from Step 4: this call is silent and the
-      // Telegram native channel is the primary source when available.
-      const sessionId = automaticGpsSessionRef.current;
-      await refreshPhysicalGpsTelemetry(false);
-      let orderFraudGps = await captureAutomaticPhysicalGps(sessionId, false);
-
-      if (!orderFraudGps) {
-        // Preserve a valid snapshot already captured during this checkout if a
-        // last-second refresh was temporarily unavailable.
-        orderFraudGps = automaticGpsSnapshotRef.current || fraudGps;
-      }
-
-      if (sessionId !== automaticGpsSessionRef.current) {
-        throw new Error("Checkout session changed while capturing GPS. Please review the order again.");
-      }
-      if (!orderFraudGps) {
-        throw new Error("Precise GPS capture is required before placing this order. Please allow location access and try again.");
-      }
-
-      const actualDevLat = Number(orderFraudGps.lat);
-      const actualDevLon = Number(orderFraudGps.lon);
-      const actualDevAcc = Number(orderFraudGps.accuracy) || 0;
-      const hasGenuineDeviceGps =
-        Number.isFinite(actualDevLat) &&
-        Number.isFinite(actualDevLon) &&
-        (actualDevLat !== 0 || actualDevLon !== 0);
-
-      if (!hasGenuineDeviceGps) {
-        throw new Error("Precise GPS capture is required before placing this order. Please allow location access and try again.");
-      }
-
-      const capturedGpsAddress =
-        String(orderFraudGps.reverseGeocodedAddress || fraudGpsAddress || "").trim();
+      // Precise location is optional and only exists when the customer explicitly
+      // used "Use My Location". No geolocation request is made here.
+      const orderLocationSnapshot = deviceGps
+        ? {
+            lat: Number(deviceGps.lat),
+            lon: Number(deviceGps.lon),
+            latitude: Number(deviceGps.lat),
+            longitude: Number(deviceGps.lon),
+            ...(Number.isFinite(Number(deviceGps.accuracy))
+              ? { accuracy: Number(deviceGps.accuracy) }
+              : {}),
+            source: "Use My Location snapshot",
+            capturedAt: String(deviceGps.capturedAt || new Date().toISOString()),
+            reverseGeocodedAddress:
+              String(deviceGps.reverseGeocodedAddress || deviceGpsAddress || "").trim() || null,
+          }
+        : null;
 
       const orderData = {
         items: selectedItems.map((it) => {
@@ -1253,31 +1009,12 @@ export default function CheckoutModal({
         notes: customerNotes.trim() || "Non",
         deviceId: fpData.deviceId,
         sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
-        coordinates: hasGenuineDeviceGps ? `${actualDevLat}, ${actualDevLon}` : "",
+        coordinates: `${coords.lat}, ${coords.lon}`,
         deviceSnapshot: {
           ...fpData,
-          deviceGps: hasGenuineDeviceGps ? {
-            lat: actualDevLat,
-            lon: actualDevLon,
-            latitude: actualDevLat,
-            longitude: actualDevLon,
-            accuracy: actualDevAcc,
-            source: orderFraudGps.source,
-            capturedAt: orderFraudGps.capturedAt,
-            reverseGeocodedAddress: capturedGpsAddress || null,
-          } : null,
+          deviceGps: orderLocationSnapshot,
           deviceId: fpData.deviceId,
           sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
-          location: hasGenuineDeviceGps ? {
-            lat: actualDevLat,
-            lon: actualDevLon,
-            latitude: actualDevLat,
-            longitude: actualDevLon,
-            accuracy: actualDevAcc,
-            source: "Actual Device Hardware GPS",
-            capturedAt: new Date().toISOString(),
-            reverseGeocodedAddress: capturedGpsAddress || null,
-          } : null,
         },
       };
 
