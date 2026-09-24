@@ -205,7 +205,7 @@ export default function CheckoutModal({
     let capturePromise = automaticGpsCaptureRef.current;
 
     if (!capturePromise) {
-      capturePromise = getClientLocation(30000, allowPermissionPrompt)
+      capturePromise = getClientLocation(60000, allowPermissionPrompt)
         .then(async (location) => {
           if (!location || location.source === "Unavailable") return null;
 
