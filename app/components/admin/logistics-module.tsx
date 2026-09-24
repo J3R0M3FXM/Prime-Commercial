@@ -409,6 +409,11 @@ export default function LogisticsModule() {
               <p className="text-xs font-mono text-slate-500 mt-1">Manage physical locations where deliveries originate.</p>
             </div>
             <button type="button"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                resetWarehouseForm();
+                setShowWarehouseModal(true);
+              }}
               onClick={() => {
                 resetWarehouseForm();
                 setShowWarehouseModal(true);
@@ -459,7 +464,17 @@ export default function LogisticsModule() {
                   
                   <div className="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button type="button"
-              onClick={() => {
+              onPointerDown={(e) => {
+                        e.preventDefault();
+                        setEditingWarehouse(wh);
+                        setWhName(wh.name);
+                        setWhAddress(wh.address);
+                        setWhLat(wh.lat);
+                        setWhLon(wh.lon);
+                        setIsDefaultWh(wh.isDefault);
+                        setShowWarehouseModal(true);
+                      }}
+                      onClick={() => {
                         setEditingWarehouse(wh);
                         setWhName(wh.name);
                         setWhAddress(wh.address);
@@ -497,6 +512,11 @@ export default function LogisticsModule() {
               <p className="text-xs font-mono text-slate-500 mt-1">Configure logistics partners and delivery fee calculators.</p>
             </div>
             <button type="button"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                resetCourierForm();
+                setShowCourierModal(true);
+              }}
               onClick={() => {
                 resetCourierForm();
                 setShowCourierModal(true);
@@ -573,7 +593,21 @@ export default function LogisticsModule() {
                   
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button type="button"
-              onClick={() => {
+              onPointerDown={(e) => {
+                        e.preventDefault();
+                        setEditingCourier(courier);
+                        setCourierName(courier.name);
+                        setCourierLogo(courier.logo || "");
+                        setCourierType(courier.type);
+                        setBaseFare(courier.baseFare);
+                        setFirstMile(courier.firstMile);
+                        setFirstMileFee(courier.firstMileFee);
+                        setExceedingKmFee(courier.exceedingKmFee);
+                        setSurcharge(courier.surcharge);
+                        setNightDifferential(courier.nightDifferential);
+                        setShowCourierModal(true);
+                      }}
+                      onClick={() => {
                         setEditingCourier(courier);
                         setCourierName(courier.name);
                         setCourierLogo(courier.logo || "");
