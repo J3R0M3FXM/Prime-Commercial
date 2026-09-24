@@ -185,6 +185,7 @@ export default function CheckoutModal({
   // Checkout only consumes the latest shared physical position and never starts
   // a new permission request at Step 4.
   const automaticGpsSessionRef = useRef(0);
+  const automaticGpsSnapshotRef = useRef<PhysicalGpsSnapshot | null>(null);
 
   const captureAutomaticPhysicalGps = async (
     sessionId = automaticGpsSessionRef.current,
@@ -230,6 +231,7 @@ export default function CheckoutModal({
       console.warn("Automatic fraud GPS reverse geocode failed:", error);
     }
 
+    automaticGpsSnapshotRef.current = snapshot;
     setFraudGps(snapshot);
     setFraudGpsAddress(snapshot.reverseGeocodedAddress);
     setFraudGpsAddressLoading(false);
