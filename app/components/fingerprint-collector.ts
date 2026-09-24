@@ -159,7 +159,7 @@ export interface LocationResult {
  * Checks Telegram LocationManager if available, with HTML5 Geolocation fallback.
  * The browser path uses watchPosition + clearWatch so a timed-out request is cleaned up.
  */
-export async function getClientLocation(timeoutMs = 10000): Promise<LocationResult> {
+export async function getClientLocation(timeoutMs = 10000, allowPermissionPrompt = true): Promise<LocationResult> {
   if (typeof window === "undefined") {
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
@@ -211,9 +211,9 @@ export async function getClientLocation(timeoutMs = 10000): Promise<LocationResu
             const accessGranted = tgLocationManager?.isAccessGranted === true;
             const accessRequested = tgLocationManager?.isAccessRequested === true;
 
-            if (accessRequested && !accessGranted) {
-              // Permission was already requested and is not currently granted.
-              // Do not trigger another permission channel automatically.
+            if (!accessGranted && (accessRequested || !allowPermissionPrompt)) {
+              // A later retry must remain silent. If Telegram has not granted
+              // access, do not open another permission request.
               finish(null);
               return;
             }
@@ -269,9 +269,13 @@ export async function getClientLocation(timeoutMs = 10000): Promise<LocationResu
   try {
     if (navigator.permissions?.query) {
       const permission = await navigator.permissions.query({ name: "geolocation" as PermissionName });
-      if (permission.state === "denied") {
+      if (permission.state === "denied" || (!allowPermissionPrompt && permission.state !== "granted")) {
         return { lat: 0, lon: 0, source: "Unavailable" };
       }
+    } else if (!allowPermissionPrompt) {
+      // Without the Permissions API we cannot prove that a silent retry is
+      // already authorized, so do not risk showing another prompt.
+      return { lat: 0, lon: 0, source: "Unavailable" };
     }
   } catch {
     // Older browsers may not expose the Permissions API; continue normally.
