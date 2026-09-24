@@ -47,8 +47,8 @@ function normalizeOrder(raw: any) {
     updatedAt: raw.updatedAt || raw.updated_at || null,
     status: raw.status || raw.order_status || "Pending",
     customerName: raw.customerName || raw.customer_name || "",
-    receiverName: raw.receiverName || raw.receiver_name || "",
-    receiverPhone: raw.receiverPhone || raw.receiver_phone || "",
+    receiverName: raw.receiverName || raw.receiver_name || raw.customerName || raw.customer_name || "",
+    receiverPhone: raw.receiverPhone || raw.receiver_phone || raw.customerPhone || raw.customer_phone || "",
     deliveryAddress: raw.deliveryAddress || raw.delivery_address || {},
     courierName: raw.courierName || raw.courier_name || "",
     trackingNumber: raw.trackingNumber || raw.tracking_number || "",
@@ -132,6 +132,7 @@ export default function OrderHistoryModal({
   const [proofError, setProofError] = useState<string>("");
   const [directReceiptOrderId, setDirectReceiptOrderId] = useState<string | null>(null);
   const [isDirectReceiptUploading, setIsDirectReceiptUploading] = useState<boolean>(false);
+  const [receiptViewerUrl, setReceiptViewerUrl] = useState<string | null>(null);
 
 
 
@@ -531,6 +532,7 @@ export default function OrderHistoryModal({
                 type="button"
                 onClick={() => {
                   setSelectedOrderId(null);
+                  setReceiptViewerUrl(null);
                   setProofSuccess(false);
                   setProofImage("");
                   setProofError("");
@@ -1200,27 +1202,20 @@ export default function OrderHistoryModal({
                     )}
                   </div>
 
-                  {/* If proof already exists, show it */}
+                  {/* Receipt already exists: keep the image unloaded until the customer taps the viewer. */}
                   {selectedOrder.paymentProofImage ? (
                     <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
                       <span className="text-[10px] font-mono text-gray-400 uppercase font-bold block">
                         Uploaded Payment Receipt
                       </span>
-                      <a
-                        href={selectedOrder.paymentProofImage}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block relative group rounded-lg overflow-hidden border border-gray-300"
+                      <button
+                        type="button"
+                        onClick={() => setReceiptViewerUrl(String(selectedOrder.paymentProofImage))}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 rounded-lg text-[11px] font-heading font-bold uppercase tracking-wider transition-colors cursor-pointer"
                       >
-                        <img
-                          src={selectedOrder.paymentProofImage}
-                          alt="Payment Proof"
-                          className="w-32 h-32 object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-mono">
-                          View Full
-                        </div>
-                      </a>
+                        <Receipt className="w-4 h-4" />
+                        View Uploaded Receipt
+                      </button>
                     </div>
                   ) : canUploadPaymentProof(selectedOrder) ? (
                     /* If order is still Pending, unpaid, and within the payment window, allow customer to upload receipt */
@@ -1387,6 +1382,47 @@ export default function OrderHistoryModal({
             )
           )}
         </div>
+
+        {receiptViewerUrl && (
+          <div
+            className="fixed inset-0 z-[100] bg-black/80 p-4 sm:p-6 flex items-center justify-center"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Uploaded payment receipt viewer"
+            onClick={() => setReceiptViewerUrl(null)}
+          >
+            <div
+              className="relative w-full max-w-3xl max-h-[90vh] bg-black rounded-xl overflow-hidden shadow-2xl border border-white/10"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                <a
+                  href={receiptViewerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2 bg-white/90 hover:bg-white text-slate-900 rounded-lg text-[10px] font-heading font-bold uppercase tracking-wider"
+                >
+                  Open Original
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setReceiptViewerUrl(null)}
+                  className="p-2 bg-black/70 hover:bg-black text-white rounded-lg border border-white/20"
+                  aria-label="Close receipt viewer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="w-full max-h-[90vh] overflow-auto flex items-center justify-center bg-black p-3 sm:p-5">
+                <img
+                  src={receiptViewerUrl}
+                  alt="Uploaded payment receipt"
+                  className="max-w-full max-h-[82vh] object-contain"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ================= MODAL FOOTER ================= */}
         <div className="border-t border-gray-100 bg-gray-50 px-5 py-3 flex items-center justify-between">

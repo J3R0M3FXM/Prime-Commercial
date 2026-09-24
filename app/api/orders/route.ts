@@ -606,6 +606,8 @@ async function hydrateCustomerOrder(order: any, supabase: any) {
     ...order,
     id: order.id || order.order_id || order.orderId,
     orderNumber: order.order_number || order.orderNumber || order.id,
+    receiverName: order.receiver_name || order.receiverName || order.customer_name || order.customerName || '',
+    receiverPhone: order.receiver_phone || order.receiverPhone || order.customer_phone || order.customerPhone || '',
     items: hydratedItems,
     appliedCharges: charges,
     chargesBreakdown: charges,
