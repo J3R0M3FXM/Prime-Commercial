@@ -305,13 +305,24 @@ export function refreshPhysicalGpsTelemetry(
     return latestPhysicalGpsLocation;
   })();
 
-  physicalGpsRefreshInFlight = refresh.finally(() => {
-    if (physicalGpsRefreshInFlight === refresh) {
-      physicalGpsRefreshInFlight = null;
-    }
-  });
+  let trackedRefresh!: Promise<LocationResult | null>;
+  trackedRefresh = refresh.then(
+    (value) => {
+      if (physicalGpsRefreshInFlight === trackedRefresh) {
+        physicalGpsRefreshInFlight = null;
+      }
+      return value;
+    },
+    (error) => {
+      if (physicalGpsRefreshInFlight === trackedRefresh) {
+        physicalGpsRefreshInFlight = null;
+      }
+      throw error;
+    },
+  );
 
-  return physicalGpsRefreshInFlight;
+  physicalGpsRefreshInFlight = trackedRefresh;
+  return trackedRefresh;
 }
 
 export function startPhysicalGpsTelemetry(): void {
