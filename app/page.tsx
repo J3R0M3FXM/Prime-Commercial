@@ -433,9 +433,9 @@ export default function Shopfront() {
                     }
                   }}
                 >
-                  <div className="relative aspect-[8/7] overflow-hidden bg-gray-50 border-b border-gray-100">
+                  <div className="relative aspect-square overflow-hidden bg-gray-50 border-b border-gray-100">
                     <img 
-                      src={p.imageUrl || "https://picsum.photos/seed/prime/400"} 
+                      src={p.imageUrl || "https://picsum.photos/seed/prime/600/600"} 
                       alt={p.name} 
                       className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
                     />
