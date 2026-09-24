@@ -250,7 +250,6 @@ export function waitForPhysicalGps(timeoutMs = 15000): Promise<LocationResult | 
     }, timeoutMs);
 
     physicalGpsWaiters.push(finish);
-    startPhysicalGpsTelemetry();
   });
 }
 
