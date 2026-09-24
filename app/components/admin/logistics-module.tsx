@@ -1,37 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { Plus, MapPin, Building2, Truck, Check, Search, X, Loader2, Star, Settings, AlertCircle, Trash2, Sparkles } from "lucide-react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
 
-// Fix Leaflet's default icon path issues with Next.js
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+const WarehouseMap = dynamic(() => import("./warehouse-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-400 text-sm">
+      Loading Map...
+    </div>
+  ),
 });
-
-interface LocationMarkerProps {
-  position: [number, number] | null;
-  setPosition: (pos: [number, number]) => void;
-  onLocationUpdate: (lat: number, lon: number) => void;
-}
-
-function LocationMarker({ position, setPosition, onLocationUpdate }: LocationMarkerProps) {
-  useMapEvents({
-    click(e) {
-      setPosition([e.latlng.lat, e.latlng.lng]);
-      onLocationUpdate(e.latlng.lat, e.latlng.lng);
-    },
-  });
-
-  return position === null ? null : (
-    <Marker position={position}></Marker>
-  );
-}
 
 export default function LogisticsModule() {
   const [activeTab, setActiveTab] = useState<"warehouse" | "courier">("warehouse");
@@ -403,7 +383,8 @@ export default function LogisticsModule() {
       {/* Tabs */}
       <div className="flex border-b border-slate-200">
         <button
-          onClick={() => setActiveTab("warehouse")}
+          type="button"
+onClick={() => setActiveTab("warehouse")}
           className={`flex items-center gap-2 px-3 py-2 font-heading font-bold text-sm tracking-wide uppercase transition-colors border-b-2 ${
             activeTab === "warehouse" ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
@@ -411,7 +392,8 @@ export default function LogisticsModule() {
           <Building2 className="w-4 h-4" /> Warehouses
         </button>
         <button
-          onClick={() => setActiveTab("courier")}
+          type="button"
+onClick={() => setActiveTab("courier")}
           className={`flex items-center gap-2 px-3 py-2 font-heading font-bold text-sm tracking-wide uppercase transition-colors border-b-2 ${
             activeTab === "courier" ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
@@ -429,7 +411,8 @@ export default function LogisticsModule() {
               <p className="text-xs font-mono text-slate-500 mt-1">Manage physical locations where deliveries originate.</p>
             </div>
             <button
-              onClick={() => {
+              type="button"
+onClick={() => {
                 resetWarehouseForm();
                 setShowWarehouseModal(true);
               }}
@@ -479,7 +462,8 @@ export default function LogisticsModule() {
                   
                   <div className="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button
-                      onClick={() => {
+                      type="button"
+onClick={() => {
                         setEditingWarehouse(wh);
                         setWhName(wh.name);
                         setWhAddress(wh.address);
@@ -494,7 +478,8 @@ export default function LogisticsModule() {
                     </button>
                     {!wh.isDefault && (
                       <button
-                        onClick={() => deleteWarehouse(wh.id)}
+                        type="button"
+onClick={() => deleteWarehouse(wh.id)}
                         className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
                       >
                         Remove
@@ -517,7 +502,8 @@ export default function LogisticsModule() {
               <p className="text-xs font-mono text-slate-500 mt-1">Configure logistics partners and delivery fee calculators.</p>
             </div>
             <button
-              onClick={() => {
+              type="button"
+onClick={() => {
                 resetCourierForm();
                 setShowCourierModal(true);
               }}
@@ -593,7 +579,8 @@ export default function LogisticsModule() {
                   
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button
-                      onClick={() => {
+                      type="button"
+onClick={() => {
                         setEditingCourier(courier);
                         setCourierName(courier.name);
                         setCourierLogo(courier.logo || "");
@@ -611,7 +598,8 @@ export default function LogisticsModule() {
                       Edit Config
                     </button>
                     <button
-                      onClick={() => deleteCourier(courier.id)}
+                      type="button"
+onClick={() => deleteCourier(courier.id)}
                       className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
                     >
                       Remove
@@ -632,7 +620,8 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
                 {editingWarehouse ? "Edit Warehouse" : "New Warehouse"}
               </h3>
-              <button onClick={() => setShowWarehouseModal(false)} className="text-slate-400 hover:text-slate-700">
+              <button type="button"
+onClick={() => setShowWarehouseModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -670,7 +659,8 @@ export default function LogisticsModule() {
                     <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-none shadow-none overflow-hidden max-h-48 overflow-y-auto">
                       {suggestions.map((sg, idx) => (
                         <button
-                          key={idx}
+                          type="button"
+key={idx}
                           onClick={() => handleSelectSuggestion(sg)}
                           className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 truncate"
                         >
@@ -712,22 +702,12 @@ export default function LogisticsModule() {
               <div className="flex flex-col">
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5">Map Location</label>
                 <div className="flex-1 min-h-[300px] rounded-none overflow-hidden border border-slate-200 relative">
-                  {(whLat && whLon) ? (
-                    <MapContainer 
-                      center={[whLat, whLon]} 
-                      zoom={14} 
-                      style={{ height: '100%', width: '100%' }}
-                    >
-                      <TileLayer
-                        attribution='&copy; OpenStreetMap contributors'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      <LocationMarker 
-                        position={[whLat, whLon]} 
-                        setPosition={(pos) => { setWhLat(pos[0]); setWhLon(pos[1]); }}
-                        onLocationUpdate={handleMapClick}
-                      />
-                    </MapContainer>
+                  {whLat !== null && whLon !== null ? (
+                    <WarehouseMap
+                      lat={whLat}
+                      lon={whLon}
+                      onLocationUpdate={handleMapClick}
+                    />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-400 text-sm">
                       Loading Map...
@@ -742,13 +722,15 @@ export default function LogisticsModule() {
 
             <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
               <button
-                onClick={() => setShowWarehouseModal(false)}
+                type="button"
+onClick={() => setShowWarehouseModal(false)}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={saveWarehouse}
+                type="button"
+onClick={saveWarehouse}
                 disabled={isSavingWh || !whName || !whAddress}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
               >
@@ -768,7 +750,8 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
                 {editingCourier ? "Edit Courier Config" : "New Courier Config"}
               </h3>
-              <button onClick={() => setShowCourierModal(false)} className="text-slate-400 hover:text-slate-700">
+              <button type="button"
+onClick={() => setShowCourierModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -795,7 +778,8 @@ export default function LogisticsModule() {
                     { name: "Standard In-House", type: "Standard", baseFare: 45, firstMile: 2, firstMileFee: 5, exceedingKmFee: 8, surcharge: 0, nightDifferential: 0 },
                   ].map((preset) => (
                     <button
-                      key={preset.name}
+                      type="button"
+key={preset.name}
                       type="button"
                       onClick={() => applyCourierPreset(preset)}
                       className="text-[11px] font-medium bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-slate-700 px-2.5 py-1.5 rounded-none transition-colors"
@@ -836,7 +820,8 @@ export default function LogisticsModule() {
                   </div>
                   {courierLogo && (
                     <button
-                      type="button"
+                     type="button"
+ type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setCourierLogo("");
@@ -947,14 +932,16 @@ export default function LogisticsModule() {
 
             <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
               <button
-                type="button"
+               type="button"
+ type="button"
                 onClick={() => setShowCourierModal(false)}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
               <button
-                type="button"
+               type="button"
+ type="button"
                 onClick={saveCourier}
                 disabled={isSavingCourier || isCompressingLogo || !courierName.trim()}
                 className="px-3 py-2.5 rounded-none text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
