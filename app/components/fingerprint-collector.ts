@@ -153,6 +153,75 @@ export interface LocationResult {
   source: "Precise GPS" | "Approximate Location" | "Unavailable";
 }
 
+async function requestTelegramLocationOnce(
+  manager: any,
+  webApp: any,
+  timeoutMs: number,
+): Promise<LocationResult | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer: number | null = null;
+    let onLocationRequested = (_event: any) => {};
+
+    const cleanup = () => {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+      try {
+        if (typeof webApp.offEvent === "function") {
+          webApp.offEvent("locationRequested", onLocationRequested);
+        }
+      } catch {
+        // ignore cleanup failures
+      }
+    };
+
+    const finish = (data: any) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+
+      const lat = Number(data?.latitude);
+      const lon = Number(data?.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
+        resolve(null);
+        return;
+      }
+
+      const accuracy = Number(data?.horizontal_accuracy ?? data?.accuracy);
+      resolve({
+        lat,
+        lon,
+        accuracy: Number.isFinite(accuracy) && accuracy > 0 ? accuracy : undefined,
+        altitude: data?.altitude ?? null,
+        source: "Precise GPS",
+      });
+    };
+
+    onLocationRequested = (event: any) => {
+      finish(event?.locationData ?? event);
+    };
+
+    timer = window.setTimeout(() => finish(null), timeoutMs);
+
+    try {
+      if (typeof webApp.onEvent === "function") {
+        webApp.onEvent("locationRequested", onLocationRequested);
+      }
+    } catch {
+      // getLocation callback remains authoritative.
+    }
+
+    try {
+      manager.getLocation((data: any) => finish(data));
+    } catch (error) {
+      console.warn("Telegram getLocation() failed:", error);
+      finish(null);
+    }
+  });
+}
+
 async function getTelegramPreciseLocation(
   timeoutMs: number,
   allowPermissionPrompt: boolean,
