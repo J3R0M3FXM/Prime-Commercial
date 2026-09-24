@@ -314,7 +314,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
     <div id="account-modal-overlay" className="w-full bg-gray-50 flex justify-center py-[4.8px]">
       <div className="w-full max-w-[760px] min-h-[calc(100vh-120px)] bg-white shadow-sm border-x border-slate-200 flex flex-col overflow-hidden">
         {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between bg-white sticky top-0 z-10">
+        <div className="px-3.5 py-2.5 border-b border-gray-200 flex items-center justify-between bg-white sticky top-0 z-10">
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-gray-900" />
             <h2 className="text-base font-normal uppercase text-gray-900 tracking-wide">

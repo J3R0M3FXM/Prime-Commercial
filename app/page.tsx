@@ -552,7 +552,7 @@ export default function Shopfront() {
             className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-3 sm:p-3.5 flex items-center justify-center"
             aria-label="Media availability announcement"
           >
-            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center shadow-sm">
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-slate-50 p-3.5 text-center shadow-sm">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-amber-200 bg-amber-50">
                 <Film className="h-5 w-5 text-amber-600" />
               </div>

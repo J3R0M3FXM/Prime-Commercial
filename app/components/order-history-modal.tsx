@@ -525,7 +525,7 @@ export default function OrderHistoryModal({
         aria-modal="true"
       >
         {/* ================= MODAL HEADER ================= */}
-        <div className="border-b border-gray-100 bg-white px-5 py-4 sticky top-0 z-30 flex items-center justify-between">
+        <div className="border-b border-gray-100 bg-white px-3.5 py-2.5 sticky top-0 z-30 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {selectedOrderId && (
               <button
