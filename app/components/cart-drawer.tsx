@@ -36,7 +36,7 @@ class CartErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
     if (this.state.hasError) {
       return (
         <div className="w-full flex justify-center bg-gray-50 py-[4.8px]">
-          <div className="w-full max-w-[760px] min-h-[calc(100vh-120px)] bg-white shadow-sm flex flex-col p-6 items-center justify-center text-center relative border-x border-slate-200">
+          <div className="w-full max-w-[760px] min-h-[calc(100vh-120px)] bg-white shadow-sm flex flex-col p-3 sm:p-3.5 items-center justify-center text-center relative border-x border-slate-200">
             <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
               <AlertCircle className="w-7 h-7" />
             </div>
