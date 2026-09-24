@@ -86,6 +86,7 @@ import ModifyOrderModal from "@/app/components/admin/modify-order-modal";
 import OrderPrintView from "@/app/components/admin/order-print-view";
 import ShareOrderModal from "@/app/components/admin/share-order-modal";
 import { StaticOrderMap } from "@/app/components/static-order-map";
+import dynamic from 'next/dynamic';
 import AutomationModule from '@/app/components/admin/automation-module';
 import LogisticsModule from "@/app/components/admin/logistics-module";
 import {
