@@ -518,7 +518,7 @@ export default function OrderHistoryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="w-full bg-gray-50 flex justify-center py-3 sm:py-3">
+    <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
       <div 
         className="w-full max-w-[760px] min-h-[calc(100vh-120px)] bg-white shadow-sm border-x border-slate-200 overflow-hidden flex flex-col"
         role="dialog"
