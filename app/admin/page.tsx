@@ -5150,9 +5150,9 @@ export default function AdminPage() {
         {view === "products" && (
           <motion.div
             key="view-products"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.22 }}
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
@@ -5355,7 +5355,7 @@ export default function AdminPage() {
 
             {/* PRODUCT CONFIGURATION MODAL (Only opened via button, not shown right away) */}
             {productModalOpen && (
-              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2.5">
+              <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-2.5">
                 <div className="bg-white rounded-none max-w-[430px] w-full max-h-[90vh] flex flex-col p-3 shadow-none border border-slate-200">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
                     <h3 className="font-heading font-black uppercase text-base text-slate-900 tracking-wide">
@@ -6163,9 +6163,9 @@ export default function AdminPage() {
         {view === "logistics" && (
           <motion.div
             key="logistics"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.22 }}
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
