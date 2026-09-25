@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { 
   Users, 
   Package, 
@@ -114,6 +115,11 @@ const MediaModule = dynamic(() => import('@/app/components/admin/media-module'),
   ssr: false,
   loading: () => <div className="p-3 text-center text-slate-500 font-mono text-sm">Loading Media Manager...</div>
 });
+
+function AdminPortal({ children }: { children: React.ReactNode }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(children, document.body);
+}
 
 type AdminView = 
   | "dashboard" 
@@ -5355,6 +5361,7 @@ export default function AdminPage() {
 
             {/* PRODUCT CONFIGURATION MODAL (Only opened via button, not shown right away) */}
             {productModalOpen && (
+              <AdminPortal>
               <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2.5">
                 <div className="bg-white rounded-none max-w-[430px] w-full max-h-[90vh] flex flex-col p-3 shadow-none border border-slate-200">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
@@ -5642,6 +5649,7 @@ export default function AdminPage() {
                   </form>
                 </div>
               </div>
+              </AdminPortal>
             )}
           </motion.div>
         )}
