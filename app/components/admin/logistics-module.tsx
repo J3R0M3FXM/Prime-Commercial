@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { Plus, MapPin, Building2, Truck, Check, Search, X, Loader2, Star, Settings, AlertCircle, Trash2, Sparkles } from "lucide-react";
 
@@ -613,7 +614,8 @@ export default function LogisticsModule() {
       )}
 
       {/* Warehouse Modal */}
-      {showWarehouseModal && (
+      {showWarehouseModal && typeof document !== "undefined" ? createPortal((
+
         <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
           <div className="bg-white rounded-none shadow-none w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
             <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
@@ -738,8 +740,11 @@ export default function LogisticsModule() {
         </div>
       )}
 
+      ), document.body) : null}
+
       {/* Courier Modal */}
-      {showCourierModal && (
+      {showCourierModal && typeof document !== "undefined" ? createPortal((
+
         <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
           <div className="bg-white rounded-none shadow-none w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
             <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
@@ -943,7 +948,7 @@ export default function LogisticsModule() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body) : null}
     </div>
   );
 }
