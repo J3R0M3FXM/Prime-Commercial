@@ -5355,8 +5355,7 @@ export default function AdminPage() {
             </div>
 
             {/* PRODUCT CONFIGURATION MODAL (Only opened via button, not shown right away) */}
-            {productModalOpen && (
-              {typeof document !== "undefined" ? createPortal(
+            {productModalOpen && typeof document !== "undefined" ? createPortal(
 
               <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2.5">
                 <div className="bg-white rounded-none max-w-[430px] w-full max-h-[90vh] flex flex-col p-3 shadow-none border border-slate-200">
@@ -5645,9 +5644,8 @@ export default function AdminPage() {
                   </form>
                 </div>
               </div>
-              , document.body
-              ) : null}
-            )}
+              , document.body)
+            ) : null}
           </motion.div>
         )}
 
