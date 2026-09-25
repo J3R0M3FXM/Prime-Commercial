@@ -222,57 +222,6 @@ export default function LogisticsModule() {
     fetchCouriers();
   }, []);
 
-  // Native hash actions provide a reliable fallback for touch/WebView environments
-  // where React synthetic click delivery can occasionally fail.
-  useEffect(() => {
-    const openFromHash = () => {
-      const hash = window.location.hash.replace(/^#/, "");
-      if (!hash.startsWith("admin-")) return;
-
-      if (hash === "admin-add-warehouse") {
-        resetWarehouseForm();
-        setShowWarehouseModal(true);
-      } else if (hash.startsWith("admin-edit-warehouse-")) {
-        const id = decodeURIComponent(hash.slice("admin-edit-warehouse-".length));
-        const wh = warehouses.find((item) => String(item.id) === id);
-        if (!wh) return;
-        setEditingWarehouse(wh);
-        setWhName(wh.name || "");
-        setWhAddress(wh.address || "");
-        setWhLat(wh.lat ?? wh.latitude ?? 14.5995);
-        setWhLon(wh.lon ?? wh.longitude ?? 120.9842);
-        setIsDefaultWh(Boolean(wh.isDefault));
-        setShowWarehouseModal(true);
-      } else if (hash === "admin-add-courier") {
-        resetCourierForm();
-        setShowCourierModal(true);
-      } else if (hash.startsWith("admin-edit-courier-")) {
-        const id = decodeURIComponent(hash.slice("admin-edit-courier-".length));
-        const courier = couriers.find((item) => String(item.id) === id);
-        if (!courier) return;
-        setEditingCourier(courier);
-        setCourierName(courier.name || "");
-        setCourierLogo(courier.logo || "");
-        setCourierType(courier.type || "Standard");
-        setBaseFare(Number(courier.baseFare) || 0);
-        setFirstMile(Number(courier.firstMile) || 0);
-        setFirstMileFee(Number(courier.firstMileFee) || 0);
-        setExceedingKmFee(Number(courier.exceedingKmFee) || 0);
-        setSurcharge(Number(courier.surcharge) || 0);
-        setNightDifferential(Number(courier.nightDifferential) || 0);
-        setShowCourierModal(true);
-      } else {
-        return;
-      }
-
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    };
-
-    window.addEventListener("hashchange", openFromHash);
-    openFromHash();
-    return () => window.removeEventListener("hashchange", openFromHash);
-  }, [warehouses, couriers]);
-
   const fetchWarehouses = async () => {
     try {
       const res = await fetch("/api/admin/warehouses", { cache: "no-store" });
@@ -459,13 +408,16 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg text-slate-900">Fulfillment Centers</h3>
               <p className="text-xs font-mono text-slate-500 mt-1">Manage physical locations where deliveries originate.</p>
             </div>
-            <a
-              href="#admin-add-warehouse"
-              role="button"
+            <button
+              type="button"
+              onClick={() => {
+                resetWarehouseForm();
+                setShowWarehouseModal(true);
+              }}
               className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Add Warehouse
-            </a>
+            </button>
           </div>
 
           {warehouseError && (
@@ -507,13 +459,23 @@ export default function LogisticsModule() {
                   </div>
                   
                   <div className="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
-                    <a
-                      href={`#admin-edit-warehouse-${encodeURIComponent(String(wh.id))}`}
-                      role="button"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingWarehouse(wh);
+                        setWhName(wh.name || "");
+                        setWhAddress(wh.address || "");
+                        setWhLat(wh.lat ?? wh.latitude ?? 14.5995);
+                        setWhLon(wh.lon ?? wh.longitude ?? 120.9842);
+                        setIsDefaultWh(Boolean(wh.isDefault));
+                        setSearchQuery("");
+                        setWarehouseError(null);
+                        setShowWarehouseModal(true);
+                      }}
                       className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md cursor-pointer"
                     >
                       Edit Details
-                    </a>
+                    </button>
                     {!wh.isDefault && (
                       <button
                         onClick={() => deleteWarehouse(wh.id)}
@@ -538,13 +500,16 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg text-slate-900">Courier Services</h3>
               <p className="text-xs font-mono text-slate-500 mt-1">Configure logistics partners and delivery fee calculators.</p>
             </div>
-            <a
-              href="#admin-add-courier"
-              role="button"
+            <button
+              type="button"
+              onClick={() => {
+                resetCourierForm();
+                setShowCourierModal(true);
+              }}
               className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Add Courier
-            </a>
+            </button>
           </div>
 
           {courierError && !showCourierModal && (
@@ -612,13 +577,27 @@ export default function LogisticsModule() {
                   </div>
                   
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                    <a
-                      href={`#admin-edit-courier-${encodeURIComponent(String(courier.id))}`}
-                      role="button"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCourier(courier);
+                        setCourierName(courier.name || "");
+                        setCourierLogo(courier.logo || "");
+                        setCourierType(courier.type || "Standard");
+                        setBaseFare(Number(courier.baseFare) || 0);
+                        setFirstMile(Number(courier.firstMile) || 0);
+                        setFirstMileFee(Number(courier.firstMileFee) || 0);
+                        setExceedingKmFee(Number(courier.exceedingKmFee) || 0);
+                        setSurcharge(Number(courier.surcharge) || 0);
+                        setNightDifferential(Number(courier.nightDifferential) || 0);
+                        setCourierError(null);
+                        if (courierFileInputRef.current) courierFileInputRef.current.value = "";
+                        setShowCourierModal(true);
+                      }}
                       className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md cursor-pointer"
                     >
                       Edit Config
-                    </a>
+                    </button>
                     <button
                       onClick={() => deleteCourier(courier.id)}
                       className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
