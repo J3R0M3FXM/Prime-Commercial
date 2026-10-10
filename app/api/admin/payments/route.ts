@@ -16,7 +16,7 @@ export async function GET() {
     }
 
     if (!isSupabaseAdminConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+      return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     }
     const supabase = getSupabaseAdmin()!;
     const { data, error } = await supabase
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   try {
     cachedPayments = null;
     if (!isSupabaseAdminConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+      return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     }
     const supabase = getSupabaseAdmin()!;
     const data = await request.json();
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     } = data;
 
     if (!name || !paymentType) {
-      return NextResponse.json({ error: "Missing required fields (name, paymentType)" }, { status: 400 });
+      return NextResponse.json({ error: "Missing required fields (name, paymentType)" }, { status: 503 });
     }
 
     let resolvedSortOrder = typeof sortOrder === 'number' ? sortOrder : 0;
@@ -114,7 +114,7 @@ export async function PUT(request: Request) {
   try {
     cachedPayments = null;
     if (!isSupabaseAdminConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+      return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     }
     const supabase = getSupabaseAdmin()!;
     const data = await request.json();
@@ -150,7 +150,7 @@ export async function PUT(request: Request) {
     } = data;
 
     if (!id || !name || !paymentType) {
-      return NextResponse.json({ error: "Missing required fields (id, name, paymentType)" }, { status: 400 });
+      return NextResponse.json({ error: "Missing required fields (id, name, paymentType)" }, { status: 503 });
     }
 
     const { data: currentPaymentMethod, error: currentPaymentMethodError } = await supabase
@@ -195,10 +195,10 @@ export async function DELETE(request: Request) {
     cachedPayments = null;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: "Missing payment method ID" }, { status: 400 });
+    if (!id) return NextResponse.json({ error: "Missing payment method ID" }, { status: 503 });
 
     if (!isSupabaseAdminConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+      return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     }
     const supabase = getSupabaseAdmin()!;
     const { error } = await supabase.from('payment_methods').delete().eq('id', id);
