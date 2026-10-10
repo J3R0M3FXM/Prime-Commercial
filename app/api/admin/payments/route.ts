@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     } = data;
 
     if (!name || !paymentType) {
-      return NextResponse.json({ error: "Missing required fields (name, paymentType)" }, { status: 503 });
+      return NextResponse.json({ error: "Missing required fields (name, paymentType)" }, { status: 400 });
     }
 
     let resolvedSortOrder = typeof sortOrder === 'number' ? sortOrder : 0;
@@ -150,7 +150,7 @@ export async function PUT(request: Request) {
     } = data;
 
     if (!id || !name || !paymentType) {
-      return NextResponse.json({ error: "Missing required fields (id, name, paymentType)" }, { status: 503 });
+      return NextResponse.json({ error: "Missing required fields (id, name, paymentType)" }, { status: 400 });
     }
 
     const { data: currentPaymentMethod, error: currentPaymentMethodError } = await supabase
@@ -195,7 +195,7 @@ export async function DELETE(request: Request) {
     cachedPayments = null;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: "Missing payment method ID" }, { status: 503 });
+    if (!id) return NextResponse.json({ error: "Missing payment method ID" }, { status: 400 });
 
     if (!isSupabaseAdminConfigured()) {
       return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
