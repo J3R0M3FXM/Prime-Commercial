@@ -30,6 +30,16 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 /**
+ * Admin database operations require the server-only service-role key.
+ * The public anon key alone is not sufficient for these routes.
+ */
+export function isSupabaseAdminConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return Boolean(url && serviceRoleKey && url.startsWith('http'));
+}
+
+/**
  * Server-side / Admin Supabase Client with full privileges (Lazy Initialized)
  */
 export function getSupabaseAdmin(): SupabaseClient | null {
