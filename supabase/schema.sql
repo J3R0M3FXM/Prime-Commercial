@@ -197,7 +197,10 @@ CREATE TABLE IF NOT EXISTS public.warehouses (
   name TEXT NOT NULL,
   code TEXT,
   address TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
   is_active BOOLEAN DEFAULT true,
+  is_default BOOLEAN NOT NULL DEFAULT false,
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
