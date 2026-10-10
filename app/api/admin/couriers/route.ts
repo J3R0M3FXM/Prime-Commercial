@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     const data = await request.json().catch(() => ({}));
     const name = typeof data.name === 'string' ? data.name.trim() : '';
     if (!name) {
-      return NextResponse.json({ error: "Courier name is required" }, { status: 503 });
+      return NextResponse.json({ error: "Courier name is required" }, { status: 400 });
     }
 
     const payload = {
@@ -100,7 +100,7 @@ export async function PUT(request: Request) {
     const supabase = getSupabaseAdmin()!;
     const body = await request.json().catch(() => ({}));
     const { id, ...data } = body;
-    if (!id) return NextResponse.json({ error: "Missing courier ID" }, { status: 503 });
+    if (!id) return NextResponse.json({ error: "Missing courier ID" }, { status: 400 });
 
     const payload: any = {
       updated_at: new Date().toISOString()
@@ -141,7 +141,7 @@ export async function DELETE(request: Request) {
     const supabase = getSupabaseAdmin()!;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 503 });
+    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
     
     const { error } = await supabase.from('couriers').delete().eq('id', id);
     if (error) throw error;
