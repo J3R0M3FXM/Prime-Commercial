@@ -125,6 +125,9 @@ backup/export options, and availability expectations before production traffic.
 
 - tgcloud/schema.js — initial target schema for the 12 base tables.
 - tgcloud/endpoints/health.js — non-sensitive smoke-test endpoint.
+- tgcloud/endpoints/getCatalog.js — public active-product read endpoint.
+- tgcloud/endpoints/getPublicPaymentMethods.js — public payment instructions without secret fields.
+- tgcloud/endpoints/getActivePromos.js — public, time-filtered promo metadata; checkout must still revalidate eligibility.
 - docs/TELEGRAM_SERVERLESS_MIGRATION.md — staged plan and safety gates.
 
 ## Next implementation sequence
