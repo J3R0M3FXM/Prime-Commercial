@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,8 +15,8 @@ export async function GET() {
       return NextResponse.json(cachedPayments);
     }
 
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) {
+      return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     }
     const supabase = getSupabaseAdmin()!;
     const { data, error } = await supabase
@@ -54,8 +54,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     cachedPayments = null;
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) {
+      return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     }
     const supabase = getSupabaseAdmin()!;
     const data = await request.json();
@@ -113,8 +113,8 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     cachedPayments = null;
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) {
+      return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     }
     const supabase = getSupabaseAdmin()!;
     const data = await request.json();
@@ -197,8 +197,8 @@ export async function DELETE(request: Request) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: "Missing payment method ID" }, { status: 400 });
 
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) {
+      return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     }
     const supabase = getSupabaseAdmin()!;
     const { error } = await supabase.from('payment_methods').delete().eq('id', id);

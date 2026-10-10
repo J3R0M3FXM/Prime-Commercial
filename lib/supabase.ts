@@ -19,7 +19,7 @@ export function getSupabaseClient(): SupabaseClient | null {
   if (!isSupabaseConfigured()) return null;
   if (!supabaseClientInstance) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     supabaseClientInstance = createClient(url, anonKey, {
       auth: {
         persistSession: false,
@@ -27,6 +27,16 @@ export function getSupabaseClient(): SupabaseClient | null {
     });
   }
   return supabaseClientInstance;
+}
+
+/**
+ * Admin database operations require the server-only service-role key.
+ * The public anon key alone is not sufficient for these routes.
+ */
+export function isSupabaseAdminConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return Boolean(url && serviceRoleKey && url.startsWith('http'));
 }
 
 /**

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export async function GET() {
       return NextResponse.json(cachedCouriers);
     }
 
-    if (!isSupabaseConfigured()) return NextResponse.json([]);
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const { data, error } = await supabase.from('couriers').select('*');
     if (error) throw error;
@@ -49,7 +49,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     cachedCouriers = null;
-    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const data = await request.json().catch(() => ({}));
     const name = typeof data.name === 'string' ? data.name.trim() : '';
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     cachedCouriers = null;
-    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const body = await request.json().catch(() => ({}));
     const { id, ...data } = body;
@@ -137,7 +137,7 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     cachedCouriers = null;
-    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

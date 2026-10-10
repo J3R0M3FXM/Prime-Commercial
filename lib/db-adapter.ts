@@ -1,4 +1,4 @@
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase';
 import { cacheStore } from '@/lib/cache';
 
 export function toSnakeCase(obj: Record<string, any>): Record<string, any> {
@@ -23,7 +23,7 @@ export function toCamelCase(obj: Record<string, any>): Record<string, any> {
 // PRODUCTS
 // ==============================================================================
 export async function getProductsFromDb() {
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('products')
@@ -62,7 +62,7 @@ export async function getProductsFromDb() {
 }
 
 export async function createProductInDb(productData: any) {
-  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
   const supabase = getSupabaseAdmin()!;
   const payload = {
     name: productData.name,
@@ -89,7 +89,7 @@ export async function createProductInDb(productData: any) {
 }
 
 export async function updateProductInDb(id: string, updates: any) {
-  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
   const supabase = getSupabaseAdmin()!;
   const payload: Record<string, any> = {};
   if (updates.name !== undefined) payload.name = updates.name;
@@ -128,7 +128,7 @@ export async function updateProductInDb(id: string, updates: any) {
 }
 
 export async function deleteProductInDb(id: string) {
-  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
   const supabase = getSupabaseAdmin()!;
   const { error } = await supabase.from('products').delete().eq('id', id);
   if (error) throw error;
@@ -139,7 +139,7 @@ export async function deleteProductInDb(id: string) {
 // ORDERS
 // ==============================================================================
 export async function getOrdersFromDb(limitCount = 150) {
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('orders')
@@ -187,7 +187,7 @@ export async function getOrdersFromDb(limitCount = 150) {
 }
 
 export async function getCustomerOrdersFromDb(customerId: string, primeMemberId: string) {
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   let queryBuilder = supabase.from('orders').select('*');
   if (customerId && primeMemberId) {
@@ -215,7 +215,7 @@ export async function getCustomerOrdersFromDb(customerId: string, primeMemberId:
 }
 
 export async function createOrderInDb(orderPayload: any) {
-  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
   const supabase = getSupabaseAdmin()!;
   const payload = {
     order_number: orderPayload.orderNumber || `ORD-${Date.now()}`,
@@ -256,7 +256,7 @@ export async function createOrderInDb(orderPayload: any) {
 }
 
 export async function updateOrderInDb(id: string, updates: any) {
-  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
   const supabase = getSupabaseAdmin()!;
   const payload: Record<string, any> = { updated_at: new Date().toISOString() };
   if (updates.status !== undefined) payload.status = updates.status;
@@ -367,7 +367,7 @@ function serializePromoDescription(promoData: any) {
 }
 
 export async function getPromosFromDb() {
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('promos')
@@ -380,7 +380,7 @@ export async function getPromosFromDb() {
 
 export async function getPromoByCodeFromDb(code: string) {
   const cleanCode = String(code || '').trim().toUpperCase();
-  if (!isSupabaseConfigured()) return null;
+  if (!isSupabaseAdminConfigured()) return null;
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('promos')
@@ -393,7 +393,7 @@ export async function getPromoByCodeFromDb(code: string) {
 }
 
 export async function createPromoInDb(promoData: any) {
-  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
   const supabase = getSupabaseAdmin()!;
   const serializedDesc = serializePromoDescription(promoData);
   const payload = {
@@ -419,7 +419,7 @@ export async function createPromoInDb(promoData: any) {
 }
 
 export async function updatePromoInDb(id: string, updates: any) {
-  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
   const supabase = getSupabaseAdmin()!;
   const { data: current, error: getErr } = await supabase
     .from('promos')
@@ -476,7 +476,7 @@ export async function updatePromoInDb(id: string, updates: any) {
 }
 
 export async function deletePromoInDb(id: string) {
-  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
   const supabase = getSupabaseAdmin()!;
   const { error } = await supabase.from('promos').delete().eq('id', id);
   if (error) throw error;
@@ -484,7 +484,7 @@ export async function deletePromoInDb(id: string) {
 }
 
 export async function getPromoRedemptionsFromDb(limitCount = 200) {
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('promo_redemptions')
@@ -509,7 +509,7 @@ export async function getPromoRedemptionsFromDb(limitCount = 200) {
 }
 
 export async function createPromoRedemptionInDb(redemptionPayload: any) {
-  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
   const supabase = getSupabaseAdmin()!;
   const payload = {
     id: redemptionPayload.id || `red_${Date.now()}`,
@@ -531,7 +531,7 @@ export async function createPromoRedemptionInDb(redemptionPayload: any) {
 
 export async function getPromoRedemptionsForCodeFromDb(code: string) {
   const cleanCode = String(code || '').trim().toUpperCase();
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('promo_redemptions')
@@ -560,7 +560,7 @@ export async function getPromoRedemptionsForCodeFromDb(code: string) {
 // WAREHOUSES, COURIERS, CHARGES, PAYMENT METHODS, CUSTOMERS
 // ==============================================================================
 export async function getWarehousesFromDb() {
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('warehouses').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -580,7 +580,7 @@ export async function getWarehousesFromDb() {
 }
 
 export async function getCouriersFromDb() {
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('couriers').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -596,7 +596,7 @@ export async function getCouriersFromDb() {
 }
 
 export async function getChargesFromDb() {
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('charges').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -634,7 +634,7 @@ export async function getChargesFromDb() {
 }
 
 export async function getPaymentMethodsFromDb() {
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('payment_methods').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -658,7 +658,7 @@ export async function getPaymentMethodsFromDb() {
 }
 
 export async function getCustomersFromDb() {
-  if (!isSupabaseConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
   if (error) throw error;
