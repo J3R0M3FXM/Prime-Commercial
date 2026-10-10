@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     };
 
     if (!payload.name || !payload.address) {
-      return NextResponse.json({ error: 'Warehouse name and address are required' }, { status: 503 });
+      return NextResponse.json({ error: 'Warehouse name and address are required' }, { status: 400 });
     }
     const { data: inserted, error } = await supabase.from('warehouses').insert([payload]).select().single();
     if (error) throw error;
@@ -53,7 +53,7 @@ export async function PUT(request: Request) {
     if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const { id, ...data } = await request.json();
-    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 503 });
+    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
 
     const isDefault = data.isDefault === true;
     if (isDefault) {
@@ -87,7 +87,7 @@ export async function DELETE(request: Request) {
     const supabase = getSupabaseAdmin()!;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 503 });
+    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
 
     const { error } = await supabase.from('warehouses').delete().eq('id', id);
     if (error) throw error;
