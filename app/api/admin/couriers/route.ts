@@ -14,7 +14,7 @@ export async function GET() {
       return NextResponse.json(cachedCouriers);
     }
 
-    if (!isSupabaseAdminConfigured()) return NextResponse.json([]);
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const { data, error } = await supabase.from('couriers').select('*');
     if (error) throw error;
@@ -49,12 +49,12 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     cachedCouriers = null;
-    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const data = await request.json().catch(() => ({}));
     const name = typeof data.name === 'string' ? data.name.trim() : '';
     if (!name) {
-      return NextResponse.json({ error: "Courier name is required" }, { status: 400 });
+      return NextResponse.json({ error: "Courier name is required" }, { status: 503 });
     }
 
     const payload = {
@@ -96,11 +96,11 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     cachedCouriers = null;
-    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const body = await request.json().catch(() => ({}));
     const { id, ...data } = body;
-    if (!id) return NextResponse.json({ error: "Missing courier ID" }, { status: 400 });
+    if (!id) return NextResponse.json({ error: "Missing courier ID" }, { status: 503 });
 
     const payload: any = {
       updated_at: new Date().toISOString()
@@ -137,11 +137,11 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     cachedCouriers = null;
-    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 503 });
     
     const { error } = await supabase.from('couriers').delete().eq('id', id);
     if (error) throw error;
