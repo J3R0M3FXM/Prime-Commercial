@@ -74,7 +74,7 @@ export async function GET(request: Request) {
         country: 'Philippines',
         result_type: item.type || 'place',
       }));
-      return NextResponse.json({ results, source: 'nominatim' }, { headers: { 'Cache-Control': 'no-store' } });
+      return NextResponse.json({ results, source: 'nominatim' }, { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } });
     }
   } catch (error) {
     console.warn('Nominatim fallback failed:', error);
@@ -83,5 +83,5 @@ export async function GET(request: Request) {
   return NextResponse.json({
     results: [],
     error: apiKey ? 'No matching Philippine address was returned by the geocoding providers.' : 'GEOAPIFY_API_KEY is not configured.',
-  }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
+  }, { status: 200, headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } });
 }
