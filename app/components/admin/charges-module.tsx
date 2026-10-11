@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Settings, Receipt, Loader2, X, Check, Trash2, Edit2, Power } from 'lucide-react';
 import { normalizeCharge, type ChargeConfig } from '@/lib/charges';
 
@@ -142,11 +143,15 @@ export default function ChargesModule() {
       const method = editingCharge ? "PUT" : "POST";
       if (editingCharge) (formData as any).id = editingCharge.id;
 
-      await fetch("/api/admin/charges", {
+      const response = await fetch("/api/admin/charges", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.error) {
+        throw new Error(result.error || "Failed to save charge configuration.");
+      }
       
       await fetchCharges();
       setShowModal(false);
@@ -319,7 +324,7 @@ export default function ChargesModule() {
       )}
 
       {/* Charge Modal */}
-      {showModal && (
+      {showModal && typeof document !== 'undefined' && createPortal((
         <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
           <div className="bg-white rounded-none shadow-none w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
             <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
@@ -507,7 +512,7 @@ export default function ChargesModule() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }
