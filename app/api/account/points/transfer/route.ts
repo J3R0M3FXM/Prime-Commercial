@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
+import { notifyStoreCreditTransferReceived, notifyStoreCreditTransferSent } from '@/lib/telegram-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,6 +89,33 @@ export async function POST(request: Request) {
       description: `Received ₱${transferAmount.toLocaleString()} from ${sender.tg_name || 'Member'}`,
       created_at: nowIso
     }]);
+
+    // Notifications are sent only after both balance updates and ledger inserts have completed.
+    const senderChatId = sender.tg_user_id;
+    const recipientChatId = recipient.tg_user_id;
+    const notificationResults = await Promise.allSettled([
+      notifyStoreCreditTransferSent({
+        chatId: senderChatId,
+        memberName: sender.tg_name || 'Member',
+        memberId: sender.prime_member_id,
+        otherMemberName: recipient.tg_name || 'Member',
+        otherMemberId: cleanRecipientCode,
+        amount: transferAmount,
+        newBalance: newSenderBalance,
+      }),
+      notifyStoreCreditTransferReceived({
+        chatId: recipientChatId,
+        memberName: recipient.tg_name || 'Member',
+        memberId: recipient.prime_member_id || cleanRecipientCode,
+        otherMemberName: sender.tg_name || 'Member',
+        otherMemberId: sender.prime_member_id,
+        amount: transferAmount,
+        newBalance: newRecipientBalance,
+      }),
+    ]);
+    notificationResults.forEach((result) => {
+      if (result.status === 'rejected') console.error('Store credit transfer notification failed:', result.reason);
+    });
 
     return NextResponse.json({
       success: true,
