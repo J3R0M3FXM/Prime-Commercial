@@ -11,7 +11,7 @@ export async function GET() {
   try {
     const now = Date.now();
     if (cachedCouriers && (now - lastCouriersFetchTime < COURIERS_CACHE_TTL_MS)) {
-      return NextResponse.json(cachedCouriers);
+      return NextResponse.json(cachedCouriers, { headers: { "Cache-Control": "no-store, max-age=0" } });
     }
 
     if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
@@ -41,7 +41,7 @@ export async function GET() {
 
     return NextResponse.json(couriers);
   } catch (error: any) {
-    if (cachedCouriers) return NextResponse.json(cachedCouriers);
+    if (cachedCouriers) return NextResponse.json({ error: error.message || "Failed to load couriers; cached data is not being presented as current." }, { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
