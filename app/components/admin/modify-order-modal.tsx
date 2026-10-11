@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+// @ts-expect-error The project currently omits @types/react-dom; the runtime export exists.
+import { createPortal } from "react-dom";
 import { 
   X, 
   Trash2, 
@@ -105,7 +107,7 @@ export default function ModifyOrderModal({
   // Delivery Fee
   const initialDeliveryFee = Number(order?.deliveryFee) || 0;
   const [deliveryFee, setDeliveryFee] = useState<number>(order?.isDeliveryFeeFree ? 0 : initialDeliveryFee);
-  const [originalDeliveryFee] = useState<number>(initialDeliveryFee);
+  const [originalDeliveryFee, setOriginalDeliveryFee] = useState<number>(initialDeliveryFee);
   const [isDeliveryFree, setIsDeliveryFree] = useState<boolean>(Boolean(order?.isDeliveryFeeFree || initialDeliveryFee === 0));
 
   // Add Product Form State
@@ -129,6 +131,32 @@ export default function ModifyOrderModal({
   const [modificationReason, setModificationReason] = useState<string>("");
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Keep the editor in sync when a different order is opened.
+  useEffect(() => {
+    if (!order) return;
+    setItems(initialItems);
+    setCharges(initialCharges);
+    const fee = Number(order.deliveryFee) || 0;
+    setOriginalDeliveryFee(fee);
+    setDeliveryFee(order.isDeliveryFeeFree ? 0 : fee);
+    setIsDeliveryFree(Boolean(order.isDeliveryFeeFree || fee === 0));
+    setSelectedProductToAdd("");
+    setSelectedVariantToAdd("");
+    setAddQty(1);
+    setAddPrice("");
+    setAddIsFree(false);
+    setShowCustomItemForm(false);
+    setCustomItemName("");
+    setCustomItemPrice("");
+    setCustomItemQty(1);
+    setCustomItemIsFree(false);
+    setShowAddChargeForm(false);
+    setNewChargeName("");
+    setNewChargeAmount("");
+    setModificationReason("");
+    setErrorMessage(null);
+  }, [order, initialItems, initialCharges]);
 
   // --- Calculations ---
   const subTotal = useMemo(() => {
@@ -435,7 +463,7 @@ export default function ModifyOrderModal({
 
   if (!isOpen || !order) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-3 bg-black/60 backdrop-blur-sm overflow-y-auto">
       <div 
         className="bg-white border border-slate-200 rounded-none w-full max-w-[430px] shadow-none overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
@@ -1051,6 +1079,7 @@ export default function ModifyOrderModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
