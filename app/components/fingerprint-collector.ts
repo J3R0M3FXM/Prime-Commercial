@@ -610,11 +610,14 @@ async function getBrowserPreciseLocation(
   return new Promise((resolve) => {
     let settled = false;
     let watchId: number | null = null;
+    let settleTimer: number | null = null;
+    let bestPosition: GeolocationPosition | null = null;
 
     const finish = (result: LocationResult) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
+      if (settleTimer !== null) window.clearTimeout(settleTimer);
       if (watchId !== null) {
         try {
           navigator.geolocation.clearWatch(watchId);
@@ -632,13 +635,27 @@ async function getBrowserPreciseLocation(
     try {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
-          finish({
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-            accuracy: Math.round(pos.coords.accuracy),
-            altitude: pos.coords.altitude ?? null,
-            source: "Precise GPS",
-          });
+          // WebViews may emit a coarse network-based fix before a better GPS
+          // fix. Keep the most accurate reading briefly instead of pinning the
+          // first coordinate immediately.
+          if (!bestPosition || pos.coords.accuracy < bestPosition.coords.accuracy) {
+            bestPosition = pos;
+          }
+          const finishBest = () => {
+            if (!bestPosition) return;
+            finish({
+              lat: bestPosition.coords.latitude,
+              lon: bestPosition.coords.longitude,
+              accuracy: Math.round(bestPosition.coords.accuracy),
+              altitude: bestPosition.coords.altitude ?? null,
+              source: "Precise GPS",
+            });
+          };
+          if (pos.coords.accuracy <= 25) {
+            finishBest();
+          } else if (settleTimer === null) {
+            settleTimer = window.setTimeout(finishBest, 8000);
+          }
         },
         (err) => {
           console.warn("Browser GPS request failed:", err.message);
