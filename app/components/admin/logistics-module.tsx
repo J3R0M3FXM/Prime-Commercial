@@ -440,9 +440,9 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg text-slate-900">Fulfillment Centers</h3>
               <p className="text-xs font-mono text-slate-500 mt-1">Manage physical locations where deliveries originate.</p>
             </div>
-            <a href="#admin-add-warehouse" role="button" className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer">
+            <button type="button" onClick={() => { setActiveTab("warehouse"); resetWarehouseForm(); setShowWarehouseModal(true); }} className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer">
               <Plus className="w-4 h-4" /> Add Warehouse
-            </a>
+            </button>
           </div>
 
           {warehouseError && (
