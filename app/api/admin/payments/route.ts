@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const now = Date.now();
     if (cachedPayments && (now - lastPaymentsFetchTime < PAYMENTS_CACHE_TTL_MS)) {
-      return NextResponse.json(cachedPayments);
+      return NextResponse.json(cachedPayments, { headers: { "Cache-Control": "no-store, max-age=0" } });
     }
 
     if (!isSupabaseAdminConfigured()) {
@@ -46,7 +46,7 @@ export async function GET() {
     lastPaymentsFetchTime = now;
     return NextResponse.json(paymentMethods);
   } catch (error: any) {
-    if (cachedPayments) return NextResponse.json(cachedPayments);
+    if (cachedPayments) return NextResponse.json({ error: error.message || "Failed to load payment methods; cached data is not being presented as current." }, { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
