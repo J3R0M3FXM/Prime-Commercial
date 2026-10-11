@@ -930,7 +930,6 @@ export default function LogisticsModule() {
               </button>
             </div>
           </div>
-        </div>
         </div>,
         document.body
       )}
