@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
+// @ts-expect-error The project currently omits @types/react-dom; the runtime export exists.
+import { createPortal } from "react-dom";
 import { 
   CreditCard, 
   Plus, 
@@ -172,7 +174,7 @@ const Base64ImageUploader = ({
         <p className="text-[10px] font-mono text-red-600 font-bold mt-1">
           {errorMessage}
         </p>
-      )}
+      ), document.body)}
     </div>
   );
 };
@@ -666,7 +668,7 @@ export default function PaymentsModule() {
       )}
 
       {/* Add/Edit Side Sheet Modal */}
-      {isOpen && (
+      {isOpen && createPortal((
         <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-2.5 backdrop-blur-xs">
           <div className="bg-white border border-slate-200 w-full max-w-[430px] h-full rounded-none overflow-y-auto shadow-none p-3 flex flex-col justify-between">
             <div className="space-y-3">
