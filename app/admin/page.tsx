@@ -1028,6 +1028,27 @@ export default function AdminPage() {
     }
   }, [selectedCustomerId]);
 
+  // Native URL actions are a touch/WebView fallback for Add/Edit product controls.
+  useEffect(() => {
+    const openProductFromHash = () => {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (hash === "admin-add-product") {
+        setEditingProduct({ name: "", price: 49.99, stock: 50, category: "Featured", description: "", imageUrl: "https://picsum.photos/seed/primeprod/400/400", active: true });
+        setProductModalOpen(true);
+      } else if (hash.startsWith("admin-edit-product-")) {
+        const id = decodeURIComponent(hash.slice("admin-edit-product-".length));
+        const product = products.find((item) => String(item.id) === id);
+        if (!product) return;
+        setEditingProduct(product);
+        setProductModalOpen(true);
+      } else return;
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    };
+    window.addEventListener("hashchange", openProductFromHash);
+    openProductFromHash();
+    return () => window.removeEventListener("hashchange", openProductFromHash);
+  }, [products]);
+
   // Product Operations
   const handleToggleProductActive = async (product: any) => {
     const newActive = product.active === false ? true : false;
@@ -5176,24 +5197,9 @@ export default function AdminPage() {
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingProduct({
-                        name: "",
-                        price: 49.99,
-                        stock: 50,
-                        category: "Featured",
-                        description: "",
-                        imageUrl: "https://picsum.photos/seed/primeprod/400/400",
-                        active: true
-                      });
-                      setProductModalOpen(true);
-                    }}
-                    className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-none"
-                  >
+                  <a href="#admin-add-product" role="button" className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-none">
                     <Plus className="w-3.5 h-3.5" /> Add Product
-                  </button>
+                  </a>
                 </div>
 
                 <div className="relative">
@@ -5326,17 +5332,9 @@ export default function AdminPage() {
                           {prod.active === false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingProduct(prod);
-                            setProductModalOpen(true);
-                          }}
-                          className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-none transition-colors cursor-pointer"
-                          title="Edit Product"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
+                        <a href={`#admin-edit-product-${encodeURIComponent(String(prod.id))}`} role="button" className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-none transition-colors cursor-pointer" title="Edit Product">
+                            <Edit2 className="w-4 h-4" />
+                          </a>
 
                         <button
                           type="button"

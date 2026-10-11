@@ -339,6 +339,26 @@ export default function PaymentsModule() {
     setIsOpen(true);
   };
 
+  // Hash-based fallback makes Add/Edit accessible even when a WebView drops synthetic click events.
+  useEffect(() => {
+    const openFromHash = () => {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (hash === "admin-add-payment-method") {
+        resetForm();
+        setIsOpen(true);
+      } else if (hash.startsWith("admin-edit-payment-method-")) {
+        const id = decodeURIComponent(hash.slice("admin-edit-payment-method-".length));
+        const method = methods.find((item) => String(item.id) === id);
+        if (!method) return;
+        handleEdit(method);
+      } else return;
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    };
+    window.addEventListener("hashchange", openFromHash);
+    openFromHash();
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, [methods]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -428,16 +448,10 @@ export default function PaymentsModule() {
             Configure transaction routes, QR codes, API integrations, and wallet details.
           </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setIsOpen(true);
-          }}
-          className="px-3.5 py-2 bg-black hover:bg-slate-800 text-white font-heading font-bold text-xs uppercase tracking-wider rounded-none flex items-center gap-1.5 transition-colors cursor-pointer shadow-none"
-        >
+        <a href="#admin-add-payment-method" role="button" className="px-3.5 py-2 bg-black hover:bg-slate-800 text-white font-heading font-bold text-xs uppercase tracking-wider rounded-none flex items-center gap-1.5 transition-colors cursor-pointer shadow-none">
           <Plus className="w-4 h-4" />
           <span>Add Method</span>
-        </button>
+        </a>
       </div>
 
       {/* Main List & Active Panel */}
@@ -598,13 +612,9 @@ export default function PaymentsModule() {
                         </button>
                       </div>
 
-                      <button
-                        onClick={() => handleEdit(method)}
-                        className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-none transition-colors cursor-pointer"
-                        title="Edit payment method"
-                      >
+                      <a href={`#admin-edit-payment-method-${encodeURIComponent(String(method.id))}`} role="button" className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-none transition-colors cursor-pointer" title="Edit payment method">
                         <Edit2 className="w-3.5 h-3.5" />
-                      </button>
+                      </a>
                       <button
                         onClick={() => handleDelete(method.id)}
                         className="p-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-none transition-colors cursor-pointer"
