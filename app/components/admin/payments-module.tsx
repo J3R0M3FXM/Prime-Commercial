@@ -612,13 +612,9 @@ export default function PaymentsModule() {
                         </button>
                       </div>
 
-                      <button
-                        onClick={() => handleEdit(method)}
-                        className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-none transition-colors cursor-pointer"
-                        title="Edit payment method"
-                      >
+                      <a href={`#admin-edit-payment-method-${encodeURIComponent(String(method.id))}`} role="button" className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-none transition-colors cursor-pointer" title="Edit payment method">
                         <Edit2 className="w-3.5 h-3.5" />
-                      </button>
+                      </a>
                       <button
                         onClick={() => handleDelete(method.id)}
                         className="p-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-none transition-colors cursor-pointer"
