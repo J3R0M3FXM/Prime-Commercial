@@ -174,7 +174,7 @@ const Base64ImageUploader = ({
         <p className="text-[10px] font-mono text-red-600 font-bold mt-1">
           {errorMessage}
         </p>
-      ), document.body)}
+      )}
     </div>
   );
 };
@@ -892,7 +892,7 @@ export default function PaymentsModule() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }
