@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const warehouses = await getWarehousesFromDb();
-    return NextResponse.json(warehouses);
+    return NextResponse.json(warehouses, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

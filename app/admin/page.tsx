@@ -1100,7 +1100,9 @@ export default function AdminPage() {
       if (editingProduct?.id) {
         res = await adminFetch("/api/admin/products", {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", "Pragma": "no-cache" },
           body: JSON.stringify({ id: editingProduct.id, ...productData })
         });
       } else {

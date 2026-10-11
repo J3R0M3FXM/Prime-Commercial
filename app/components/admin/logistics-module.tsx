@@ -337,7 +337,7 @@ export default function LogisticsModule() {
     setWhLat(lat);
     setWhLon(lon);
     try {
-      const res = await fetch(`/api/geoapify/reverse?lat=${lat}&lon=${lon}`);
+      const res = await fetch(`/api/geoapify/reverse?lat=${lat}&lon=${lon}`, { credentials: "include", cache: "no-store" });
       const data = await res.json();
       if (data.results && data.results.length > 0) {
         setWhAddress(data.results[0].formatted);
@@ -378,7 +378,9 @@ export default function LogisticsModule() {
 
       const res = await fetch("/api/admin/warehouses", {
         method,
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", "Pragma": "no-cache" },
         body: JSON.stringify(formData)
       });
       const resData = await res.json().catch(() => ({}));
