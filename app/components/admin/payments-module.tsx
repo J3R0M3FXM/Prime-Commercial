@@ -208,8 +208,9 @@ export default function PaymentsModule() {
     try {
       setLoading(true);
       const res = await fetch(`/api/admin/payments?_t=${Date.now()}`, {
+        credentials: "include",
         cache: "no-store",
-        headers: { "Pragma": "no-cache" }
+        headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
       });
       if (res.ok) {
         setMethods(await res.json());
@@ -266,7 +267,9 @@ export default function PaymentsModule() {
       const reorderPayload = updated.map((m, idx) => ({ id: m.id, sortOrder: idx }));
       const res = await fetch("/api/admin/payments", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
         body: JSON.stringify({ reorder: reorderPayload })
       });
       if (!res.ok) {
