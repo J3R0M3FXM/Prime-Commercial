@@ -641,7 +641,6 @@ async function getBrowserPreciseLocation(
           if (!bestPosition || pos.coords.accuracy < bestPosition.coords.accuracy) {
             bestPosition = pos;
           }
-          const best = bestPosition;
           const finishBest = () => {
             if (!bestPosition) return;
             finish({
