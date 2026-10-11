@@ -543,7 +543,7 @@ export default function LogisticsModule() {
                 <div key={courier.id} className="bg-white border border-slate-200 rounded-none p-3 shadow-none relative group overflow-hidden">
                   <div className="flex items-center gap-2.5 mb-2.5">
                     {courier.logo ? (
-                      <img src={courier.logo} alt={courier.name} className="w-12 h-12 rounded-none object-contain bg-slate-50 border border-slate-100 p-1 shrink-0" />
+                      <img src={courier.logo} alt={courier.name} className="w-12 h-12 rounded-none object-contain bg-slate-50 border border-slate-100 p-1 shrink-0 shadow-none drop-shadow-none filter-none" />
                     ) : (
                       <div className="w-12 h-12 rounded-none bg-slate-100 flex items-center justify-center shrink-0">
                         <Truck className="w-5 h-5 text-slate-400" />
@@ -789,7 +789,7 @@ export default function LogisticsModule() {
                       </div>
                     ) : courierLogo ? (
                       <>
-                        <img src={courierLogo} alt="Logo" className="w-full h-full object-contain p-2" />
+                        <img src={courierLogo} alt="Logo" className="w-full h-full object-contain p-2 shadow-none drop-shadow-none filter-none" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold uppercase">
                           Change
                         </div>
