@@ -181,7 +181,9 @@ export default function LogisticsModule() {
 
       const res = await fetch("/api/admin/couriers", {
         method,
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
         body: JSON.stringify(formData)
       });
 
@@ -204,7 +206,7 @@ export default function LogisticsModule() {
   const deleteCourier = async (id: string) => {
     if (!confirm("Delete this courier?")) return;
     try {
-      const res = await fetch(`/api/admin/couriers?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/couriers?id=${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include", cache: "no-store" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         alert(err.error || "Failed to delete courier");
@@ -244,41 +246,7 @@ export default function LogisticsModule() {
     return () => window.removeEventListener("hashchange", openFromHash);
   }, [warehouses, couriers]);
 
-  // Native hash navigation fallback for touch/WebView environments where React click events may not fire reliably.
-  useEffect(() => {
-    const openFromHash = () => {
-      const hash = window.location.hash.replace(/^#/, "");
-      if (!hash.startsWith("admin-")) return;
-      if (hash === "admin-add-warehouse") {
-        setActiveTab("warehouse"); resetWarehouseForm(); setShowWarehouseModal(true);
-      } else if (hash.startsWith("admin-edit-warehouse-")) {
-        const id = decodeURIComponent(hash.slice("admin-edit-warehouse-".length));
-        const wh = warehouses.find((item) => String(item.id) === id);
-        if (!wh) return;
-        setActiveTab("warehouse"); setEditingWarehouse(wh);
-        setWhName(wh.name || ""); setWhAddress(wh.address || "");
-        setWhLat(wh.lat ?? wh.latitude ?? 14.5995); setWhLon(wh.lon ?? wh.longitude ?? 120.9842);
-        setIsDefaultWh(Boolean(wh.isDefault)); setShowWarehouseModal(true);
-      } else if (hash === "admin-add-courier") {
-        setActiveTab("courier"); resetCourierForm(); setShowCourierModal(true);
-      } else if (hash.startsWith("admin-edit-courier-")) {
-        const id = decodeURIComponent(hash.slice("admin-edit-courier-".length));
-        const courier = couriers.find((item) => String(item.id) === id);
-        if (!courier) return;
-        setActiveTab("courier"); setEditingCourier(courier);
-        setCourierName(courier.name || ""); setCourierLogo(courier.logo || "");
-        setCourierType(courier.type || "Standard"); setBaseFare(Number(courier.baseFare) || 0);
-        setFirstMile(Number(courier.firstMile) || 0); setFirstMileFee(Number(courier.firstMileFee) || 0);
-        setExceedingKmFee(Number(courier.exceedingKmFee) || 0); setSurcharge(Number(courier.surcharge) || 0);
-        setNightDifferential(Number(courier.nightDifferential) || 0); setShowCourierModal(true);
-      } else return;
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    };
-    window.addEventListener("hashchange", openFromHash);
-    openFromHash();
-    return () => window.removeEventListener("hashchange", openFromHash);
-  }, [warehouses, couriers]);
-
+  
   useEffect(() => {
     fetchWarehouses();
     fetchCouriers();
@@ -286,7 +254,7 @@ export default function LogisticsModule() {
 
   const fetchWarehouses = async () => {
     try {
-      const res = await fetch("/api/admin/warehouses", { cache: "no-store" });
+      const res = await fetch("/api/admin/warehouses", { cache: "no-store", credentials: "include", headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } });
       const data = await res.json().catch(() => []);
       if (!res.ok) throw new Error(data?.error || `Failed to load warehouses (HTTP ${res.status})`);
       if (!Array.isArray(data)) throw new Error("Invalid warehouse response from server");
@@ -302,7 +270,7 @@ export default function LogisticsModule() {
 
   const fetchCouriers = async () => {
     try {
-      const res = await fetch("/api/admin/couriers", { cache: "no-store" });
+      const res = await fetch("/api/admin/couriers", { cache: "no-store", credentials: "include", headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } });
       const data = await res.json().catch(() => []);
       if (!res.ok) throw new Error(data?.error || `Failed to load couriers (HTTP ${res.status})`);
       if (!Array.isArray(data)) throw new Error("Invalid courier response from server");
@@ -430,7 +398,7 @@ export default function LogisticsModule() {
   const deleteWarehouse = async (id: string) => {
     if (!confirm("Delete this warehouse?")) return;
     try {
-      const res = await fetch(`/api/admin/warehouses?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/warehouses?id=${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include", cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Failed to delete warehouse (HTTP ${res.status})`);
       await fetchWarehouses();
