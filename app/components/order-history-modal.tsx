@@ -1264,7 +1264,7 @@ export default function OrderHistoryModal({
                                       setProofError("");
                                       setProofImage("");
                                     }}
-                                    className={`group w-full aspect-video border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white select-none rounded-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_18px_rgba(15,23,42,0.05),0_2px_6px_rgba(15,23,42,0.08)] ${isOffline ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90" : isSelected ? "border-slate-900 shadow-sm ring-1 ring-slate-900 cursor-pointer" : "border-gray-200 bg-white hover:border-gray-300 cursor-pointer"}`}
+                                    className={`group w-full aspect-video border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white select-none rounded-2xl  ${isOffline ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90" : isSelected ? "border-slate-900 shadow-sm ring-1 ring-slate-900 cursor-pointer" : "border-gray-200 bg-white hover:border-gray-300 cursor-pointer"}`}
                                     title={isOffline ? `${method.name} is currently offline` : method.name}
                                   >
                                     {method.logo ? (
@@ -1276,12 +1276,6 @@ export default function OrderHistoryModal({
                                       />
                                     ) : (
                                       <CreditCard className={`relative z-[2] w-5 h-5 text-gray-400 ${isOffline ? "filter blur-[1px] opacity-40" : ""}`} />
-                                    )}
-                                    {!isOffline && (
-                                      <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-br from-white/75 via-white/15 to-transparent opacity-90" />
-                                    )}
-                                    {!isOffline && (
-                                      <div className="absolute inset-x-3 top-1.5 z-[6] h-1/3 rounded-t-xl pointer-events-none bg-gradient-to-b from-white/70 to-transparent" />
                                     )}
                                     {isOffline && (
                                       <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-[0.5px]">
