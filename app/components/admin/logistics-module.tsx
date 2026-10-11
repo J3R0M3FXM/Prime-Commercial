@@ -722,8 +722,7 @@ export default function LogisticsModule() {
                 Save Warehouse
               </button>
             </div>
-          </div>
-        </div>,
+          </div>,
         document.body
       )}
 
