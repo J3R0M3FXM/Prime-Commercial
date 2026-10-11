@@ -229,3 +229,57 @@ export async function notifyPaymentUpdated(order: OrderNotification): Promise<bo
     await buildOrderInlineKeyboard(order.orderNumber, '📄 View Order Details')
   );
 }
+
+
+export type StoreCreditTransferNotification = {
+  chatId?: string | number | null;
+  memberName?: string | null;
+  memberId?: string | null;
+  otherMemberName?: string | null;
+  otherMemberId?: string | null;
+  amount: number;
+  newBalance: number;
+};
+
+async function buildAccountInlineKeyboard() {
+  const botUsername = await getBotUsername();
+  return {
+    inline_keyboard: [[{
+      text: 'VIEW PRIME ACCOUNT',
+      url: 'https://t.me/' + botUsername + '?startapp=account',
+    }]],
+  };
+}
+
+export async function notifyStoreCreditTransferReceived(
+  transfer: StoreCreditTransferNotification
+): Promise<boolean> {
+  if (!transfer.chatId) return false;
+  const message = [
+    '<b>STORE CREDIT RECEIVED</b>',
+    '',
+    `Hello ${escapeHtml(transfer.memberName || 'Member')}!`,
+    `You received ${money(transfer.amount)} in Store Credits from ${escapeHtml(transfer.otherMemberName || 'PRIME Member')}.`,
+    transfer.otherMemberId ? `Sender PRIME Member ID: <code>${escapeHtml(transfer.otherMemberId)}</code>` : '',
+    transfer.memberId ? `Your PRIME Member ID: <code>${escapeHtml(transfer.memberId)}</code>` : '',
+    `New Store Credit balance: ${money(transfer.newBalance)}`,
+    '',
+    'The transfer has been completed successfully.',
+  ].filter(Boolean).join('\\n');
+  return sendTelegramMessage(transfer.chatId, message, await buildAccountInlineKeyboard());
+}
+
+export async function notifyStoreCreditTransferSent(
+  transfer: StoreCreditTransferNotification
+): Promise<boolean> {
+  if (!transfer.chatId) return false;
+  const message = [
+    '<b>STORE CREDIT TRANSFER COMPLETED</b>',
+    '',
+    `Your transfer of ${money(transfer.amount)} in Store Credits was completed successfully.`,
+    `Recipient: ${escapeHtml(transfer.otherMemberName || 'PRIME Member')}`,
+    transfer.otherMemberId ? `Recipient PRIME Member ID: <code>${escapeHtml(transfer.otherMemberId)}</code>` : '',
+    `Remaining Store Credit balance: ${money(transfer.newBalance)}`,
+  ].filter(Boolean).join('\\n');
+  return sendTelegramMessage(transfer.chatId, message, await buildAccountInlineKeyboard());
+}
