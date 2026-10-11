@@ -6227,9 +6227,9 @@ export default function AdminPage() {
         {view === "payments" && (
           <motion.div
             key="payments"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.22 }}
             className="flex-1 flex flex-col min-h-screen bg-slate-50"
           >
