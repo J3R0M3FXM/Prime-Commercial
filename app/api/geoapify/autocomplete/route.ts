@@ -15,8 +15,9 @@ function normalize(items: any[]) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const text = (searchParams.get('text') || '').trim();
-  if (text.length < 2) return NextResponse.json({ results: [] });
+  const text = (searchParams.get('text') || '').trim().replace(/\\s+/g, ' ');
+  if (text.length < 3) return NextResponse.json({ results: [] }, { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } });
+  if (text.length > 180) return NextResponse.json({ error: 'Search text is too long.', results: [] }, { status: 400 });
 
   const apiKey = process.env.GEOAPIFY_API_KEY?.trim();
 
@@ -31,12 +32,12 @@ export async function GET(request: Request) {
         url.searchParams.set('limit', '8');
         url.searchParams.set('apiKey', apiKey);
 
-        const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+        const res = await fetch(url, { cache: 'force-cache', next: { revalidate: 86400 }, signal: AbortSignal.timeout(6000) });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
           const results = normalize(Array.isArray(data?.results) ? data.results : []);
           if (results.length) {
-            return NextResponse.json({ results, source: `geoapify-${endpoint}` }, { headers: { 'Cache-Control': 'no-store' } });
+            return NextResponse.json({ results, source: `geoapify-${endpoint}` }, { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } });
           }
         } else {
           console.warn(`Geoapify ${endpoint} HTTP error:`, res.status, data);
@@ -56,7 +57,8 @@ export async function GET(request: Request) {
     url.searchParams.set('countrycodes', 'ph');
 
     const res = await fetch(url, {
-      cache: 'no-store',
+      cache: 'force-cache',
+      next: { revalidate: 86400 },
       headers: { Accept: 'application/json', 'User-Agent': 'PRIME-Shop/1.0 address-autocomplete' },
       signal: AbortSignal.timeout(6000),
     });
