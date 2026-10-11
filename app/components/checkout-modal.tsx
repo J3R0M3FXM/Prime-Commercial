@@ -2283,10 +2283,6 @@ export default function CheckoutModal({
                                         <CreditCard className={`relative z-[2] w-5 h-5 text-gray-400 ${isOffline ? "filter blur-[1px] opacity-40" : ""}`} />
                                       )}
 
-                                      {!isOffline && (
-                                      )}
-                                      {!isOffline && (
-                                      )}
 
                                       {/* Offline Overlay */}
                                       {isOffline && (
