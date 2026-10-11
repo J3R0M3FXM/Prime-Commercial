@@ -728,8 +728,8 @@ export default function LogisticsModule() {
       )}
 
       {/* Courier Modal */}
-      {showCourierModal && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
+      {showCourierModal && typeof document !== "undefined" && createPortal(
+        <div role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCourierModal(false); }} className="fixed inset-0 z-[2147483000] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
           <div className="bg-white rounded-none shadow-none w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
             <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
@@ -932,6 +932,8 @@ export default function LogisticsModule() {
             </div>
           </div>
         </div>
+        </div>,
+        document.body
       )}
     </div>
   );
