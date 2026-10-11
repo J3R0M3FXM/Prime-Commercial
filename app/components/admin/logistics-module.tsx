@@ -217,6 +217,33 @@ export default function LogisticsModule() {
     }
   };
 
+  // Native hash navigation fallback for touch/WebView environments where React click events may not fire reliably.
+  useEffect(() => {
+    const openFromHash = () => {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (!hash.startsWith("admin-")) return;
+      if (hash === "admin-add-warehouse") { setActiveTab("warehouse"); resetWarehouseForm(); setShowWarehouseModal(true); }
+      else if (hash.startsWith("admin-edit-warehouse-")) {
+        const id = decodeURIComponent(hash.slice("admin-edit-warehouse-".length));
+        const wh = warehouses.find((item) => String(item.id) === id); if (!wh) return;
+        setActiveTab("warehouse"); setEditingWarehouse(wh); setWhName(wh.name || ""); setWhAddress(wh.address || "");
+        setWhLat(wh.lat ?? wh.latitude ?? 14.5995); setWhLon(wh.lon ?? wh.longitude ?? 120.9842);
+        setIsDefaultWh(Boolean(wh.isDefault)); setShowWarehouseModal(true);
+      } else if (hash === "admin-add-courier") { setActiveTab("courier"); resetCourierForm(); setShowCourierModal(true); }
+      else if (hash.startsWith("admin-edit-courier-")) {
+        const id = decodeURIComponent(hash.slice("admin-edit-courier-".length));
+        const courier = couriers.find((item) => String(item.id) === id); if (!courier) return;
+        setActiveTab("courier"); setEditingCourier(courier); setCourierName(courier.name || ""); setCourierLogo(courier.logo || "");
+        setCourierType(courier.type || "Standard"); setBaseFare(Number(courier.baseFare) || 0); setFirstMile(Number(courier.firstMile) || 0);
+        setFirstMileFee(Number(courier.firstMileFee) || 0); setExceedingKmFee(Number(courier.exceedingKmFee) || 0);
+        setSurcharge(Number(courier.surcharge) || 0); setNightDifferential(Number(courier.nightDifferential) || 0); setShowCourierModal(true);
+      } else return;
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    };
+    window.addEventListener("hashchange", openFromHash); openFromHash();
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, [warehouses, couriers]);
+
   useEffect(() => {
     fetchWarehouses();
     fetchCouriers();
@@ -408,16 +435,9 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg text-slate-900">Fulfillment Centers</h3>
               <p className="text-xs font-mono text-slate-500 mt-1">Manage physical locations where deliveries originate.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                resetWarehouseForm();
-                setShowWarehouseModal(true);
-              }}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
-            >
+            <a href="#admin-add-warehouse" role="button" className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer">
               <Plus className="w-4 h-4" /> Add Warehouse
-            </button>
+            </a>
           </div>
 
           {warehouseError && (
@@ -500,16 +520,9 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg text-slate-900">Courier Services</h3>
               <p className="text-xs font-mono text-slate-500 mt-1">Configure logistics partners and delivery fee calculators.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                resetCourierForm();
-                setShowCourierModal(true);
-              }}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
-            >
+            <a href="#admin-add-courier" role="button" className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer">
               <Plus className="w-4 h-4" /> Add Courier
-            </button>
+            </a>
           </div>
 
           {courierError && !showCourierModal && (
