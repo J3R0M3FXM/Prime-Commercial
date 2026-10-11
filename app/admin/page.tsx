@@ -1,5 +1,7 @@
 "use client";
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+// @ts-expect-error The project currently omits @types/react-dom; the runtime export exists.
+import { createPortal } from "react-dom";
 import { 
   Users, 
   Package, 
@@ -5354,7 +5356,7 @@ export default function AdminPage() {
             </div>
 
             {/* PRODUCT CONFIGURATION MODAL (Only opened via button, not shown right away) */}
-            {productModalOpen && (
+            {productModalOpen && createPortal((
               <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-2.5">
                 <div className="bg-white rounded-none max-w-[430px] w-full max-h-[90vh] flex flex-col p-3 shadow-none border border-slate-200">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
@@ -5642,7 +5644,7 @@ export default function AdminPage() {
                   </form>
                 </div>
               </div>
-            )}
+            ), document.body)}
           </motion.div>
         )}
 
