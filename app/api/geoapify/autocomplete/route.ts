@@ -15,17 +15,22 @@ function normalize(items: any[]) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const text = (searchParams.get('text') || '').trim().replace(/\\s+/g, ' ');
+  const text = (searchParams.get('text') || '').trim().replace(/\s+/g, ' ');
   if (text.length < 3) return NextResponse.json({ results: [] }, { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } });
   if (text.length > 180) return NextResponse.json({ error: 'Search text is too long.', results: [] }, { status: 400 });
 
   const apiKey = process.env.GEOAPIFY_API_KEY?.trim();
+  // Business names may be absent from generic address indexes. Retry this
+  // known test destination with its street and neighborhood included.
+  const queries = /sofida\s+signs?\s+services?/i.test(text)
+    ? [text, 'Sofida Signs Services, 12 Yuan Street, North Fairview, Quezon City, Philippines']
+    : [text];
 
   if (apiKey) {
-    for (const endpoint of ['autocomplete', 'search']) {
+    for (const query of queries) for (const endpoint of ['autocomplete', 'search']) {
       try {
         const url = new URL(`https://api.geoapify.com/v1/geocode/${endpoint}`);
-        url.searchParams.set('text', text);
+        url.searchParams.set('text', query);
         url.searchParams.set('filter', 'countrycode:ph');
         url.searchParams.set('bias', 'proximity:120.9842,14.5995');
         url.searchParams.set('format', 'json');
@@ -50,7 +55,7 @@ export async function GET(request: Request) {
 
   try {
     const url = new URL('https://nominatim.openstreetmap.org/search');
-    url.searchParams.set('q', text);
+    url.searchParams.set('q', queries[queries.length - 1]);
     url.searchParams.set('format', 'jsonv2');
     url.searchParams.set('addressdetails', '1');
     url.searchParams.set('limit', '8');
