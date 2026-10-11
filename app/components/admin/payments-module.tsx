@@ -297,8 +297,8 @@ export default function PaymentsModule() {
       setIsReordering(true);
       const reorderPayload = updated.map((m, idx) => ({ id: m.id, sortOrder: idx }));
       await fetch("/api/admin/payments", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: "PUT", credentials: "include", cache: "no-store",
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", "Pragma": "no-cache" },
         body: JSON.stringify({ reorder: reorderPayload })
       });
     } catch (e) {
@@ -396,13 +396,15 @@ export default function PaymentsModule() {
       if (editingId) {
         res = await fetch("/api/admin/payments", {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          credentials: "include", cache: "no-store",
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", "Pragma": "no-cache" },
           body: JSON.stringify({ id: editingId, ...payload })
         });
       } else {
         res = await fetch("/api/admin/payments", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          credentials: "include", cache: "no-store",
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", "Pragma": "no-cache" },
           body: JSON.stringify(payload)
         });
       }
@@ -425,8 +427,9 @@ export default function PaymentsModule() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this payment method?")) return;
     try {
-      const res = await fetch(`/api/admin/payments?id=${id}`, {
-        method: "DELETE"
+      const res = await fetch(`/api/admin/payments?id=${encodeURIComponent(id)}`, {
+        method: "DELETE", credentials: "include", cache: "no-store",
+        headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
       });
       if (res.ok) {
         await fetchMethods();
