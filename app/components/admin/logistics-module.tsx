@@ -514,23 +514,9 @@ export default function LogisticsModule() {
                   </div>
                   
                   <div className="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingWarehouse(wh);
-                        setWhName(wh.name || "");
-                        setWhAddress(wh.address || "");
-                        setWhLat(wh.lat ?? wh.latitude ?? 14.5995);
-                        setWhLon(wh.lon ?? wh.longitude ?? 120.9842);
-                        setIsDefaultWh(Boolean(wh.isDefault));
-                        setSearchQuery("");
-                        setWarehouseError(null);
-                        setShowWarehouseModal(true);
-                      }}
-                      className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md cursor-pointer"
-                    >
+                    <a href={`#admin-edit-warehouse-${encodeURIComponent(String(wh.id))}`} role="button" className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md cursor-pointer">
                       Edit Details
-                    </button>
+                    </a>
                     {!wh.isDefault && (
                       <button
                         onClick={() => deleteWarehouse(wh.id)}
@@ -625,27 +611,9 @@ export default function LogisticsModule() {
                   </div>
                   
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingCourier(courier);
-                        setCourierName(courier.name || "");
-                        setCourierLogo(courier.logo || "");
-                        setCourierType(courier.type || "Standard");
-                        setBaseFare(Number(courier.baseFare) || 0);
-                        setFirstMile(Number(courier.firstMile) || 0);
-                        setFirstMileFee(Number(courier.firstMileFee) || 0);
-                        setExceedingKmFee(Number(courier.exceedingKmFee) || 0);
-                        setSurcharge(Number(courier.surcharge) || 0);
-                        setNightDifferential(Number(courier.nightDifferential) || 0);
-                        setCourierError(null);
-                        if (courierFileInputRef.current) courierFileInputRef.current.value = "";
-                        setShowCourierModal(true);
-                      }}
-                      className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md cursor-pointer"
-                    >
+                    <a href={`#admin-edit-courier-${encodeURIComponent(String(courier.id))}`} role="button" className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md cursor-pointer">
                       Edit Config
-                    </button>
+                    </a>
                     <button
                       onClick={() => deleteCourier(courier.id)}
                       className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
