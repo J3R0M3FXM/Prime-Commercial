@@ -77,7 +77,8 @@ import {
   ChevronUp,
   Film,
   Scan,
-  FileCheck
+  FileCheck,
+  Headphones
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { motion, AnimatePresence } from "motion/react";
