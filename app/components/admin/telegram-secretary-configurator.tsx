@@ -241,7 +241,7 @@ export default function TelegramSecretaryConfigurator() {
       setNotice("MEDIA URL IS REQUIRED FOR " + invalidMedia.text.toUpperCase() + ".");
       return;
     }
-    const invalidUrl = selected.buttons.find((button) => button.action === "url" && !/^https?:\\/\\//i.test(button.url.trim()));
+    const invalidUrl = selected.buttons.find((button) => button.action === "url" && !/^https?:\/\//i.test(button.url.trim()));
     if (invalidUrl) {
       setNotice("ENTER A VALID HTTP(S) URL FOR " + invalidUrl.text.toUpperCase() + ".");
       return;
