@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-// @ts-expect-error The project currently omits @types/react-dom; the runtime export exists.
 import { createPortal } from 'react-dom';
 import { Plus, Settings, Receipt, Loader2, X, Check, Trash2, Edit2, Power } from 'lucide-react';
 import { normalizeCharge, type ChargeConfig } from '@/lib/charges';

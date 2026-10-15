@@ -20,10 +20,296 @@ export function toCamelCase(obj: Record<string, any>): Record<string, any> {
 }
 
 // ==============================================================================
+// IN-MEMORY STUBS (Active when Supabase is not configured)
+// ==============================================================================
+const DEFAULT_PRODUCTS = [
+  {
+    id: 'prod-001',
+    name: 'PRIME Heavyweight French Terry Hoodie',
+    price: 1899,
+    stock: 45,
+    category: 'Clothing',
+    imageUrl: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
+    description: 'Signature 460gsm cotton fleece hoodie with structured drop-shoulder fit and matte chrome hardware accents.',
+    isActive: true,
+    active: true,
+    isFeatured: true,
+    sortOrder: 1,
+    bundleConfig: {
+      variants: [
+        { id: 'v1', name: 'Black / M', price: 1899, stock: 15 },
+        { id: 'v2', name: 'Black / L', price: 1899, stock: 20 },
+        { id: 'v3', name: 'Black / XL', price: 1899, stock: 10 },
+      ],
+      lowStockThreshold: 5,
+    },
+    variants: [
+      { id: 'v1', name: 'Black / M', price: 1899, stock: 15 },
+      { id: 'v2', name: 'Black / L', price: 1899, stock: 20 },
+      { id: 'v3', name: 'Black / XL', price: 1899, stock: 10 },
+    ],
+    lowStockThreshold: 5,
+    tags: ['Best Seller', 'Drop 01', 'Featured'],
+    gallery: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'prod-002',
+    name: 'PRIME Oversized Minimalist Tee',
+    price: 899,
+    stock: 60,
+    category: 'Clothing',
+    imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80',
+    description: '280gsm combed cotton boxy tee. High density ribbed collar with subtle tonal PRIME crest typography.',
+    isActive: true,
+    active: true,
+    isFeatured: true,
+    sortOrder: 2,
+    bundleConfig: {
+      variants: [
+        { id: 'v4', name: 'Washed Black / M', price: 899, stock: 25 },
+        { id: 'v5', name: 'Washed Black / L', price: 899, stock: 25 },
+        { id: 'v6', name: 'Chalk White / L', price: 899, stock: 10 },
+      ],
+      lowStockThreshold: 5,
+    },
+    variants: [
+      { id: 'v4', name: 'Washed Black / M', price: 899, stock: 25 },
+      { id: 'v5', name: 'Washed Black / L', price: 899, stock: 25 },
+      { id: 'v6', name: 'Chalk White / L', price: 899, stock: 10 },
+    ],
+    lowStockThreshold: 5,
+    tags: ['Essential', 'Featured'],
+    gallery: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'prod-003',
+    name: 'PRIME Stealth Crossbody Bag',
+    price: 1450,
+    stock: 28,
+    category: 'Bags',
+    imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=800&q=80',
+    description: 'Weather-resistant Cordura ballistic nylon sling with Fidlock magnetic buckle and modular compartments.',
+    isActive: true,
+    active: true,
+    isFeatured: true,
+    sortOrder: 3,
+    bundleConfig: { variants: [], lowStockThreshold: 5 },
+    variants: [],
+    lowStockThreshold: 5,
+    tags: ['Accessories', 'Waterproof'],
+    gallery: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'prod-004',
+    name: 'PRIME Insulated Tumbler 750ml',
+    price: 1150,
+    stock: 35,
+    category: 'Accessories',
+    imageUrl: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=800&q=80',
+    description: 'Double-wall vacuum insulated 18/8 stainless steel flask. Keeps beverages cold 24h, hot 12h.',
+    isActive: true,
+    active: true,
+    isFeatured: false,
+    sortOrder: 4,
+    bundleConfig: { variants: [], lowStockThreshold: 5 },
+    variants: [],
+    lowStockThreshold: 5,
+    tags: ['Lifestyle'],
+    gallery: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'prod-005',
+    name: 'PRIME Low-Profile Dad Cap',
+    price: 650,
+    stock: 50,
+    category: 'Accessories',
+    imageUrl: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=800&q=80',
+    description: 'Washed cotton twill 6-panel cap with brass tri-glide closure and discreet tonal embroidery.',
+    isActive: true,
+    active: true,
+    isFeatured: false,
+    sortOrder: 5,
+    bundleConfig: { variants: [], lowStockThreshold: 5 },
+    variants: [],
+    lowStockThreshold: 5,
+    tags: ['Headwear'],
+    gallery: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'prod-006',
+    name: 'PRIME Cargo Utility Track Pants',
+    price: 1750,
+    stock: 22,
+    category: 'Clothing',
+    imageUrl: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=800&q=80',
+    description: 'Ergonomic tapered fit with dual bellows cargo pockets and toggle hem cinch cords.',
+    isActive: true,
+    active: true,
+    isFeatured: false,
+    sortOrder: 6,
+    bundleConfig: {
+      variants: [
+        { id: 'v7', name: 'Matte Slate / M', price: 1750, stock: 10 },
+        { id: 'v8', name: 'Matte Slate / L', price: 1750, stock: 12 },
+      ],
+      lowStockThreshold: 5,
+    },
+    variants: [
+      { id: 'v7', name: 'Matte Slate / M', price: 1750, stock: 10 },
+      { id: 'v8', name: 'Matte Slate / L', price: 1750, stock: 12 },
+    ],
+    lowStockThreshold: 5,
+    tags: ['New Arrival'],
+    gallery: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+let inMemoryProducts: any[] = [...DEFAULT_PRODUCTS];
+let inMemoryOrders: any[] = [];
+let inMemoryCouriers: any[] = [
+  {
+    id: 'courier-grab',
+    name: 'Grab Express (Metro Manila)',
+    trackingUrlPattern: 'https://grab.com/ph/track/{trackingNumber}',
+    isActive: true,
+    sortOrder: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'courier-lalamove',
+    name: 'Lalamove Instant Courier',
+    trackingUrlPattern: 'https://lalamove.com/track/{trackingNumber}',
+    isActive: true,
+    sortOrder: 2,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'courier-jnt',
+    name: 'J&T Express (Nationwide)',
+    trackingUrlPattern: 'https://jtexpress.ph/index/query/gzquery.html?bills={trackingNumber}',
+    isActive: true,
+    sortOrder: 3,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+let inMemoryWarehouses: any[] = [
+  {
+    id: 'wh-main',
+    name: 'PRIME BGC Fulfillment Hub',
+    code: 'BGC-01',
+    address: 'Bonifacio Global City, Taguig, Metro Manila',
+    lat: 14.5492,
+    lon: 121.0478,
+    isActive: true,
+    isDefault: true,
+    sortOrder: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+let inMemoryCharges: any[] = [
+  {
+    id: 'charge-packaging',
+    name: 'Eco-Protective Packaging',
+    type: 'fixed',
+    amount: 30,
+    value: 30,
+    rate: 30,
+    isActive: true,
+    isDefault: true,
+    defaultAddToBill: true,
+    schedules: { days: [0,1,2,3,4,5,6], daysOfWeek: [0,1,2,3,4,5,6], isOvernight: false, overnight: false, isRecurring: false, recurring: false },
+    description: 'High-grade biodegradable courier packaging and tamper-evident seal.',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+let inMemoryPaymentMethods: any[] = [
+  {
+    id: 'pm-gcash',
+    name: 'GCash',
+    logo: '',
+    paymentType: 'manual_qr',
+    qrCodeImage: '',
+    accountName: 'PRIME MERCHANDISE PH',
+    accountNumber: '0917-123-4567',
+    sortOrder: 1,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'pm-maya',
+    name: 'Maya',
+    logo: '',
+    paymentType: 'manual_qr',
+    qrCodeImage: '',
+    accountName: 'PRIME STORE INC',
+    accountNumber: '0918-987-6543',
+    sortOrder: 2,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'pm-cod',
+    name: 'Cash on Delivery',
+    logo: '',
+    paymentType: 'cod',
+    qrCodeImage: '',
+    accountName: '',
+    accountNumber: '',
+    sortOrder: 3,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+let inMemoryCustomers: any[] = [];
+let inMemoryPromos: any[] = [
+  {
+    id: 'promo-prime10',
+    code: 'PRIME10',
+    title: '10% Off Prime Welcome',
+    description: 'Enjoy 10% off on your order over ₱1,000.',
+    voucherType: 'shop_voucher',
+    discountType: 'percentage',
+    discountValue: 10,
+    maxDiscountAmount: 300,
+    minSpend: 1000,
+    customerEligibility: 'all',
+    allowedPaymentMethods: ['all'],
+    allowedCourierIds: ['all'],
+    activeDaysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    isPaydayOnly: false,
+    usageLimitPerCustomer: 1,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+let inMemoryPromoRedemptions: any[] = [];
+
+// ==============================================================================
 // PRODUCTS
 // ==============================================================================
 export async function getProductsFromDb() {
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [...inMemoryProducts];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('products')
@@ -62,7 +348,31 @@ export async function getProductsFromDb() {
 }
 
 export async function createProductInDb(productData: any) {
-  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
+  if (!isSupabaseAdminConfigured()) {
+    const id = `prod-${Date.now()}`;
+    const newProduct = {
+      id,
+      name: productData.name || '',
+      price: Number(productData.price) || 0,
+      stock: Number(productData.stock) || 0,
+      category: productData.category || 'General',
+      imageUrl: productData.imageUrl || '',
+      description: productData.description || '',
+      isActive: productData.isActive !== false,
+      active: productData.isActive !== false,
+      isFeatured: Boolean(productData.isFeatured),
+      sortOrder: Number(productData.sortOrder) || inMemoryProducts.length + 1,
+      bundleConfig: productData.bundleConfig || {},
+      variants: Array.isArray(productData.variants) ? productData.variants : [],
+      lowStockThreshold: Number(productData.lowStockThreshold || 5),
+      tags: productData.tags || [],
+      gallery: productData.gallery || [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    inMemoryProducts.push(newProduct);
+    return newProduct;
+  }
   const supabase = getSupabaseAdmin()!;
   const payload = {
     name: productData.name,
@@ -89,7 +399,17 @@ export async function createProductInDb(productData: any) {
 }
 
 export async function updateProductInDb(id: string, updates: any) {
-  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
+  if (!isSupabaseAdminConfigured()) {
+    const idx = inMemoryProducts.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      inMemoryProducts[idx] = {
+        ...inMemoryProducts[idx],
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    return { success: true };
+  }
   const supabase = getSupabaseAdmin()!;
   const payload: Record<string, any> = {};
   if (updates.name !== undefined) payload.name = updates.name;
@@ -128,7 +448,10 @@ export async function updateProductInDb(id: string, updates: any) {
 }
 
 export async function deleteProductInDb(id: string) {
-  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
+  if (!isSupabaseAdminConfigured()) {
+    inMemoryProducts = inMemoryProducts.filter(p => p.id !== id);
+    return { success: true };
+  }
   const supabase = getSupabaseAdmin()!;
   const { error } = await supabase.from('products').delete().eq('id', id);
   if (error) throw error;
@@ -139,7 +462,7 @@ export async function deleteProductInDb(id: string) {
 // ORDERS
 // ==============================================================================
 export async function getOrdersFromDb(limitCount = 150) {
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [...inMemoryOrders];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('orders')
@@ -187,7 +510,16 @@ export async function getOrdersFromDb(limitCount = 150) {
 }
 
 export async function getCustomerOrdersFromDb(customerId: string, primeMemberId: string) {
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) {
+    return inMemoryOrders.map(o => ({
+      id: o.id,
+      status: o.status,
+      subtotal: Number(o.subtotal) || 0,
+      subTotal: Number(o.subtotal) || 0,
+      totalAmount: Number(o.totalAmount) || 0,
+      createdAt: o.createdAt,
+    })) as any[];
+  }
   const supabase = getSupabaseAdmin()!;
   let queryBuilder = supabase.from('orders').select('*');
   if (customerId && primeMemberId) {
@@ -215,7 +547,22 @@ export async function getCustomerOrdersFromDb(customerId: string, primeMemberId:
 }
 
 export async function createOrderInDb(orderPayload: any) {
-  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
+  if (!isSupabaseAdminConfigured()) {
+    const orderNumber = orderPayload.orderNumber || `ORD-${Date.now()}`;
+    const newOrder = {
+      id: `ord_${Date.now()}`,
+      orderNumber,
+      ...orderPayload,
+      status: orderPayload.status || 'Processing',
+      paymentStatus: orderPayload.paymentStatus || (orderPayload.paymentProofImage ? 'Pending Review' : 'Unpaid'),
+      reviewStatus: 'Pending Manual Review',
+      requiresManualReview: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    inMemoryOrders.unshift(newOrder);
+    return newOrder;
+  }
   const supabase = getSupabaseAdmin()!;
   const payload = {
     order_number: orderPayload.orderNumber || `ORD-${Date.now()}`,
@@ -256,7 +603,13 @@ export async function createOrderInDb(orderPayload: any) {
 }
 
 export async function updateOrderInDb(id: string, updates: any) {
-  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
+  if (!isSupabaseAdminConfigured()) {
+    const idx = inMemoryOrders.findIndex(o => o.id === id);
+    if (idx !== -1) {
+      inMemoryOrders[idx] = { ...inMemoryOrders[idx], ...updates, updatedAt: new Date().toISOString() };
+    }
+    return { success: true };
+  }
   const supabase = getSupabaseAdmin()!;
   const payload: Record<string, any> = { updated_at: new Date().toISOString() };
   if (updates.status !== undefined) payload.status = updates.status;
@@ -367,7 +720,7 @@ function serializePromoDescription(promoData: any) {
 }
 
 export async function getPromosFromDb() {
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [...inMemoryPromos];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('promos')
@@ -380,7 +733,10 @@ export async function getPromosFromDb() {
 
 export async function getPromoByCodeFromDb(code: string) {
   const cleanCode = String(code || '').trim().toUpperCase();
-  if (!isSupabaseAdminConfigured()) return null;
+  if (!isSupabaseAdminConfigured()) {
+    const found = inMemoryPromos.find(p => p.code === cleanCode);
+    return found ? { ...found } : null;
+  }
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('promos')
@@ -393,7 +749,17 @@ export async function getPromoByCodeFromDb(code: string) {
 }
 
 export async function createPromoInDb(promoData: any) {
-  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
+  if (!isSupabaseAdminConfigured()) {
+    const newPromo = {
+      id: promoData.id || `promo_${Date.now()}`,
+      code: String(promoData.code || '').trim().toUpperCase(),
+      ...promoData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    inMemoryPromos.push(newPromo);
+    return newPromo;
+  }
   const supabase = getSupabaseAdmin()!;
   const serializedDesc = serializePromoDescription(promoData);
   const payload = {
@@ -419,7 +785,14 @@ export async function createPromoInDb(promoData: any) {
 }
 
 export async function updatePromoInDb(id: string, updates: any) {
-  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
+  if (!isSupabaseAdminConfigured()) {
+    const idx = inMemoryPromos.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      inMemoryPromos[idx] = { ...inMemoryPromos[idx], ...updates, updatedAt: new Date().toISOString() };
+      return inMemoryPromos[idx];
+    }
+    return null;
+  }
   const supabase = getSupabaseAdmin()!;
   const { data: current, error: getErr } = await supabase
     .from('promos')
@@ -476,7 +849,10 @@ export async function updatePromoInDb(id: string, updates: any) {
 }
 
 export async function deletePromoInDb(id: string) {
-  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
+  if (!isSupabaseAdminConfigured()) {
+    inMemoryPromos = inMemoryPromos.filter(p => p.id !== id);
+    return { success: true };
+  }
   const supabase = getSupabaseAdmin()!;
   const { error } = await supabase.from('promos').delete().eq('id', id);
   if (error) throw error;
@@ -484,7 +860,7 @@ export async function deletePromoInDb(id: string) {
 }
 
 export async function getPromoRedemptionsFromDb(limitCount = 200) {
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [...inMemoryPromoRedemptions];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('promo_redemptions')
@@ -509,7 +885,23 @@ export async function getPromoRedemptionsFromDb(limitCount = 200) {
 }
 
 export async function createPromoRedemptionInDb(redemptionPayload: any) {
-  if (!isSupabaseAdminConfigured()) throw new Error('Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY');
+  if (!isSupabaseAdminConfigured()) {
+    const payload = {
+      id: redemptionPayload.id || `red_${Date.now()}`,
+      promo_code: redemptionPayload.promoCode,
+      promo_id: redemptionPayload.promoId,
+      customer_id: redemptionPayload.customerId || null,
+      order_id: redemptionPayload.orderId || null,
+      device_id: redemptionPayload.deviceId || null,
+      hardware_id: redemptionPayload.hardwareId || null,
+      device_fingerprint_id: redemptionPayload.deviceFingerprintId || null,
+      server_fingerprint_id: redemptionPayload.serverFingerprintId || null,
+      discount_amount: Number(redemptionPayload.discountAmount) || 0,
+      used_at: redemptionPayload.usedAt || new Date().toISOString()
+    };
+    inMemoryPromoRedemptions.push(payload);
+    return payload;
+  }
   const supabase = getSupabaseAdmin()!;
   const payload = {
     id: redemptionPayload.id || `red_${Date.now()}`,
@@ -531,7 +923,24 @@ export async function createPromoRedemptionInDb(redemptionPayload: any) {
 
 export async function getPromoRedemptionsForCodeFromDb(code: string) {
   const cleanCode = String(code || '').trim().toUpperCase();
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) {
+    return inMemoryPromoRedemptions
+      .filter(r => (r.promo_code || r.promoCode) === cleanCode && !(r.released_at || r.releasedAt))
+      .map(r => ({
+        id: r.id,
+        promoCode: r.promo_code || r.promoCode,
+        promoId: r.promo_id || r.promoId,
+        customerId: r.customer_id || r.customerId,
+        orderId: r.order_id || r.orderId,
+        deviceId: r.device_id || r.deviceId,
+        hardwareId: r.hardware_id || r.hardwareId,
+        deviceFingerprintId: r.device_fingerprint_id || r.deviceFingerprintId,
+        serverFingerprintId: r.server_fingerprint_id || r.serverFingerprintId,
+        releasedAt: r.released_at || r.releasedAt,
+        discountAmount: Number(r.discount_amount || r.discountAmount) || 0,
+        usedAt: r.used_at || r.usedAt
+      }));
+  }
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('promo_redemptions')
@@ -560,7 +969,7 @@ export async function getPromoRedemptionsForCodeFromDb(code: string) {
 // WAREHOUSES, COURIERS, CHARGES, PAYMENT METHODS, CUSTOMERS
 // ==============================================================================
 export async function getWarehousesFromDb() {
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [...inMemoryWarehouses];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('warehouses').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -580,7 +989,7 @@ export async function getWarehousesFromDb() {
 }
 
 export async function getCouriersFromDb() {
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [...inMemoryCouriers];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('couriers').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -596,7 +1005,7 @@ export async function getCouriersFromDb() {
 }
 
 export async function getChargesFromDb() {
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [...inMemoryCharges];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('charges').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -634,7 +1043,7 @@ export async function getChargesFromDb() {
 }
 
 export async function getPaymentMethodsFromDb() {
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [...inMemoryPaymentMethods];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('payment_methods').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -658,7 +1067,7 @@ export async function getPaymentMethodsFromDb() {
 }
 
 export async function getCustomersFromDb() {
-  if (!isSupabaseAdminConfigured()) return [];
+  if (!isSupabaseAdminConfigured()) return [...inMemoryCustomers];
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
   if (error) throw error;

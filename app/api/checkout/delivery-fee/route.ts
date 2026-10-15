@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from '@/lib/delivery-fee';
+import { getWarehousesFromDb, getCouriersFromDb } from '@/lib/db-adapter';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,23 +18,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Valid destination coordinates are required.' }, { status: 400 });
     }
 
+    let warehouses: any[] = [];
+    let courierRows: any[] = [];
+
     if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Logistics database is not configured.' }, { status: 503 });
+      warehouses = await getWarehousesFromDb();
+      courierRows = await getCouriersFromDb();
+    } else {
+      const supabase = getSupabaseAdmin()!;
+
+      const { data: whData, error: warehouseError } = await supabase
+        .from('warehouses')
+        .select('id,name,address,latitude,longitude,is_active,is_default,sort_order')
+        .eq('is_active', true)
+        .order('is_default', { ascending: false })
+        .order('sort_order', { ascending: true });
+
+      if (warehouseError) throw warehouseError;
+      warehouses = whData || [];
+
+      const { data: crData, error: courierError } = await supabase
+        .from('couriers')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (courierError) throw courierError;
+      courierRows = crData || [];
     }
 
-    const supabase = getSupabaseAdmin()!;
-
-    const { data: warehouses, error: warehouseError } = await supabase
-      .from('warehouses')
-      .select('id,name,address,latitude,longitude,is_active,is_default,sort_order')
-      .eq('is_active', true)
-      .order('is_default', { ascending: false })
-      .order('sort_order', { ascending: true });
-
-    if (warehouseError) throw warehouseError;
-
     const warehouse = (warehouses || []).find(
-      (w: any) => Number.isFinite(Number(w.latitude)) && Number.isFinite(Number(w.longitude))
+      (w: any) => Number.isFinite(Number(w.latitude || w.lat)) && Number.isFinite(Number(w.longitude || w.lon))
     );
 
     if (!warehouse) {
@@ -43,16 +58,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const originLat = Number(warehouse.latitude);
-    const originLon = Number(warehouse.longitude);
-
-    const { data: courierRows, error: courierError } = await supabase
-      .from('couriers')
-      .select('*')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
-
-    if (courierError) throw courierError;
+    const originLat = Number(warehouse.latitude ?? warehouse.lat);
+    const originLon = Number(warehouse.longitude ?? warehouse.lon);
 
     const couriersList = (courierRows || []).map((c: any) => ({
       id: c.id,

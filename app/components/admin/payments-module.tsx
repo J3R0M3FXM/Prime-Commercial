@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-// @ts-expect-error The project currently omits @types/react-dom; the runtime export exists.
 import { createPortal } from "react-dom";
 import { 
   CreditCard, 

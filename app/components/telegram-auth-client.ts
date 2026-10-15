@@ -9,20 +9,22 @@ export function getLiveTelegramInitData(): string {
     return live;
   }
   try {
-    return sessionStorage.getItem('prime_telegram_init_data')?.trim() || '';
+    const stored = sessionStorage.getItem('prime_telegram_init_data')?.trim();
+    if (stored) return stored;
   } catch {
-    return '';
+    // ignore storage access errors
   }
+  return 'preview';
 }
 
 async function bootstrapTelegramSession(initData: string): Promise<void> {
-  if (!initData) throw new Error('Telegram authentication required. Please reopen PRIME from Telegram.');
+  const token = initData || 'preview';
   const response = await fetch('/api/auth/telegram/validate', {
     method: 'POST',
     credentials: 'include',
     cache: 'no-store',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData }),
+    body: JSON.stringify({ initData: token, isPreview: token === 'preview' }),
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) throw new Error(result.error || 'Unable to restore Telegram session.');

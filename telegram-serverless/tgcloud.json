@@ -1,0 +1,12 @@
+{
+  "$schema": "https://telegram.org/schemas/tgcloud.json",
+  "name": "prime-commercial-serverless",
+  "entry": "index.js",
+  "schema": "schema.js",
+  "runtime": "v8-edge",
+  "env": [
+    "PRIME_APP_URL",
+    "NEXT_PUBLIC_APP_URL"
+  ],
+  "description": "PRIME Commercial Telegram Mini App Serverless Backend & Secretary Bot"
+}

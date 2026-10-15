@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-// @ts-expect-error The project currently omits @types/react-dom; the runtime export exists.
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { Plus, MapPin, Building2, Truck, Check, Search, X, Loader2, Star, Settings, AlertCircle, Trash2, Sparkles } from "lucide-react";

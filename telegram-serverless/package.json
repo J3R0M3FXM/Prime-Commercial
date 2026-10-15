@@ -1,0 +1,14 @@
+{
+  "name": "prime-telegram-serverless",
+  "version": "1.0.0",
+  "description": "Serverless backend, bot handlers, and SQLite database for PRIME Commercial on Telegram Serverless infrastructure",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "tgcloud push",
+    "migrate": "tgcloud migrate",
+    "status": "tgcloud status",
+    "dev": "tgcloud run"
+  },
+  "dependencies": {}
+}
