@@ -587,6 +587,7 @@ export default function AdminPage() {
   const [productSearch, setProductSearch] = useState("");
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   const [inventorySearch, setInventorySearch] = useState("");
   const [inventoryFilter, setInventoryFilter] = useState<"all" | "low" | "out">("all");
@@ -1096,8 +1097,10 @@ export default function AdminPage() {
   };
 
   const handleSaveProduct = async (productData: any) => {
+    setIsSavingProduct(true);
     try {
       let res;
+      let savedData = null;
       if (editingProduct?.id) {
         res = await adminFetch("/api/admin/products", {
           method: "PUT",
@@ -1117,13 +1120,25 @@ export default function AdminPage() {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || `HTTP error ${res.status}`);
       }
+      savedData = await res.json().catch(() => null);
+
+      if (editingProduct?.id) {
+        setProducts(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...productData, id: editingProduct.id } : p));
+      } else if (savedData && savedData.id) {
+        setProducts(prev => [savedData, ...prev]);
+      } else {
+        fetchAllData();
+      }
+
       setProductModalOpen(false);
       setEditingProduct(null);
-      fetchAllData();
       showAlert("Product saved successfully.", "Success", "success");
+      setTimeout(() => fetchAllData(), 300);
     } catch (e: any) {
       console.error(e);
       showAlert(`Failed to save product: ${e.message || String(e)}`, "Error", "error");
+    } finally {
+      setIsSavingProduct(false);
     }
   };
 
@@ -5635,9 +5650,11 @@ export default function AdminPage() {
                       </button>
                       <button
                         type="submit"
-                        className="px-3 py-2 bg-slate-900 hover:bg-black text-white rounded-none font-bold uppercase tracking-wider text-[11px] shadow-none"
+                        disabled={isSavingProduct}
+                        className="px-3 py-2 bg-slate-900 hover:bg-black text-white rounded-none font-bold uppercase tracking-wider text-[11px] shadow-none disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
                       >
-                        Save Product
+                        {isSavingProduct && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        {isSavingProduct ? "SAVING..." : "Save Product"}
                       </button>
                     </div>
                   </form>
