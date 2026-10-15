@@ -176,7 +176,39 @@ const DEFAULT_PRODUCTS = [
   },
 ];
 
-let inMemoryProducts: any[] = [...DEFAULT_PRODUCTS];
+import fs from 'fs';
+import path from 'path';
+
+const DATA_DIR = path.join(process.cwd(), '.data');
+const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
+
+function loadInMemoryProducts() {
+  try {
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      const data = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to load products from disk:", e);
+  }
+  return [...DEFAULT_PRODUCTS];
+}
+
+function saveInMemoryProducts(products: any[]) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf8');
+  } catch (e) {
+    console.warn("Failed to save products to disk:", e);
+  }
+}
+
+let inMemoryProducts: any[] = loadInMemoryProducts();
 let inMemoryOrders: any[] = [];
 let inMemoryCouriers: any[] = [
   {
@@ -309,147 +341,170 @@ let inMemoryPromoRedemptions: any[] = [];
 // PRODUCTS
 // ==============================================================================
 export async function getProductsFromDb() {
-  if (!isSupabaseAdminConfigured()) return [...inMemoryProducts];
-  const supabase = getSupabaseAdmin()!;
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .order('sort_order', { ascending: true })
-    .order('name', { ascending: true });
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const supabase = getSupabaseAdmin()!;
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true });
 
-  if (error) {
-    console.error('Supabase getProducts error:', error);
-    throw error;
+      if (!error && data && data.length > 0) {
+        return data.map(p => {
+          const bundleConfig = (p.bundle_config && typeof p.bundle_config === 'object') ? p.bundle_config : {};
+          return {
+            id: p.id,
+            name: p.name,
+            price: Number(p.price),
+            stock: Number(p.stock),
+            category: p.category,
+            imageUrl: p.image_url,
+            description: p.description,
+            isActive: p.is_active,
+            active: p.is_active,
+            isFeatured: p.is_featured,
+            sortOrder: p.sort_order,
+            bundleConfig,
+            variants: Array.isArray(bundleConfig.variants) ? bundleConfig.variants : [],
+            lowStockThreshold: Number(bundleConfig.lowStockThreshold ?? 10),
+            tags: p.tags,
+            gallery: p.gallery,
+            createdAt: p.created_at,
+            updatedAt: p.updated_at,
+          };
+        });
+      }
+    } catch (err) {
+      console.warn("Supabase getProducts fallback to local:", err);
+    }
   }
-
-  return (data || []).map(p => {
-    const bundleConfig = (p.bundle_config && typeof p.bundle_config === 'object') ? p.bundle_config : {};
-    return {
-      id: p.id,
-      name: p.name,
-      price: Number(p.price),
-      stock: Number(p.stock),
-      category: p.category,
-      imageUrl: p.image_url,
-      description: p.description,
-      isActive: p.is_active,
-      active: p.is_active,
-      isFeatured: p.is_featured,
-      sortOrder: p.sort_order,
-      bundleConfig,
-      variants: Array.isArray(bundleConfig.variants) ? bundleConfig.variants : [],
-      lowStockThreshold: Number(bundleConfig.lowStockThreshold ?? 10),
-      tags: p.tags,
-      gallery: p.gallery,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at,
-    };
-  });
+  return [...inMemoryProducts];
 }
 
 export async function createProductInDb(productData: any) {
-  if (!isSupabaseAdminConfigured()) {
-    const id = `prod-${Date.now()}`;
-    const newProduct = {
-      id,
-      name: productData.name || '',
-      price: Number(productData.price) || 0,
-      stock: Number(productData.stock) || 0,
-      category: productData.category || 'General',
-      imageUrl: productData.imageUrl || '',
-      description: productData.description || '',
-      isActive: productData.isActive !== false,
-      active: productData.isActive !== false,
-      isFeatured: Boolean(productData.isFeatured),
-      sortOrder: Number(productData.sortOrder) || inMemoryProducts.length + 1,
-      bundleConfig: productData.bundleConfig || {},
-      variants: Array.isArray(productData.variants) ? productData.variants : [],
-      lowStockThreshold: Number(productData.lowStockThreshold || 5),
-      tags: productData.tags || [],
-      gallery: productData.gallery || [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    inMemoryProducts.push(newProduct);
-    return newProduct;
-  }
-  const supabase = getSupabaseAdmin()!;
-  const payload = {
-    name: productData.name,
+  const id = productData.id || `prod-${Date.now()}`;
+  const newProduct = {
+    id,
+    name: productData.name || '',
     price: Number(productData.price) || 0,
     stock: Number(productData.stock) || 0,
     category: productData.category || 'General',
-    image_url: productData.imageUrl || '',
+    imageUrl: productData.imageUrl || '',
     description: productData.description || '',
-    is_active: productData.isActive !== false,
-    is_featured: Boolean(productData.isFeatured),
-    sort_order: Number(productData.sortOrder) || 0,
-    bundle_config: {
-      ...((productData.bundleConfig && typeof productData.bundleConfig === 'object') ? productData.bundleConfig : {}),
-      ...(Array.isArray(productData.variants) ? { variants: productData.variants } : {}),
-      ...(productData.lowStockThreshold !== undefined ? { lowStockThreshold: Number(productData.lowStockThreshold) || 0 } : {}),
-    },
+    isActive: productData.isActive !== false,
+    active: productData.isActive !== false,
+    isFeatured: Boolean(productData.isFeatured),
+    sortOrder: Number(productData.sortOrder) || inMemoryProducts.length + 1,
+    bundleConfig: productData.bundleConfig || {},
+    variants: Array.isArray(productData.variants) ? productData.variants : [],
+    lowStockThreshold: Number(productData.lowStockThreshold || 5),
     tags: productData.tags || [],
     gallery: productData.gallery || [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
-  const { data, error } = await supabase.from('products').insert([payload]).select().single();
-  if (error) throw error;
-  return { id: data.id, ...productData };
+  const existingIdx = inMemoryProducts.findIndex(p => p.id === id);
+  if (existingIdx !== -1) {
+    inMemoryProducts[existingIdx] = { ...inMemoryProducts[existingIdx], ...newProduct };
+  } else {
+    inMemoryProducts.push(newProduct);
+  }
+  saveInMemoryProducts(inMemoryProducts);
+  cacheStore.invalidateProducts();
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const supabase = getSupabaseAdmin()!;
+      const payload = {
+        id,
+        name: newProduct.name,
+        price: newProduct.price,
+        stock: newProduct.stock,
+        category: newProduct.category,
+        image_url: newProduct.imageUrl,
+        description: newProduct.description,
+        is_active: newProduct.isActive,
+        is_featured: newProduct.isFeatured,
+        sort_order: newProduct.sortOrder,
+        bundle_config: {
+          ...newProduct.bundleConfig,
+          variants: newProduct.variants,
+          lowStockThreshold: newProduct.lowStockThreshold,
+        },
+        tags: newProduct.tags,
+        gallery: newProduct.gallery,
+        updated_at: newProduct.updatedAt,
+      };
+      await supabase.from('products').upsert([payload]);
+    } catch (err) {
+      console.warn("Supabase product upsert fallback to local:", err);
+    }
+  }
+
+  return newProduct;
 }
 
 export async function updateProductInDb(id: string, updates: any) {
-  if (!isSupabaseAdminConfigured()) {
-    const idx = inMemoryProducts.findIndex(p => p.id === id);
-    if (idx !== -1) {
-      inMemoryProducts[idx] = {
-        ...inMemoryProducts[idx],
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      };
-    }
-    return { success: true };
-  }
-  const supabase = getSupabaseAdmin()!;
-  const payload: Record<string, any> = {};
-  if (updates.name !== undefined) payload.name = updates.name;
-  if (updates.price !== undefined) payload.price = Number(updates.price);
-  if (updates.stock !== undefined) payload.stock = Number(updates.stock);
-  if (updates.category !== undefined) payload.category = updates.category;
-  if (updates.imageUrl !== undefined) payload.image_url = updates.imageUrl;
-  if (updates.description !== undefined) payload.description = updates.description;
-  if (updates.isActive !== undefined) payload.is_active = updates.isActive;
-  if (updates.active !== undefined) payload.is_active = Boolean(updates.active);
-  if (updates.isFeatured !== undefined) payload.is_featured = updates.isFeatured;
-  if (updates.sortOrder !== undefined) payload.sort_order = Number(updates.sortOrder);
-  if (updates.bundleConfig !== undefined) payload.bundle_config = updates.bundleConfig;
-  if (updates.variants !== undefined || updates.lowStockThreshold !== undefined) {
-    const { data: current, error: currentError } = await supabase
-      .from('products')
-      .select('bundle_config')
-      .eq('id', id)
-      .single();
-    if (currentError) throw currentError;
-    const currentBundle = (current?.bundle_config && typeof current.bundle_config === 'object') ? current.bundle_config : {};
-    payload.bundle_config = {
-      ...currentBundle,
-      ...(updates.bundleConfig && typeof updates.bundleConfig === 'object' ? updates.bundleConfig : {}),
-      ...(updates.variants !== undefined ? { variants: updates.variants } : {}),
-      ...(updates.lowStockThreshold !== undefined ? { lowStockThreshold: Number(updates.lowStockThreshold) || 0 } : {}),
+  const idx = inMemoryProducts.findIndex(p => p.id === id);
+  let updatedProduct: any;
+  if (idx !== -1) {
+    inMemoryProducts[idx] = {
+      ...inMemoryProducts[idx],
+      ...updates,
+      ...(updates.active !== undefined ? { isActive: Boolean(updates.active) } : {}),
+      ...(updates.isActive !== undefined ? { active: Boolean(updates.isActive) } : {}),
+      updatedAt: new Date().toISOString(),
     };
+    updatedProduct = inMemoryProducts[idx];
+  } else {
+    updatedProduct = { id, ...updates, updatedAt: new Date().toISOString() };
+    inMemoryProducts.push(updatedProduct);
   }
-  if (updates.tags !== undefined) payload.tags = updates.tags;
-  if (updates.gallery !== undefined) payload.gallery = updates.gallery;
-  payload.updated_at = new Date().toISOString();
+  saveInMemoryProducts(inMemoryProducts);
+  cacheStore.invalidateProducts();
 
-  const { error } = await supabase.from('products').update(payload).eq('id', id);
-  if (error) throw error;
-  return { success: true };
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const supabase = getSupabaseAdmin()!;
+      const payload: Record<string, any> = {};
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.price !== undefined) payload.price = Number(updates.price);
+      if (updates.stock !== undefined) payload.stock = Number(updates.stock);
+      if (updates.category !== undefined) payload.category = updates.category;
+      if (updates.imageUrl !== undefined) payload.image_url = updates.imageUrl;
+      if (updates.description !== undefined) payload.description = updates.description;
+      if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+      if (updates.active !== undefined) payload.is_active = Boolean(updates.active);
+      if (updates.isFeatured !== undefined) payload.is_featured = updates.isFeatured;
+      if (updates.sortOrder !== undefined) payload.sort_order = Number(updates.sortOrder);
+      if (updates.bundleConfig !== undefined) payload.bundle_config = updates.bundleConfig;
+      if (updates.variants !== undefined || updates.lowStockThreshold !== undefined) {
+        payload.bundle_config = {
+          ...(updatedProduct.bundleConfig || {}),
+          ...(updates.bundleConfig && typeof updates.bundleConfig === 'object' ? updates.bundleConfig : {}),
+          ...(updates.variants !== undefined ? { variants: updates.variants } : {}),
+          ...(updates.lowStockThreshold !== undefined ? { lowStockThreshold: Number(updates.lowStockThreshold) || 0 } : {}),
+        };
+      }
+      if (updates.tags !== undefined) payload.tags = updates.tags;
+      if (updates.gallery !== undefined) payload.gallery = updates.gallery;
+      payload.updated_at = new Date().toISOString();
+
+      await supabase.from('products').update(payload).eq('id', id);
+    } catch (err) {
+      console.warn("Supabase product update fallback to local:", err);
+    }
+  }
+
+  return { success: true, product: updatedProduct };
 }
 
 export async function deleteProductInDb(id: string) {
   if (!isSupabaseAdminConfigured()) {
     inMemoryProducts = inMemoryProducts.filter(p => p.id !== id);
+    saveInMemoryProducts(inMemoryProducts);
     return { success: true };
   }
   const supabase = getSupabaseAdmin()!;

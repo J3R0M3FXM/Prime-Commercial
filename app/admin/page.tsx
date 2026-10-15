@@ -6442,7 +6442,7 @@ export default function AdminPage() {
 
       {/* Custom Confirmation Modal */}
       {customConfirm.open && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-2.5 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-2.5 backdrop-blur-xs">
           <div className="bg-white rounded-none max-w-sm w-full p-3 shadow-none border border-slate-200">
             <h3 className="font-heading font-normal text-base text-slate-900 uppercase tracking-wide mb-2">
               {customConfirm.title}
@@ -6473,7 +6473,7 @@ export default function AdminPage() {
 
       {/* Custom Alert Modal */}
       {customAlert.open && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-2.5 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-2.5 backdrop-blur-xs">
           <div className="bg-white rounded-none max-w-sm w-full p-3 shadow-none border border-slate-200">
             <h3 className={`font-heading font-normal text-base uppercase tracking-wide mb-2 ${
               customAlert.type === "error" ? "text-red-600" : customAlert.type === "success" ? "text-emerald-600" : "text-slate-900"
