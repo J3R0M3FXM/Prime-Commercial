@@ -5215,9 +5215,16 @@ export default function AdminPage() {
                     </span>
                   </div>
 
-                  <a href="#admin-add-product" role="button" className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-none">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProduct({ name: "", price: 49.99, stock: 50, category: "Featured", description: "", imageUrl: "https://picsum.photos/seed/primeprod/400/400", active: true, sortOrder: products.length + 1 });
+                      setProductModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-none"
+                  >
                     <Plus className="w-3.5 h-3.5" /> Add Product
-                  </a>
+                  </button>
                 </div>
 
                 <div className="relative">
@@ -5350,9 +5357,17 @@ export default function AdminPage() {
                           {prod.active === false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
 
-                        <a href={`#admin-edit-product-${encodeURIComponent(String(prod.id))}`} role="button" className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-none transition-colors cursor-pointer" title="Edit Product">
-                            <Edit2 className="w-4 h-4" />
-                          </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingProduct(prod);
+                            setProductModalOpen(true);
+                          }}
+                          className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-none transition-colors cursor-pointer"
+                          title="Edit Product"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
 
                         <button
                           type="button"
