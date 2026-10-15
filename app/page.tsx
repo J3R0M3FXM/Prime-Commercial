@@ -334,7 +334,7 @@ export default function Shopfront() {
       
       {/* Sticky Header */}
       <header className="sticky top-0 z-45 h-[38px] bg-white border-b border-gray-100 shadow-sm">
-        <div className="h-full px-2 flex items-center justify-between">
+        <div className="h-full px-0 flex items-center justify-between">
           <div className="flex items-center">
             <img 
               src="/primefinal.png" 
@@ -361,7 +361,7 @@ export default function Shopfront() {
       </header>
 
       {/* Search & Filter Controls (Below Header, matching the thin footer style/height) */}
-      <div className={`${activeTab !== "shop" ? "hidden" : ""} px-2 py-1 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-1.5 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[38px]`}>
+      <div className={`${activeTab !== "shop" ? "hidden" : ""} px-0 py-1 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-1.5 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[38px]`}>
         <div className="relative flex-[5] flex items-center">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input 
@@ -385,7 +385,7 @@ export default function Shopfront() {
       </div>
 
       {/* Main Content */}
-      <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 px-2 pt-1 pb-1 w-full`}>
+      <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 px-0 pt-1 pb-1 w-full`}>
         
         {/* Product Grid */}
         {products.length === 0 ? (
