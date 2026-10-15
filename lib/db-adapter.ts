@@ -453,13 +453,19 @@ export async function updateProductInDb(id: string, updates: any) {
     inMemoryProducts[idx] = {
       ...inMemoryProducts[idx],
       ...updates,
+      imageUrl: updates.imageUrl !== undefined ? updates.imageUrl : (updates.image_url !== undefined ? updates.image_url : (inMemoryProducts[idx].imageUrl || '')),
       ...(updates.active !== undefined ? { isActive: Boolean(updates.active) } : {}),
       ...(updates.isActive !== undefined ? { active: Boolean(updates.isActive) } : {}),
       updatedAt: new Date().toISOString(),
     };
     updatedProduct = inMemoryProducts[idx];
   } else {
-    updatedProduct = { id, ...updates, updatedAt: new Date().toISOString() };
+    updatedProduct = { 
+      id, 
+      ...updates, 
+      imageUrl: updates.imageUrl || updates.image_url || '',
+      updatedAt: new Date().toISOString() 
+    };
     inMemoryProducts.push(updatedProduct);
   }
   saveInMemoryProducts(inMemoryProducts);
@@ -468,33 +474,30 @@ export async function updateProductInDb(id: string, updates: any) {
   if (isSupabaseAdminConfigured()) {
     try {
       const supabase = getSupabaseAdmin()!;
-      const payload: Record<string, any> = {};
-      if (updates.name !== undefined) payload.name = updates.name;
-      if (updates.price !== undefined) payload.price = Number(updates.price);
-      if (updates.stock !== undefined) payload.stock = Number(updates.stock);
-      if (updates.category !== undefined) payload.category = updates.category;
-      if (updates.imageUrl !== undefined) payload.image_url = updates.imageUrl;
-      if (updates.description !== undefined) payload.description = updates.description;
-      if (updates.isActive !== undefined) payload.is_active = updates.isActive;
-      if (updates.active !== undefined) payload.is_active = Boolean(updates.active);
-      if (updates.isFeatured !== undefined) payload.is_featured = updates.isFeatured;
-      if (updates.sortOrder !== undefined) payload.sort_order = Number(updates.sortOrder);
-      if (updates.bundleConfig !== undefined) payload.bundle_config = updates.bundleConfig;
-      if (updates.variants !== undefined || updates.lowStockThreshold !== undefined) {
-        payload.bundle_config = {
+      const payload = {
+        id: updatedProduct.id,
+        name: updatedProduct.name || '',
+        price: Number(updatedProduct.price) || 0,
+        stock: Number(updatedProduct.stock) || 0,
+        category: updatedProduct.category || 'General',
+        image_url: updatedProduct.imageUrl || '',
+        description: updatedProduct.description || '',
+        is_active: updatedProduct.active !== undefined ? updatedProduct.active : (updatedProduct.isActive !== undefined ? updatedProduct.isActive : true),
+        is_featured: Boolean(updatedProduct.isFeatured),
+        sort_order: Number(updatedProduct.sortOrder) || 0,
+        bundle_config: {
           ...(updatedProduct.bundleConfig || {}),
-          ...(updates.bundleConfig && typeof updates.bundleConfig === 'object' ? updates.bundleConfig : {}),
-          ...(updates.variants !== undefined ? { variants: updates.variants } : {}),
-          ...(updates.lowStockThreshold !== undefined ? { lowStockThreshold: Number(updates.lowStockThreshold) || 0 } : {}),
-        };
-      }
-      if (updates.tags !== undefined) payload.tags = updates.tags;
-      if (updates.gallery !== undefined) payload.gallery = updates.gallery;
-      payload.updated_at = new Date().toISOString();
+          variants: updatedProduct.variants || [],
+          lowStockThreshold: Number(updatedProduct.lowStockThreshold || 10),
+        },
+        tags: updatedProduct.tags || [],
+        gallery: updatedProduct.gallery || [],
+        updated_at: updatedProduct.updatedAt,
+      };
 
-      await supabase.from('products').update(payload).eq('id', id);
+      await supabase.from('products').upsert([payload]);
     } catch (err) {
-      console.warn("Supabase product update fallback to local:", err);
+      console.warn("Supabase product upsert error in update:", err);
     }
   }
 
