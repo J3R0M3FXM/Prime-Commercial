@@ -361,21 +361,21 @@ export default function Shopfront() {
       </header>
 
       {/* Search & Filter Controls (Below Header, matching the thin footer style/height) */}
-      <div className={`${activeTab !== "shop" ? "hidden" : ""} px-4 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[38px]`}>
+      <div className={`${activeTab !== "shop" ? "hidden" : ""} px-2 py-1 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-1.5 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[38px]`}>
         <div className="relative flex-[5] flex items-center">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input 
             type="text" 
             placeholder="SEARCH PRODUCTS..." 
-            className="w-full h-[26px] pl-8 pr-2 py-0 bg-white border border-gray-200 rounded shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all font-heading font-normal uppercase text-[10px]"
+            className="w-full h-[26px] pl-7 pr-1.5 py-0 bg-white border border-gray-200 rounded shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all font-heading font-normal uppercase text-[10px]"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
           />
         </div>
         <div className="relative flex-[3] flex items-center">
-          <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Filter className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <select 
-            className="w-full h-[26px] pl-8 pr-2 py-0 bg-white border border-gray-200 rounded shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black appearance-none cursor-pointer font-heading font-normal uppercase text-[10px]" 
+            className="w-full h-[26px] pl-7 pr-1.5 py-0 bg-white border border-gray-200 rounded shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black appearance-none cursor-pointer font-heading font-normal uppercase text-[10px]" 
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
           >
@@ -385,7 +385,7 @@ export default function Shopfront() {
       </div>
 
       {/* Main Content */}
-      <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 px-3 sm:px-3.5 pt-[4.8px] pb-[4.8px] sm:pt-[5.6px] sm:pb-[5.6px] w-full`}>
+      <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 px-2 pt-1 pb-1 w-full`}>
         
         {/* Product Grid */}
         {products.length === 0 ? (
@@ -401,7 +401,7 @@ export default function Shopfront() {
             <p className="text-gray-500">Try adjusting your search or filters.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             {filteredProducts.map(p => {
               const variants = p.variants && p.variants.length > 0 ? p.variants : [];
               const isOutOfStock = variants.length > 0 
@@ -445,22 +445,22 @@ export default function Shopfront() {
                     )}
                   </div>
                   
-                  <div className="p-2 sm:p-2.5 flex flex-col flex-1 justify-between gap-0.5 sm:gap-1">
+                  <div className="p-1.5 flex flex-col flex-1 justify-between gap-0.5">
                     {/* Category */}
                     {p.category && (
-                      <p className="text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-widest text-slate-400 truncate leading-none mb-0.5">
+                      <p className="text-[8px] font-mono font-bold uppercase tracking-widest text-slate-400 truncate leading-none mb-0.5">
                         {p.category}
                       </p>
                     )}
 
                     {/* Product Name */}
-                    <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-[1.05] text-[11px] sm:text-[12.5px] tracking-tight">
+                    <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-[1.05] text-[11px] tracking-tight">
                       {p.name}
                     </h3>
 
                     {/* Horizontally Aligned Lowest Price (Left) & Cart Icon (Right) */}
-                    <div className="flex items-center justify-between pt-1 sm:pt-1.5 border-t border-gray-100 mt-auto gap-1">
-                      <div className="text-left font-mono font-bold text-xs sm:text-base text-gray-950 truncate">
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-100 mt-auto gap-1">
+                      <div className="text-left font-mono font-bold text-xs text-gray-950 truncate">
                         {formatPHP(lowestPrice)}
                       </div>
 
@@ -471,11 +471,11 @@ export default function Shopfront() {
                           setSelectedProduct(p);
                         }}
                         disabled={isOutOfStock}
-                        className="p-1 sm:p-1.5 bg-slate-900 hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-md transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
+                        className="p-1 bg-slate-900 hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-md transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
                         title={isOutOfStock ? "Sold Out" : "Select Options / Add to Cart"}
                         aria-label="Select Options"
                       >
-                        <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        <ShoppingCart className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
