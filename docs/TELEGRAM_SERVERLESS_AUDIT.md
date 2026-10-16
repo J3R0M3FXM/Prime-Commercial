@@ -229,3 +229,8 @@ Next safe implementation steps: map the four missing tables and their keys; veri
 A follow-up code-only commit (`a72f2a96f0970203eba15bc9c33b1b4056aa60fd`) adds declarations for `telegram_automation_flows`, `telegram_automation_settings`, `telegram_automation_chats`, and `maya_webhook_events`. The chat-state table uses a composite unique index over `business_connection_id` and `chat_id` instead of inventing an `id` column. This is an initial mapping from the live column inventory, not certified schema parity.
 
 Before any import, validate the target schema with the official CLI against the intended non-production bot. Specifically verify SDK handling of PostgreSQL `bigint` Telegram identifiers, timestamp round-tripping, JSON defaults, composite uniqueness, and generated/default ID behavior. `maya_webhook_events.event_key` is not declared unique until the matching live constraint is confirmed. Do not apply schema migrations to an unverified production bot.
+
+
+### Automated column-name reconciliation pass — 2026-10-17
+
+A read-only comparison of the current target declaration against the live public schema now finds **16 live tables and 16 target tables**, with no missing or extra column names after correcting the Maya event timestamp mapping from `created_at` to `received_at` (commit `be8aa6b1c82949934bae8f5d2455c891f42f1de2`). This is a column-name comparison only; it does not yet validate types, nullability, defaults, indexes, uniqueness, constraints, or runtime schema generation. The target `received_at` field is currently non-null without a default, so the Maya event insertion path must supply it explicitly unless the default can be verified and safely restored. No schema migration has been applied to Telegram Serverless.
