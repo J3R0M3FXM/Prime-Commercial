@@ -20,6 +20,7 @@ export default async function (input) {
       .orderBy(asc(couriers.sortOrder)).all(),
   ]);
   const warehouse = warehouseRows.find((row) =>
+    row.latitude != null && row.longitude != null &&
     Number.isFinite(Number(row.latitude)) && Number.isFinite(Number(row.longitude))
   );
   if (!warehouse) throw new EndpointError('No active warehouse with valid coordinates is configured.', { code: 'WAREHOUSE_UNCONFIGURED' });
