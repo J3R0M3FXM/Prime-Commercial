@@ -61,7 +61,8 @@ const assets = Object.values(manifest.entries).map((entry) => ({
   sha256: entry.sha256,
   orderId: entry.orderId || null,
   visibility: entry.bucket === 'product-images' ? 'public'
-    : entry.bucket === 'receipt-proofs' ? 'private' : 'private',
+    : entry.bucket === 'receipt-proofs' ? 'private'
+      : entry.visibility === 'public' ? 'public' : 'private',
 }));
 if (!assets.length) throw new Error('The encrypted media map contains no entries.');
 
