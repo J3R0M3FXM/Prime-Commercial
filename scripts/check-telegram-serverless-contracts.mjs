@@ -14,7 +14,7 @@ for (const name of requiredTables) {
 
 const requiredEndpoints = [
   'health.js', 'getCatalog.js', 'getActivePromos.js',
-  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js',
+  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
 ];
 for (const name of requiredEndpoints) {
   assert.ok(existsSync('tgcloud/endpoints/' + name), 'Missing public endpoint: ' + name);
@@ -67,3 +67,9 @@ for (const [file, label] of adminEndpoints) {
 const managePayments = readFileSync('tgcloud/endpoints/managePaymentMethods.js', 'utf8');
 assert.match(managePayments, /secretKeyConfigured/, 'Admin payment list must indicate whether a secret exists');
 assert.doesNotMatch(managePayments, /return \{[^}]*secretKey[,}]/, 'Payment CRUD must not return raw secret keys');
+
+const manageProducts = readFileSync('tgcloud/endpoints/manageProducts.js', 'utf8');
+assert.match(manageProducts, /await requireAdmin\(ctx\)/, 'Product CRUD must require admin authorization');
+assert.match(manageProducts, /action === 'reorder'/, 'Product configurator must support reorder');
+assert.match(manageProducts, /Deliberately update only sort_order; never replace\/delete the product collection/, 'Reorder must only update sort_order');
+assert.match(manageProducts, /BUNDLE_STOCK_MISMATCH/, 'Product writes must validate bundle stock totals');
