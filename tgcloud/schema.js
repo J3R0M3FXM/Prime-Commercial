@@ -28,7 +28,10 @@ export const customers = table('customers', {
   storeCredits: numeric('store_credits').default(0), referralCode: text('referral_code').unique(),
   referredBy: text('referred_by'), totalOrders: integer('total_orders').default(0),
   lifetimeSpent: numeric('lifetime_spent').default(0), isBanned: boolean('is_banned').default(false),
-  fingerprints: json('fingerprints').default([]), createdAt: createdAt(), updatedAt: updatedAt(),
+  fingerprints: json('fingerprints').default([]),
+  referralPoints: numeric('referral_points').notNull().default(0),
+  referredByUserId: text('referred_by_user_id'), referredByMemberId: text('referred_by_member_id'),
+  createdAt: createdAt(), updatedAt: updatedAt(),
 });
 
 export const orders = table('orders', {
@@ -47,7 +50,34 @@ export const orders = table('orders', {
   requiresManualReview: boolean('requires_manual_review').default(true),
   deliveryAddress: json('delivery_address').default({}), courierId: text('courier_id'),
   courierName: text('courier_name'), trackingNumber: text('tracking_number'), notes: text('notes'),
-  fingerprintSnapshot: json('fingerprint_snapshot'), createdAt: createdAt(), updatedAt: updatedAt(),
+  fingerprintSnapshot: json('fingerprint_snapshot'),
+  // Migration-added payment, expiry, inventory-release, credits, and loyalty fields.
+  mayaPaymentId: text('maya_payment_id'), mayaRequestReferenceNumber: text('maya_request_reference_number'),
+  mayaReceiptNumber: text('maya_receipt_number'), mayaPaymentScheme: text('maya_payment_scheme'),
+  mayaFundSourceType: text('maya_fund_source_type'), mayaLastWebhookStatus: text('maya_last_webhook_status'),
+  mayaLastWebhookAt: integer('maya_last_webhook_at', { mode: 'timestamp' }),
+  storeCreditsUsed: numeric('store_credits_used').notNull().default(0),
+  promoShippingSubsidy: numeric('promo_shipping_subsidy').notNull().default(0),
+  cashbackPointsAmount: numeric('cashback_points_amount').notNull().default(0),
+  cashbackPointsAwardedAt: integer('cashback_points_awarded_at', { mode: 'timestamp' }),
+  cashbackPointsReversedAt: integer('cashback_points_reversed_at', { mode: 'timestamp' }),
+  purchasingPointsAmount: numeric('purchasing_points_amount').notNull().default(0),
+  purchasingPointsAwardedAt: integer('purchasing_points_awarded_at', { mode: 'timestamp' }),
+  purchasingPointsReversedAt: integer('purchasing_points_reversed_at', { mode: 'timestamp' }),
+  customerAggregateUpdatedAt: integer('customer_aggregate_updated_at', { mode: 'timestamp' }),
+  deliveredAt: integer('delivered_at', { mode: 'timestamp' }),
+  referredByUserId: text('referred_by_user_id'), referredByMemberId: text('referred_by_member_id'),
+  referralPointsStatus: text('referral_points_status').notNull().default('none'),
+  referralPointsCreditAfter: integer('referral_points_credit_after', { mode: 'timestamp' }),
+  referralPointsCreditedAt: integer('referral_points_credited_at', { mode: 'timestamp' }),
+  referralPointsAmount: numeric('referral_points_amount').notNull().default(0),
+  paymentDeadlineAt: integer('payment_deadline_at', { mode: 'timestamp' }),
+  paymentProofSubmittedAt: integer('payment_proof_submitted_at', { mode: 'timestamp' }),
+  expiredAt: integer('expired_at', { mode: 'timestamp' }),
+  inventoryReleasedAt: integer('inventory_released_at', { mode: 'timestamp' }),
+  inventoryReleaseError: text('inventory_release_error'),
+  storeCreditsReleasedAt: integer('store_credits_released_at', { mode: 'timestamp' }),
+  createdAt: createdAt(), updatedAt: updatedAt(),
 });
 
 export const paymentMethods = table('payment_methods', {
@@ -78,11 +108,16 @@ export const promoRedemptions = table('promo_redemptions', {
   customerId: text('customer_id'), orderId: text('order_id'), deviceId: text('device_id'),
   discountAmount: numeric('discount_amount').default(0),
   usedAt: integer('used_at', { mode: 'timestamp' }).default(sql\`(unixepoch())\`),
+  releasedAt: integer('released_at', { mode: 'timestamp' }),
+  hardwareId: text('hardware_id'), deviceFingerprintId: text('device_fingerprint_id'),
+  serverFingerprintId: text('server_fingerprint_id'),
 });
 
 export const warehouses = table('warehouses', {
   id: text('id').primaryKey(), name: text('name').notNull(), code: text('code'), address: text('address'),
   isActive: boolean('is_active').default(true), sortOrder: integer('sort_order').default(0),
+  isDefault: boolean('is_default').notNull().default(false),
+  latitude: numeric('latitude'), longitude: numeric('longitude'),
   createdAt: createdAt(), updatedAt: updatedAt(),
 });
 
