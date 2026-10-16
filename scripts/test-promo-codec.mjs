@@ -17,7 +17,9 @@ const original = {
   cappedShippingDiscount: 120,
   cashbackPercentage: 5,
 };
-const description = serializePromoDescription(original);
+const existingDescription = JSON.stringify({ realDescription: 'Old description', futureEligibilityRule: { region: 'PH', version: 2 } });
+const description = serializePromoDescription(original, existingDescription);
+assert.deepEqual(JSON.parse(description).futureEligibilityRule, { region: 'PH', version: 2 }, 'Unknown metadata keys must survive edits');
 const decoded = deserializePromo({
   id: 'promo_test',
   code: 'WEEKEND',
