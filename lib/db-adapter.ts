@@ -197,6 +197,7 @@ function loadInMemoryProducts() {
 }
 
 function saveInMemoryProducts(products: any[]) {
+  console.log("Saving products to disk, count:", products.length);
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -515,25 +516,30 @@ export async function createProductInDb(productData: any) {
 
 export async function updateProductInDb(id: string, updates: any) {
   const idx = inMemoryProducts.findIndex(p => p.id === id);
-
+  const sanitizedUpdates = Object.entries(updates).reduce((acc, [key, val]) => {
+    if (val !== undefined && val !== null) acc[key] = val;
+    return acc;
+  }, {} as any);
+  console.log("Updating product:", id, "Sanitized updates keys:", Object.keys(sanitizedUpdates));
+  
   // Process main product image if provided
   let finalImageUrl: string | undefined = undefined;
-  if (updates.imageUrl !== undefined || updates.image_url !== undefined) {
-    const rawImage = updates.imageUrl !== undefined ? updates.imageUrl : updates.image_url;
+  if (sanitizedUpdates.imageUrl !== undefined || sanitizedUpdates.image_url !== undefined) {
+    const rawImage = sanitizedUpdates.imageUrl !== undefined ? sanitizedUpdates.imageUrl : sanitizedUpdates.image_url;
     finalImageUrl = await processProductImage(rawImage, id, 'prod');
   }
 
   // Process variant images if provided
   let processedVariants: any[] | undefined = undefined;
-  if (Array.isArray(updates.variants)) {
-    processedVariants = [...updates.variants];
+  if (Array.isArray(sanitizedUpdates.variants)) {
+    processedVariants = [...sanitizedUpdates.variants];
     for (let i = 0; i < processedVariants.length; i++) {
       const v = processedVariants[i];
       if (v && v.imageUrl && typeof v.imageUrl === 'string' && v.imageUrl.startsWith('data:image/')) {
         v.imageUrl = await processProductImage(v.imageUrl, `${id}-v${i + 1}`, 'variant');
       }
       v.stock = Math.max(0, Math.floor(Number(v.stock) || 0));
-      v.price = Number(v.price) || Number(updates.price) || 0;
+      v.price = Number(v.price) || Number(sanitizedUpdates.price) || 0;
     }
   }
 
@@ -541,25 +547,25 @@ export async function updateProductInDb(id: string, updates: any) {
   if (idx !== -1) {
     const existing = inMemoryProducts[idx];
     const variants = processedVariants !== undefined ? processedVariants : (existing.variants || []);
-    let calculatedStock = Number(updates.stock !== undefined ? updates.stock : existing.stock) || 0;
+    let calculatedStock = Number(sanitizedUpdates.stock !== undefined ? sanitizedUpdates.stock : existing.stock) || 0;
     if (variants.length > 0) {
       calculatedStock = variants.reduce((sum: number, v: any) => sum + (v.stock || 0), 0);
     }
 
     inMemoryProducts[idx] = {
       ...existing,
-      ...updates,
+      ...sanitizedUpdates,
       stock: calculatedStock,
       ...(finalImageUrl !== undefined ? { imageUrl: finalImageUrl, image_url: finalImageUrl } : {}),
       variants,
       bundleConfig: {
         ...(existing.bundleConfig || {}),
-        ...(updates.bundleConfig || {}),
+        ...(sanitizedUpdates.bundleConfig || {}),
         variants,
-        lowStockThreshold: Number(updates.lowStockThreshold ?? existing.lowStockThreshold ?? 10),
+        lowStockThreshold: Number(sanitizedUpdates.lowStockThreshold ?? existing.lowStockThreshold ?? 10),
       },
-      ...(updates.active !== undefined ? { isActive: Boolean(updates.active) } : {}),
-      ...(updates.isActive !== undefined ? { active: Boolean(updates.isActive) } : {}),
+      ...(sanitizedUpdates.active !== undefined ? { isActive: Boolean(sanitizedUpdates.active) } : {}),
+      ...(sanitizedUpdates.isActive !== undefined ? { active: Boolean(sanitizedUpdates.isActive) } : {}),
       updatedAt: new Date().toISOString(),
     };
     updatedProduct = inMemoryProducts[idx];
