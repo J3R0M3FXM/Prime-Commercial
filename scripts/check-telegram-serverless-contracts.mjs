@@ -140,3 +140,6 @@ assert.match(myOrders, /limit\(100\)/, 'Order history must be bounded');
 const activePromos = readFileSync('tgcloud/endpoints/getActivePromos.js', 'utf8');
 assert.match(activePromos, /totalUsageLimit/, 'Public promo display must respect total usage limits');
 assert.match(activePromos, /usageCount/, 'Public promo display must compare current usage with the limit');
+
+assert.match(activePromos, /underUsageLimit/, 'Public promo display must hide exhausted promos');
+assert.match(activePromos, /return valid\.map\(\(\{ totalUsageLimit, usageCount/, 'Public promo responses must not expose internal usage counters');
