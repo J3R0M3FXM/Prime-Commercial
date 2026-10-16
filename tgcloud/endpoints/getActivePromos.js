@@ -21,6 +21,7 @@ export default async function () {
       minSpend: promos.minSpend,
       startDate: promos.startDate,
       endDate: promos.endDate,
+      isActive: promos.isActive,
     })
     .from(promos)
     .where(eq(promos.isActive, true))
@@ -32,5 +33,5 @@ export default async function () {
     return (starts === null || starts <= now) && (ends === null || ends >= now);
   });
 
-  return { promos: valid };
+  return valid;
 }
