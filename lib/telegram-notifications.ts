@@ -158,21 +158,19 @@ export async function notifyOrderCreated(order: OrderNotification): Promise<bool
   const message = [
     '<b>PRIME™ ORDER MANAGEMENT</b>',
     '',
+    `Order No.: <code>${escapeHtml(order.orderNumber)}</code>`,
+    `Status: ${escapeHtml(String(order.paymentStatus || '').toLowerCase() === 'unpaid' ? 'Awaiting Payment' : order.status)}`,
+    order.paymentDeadlineAt ? `Expiration: ${escapeHtml(formatPaymentDeadline(order.paymentDeadlineAt))}` : null,
+    '',
     `Hi, ${escapeHtml(order.customerName || 'there')}!`,
     '',
-    'We have received your order. It is currently awaiting payment proof.',
+    `We have received your order with a total payable amount of <b>${money(order.payableNow ?? order.totalAmount ?? 0)}</b>.`,
     '',
-    `Order Number: <code>${escapeHtml(order.orderNumber)}</code>`,
-    `Status: ${escapeHtml(String(order.paymentStatus || '').toLowerCase() === 'unpaid' ? 'Awaiting Payment' : order.status)}`,
-    order.totalAmount !== undefined ? `Total Amount: ${money(order.totalAmount)}` : '',
-    order.payableNow !== undefined ? `Payable Now: ${money(order.payableNow)}` : '',
-    order.paymentDeadlineAt ? `Expiration: ${escapeHtml(formatPaymentDeadline(order.paymentDeadlineAt))}` : '',
-    items ? `\nItems\n${items}` : '',
-    '',
-    'Please settle the payable amount and upload your payment proof before the expiration time to avoid cancellation.',
+    'Please settle the amount and upload your proof of payment before the expiration time indicated above to avoid automatic cancellation by the system.',
     '',
     'Thank you for choosing PRIME™ Sourcing &amp; Distribution Network!',
-  ].filter(Boolean).join('\n');
+    items ? `\n\nORDER ITEMS\n${items}` : null,
+  ].filter((line) => line !== null).join('\n');
 
   return sendTelegramMessage(
     order.chatId,
