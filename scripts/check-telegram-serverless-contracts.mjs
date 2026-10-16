@@ -55,6 +55,7 @@ const adminEndpoints = [
   ['manageCouriers.js', 'courier'],
   ['manageWarehouses.js', 'warehouse'],
   ['managePaymentMethods.js', 'payment method'],
+  ['manageVideos.js', 'video metadata'],
 ];
 for (const [file, label] of adminEndpoints) {
   const source = readFileSync('tgcloud/endpoints/' + file, 'utf8');
@@ -159,3 +160,7 @@ const publicVideos = readFileSync('tgcloud/endpoints/getPublicVideos.js', 'utf8'
 assert.match(publicVideos, /eq\(videos\.isPublished, true\)/, 'Public video gallery must exclude unpublished media');
 assert.doesNotMatch(publicVideos, /input\.includeAll|input\?\.includeAll/, 'Public video gallery must not allow clients to expose unpublished media');
 assert.doesNotMatch(publicVideos, /db\.(insert|update|delete)/, 'Public video gallery must remain read-only');
+
+const manageVideos = readFileSync('tgcloud/endpoints/manageVideos.js', 'utf8');
+assert.doesNotMatch(manageVideos, /'views'\s*,|'views'\]/, 'Video views must not be writable through metadata CRUD');
+assert.match(manageVideos, /await requireAdmin\(ctx\)/, 'Video metadata mutations must require admin authorization');
