@@ -3,7 +3,7 @@
 Date: 2026-10-17
 Source reference: tracked `main` API route tree inspected during the audit
 Target branch: `migration/telegram-serverless`
-Status: planning inventory only. No endpoints or production behavior changed.
+Status: implementation in progress. Target modules are code-only; none of these changes has been deployed or wired into the Mini App.
 
 A target capability below is a required migration work item, not a claim that a target endpoint already exists. Every endpoint must enforce authorization itself; Next.js middleware will not protect Telegram Serverless handlers.
 
@@ -52,6 +52,29 @@ A target capability below is a required migration work item, not a claim that a 
 | `app/api/webhooks/maya/card/route.ts` | Maya card webhook | Verify provider authenticity and replay/idempotency; redesign deferred |
 | `app/api/webhooks/maya/route.ts` | Maya webhook router | Preserve payment state machine and event audit trail; redesign deferred |
 | `app/api/webhooks/maya/wallet/route.ts` | Maya wallet webhook | Verify provider authenticity and replay/idempotency; redesign deferred |
+
+
+## Route implementation status (2026-10-17)
+
+| Existing route / capability | Target module(s) | Status |
+|---|---|---|
+| Public catalog `/api/products` | `getCatalog.js` | Partial: active read only; frontend bridge and checkout validation still missing |
+| Public payment methods `/api/payment-methods` | `getPublicPaymentMethods.js` | Partial: public allowlist only |
+| Public charges `/api/charges` | `getPublicCharges.js` | Partial: read only |
+| Courier options / pricing config | `getPublicCouriers.js` | Supporting read endpoint |
+| Active promo display | `getActivePromos.js` | Partial: display metadata only; not promo validation/redemption |
+| Delivery fee preview | `getDeliveryQuote.js`, `lib/delivery-fee.js` | Partial: server-calculated estimate only; order creation must recalculate |
+| Customer order history | `getMyOrders.js` | Partial: verified Telegram identity, bounded owner-scoped reads |
+| Admin product CRUD / reorder | `manageProducts.js` | Backend only; needs target runtime tests and UI adapter |
+| Admin charges CRUD | `manageCharges.js` | Backend only; needs target runtime tests and UI adapter |
+| Admin courier CRUD | `manageCouriers.js` | Backend only; needs target runtime tests and UI adapter |
+| Admin warehouse CRUD | `manageWarehouses.js` | Backend only; needs target runtime tests and UI adapter |
+| Admin payment method CRUD | `managePaymentMethods.js` | Backend only; secret key never returned; needs target runtime tests and UI adapter |
+| Admin automation settings / flows / chat pause | `manageAutomation.js` | Backend only; needs admin bootstrap and UI adapter |
+| Telegram Business automation | `handlers/business_connection.js`, `business_message.js`, `callback_query.js`, `lib/telegram-automation.js` | Code ported; needs BotFather runtime test |
+| All other listed routes | — | Not ported yet |
+
+The customer account route remains blocked by confirmed app/live-schema drift (`photo_url`, `has_custom_photo`, `referred_by_name`, `referred_by_username`, and `role` are referenced by current app code but absent from the live customer table). Checkout, payment state transitions, stock reservation, loyalty/referral mutations, receipt upload/privacy, media streaming, Geoapify server-side routes, Maya webhook routes, and both scheduled jobs remain unported. The route inventory is not a declaration of production readiness.
 
 ## Completion gates
 
