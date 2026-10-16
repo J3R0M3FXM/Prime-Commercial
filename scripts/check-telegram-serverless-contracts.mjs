@@ -13,8 +13,11 @@ for (const name of requiredTables) {
 }
 
 const requiredEndpoints = [
-  'health.js', 'getCatalog.js', 'getActivePromos.js',
-  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'getPublicCouriers.js', 'getPublicVideos.js', 'getDeliveryQuote.js', 'getMyOrders.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
+  'health.js', 'getCatalog.js', 'getActivePromos.js', 'getPublicPaymentMethods.js',
+  'getPublicCharges.js', 'getPublicCouriers.js', 'getPublicVideos.js', 'getDeliveryQuote.js',
+  'getMyOrders.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js',
+  'managePaymentMethods.js', 'manageProducts.js', 'managePromos.js', 'manageVideos.js',
+  'manageAutomation.js',
 ];
 for (const name of requiredEndpoints) {
   assert.ok(existsSync('tgcloud/endpoints/' + name), 'Missing public endpoint: ' + name);
