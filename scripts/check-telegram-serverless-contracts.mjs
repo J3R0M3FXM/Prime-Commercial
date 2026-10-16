@@ -15,7 +15,7 @@ for (const name of requiredTables) {
 const requiredEndpoints = [
   'health.js', 'getCatalog.js', 'getActivePromos.js', 'getPublicPaymentMethods.js',
   'getPublicCharges.js', 'getPublicCouriers.js', 'getPublicVideos.js', 'getDeliveryQuote.js',
-  'getMyOrders.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js',
+  'getMyOrders.js', 'validatePromo.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js',
   'managePaymentMethods.js', 'manageProducts.js', 'managePromos.js', 'manageVideos.js',
   'manageAutomation.js',
 ];
@@ -180,3 +180,10 @@ assert.match(managePromos, /action === 'create'/, 'Promo CRUD must support creat
 assert.match(managePromos, /action === 'update'/, 'Promo CRUD must support update');
 assert.match(managePromos, /action === 'delete'/, 'Promo CRUD must support delete');
 assert.match(activePromos, /deserializePromo/, 'Public promo display must decode the stored metadata JSON');
+
+const validatePromo = readFileSync('tgcloud/endpoints/validatePromo.js', 'utf8');
+assert.match(validatePromo, /ctx\?\.initData\?\.user/, 'Promo validation must use platform-verified Telegram identity');
+assert.match(validatePromo, /isNull\(promoRedemptions\.releasedAt\)/, 'Promo limits must ignore released redemptions');
+assert.match(validatePromo, /resolveTrustedFingerprint/, 'Promo validation must use stored trusted fingerprint resolution');
+assert.match(validatePromo, /calculatePromoDiscount/, 'Promo validation must use shared discount rules');
+assert.doesNotMatch(validatePromo, /db\.(insert|update|delete)/, 'Promo validation must remain read-only');
