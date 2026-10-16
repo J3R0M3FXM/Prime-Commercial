@@ -156,13 +156,14 @@ export async function notifyOrderCreated(order: OrderNotification): Promise<bool
     : '';
 
   const message = [
-    '<b>ORDER RECEIVED</b>',
+    '<b>PRIME™ ORDER MANAGEMENT</b>',
     '',
-    `Hello ${escapeHtml(order.customerName || 'Customer')},`,
-    'Your order has been received and is being processed.',
+    `Hi, ${escapeHtml(order.customerName || 'there')}!`,
+    '',
+    'We have received your order. It is currently awaiting payment proof.',
     '',
     `Order Number: <code>${escapeHtml(order.orderNumber)}</code>`,
-    `Status: ${escapeHtml(order.status)}`,
+    `Status: ${escapeHtml(String(order.paymentStatus || '').toLowerCase() === 'unpaid' ? 'Awaiting Payment' : order.status)}`,
     order.totalAmount !== undefined ? `Total Amount: ${money(order.totalAmount)}` : '',
     order.payableNow !== undefined ? `Payable Now: ${money(order.payableNow)}` : '',
     order.paymentDeadlineAt ? `Payment Proof Deadline: ${escapeHtml(formatPaymentDeadline(order.paymentDeadlineAt))}` : '',
@@ -183,18 +184,19 @@ export async function notifyOrderStatusChanged(order: OrderNotification): Promis
   if (!order.chatId) return false;
 
   const message = [
-    `<b>ORDER UPDATE: ${escapeHtml(order.status.toUpperCase())}</b>`,
+    `<b>PRIME™ ORDER MANAGEMENT</b>`,
     '',
     `Order Number: <code>${escapeHtml(order.orderNumber)}</code>`,
-    `New Status: ${escapeHtml(order.status)}`,
+    `Status: ${escapeHtml(order.status)}`,
     order.courierName ? `Courier: ${escapeHtml(order.courierName)}` : '',
     order.trackingNumber ? `Tracking Number: <code>${escapeHtml(order.trackingNumber)}</code>` : '',
     order.totalAmount !== undefined ? `Total Amount: ${money(order.totalAmount)}` : '',
     order.status.toLowerCase() === 'expired'
-      ? 'Your payment proof was not received within the one-hour window. This order has been cancelled.'
+      ? 'Your order has expired because payment proof was not received within the one-hour submission window. The order has been cancelled.'
       : '',
     '',
-    'Your order record has been updated. Please contact support if you have questions.',
+    '',
+    'Your order status has been updated. If you need assistance, please contact PRIME™ Commercial support.',
   ].filter(Boolean).join('\n');
 
   return sendTelegramMessage(
