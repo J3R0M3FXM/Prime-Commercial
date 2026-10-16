@@ -16,7 +16,7 @@ function normalize(input, creating) {
       if (typeof value !== 'string' && value !== null) throw new EndpointError(key + ' must be text.', { code: 'INVALID_INPUT' });
       const text = value == null ? '' : value.trim();
       if (key === 'title' && !text) throw new EndpointError('Video title is required.', { code: 'INVALID_INPUT' });
-      if ((key === 'directUrl' || key === 'thumbnailUrl') && text && !/^https?:\\/\\//i.test(text)) {
+      if ((key === 'directUrl' || key === 'thumbnailUrl') && text && !/^https?:\/\//i.test(text)) {
         throw new EndpointError(key + ' must be an HTTP(S) URL.', { code: 'INVALID_INPUT' });
       }
       if (text.length > 10000) throw new EndpointError(key + ' is too long.', { code: 'INVALID_INPUT' });
