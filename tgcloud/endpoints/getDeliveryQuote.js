@@ -1,7 +1,6 @@
-import { EndpointError } from 'sdk';
+import { db, EndpointError } from 'sdk';
 import { asc, desc, eq } from 'sdk/db';
 import { couriers, warehouses } from '../schema.js';
-import { db } from 'sdk';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from '../lib/delivery-fee.js';
 
 export default async function (input) {
@@ -20,7 +19,7 @@ export default async function (input) {
       .orderBy(asc(couriers.sortOrder)).all(),
   ]);
   const warehouse = warehouseRows.find((row) =>
-    Number.isFinite(Number(row.latitude)) && Number.isFinite(Number(row.longitude));
+    Number.isFinite(Number(row.latitude)) && Number.isFinite(Number(row.longitude))
   );
   if (!warehouse) throw new EndpointError('No active warehouse with valid coordinates is configured.', { code: 'WAREHOUSE_UNCONFIGURED' });
 
