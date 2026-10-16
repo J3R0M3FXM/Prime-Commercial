@@ -36,5 +36,5 @@ export default async function () {
     return (starts === null || starts <= now) && (ends === null || ends >= now) && underUsageLimit;
   });
 
-  return valid;
+  return valid.map(({ totalUsageLimit, usageCount, ...promo }) => promo);
 }
