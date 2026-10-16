@@ -73,3 +73,13 @@ assert.match(manageProducts, /await requireAdmin\(ctx\)/, 'Product CRUD must req
 assert.match(manageProducts, /action === 'reorder'/, 'Product configurator must support reorder');
 assert.match(manageProducts, /Deliberately update only sort_order; never replace\/delete the product collection/, 'Reorder must only update sort_order');
 assert.match(manageProducts, /BUNDLE_STOCK_MISMATCH/, 'Product writes must validate bundle stock totals');
+
+const backupExporter = readFileSync('scripts/export-supabase-snapshot.mjs', 'utf8');
+assert.match(backupExporter, /createCipheriv/, 'Snapshot export must encrypt data');
+assert.match(backupExporter, /aes-256-gcm/, 'Snapshot export must use authenticated encryption');
+assert.match(backupExporter, /receipt-proofs/, 'Snapshot export must include receipt proof storage');
+assert.match(backupExporter, /SUPABASE_SERVICE_ROLE_KEY/, 'Snapshot export must require a server-side service key');
+const backupVerifier = readFileSync('scripts/verify-supabase-snapshot.mjs', 'utf8');
+assert.match(backupVerifier, /setAuthTag/, 'Snapshot verifier must authenticate the encrypted file');
+assert.match(backupVerifier, /Table checksum mismatch/, 'Snapshot verifier must validate table checksums');
+assert.match(backupVerifier, /Storage checksum mismatch/, 'Snapshot verifier must validate media checksums');
