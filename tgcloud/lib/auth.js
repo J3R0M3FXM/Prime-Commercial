@@ -34,3 +34,13 @@ export async function requireAdmin(ctx) {
 
   return user;
 }
+
+
+export async function isAdminUser(ctx) {
+  try {
+    await requireAdmin(ctx);
+    return true;
+  } catch {
+    return false;
+  }
+}
