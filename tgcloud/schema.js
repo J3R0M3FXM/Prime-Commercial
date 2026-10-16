@@ -210,5 +210,5 @@ export const mayaWebhookEvents = table('maya_webhook_events', {
   processingStatus: text('processing_status').notNull().default('RECEIVED'),
   processingError: text('processing_error'),
   payload: json('payload').notNull().default({}),
-  receivedAt: createdAt(), processedAt: integer('processed_at', { mode: 'timestamp' }),
+  receivedAt: integer('received_at', { mode: 'timestamp' }).notNull(), processedAt: integer('processed_at', { mode: 'timestamp' }),
 });
