@@ -21,6 +21,8 @@ export default async function () {
       minSpend: promos.minSpend,
       startDate: promos.startDate,
       endDate: promos.endDate,
+      totalUsageLimit: promos.totalUsageLimit,
+      usageCount: promos.usageCount,
       isActive: promos.isActive,
     })
     .from(promos)
@@ -30,7 +32,7 @@ export default async function () {
   const valid = rows.filter((promo) => {
     const starts = promo.startDate instanceof Date ? promo.startDate.getTime() : null;
     const ends = promo.endDate instanceof Date ? promo.endDate.getTime() : null;
-    return (starts === null || starts <= now) && (ends === null || ends >= now);
+    const underUsageLimit = promo.totalUsageLimit == null || Number(promo.usageCount || 0) < Number(promo.totalUsageLimit);\n    return (starts === null || starts <= now) && (ends === null || ends >= now) && underUsageLimit;
   });
 
   return valid;
