@@ -259,3 +259,9 @@ The latest inspected Build Check failure was not a TypeScript or application bui
 
 The most recent successful schema syntax run remains a syntax-only check. The target still needs an official CLI schema diff and non-production data/behavior rehearsal. The live `telegram_automation_chats` composite primary key remains represented only as a unique index in target code; exact primary-key parity is still open. No production deployment, schema migration, or data import has been performed.
 
+### Required timestamp nullability reconciliation — 2026-10-17
+
+A second live-schema comparison found required `created_at` / `updated_at` columns on `telegram_automation_flows`, `telegram_automation_settings`, and `telegram_automation_chats` were incorrectly nullable in the SQLite target because they shared helpers with legacy tables whose timestamps are nullable. Added required timestamp helpers and applied them only to those three automation tables in code-only commit `d79ad24fa94da5b48dba90353c4104ff2e023936`. This preserves the live nullability contract without changing the other tables. The `maya_webhook_events.received_at` target remains non-null with a Unix-seconds default.
+
+The React/React Leaflet dependency fix and this schema update have new GitHub Actions runs pending at the time of this note; their results must be checked before marking either check green. The schema audit is still not complete: full defaults/check constraints and composite-primary-key parity need verification, followed by CLI diff and a non-production import/restore rehearsal.
+
