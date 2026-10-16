@@ -80,7 +80,7 @@ Locally configure `TELEGRAM_BOT_TOKEN`, `TELEGRAM_STORAGE_CHAT_ID`, one expected
 node scripts/migrate-media-to-telegram.mjs ./migration-backups/pre-cutover.pcmbak ./migration-backups/telegram-media-map.pcmmapping
 ```
 
-This script has **not** been run. Do not run it until the exact Telegram Serverless bot is confirmed and the storage chat is controlled by the business owner. The encrypted mapping is only an inventory/transfer artifact; a target `media_assets` table, authenticated media-content endpoint, and frontend URL adapter still need to be implemented and tested. Receipt proofs must remain private and must never be bundled into the public static Mini App.
+This script has **not** been run. Do not run it until the exact Telegram Serverless bot is confirmed and the storage chat is controlled by the business owner. The encrypted mapping is an inventory/transfer artifact. The target `media_assets` table and authenticated `getMediaContent` endpoint are now implemented in code, but the target schema still needs review/migration, runtime access-control tests, and the frontend `tgmedia:` URL adapter. Receipt proofs must remain private and must never be bundled into the public static Mini App.
 
 After the transfer manifest is created and independently checked, import its mappings into the target database with:
 
