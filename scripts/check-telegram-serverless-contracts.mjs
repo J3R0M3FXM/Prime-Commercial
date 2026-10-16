@@ -14,7 +14,7 @@ for (const name of requiredTables) {
 
 const requiredEndpoints = [
   'health.js', 'getCatalog.js', 'getActivePromos.js',
-  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'getPublicCouriers.js', 'getMyOrders.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
+  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'getPublicCouriers.js', 'getDeliveryQuote.js', 'getMyOrders.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
 ];
 for (const name of requiredEndpoints) {
   assert.ok(existsSync('tgcloud/endpoints/' + name), 'Missing public endpoint: ' + name);
@@ -148,3 +148,9 @@ const publicCouriers = readFileSync('tgcloud/endpoints/getPublicCouriers.js', 'u
 assert.match(publicCouriers, /eq\(couriers\.isActive, true\)/, 'Public courier options must exclude inactive couriers');
 assert.doesNotMatch(publicCouriers, /db\.(insert|update|delete)/, 'Public courier endpoint must remain read-only');
 assert.doesNotMatch(publicCouriers, /latitude|longitude|address/, 'Public courier endpoint must not expose warehouse location data');
+
+const deliveryQuote = readFileSync('tgcloud/endpoints/getDeliveryQuote.js', 'utf8');
+assert.match(deliveryQuote, /calculateRoadDistanceFallback/, 'Delivery quote must calculate distance server-side');
+assert.match(deliveryQuote, /calculateDeliveryFee/, 'Delivery quote must calculate fees server-side');
+assert.doesNotMatch(deliveryQuote, /input\?\.deliveryFee|input\.deliveryFee/, 'Delivery quote must not trust a client-supplied fee');
+assert.doesNotMatch(deliveryQuote, /return \{[^}]*latitude|return \{[^}]*longitude/, 'Delivery quote must not return warehouse coordinates');
