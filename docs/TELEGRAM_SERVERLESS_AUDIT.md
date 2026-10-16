@@ -214,3 +214,11 @@ Checked-in migration files not matched by a straightforward filename comparison 
 - `20260923120000_customer_fingerprint_hydration_and_server_enforcement.sql`
 
 This is a **preliminary filename-level diff only**. Some changes may have been consolidated, renamed, or applied through SQL not retained under the original filename. The safe next step is to compare each SQL file's DDL/function definitions to live columns, indexes, constraints, functions, triggers, and policies, then produce a reviewed mapping. Do not replay all migrations blindly against a populated database.
+
+### Target-schema reconciliation progress — 2026-10-17
+
+A code-only update was committed to `tgcloud/schema.js` on `migration/telegram-serverless` (commit `88ecddf1e0595345e40c733a704f800ba1c3d3b6`). It adds the live migration-added fields to the existing target declarations for `customers`, `orders`, `promo_redemptions`, and `warehouses`, including the order expiry/inventory-release, credits, cashback, purchasing-points, referral, and Maya-reference state. This updates repository code only; it does not alter the live Supabase schema or import any records.
+
+The four live tables `telegram_automation_flows`, `telegram_automation_settings`, `telegram_automation_chats`, and `maya_webhook_events` are **still not represented** in the target schema. They must be mapped before the schema can be called complete. The chat-state table has a composite identity (`business_connection_id`, `chat_id`), so its primary/unique-key declaration must be implemented using a verified SDK-supported pattern rather than inventing an `id` column. The target schema also still needs a complete automated comparison of every live column, constraint, default, index, and nullability; the additions above are a partial reconciliation, not a green-light for import.
+
+Next safe implementation steps: map the four missing tables and their keys; verify the SDK timestamp and composite-key syntax; add schema parity tests; then create a repeatable export/import dry-run that writes only to a non-production target and reports row counts, key collisions, relationship gaps, timestamp drift, and money/loyalty reconciliation. No production cutover or data transfer is authorized by this code change.
