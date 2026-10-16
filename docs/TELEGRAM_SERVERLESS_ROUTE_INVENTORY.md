@@ -67,6 +67,7 @@ A target capability below is a required migration work item, not a claim that a 
 | Delivery fee preview | `getDeliveryQuote.js`, `lib/delivery-fee.js` | Partial: server-calculated estimate only; order creation must recalculate |
 | Customer order history | `getMyOrders.js` | Partial: verified Telegram identity, bounded owner-scoped reads |
 | Admin product CRUD / reorder | `manageProducts.js` | Backend only; needs target runtime tests and UI adapter |
+| Admin promo CRUD | `managePromos.js`, `lib/promos.js` | Backend only; preserves advanced rules stored inside description JSON |
 | Admin charges CRUD | `manageCharges.js` | Backend only; needs target runtime tests and UI adapter |
 | Admin courier CRUD | `manageCouriers.js` | Backend only; needs target runtime tests and UI adapter |
 | Admin warehouse CRUD | `manageWarehouses.js` | Backend only; needs target runtime tests and UI adapter |
