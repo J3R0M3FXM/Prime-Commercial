@@ -117,7 +117,7 @@ export default async function (input, ctx) {
       (fingerprint.deviceFingerprintId && redemption.deviceFingerprintId &&
         String(redemption.deviceFingerprintId).trim() === fingerprint.deviceFingerprintId)
     );
-    if (deviceMatches.some((redemption) => redemption.customerId !== customer.id)) {
+    if (deviceMatches.some((redemption) => redemption.customerId && redemption.customerId !== customer.id)) {
       return fail('Promo abuse detected: this promo was already claimed from the same device under another account.');
     }
   }
