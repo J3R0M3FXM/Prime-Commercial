@@ -17,6 +17,7 @@ on:
       - "tgcloud/schema.js"
       - "tgcloud/endpoints/**"
       - "tgcloud/lib/**"
+      - "tgcloud/handlers/**"
       - "scripts/check-telegram-serverless-contracts.mjs"
       - "scripts/export-supabase-snapshot.mjs"
       - "scripts/verify-supabase-snapshot.mjs"
