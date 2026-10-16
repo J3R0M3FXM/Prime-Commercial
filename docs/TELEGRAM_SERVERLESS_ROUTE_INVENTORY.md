@@ -62,7 +62,7 @@ A target capability below is a required migration work item, not a claim that a 
 | Public payment methods `/api/payment-methods` | `getPublicPaymentMethods.js` | Partial: public allowlist only |
 | Public charges `/api/charges` | `getPublicCharges.js` | Partial: read only |
 | Courier options / pricing config | `getPublicCouriers.js` | Supporting read endpoint |
-| Active promo display | `getActivePromos.js` | Partial: display metadata only; not promo validation/redemption |
+| Active promo display / validation | `getActivePromos.js`, `validatePromo.js`, `lib/promos.js`, `lib/fingerprints.js`, `lib/loyalty.js` | Partial: validation preflight only; atomic redemption and server-network fingerprint fallback missing |
 | Public video gallery metadata | `getPublicVideos.js` | Partial: published metadata only; media streaming/view tracking still missing |
 | Delivery fee preview | `getDeliveryQuote.js`, `lib/delivery-fee.js` | Partial: server-calculated estimate only; order creation must recalculate |
 | Customer order history | `getMyOrders.js` | Partial: verified Telegram identity, bounded owner-scoped reads |
