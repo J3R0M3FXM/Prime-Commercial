@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { calculatePromoDiscount, deserializePromo, serializePromoDescription } from '../tgcloud/lib/promos.js';
+import { calculateCustomerTier } from '../tgcloud/lib/loyalty.js';
+import { resolveTrustedFingerprint } from '../tgcloud/lib/fingerprints.js';
 
 const original = {
   description: 'Weekend offer',
@@ -58,3 +60,11 @@ assert.equal(calculatePromoDiscount({ discountType: 'shipping_discount', discoun
   'Shipping promo must cap the subsidy');
 assert.equal(calculatePromoDiscount({ discountType: 'coins_cashback', cashbackPercentage: 5 }, 999, 20).cashbackPoints, 49,
   'Cashback promo must floor points without reducing upfront discount');
+
+const now = new Date('2026-10-17T00:00:00.000Z');
+assert.equal(calculateCustomerTier([], now).tier, 'Silver', 'Tier defaults must remain Silver for customers without completed orders');
+const tier = calculateCustomerTier([{ status: 'delivered', subtotal: 6000, createdAt: new Date('2026-10-10T00:00:00.000Z') }], now);
+assert.equal(tier.tier, 'Bronze', 'Tier calculation must apply the current 30-day spending cycle');
+assert.equal(tier.progressPercent, 20, 'Tier progress must reflect spending toward the next tier');
+const trusted = resolveTrustedFingerprint({ fingerprints: [{ deviceId: 'device-1', hardwareId: 'hardware-1', deviceFingerprintId: 'fp-1', sessionToken: 'session-1' }] }, { hardwareId: 'hardware-1' });
+assert.equal(trusted.deviceFingerprintId, 'fp-1', 'Fingerprint resolution must recover stored identifiers by hardware ID');
