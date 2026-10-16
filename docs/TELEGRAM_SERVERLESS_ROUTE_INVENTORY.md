@@ -63,7 +63,7 @@ A target capability below is a required migration work item, not a claim that a 
 | Public charges `/api/charges` | `getPublicCharges.js` | Partial: read only |
 | Courier options / pricing config | `getPublicCouriers.js` | Supporting read endpoint |
 | Active promo display / validation | `getActivePromos.js`, `validatePromo.js`, `lib/promos.js`, `lib/fingerprints.js`, `lib/loyalty.js` | Partial: validation preflight only; atomic redemption and server-network fingerprint fallback missing |
-| Public video gallery metadata | `getPublicVideos.js` | Partial: published metadata only; media streaming/view tracking still missing |
+| Public video gallery / media content | `getPublicVideos.js`, `getMediaContent.js`, `lib/media.js` | Partial: private owner/admin access implemented; frontend `tgmedia:` decoding and view tracking still missing |
 | Delivery fee preview | `getDeliveryQuote.js`, `lib/delivery-fee.js` | Partial: server-calculated estimate only; order creation must recalculate |
 | Customer order history | `getMyOrders.js` | Partial: verified Telegram identity, bounded owner-scoped reads |
 | Admin product CRUD / reorder | `manageProducts.js` | Backend only; needs target runtime tests and UI adapter |
@@ -72,7 +72,7 @@ A target capability below is a required migration work item, not a claim that a 
 | Admin courier CRUD | `manageCouriers.js` | Backend only; needs target runtime tests and UI adapter |
 | Admin warehouse CRUD | `manageWarehouses.js` | Backend only; needs target runtime tests and UI adapter |
 | Admin payment method CRUD | `managePaymentMethods.js` | Backend only; secret key never returned; needs target runtime tests and UI adapter |
-| Admin video metadata CRUD | `manageVideos.js` | Backend only; metadata only; upload and private media streaming still missing |
+| Admin video metadata / media mapping | `manageVideos.js`, `manageMediaAssets.js` | Backend only; media upload/mapping scripts exist but are unexecuted; frontend adapter still missing |
 | Admin automation settings / flows / chat pause | `manageAutomation.js` | Backend only; needs admin bootstrap and UI adapter |
 | Telegram Business automation | `handlers/business_connection.js`, `business_message.js`, `callback_query.js`, `lib/telegram-automation.js` | Code ported; needs BotFather runtime test |
 | All other listed routes | — | Not ported yet |
