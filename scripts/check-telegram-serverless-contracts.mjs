@@ -14,7 +14,7 @@ for (const name of requiredTables) {
 
 const requiredEndpoints = [
   'health.js', 'getCatalog.js', 'getActivePromos.js',
-  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'getMyOrders.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
+  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'getPublicCouriers.js', 'getMyOrders.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
 ];
 for (const name of requiredEndpoints) {
   assert.ok(existsSync('tgcloud/endpoints/' + name), 'Missing public endpoint: ' + name);
@@ -143,3 +143,8 @@ assert.match(activePromos, /usageCount/, 'Public promo display must compare curr
 
 assert.match(activePromos, /underUsageLimit/, 'Public promo display must hide exhausted promos');
 assert.match(activePromos, /return valid\.map\(\(\{ totalUsageLimit, usageCount/, 'Public promo responses must not expose internal usage counters');
+
+const publicCouriers = readFileSync('tgcloud/endpoints/getPublicCouriers.js', 'utf8');
+assert.match(publicCouriers, /eq\(couriers\.isActive, true\)/, 'Public courier options must exclude inactive couriers');
+assert.doesNotMatch(publicCouriers, /db\.(insert|update|delete)/, 'Public courier endpoint must remain read-only');
+assert.doesNotMatch(publicCouriers, /latitude|longitude|address/, 'Public courier endpoint must not expose warehouse location data');
