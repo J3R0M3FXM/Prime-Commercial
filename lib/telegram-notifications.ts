@@ -196,7 +196,6 @@ export async function notifyOrderStatusChanged(order: OrderNotification): Promis
       ? 'Your order has expired because payment proof was not received within the one-hour submission window. The order has been cancelled.'
       : '',
     '',
-    '',
     'Your order status has been updated. If you need assistance, please contact PRIME™ Commercial support.',
   ].filter(Boolean).join('\n');
 
