@@ -136,3 +136,7 @@ assert.match(myOrders, /ctx\?\.initData\?\.user/, 'Order history must use platfo
 assert.match(myOrders, /orders\.tgUserId, telegramId/, 'Order history must always scope results to the verified Telegram user');
 assert.match(myOrders, /ownership\.push\(eq\(orders\.customerId/, 'Order history may include customer-owned legacy orders');
 assert.match(myOrders, /limit\(100\)/, 'Order history must be bounded');
+
+const activePromos = readFileSync('tgcloud/endpoints/getActivePromos.js', 'utf8');
+assert.match(activePromos, /totalUsageLimit/, 'Public promo display must respect total usage limits');
+assert.match(activePromos, /usageCount/, 'Public promo display must compare current usage with the limit');
