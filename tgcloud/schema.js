@@ -6,7 +6,7 @@
  * Telegram Serverless SQLite does not enforce foreign keys: validate references
  * in endpoint logic and in migration reconciliation.
  */
-import { table, text, integer, numeric, json, boolean, uniqueIndex, sql } from 'sdk/db';
+import { table, text, integer, numeric, json, boolean, index, uniqueIndex, sql } from 'sdk/db';
 
 const createdAt = () => integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`);
 const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`);
@@ -83,7 +83,7 @@ export const orders = table('orders', {
     .on(t.mayaPaymentId).where(sql`${t.mayaPaymentId} IS NOT NULL AND ${t.mayaPaymentId} <> ''`),
   mayaRequestReferenceUnique: uniqueIndex('orders_maya_request_reference_uidx')
     .on(t.mayaRequestReferenceNumber).where(sql`${t.mayaRequestReferenceNumber} IS NOT NULL AND ${t.mayaRequestReferenceNumber} <> ''`),
-  paymentExpiryIdx: uniqueIndex('orders_payment_expiry_guard')
+  paymentExpiryIdx: index('idx_orders_payment_expiry')
     .on(t.paymentDeadlineAt).where(sql`${t.status} = 'Pending' AND ${t.paymentStatus} = 'Unpaid' AND ${t.paymentDeadlineAt} IS NOT NULL`),
 }));
  
