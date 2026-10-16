@@ -252,3 +252,10 @@ The live `telegram_automation_chats` table has a composite primary key (`busines
 ### Default-value parity follow-up
 
 The target schema now supplies UUID-shaped SQLite defaults for the twelve ordinary text-ID tables, preserves the automation settings singleton default ID (`default`), and supplies an `mwe_`-prefixed ID for Maya event rows. This avoids relying on PostgreSQL-only UUID functions after cutover. The ID defaults are a compatibility implementation, not a guarantee of byte-for-byte identical UUID generation; verify with CLI schema diff and insert/read-back tests. The syntax-only GitHub Actions workflow has been added and its first run was queued at last check, so there is not yet a passing CI result.
+
+### Build CI dependency conflict — 2026-10-17
+
+The latest inspected Build Check failure was not a TypeScript or application build failure: `npm install` stopped with `ERESOLVE` before `npm run build`. The resolved React version was 19.3.1 while the declared `react-leaflet@4.2.1` peer dependency requires React 18. React Leaflet 5 declares React and React DOM 19 peer dependencies, so `package.json` was updated to `react-leaflet: ^5.0.0` in code-only commit `7b62f765c78decf8c6d745cf85c909a17c82e086`. This is a dependency compatibility fix, not proof the full build passes; wait for the workflow triggered by that commit and address any further errors based on its logs.
+
+The most recent successful schema syntax run remains a syntax-only check. The target still needs an official CLI schema diff and non-production data/behavior rehearsal. The live `telegram_automation_chats` composite primary key remains represented only as a unique index in target code; exact primary-key parity is still open. No production deployment, schema migration, or data import has been performed.
+
