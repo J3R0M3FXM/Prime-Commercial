@@ -68,3 +68,6 @@ assert.equal(tier.tier, 'Bronze', 'Tier calculation must apply the current 30-da
 assert.equal(tier.progressPercent, 20, 'Tier progress must reflect spending toward the next tier');
 const trusted = resolveTrustedFingerprint({ fingerprints: [{ deviceId: 'device-1', hardwareId: 'hardware-1', deviceFingerprintId: 'fp-1', sessionToken: 'session-1' }] }, { hardwareId: 'hardware-1' });
 assert.equal(trusted.deviceFingerprintId, 'fp-1', 'Fingerprint resolution must recover stored identifiers by hardware ID');
+
+assert.equal(calculatePromoDiscount({ discountType: 'percentage', discountValue: 10 }, Infinity, Infinity).discount, 0,
+  'Non-finite client-supplied amounts must not create an unbounded discount');
