@@ -62,6 +62,7 @@ function normalize(input, current = {}) {
       if (values[key] === 0) values[key] = null;
     } else if (key === 'cashbackPercentage') {
       values[key] = numberValue(value, key, { nullable: true, max: 100 });
+      if (values[key] === 0) values[key] = null;
     } else if (key === 'minItemQuantity' || key === 'minPreviousOrders') {
       values[key] = numberValue(value, key, { integer: true, nullable: true });
       if (values[key] === 0) values[key] = null;
