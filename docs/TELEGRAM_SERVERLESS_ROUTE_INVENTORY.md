@@ -92,3 +92,9 @@ Added a fail-closed authorization helper at `tgcloud/lib/auth.js`. It relies on 
 
 The contract-check script now checks admin guards, explicit field allowlists, and create/update/delete coverage. The latest schema-check and build runs for these additions are still running/queued; only completed workflow results count as verification.
 
+### Admin configurator implementation extension
+
+The target now has admin-only CRUD endpoints for `products`, `charges`, `couriers`, `warehouses`, and `payment_methods`, all behind the shared fail-closed `requireAdmin(ctx)` guard. Product reorder explicitly changes only each row's `sort_order`; it never replaces or deletes the collection. Product writes validate non-negative price/stock and, when bundle variants exist, require non-negative integer variant stock whose sum equals parent stock. Payment method writes preserve an existing secret when the masked secret field is blank, and responses expose only `secretKeyConfigured`, never the raw secret. Warehouse writes reject a second default rather than silently introducing duplicate defaults.
+
+These are backend modules only. The current Next.js Admin Panel has not yet been connected to `Telegram.WebApp.Serverless.call`, and the `admin_telegram_user_id` setting must be bootstrapped into the target's `system_settings` before any admin endpoint can authorize a user. The live table was empty at last inspection, so access correctly remains denied until that secure setup is done. Product, warehouse, and payment-method behaviors still need runtime tests against the target SDK before use with real data.
+
