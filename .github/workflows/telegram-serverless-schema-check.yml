@@ -7,6 +7,8 @@ on:
       - "tgcloud/endpoints/**"
       - "tgcloud/lib/**"
       - "scripts/check-telegram-serverless-contracts.mjs"
+      - "scripts/export-supabase-snapshot.mjs"
+      - "scripts/verify-supabase-snapshot.mjs"
       - ".github/workflows/telegram-serverless-schema-check.yml"
   pull_request:
     branches: [migration/telegram-serverless]
@@ -29,3 +31,7 @@ jobs:
         run: node --input-type=module --check < tgcloud/schema.js
       - name: Check migration schema and public endpoint contracts
         run: node scripts/check-telegram-serverless-contracts.mjs
+      - name: Check backup utility syntax
+        run: |
+          node --check scripts/export-supabase-snapshot.mjs
+          node --check scripts/verify-supabase-snapshot.mjs
