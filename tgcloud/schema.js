@@ -8,8 +8,8 @@
  */
 import { table, text, integer, numeric, json, boolean, uniqueIndex, sql } from 'sdk/db';
 
-const createdAt = () => integer('created_at', { mode: 'timestamp' }).default(sql\`(unixepoch())\`);
-const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).default(sql\`(unixepoch())\`);
+const createdAt = () => integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`);
+const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`);
 
 export const products = table('products', {
   id: text('id').primaryKey(), name: text('name').notNull(),
@@ -107,7 +107,7 @@ export const promoRedemptions = table('promo_redemptions', {
   id: text('id').primaryKey(), promoCode: text('promo_code').notNull(), promoId: text('promo_id'),
   customerId: text('customer_id'), orderId: text('order_id'), deviceId: text('device_id'),
   discountAmount: numeric('discount_amount').default(0),
-  usedAt: integer('used_at', { mode: 'timestamp' }).default(sql\`(unixepoch())\`),
+  usedAt: integer('used_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
   releasedAt: integer('released_at', { mode: 'timestamp' }),
   hardwareId: text('hardware_id'), deviceFingerprintId: text('device_fingerprint_id'),
   serverFingerprintId: text('server_fingerprint_id'),
@@ -210,5 +210,5 @@ export const mayaWebhookEvents = table('maya_webhook_events', {
   processingStatus: text('processing_status').notNull().default('RECEIVED'),
   processingError: text('processing_error'),
   payload: json('payload').notNull().default({}),
-  receivedAt: integer('received_at', { mode: 'timestamp' }).notNull(), processedAt: integer('processed_at', { mode: 'timestamp' }),
+  receivedAt: integer('received_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`), processedAt: integer('processed_at', { mode: 'timestamp' }),
 });
