@@ -101,3 +101,10 @@ export function calculatePromoDiscount(promo, itemsSubtotal, deliveryFee = 0) {
   }
   return { discount: 0, isFreeShipping: false, shippingSubsidy: 0, cashbackPoints: 0 };
 }
+export function generatePromoCode(prefix = 'PRIME') {
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let rand = '';
+  for (let i = 0; i < 4; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  const cleanPrefix = String(prefix || 'PRIME').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return cleanPrefix + '-' + rand;
+}
