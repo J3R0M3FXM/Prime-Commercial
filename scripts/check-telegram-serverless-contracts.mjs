@@ -33,7 +33,7 @@ assert.match(paymentMethods, /return rows;/, 'Payment methods endpoint must pres
 const catalog = readFileSync('tgcloud/endpoints/getCatalog.js', 'utf8');
 assert.match(catalog, /eq\(products\.isActive, true\)/, 'Public catalog must filter inactive products');
 assert.doesNotMatch(catalog, /db\.(insert|update|delete)/, 'Public catalog endpoint must remain read-only');
-assert.match(catalog, /return rows;/, 'Catalog endpoint must preserve the existing array response shape');
+assert.match(catalog, /return await Promise\.all\(rows\.map/, 'Catalog endpoint must preserve the array response shape while resolving media references');
 
 const charges = readFileSync('tgcloud/endpoints/getPublicCharges.js', 'utf8');
 assert.match(charges, /eq\(charges\.isActive, true\)/, 'Public charges must filter inactive rows');
