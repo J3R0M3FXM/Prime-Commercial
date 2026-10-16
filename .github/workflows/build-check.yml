@@ -1,7 +1,7 @@
 name: Build Check
 on:
   push:
-    branches: [main]
+    branches: [main, migration/telegram-serverless]
   pull_request:
     branches: [main]
 
@@ -13,6 +13,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - run: npm install --no-audit --no-fund
       - run: npm run build

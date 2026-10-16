@@ -1,0 +1,52 @@
+name: Telegram Serverless Schema Check
+on:
+  push:
+    branches: [migration/telegram-serverless]
+    paths:
+      - "tgcloud/schema.js"
+      - "tgcloud/endpoints/**"
+      - "tgcloud/lib/**"
+      - "tgcloud/handlers/**"
+      - "scripts/check-telegram-serverless-contracts.mjs"
+      - "scripts/export-supabase-snapshot.mjs"
+      - "scripts/verify-supabase-snapshot.mjs"
+      - "scripts/test-delivery-fee.mjs"
+      - "scripts/test-promo-codec.mjs"
+      - ".github/workflows/telegram-serverless-schema-check.yml"
+  pull_request:
+    branches: [migration/telegram-serverless]
+    paths:
+      - "tgcloud/schema.js"
+      - "tgcloud/endpoints/**"
+      - "tgcloud/lib/**"
+      - "tgcloud/handlers/**"
+      - "scripts/check-telegram-serverless-contracts.mjs"
+      - "scripts/export-supabase-snapshot.mjs"
+      - "scripts/verify-supabase-snapshot.mjs"
+      - "scripts/test-delivery-fee.mjs"
+      - "scripts/test-promo-codec.mjs"
+      - ".github/workflows/telegram-serverless-schema-check.yml"
+
+jobs:
+  schema-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check schema JavaScript syntax
+        run: |
+          for file in tgcloud/schema.js $(find tgcloud/lib tgcloud/endpoints tgcloud/handlers -name "*.js" -type f 2>/dev/null); do
+            [ -f "$file" ] && node --input-type=module --check < "$file"
+          done
+      - name: Check migration schema and public endpoint contracts
+        run: node scripts/check-telegram-serverless-contracts.mjs
+      - name: Check backup utility syntax
+        run: |
+          node --check scripts/export-supabase-snapshot.mjs
+          node --check scripts/verify-supabase-snapshot.mjs
+      - name: Test delivery pricing rules
+        run: node --experimental-default-type=module scripts/test-delivery-fee.mjs
+      - name: Test promo metadata round-trip
+        run: node --experimental-default-type=module scripts/test-promo-codec.mjs
