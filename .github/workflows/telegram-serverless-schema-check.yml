@@ -5,6 +5,7 @@ on:
     paths:
       - "tgcloud/schema.js"
       - "tgcloud/endpoints/**"
+      - "tgcloud/lib/**"
       - "scripts/check-telegram-serverless-contracts.mjs"
       - ".github/workflows/telegram-serverless-schema-check.yml"
   pull_request:
