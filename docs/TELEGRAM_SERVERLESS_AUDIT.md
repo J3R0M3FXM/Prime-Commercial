@@ -287,3 +287,11 @@ Added `scripts/check-telegram-serverless-contracts.mjs` and expanded the schema-
 
 The target still does not implement the 43 route handlers, authenticated Telegram initData/session validation, admin CRUD, atomic checkout/inventory/loyalty operations, private receipt handling, video streaming, or the scheduled expiry/referral jobs. Do not treat the public read-only slice as app migration completion. Production cutover remains blocked on verified bot identity, CLI schema diff, export/import/restore rehearsal, authorization and concurrency tests, and end-to-end checks.
 
+### Admin configurator vertical slice — code only
+
+Added a fail-closed authorization helper at `tgcloud/lib/auth.js`. It relies on Telegram Serverless's verified `ctx.initData.user` and compares that identity against the server-side `system_settings.admin_telegram_user_id` allowlist. A missing, malformed, or mismatched allowlist denies access; the Mini App cannot submit its own admin flag. Added admin-only CRUD endpoint modules for charges, couriers, warehouses, and payment methods. The handlers use field allowlists, validate numeric/boolean inputs, preserve sorting, and never return raw payment `secret_key` values. Warehouse CRUD rejects setting a second default rather than silently creating conflicting defaults.
+
+**Activation prerequisite:** live `system_settings` was empty at the last read. Therefore these admin endpoints intentionally fail closed until a controlled, non-secret-leaking bootstrap step imports the configured administrator Telegram user ID into the target's `system_settings` JSON value. Do not place the ID or any bot/payment credentials in Git. The source admin access-code flow and its credential handling still need an explicit migration design; these endpoints are not yet connected to the admin UI.
+
+The contract-check script now checks admin guards, explicit field allowlists, and create/update/delete coverage. The latest schema-check and build runs for these additions are still running/queued; only completed workflow results count as verification.
+
