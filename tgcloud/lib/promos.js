@@ -41,8 +41,18 @@ export function deserializePromo(row) {
   };
 }
 
-export function serializePromoDescription(promo) {
+export function serializePromoDescription(promo, existingDescription = '') {
+  let previous = {};
+  try {
+    if (typeof existingDescription === 'string' && existingDescription.startsWith('{') && existingDescription.endsWith('}')) {
+      const parsed = JSON.parse(existingDescription);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) previous = parsed;
+    }
+  } catch {
+    previous = {};
+  }
   return JSON.stringify({
+    ...previous,
     realDescription: String(promo.description || ''),
     voucherType: promo.voucherType || 'shop_voucher',
     customerEligibility: promo.customerEligibility || 'all',
