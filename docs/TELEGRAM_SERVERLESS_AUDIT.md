@@ -236,3 +236,8 @@ Before any import, validate the target schema with the official CLI against the 
 A read-only comparison of the current target declaration against the live public schema now finds **16 live tables and 16 target tables**, with no missing or extra column names after correcting the Maya event timestamp mapping from `created_at` to `received_at` (commit `be8aa6b1c82949934bae8f5d2455c891f42f1de2`). This is a column-name comparison only; it does not yet validate types, nullability, defaults, indexes, uniqueness, constraints, or runtime schema generation. The target `received_at` field is currently non-null without a default, so the Maya event insertion path must supply it explicitly unless the default can be verified and safely restored. No schema migration has been applied to Telegram Serverless.
 
 Static type-mapping review also found no additional column type mismatches under the intended timestamp and JSON conversions. This does not replace an official CLI schema diff or runtime test. The received_at default remains a known open parity item; constraints, indexes, and nullability still require verification.
+
+
+### Static syntax blocker found and corrected — 2026-10-17
+
+A source inspection found escaped backticks in six SQL-template-literal positions in `tgcloud/schema.js`, which would make the JavaScript invalid. These have been corrected to actual template literals in commit `5a1fb0109320b31c92feb18a688cbd448002ea0c`. The `maya_webhook_events.received_at` target declaration now also restores the SQLite `unixepoch()` default matching the live table's `now()` default after timestamp conversion. This is a source-level correction; an actual CLI parse/diff and non-production migration dry-run are still required before treating the schema as valid.
