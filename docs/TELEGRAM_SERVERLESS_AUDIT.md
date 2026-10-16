@@ -1,4 +1,4 @@
-# Prime Commercial — Telegram Serverless Audit (Initial)
+# Prime Commercial — Telegram Serverless Audit
 
 Date: 2026-10-17
 Branch: `migration/telegram-serverless`
@@ -109,3 +109,58 @@ The receipt bucket is currently configured as public. Treat that as a privacy ri
 - These are business logic, not optional infrastructure details. The migration must preserve their observable behavior and idempotency. Because the immediate plan is to defer Maya/GCash webhook changes, do not implement new webhook plumbing as part of the first vertical slice; still preserve existing schema/data and document which payment behaviors remain active.
 - The five-minute referral task is a concrete migration requirement. Do not replace it with frequent client polling. First check whether Telegram Serverless offers a supported scheduled-task mechanism for the selected bot; otherwise design an event-driven/on-demand alternative that preserves maturation timing and does not double-award points.
 
+
+
+## Expanded reconciliation findings — 2026-10-17
+
+### Live schema versus target mapping
+
+A second pass inspected all live column names, the full target schema declaration, the live migration history, active database triggers, and RLS policies. The target schema still needs a proper reconciliation before it can be treated as import-ready.
+
+**Critical missing target fields:**
+
+- `customers`: `referral_points`, `referred_by_user_id`, `referred_by_member_id`.
+- `orders`: `maya_payment_id`, `maya_request_reference_number`, `maya_receipt_number`, `maya_payment_scheme`, `maya_fund_source_type`, `maya_last_webhook_status`, `maya_last_webhook_at`, `store_credits_used`, `promo_shipping_subsidy`, `cashback_points_amount`, `cashback_points_awarded_at`, `cashback_points_reversed_at`, `purchasing_points_amount`, `purchasing_points_awarded_at`, `purchasing_points_reversed_at`, `customer_aggregate_updated_at`, `delivered_at`, `referred_by_user_id`, `referred_by_member_id`, `referral_points_status`, `referral_points_credit_after`, `referral_points_credited_at`, `referral_points_amount`, `payment_deadline_at`, `payment_proof_submitted_at`, `expired_at`, `inventory_released_at`, `inventory_release_error`, `store_credits_released_at`.
+- `promo_redemptions`: `released_at`, `hardware_id`, `device_fingerprint_id`, `server_fingerprint_id`.
+- `warehouses`: `is_default`, `latitude`, `longitude`.
+- Four additional tables remain absent from the target: `telegram_automation_flows`, `telegram_automation_settings`, `telegram_automation_chats`, and `maya_webhook_events`.
+
+The target's `created_at` / `updated_at` helpers are intended timestamp mappings, not additional business fields; however, conversion still needs a tested UTC/precision rule. The order-column gap is especially important because it includes payment references, expiry, inventory release, credits, cashback, purchasing points, and referral maturity state. These cannot be silently dropped, even if the initial cutover keeps provider webhook work deferred.
+
+### Live migration history is not fully reproducible from this branch
+
+Supabase reports **17 applied migration records** from 2026-09-20 through 2026-09-23. Some migration SQL files can be fetched from the branch, but several applied-history names were not found at their expected paths (including the runtime alignment and payment-expiry/receipt-flow migration filenames). Therefore the migration branch's checked-in SQL is not yet proven to be a complete reproducible record of the live database. Resolve this discrepancy by locating the canonical migration files or safely exporting the live schema/functions/policies; do not fabricate replacement migrations from filenames alone.
+
+### Database functions and triggers that must be ported
+
+The live project has 12 public functions:
+
+- `create_order_with_inventory`, `create_order_with_loyalty`: order creation and stock/loyalty path.
+- `validate_product_inventory`: rejects negative stock and requires bundle variant stock to be integral, nonnegative, and sum to the parent stock.
+- `set_order_payment_deadline`: initializes a one-hour deadline for pending unpaid orders.
+- `expire_unpaid_orders`: expiry processing.
+- `award_order_loyalty`, `handle_order_loyalty_status`: completion/delivery loyalty behavior.
+- `process_matured_referrals`: credits eligible referral rewards after the configured delay.
+- `release_promo_redemptions_for_order`, `enforce_promo_device_fingerprint`: active redemption release and device-fraud controls.
+- `convert_points_to_store_credits`, `current_customer_tier`: customer rewards/tier logic.
+
+Four non-internal triggers were confirmed: promo fingerprint enforcement before redemption insert; loyalty status handling after order insert/status update; payment-deadline assignment before order insert or relevant updates; and product/bundle stock validation before stock/bundle changes. The equivalent Serverless endpoints must preserve transaction boundaries, locking/idempotency semantics, and rejection conditions rather than merely matching table columns.
+
+### RLS policy risk — do not copy policies as-is
+
+RLS is enabled on the live tables, but the current policy inventory includes broad policies granted to `public`, including:
+
+- `customers`: `Allow Public Customers Upsert` (`ALL`, `USING true`)
+- `orders`: `Allow Public Orders Select` and `Allow Public Orders Update` (`UPDATE`, `USING true`)
+- `point_transactions`: `Allow Public Point Transactions` (`ALL`, `USING true`)
+- `promo_redemptions`: `Allow Public Redemptions` (`ALL`, `USING true`)
+
+Other public read policies exist for product/configuration tables. This is a significant authorization risk: RLS being enabled does not itself mean access is restricted. The new backend must enforce validated Telegram identity, order/customer ownership, and admin role checks on every sensitive read and mutation. Do not port these permissive policies or expose direct write access from the Mini App. Payment secret fields must remain server-only.
+
+### Backup and cutover gates remain closed
+
+- No verified export/restore rehearsal has been performed.
+- No storage objects or database rows have been imported into Telegram Serverless.
+- No production bot binding, deployment, payment configuration, or Supabase schema has been changed.
+- Maya/GCash webhook redesign remains outside the initial slice, as requested; existing payment/order state and audit records must still be preserved.
+- The current evidence supports continuing with schema/security reconciliation and migration tooling, not production cutover.
