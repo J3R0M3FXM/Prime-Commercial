@@ -82,3 +82,11 @@ node scripts/migrate-media-to-telegram.mjs ./migration-backups/pre-cutover.pcmba
 
 This script has **not** been run. Do not run it until the exact Telegram Serverless bot is confirmed and the storage chat is controlled by the business owner. The encrypted mapping is only an inventory/transfer artifact; a target `media_assets` table, authenticated media-content endpoint, and frontend URL adapter still need to be implemented and tested. Receipt proofs must remain private and must never be bundled into the public static Mini App.
 
+After the transfer manifest is created and independently checked, import its mappings into the target database with:
+
+```bash
+node scripts/import-telegram-media-map.mjs ./migration-backups/telegram-media-map.pcmmapping
+```
+
+This uses `npx tgcloud run endpoints/manageMediaAssets` in resumable batches; it does not deploy modules. Before running it, the target schema must have been reviewed and migrated, `system_settings.admin_telegram_user_id` must contain the authorized administrator ID, and the local CLI must be logged into the **same bot** verified in the encrypted manifest. The importer rechecks the Bot API token's bot ID and private storage chat before writing. If a batch fails, rerun the script; upserts are idempotent by bucket/path.
+
