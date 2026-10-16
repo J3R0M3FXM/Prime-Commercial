@@ -840,7 +840,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    void notifyPaymentUpdated({
+    const notificationSent = await notifyPaymentUpdated({
       chatId: auth.customer.tg_user_id,
       orderNumber: String(currentOrder.order_number || orderId),
       status: 'Pending',
@@ -848,6 +848,12 @@ export async function PUT(request: Request) {
       paymentStatus: 'Pending Review',
       event: 'payment',
     });
+    if (!notificationSent) {
+      console.error('Payment proof was saved, but Telegram payment notification delivery failed.', {
+        orderNumber: String(currentOrder.order_number || orderId),
+        customerId: auth.customer.id,
+      });
+    }
 
     cacheStore.invalidateOrders();
 
