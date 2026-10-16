@@ -71,7 +71,7 @@ function storagePathFromReference(value, bucket) {
   try { reference = decodeURIComponent(reference); } catch {}
   const marker = '/' + bucket + '/';
   const index = reference.indexOf(marker);
-  if (index >= 0) return reference.slice(index + marker.length).replace(/^\\/+/, '');
+  if (index >= 0) return reference.slice(index + marker.length).replace(/^\/+/, '');
   const prefix = bucket + '/';
   if (reference.startsWith(prefix)) return reference.slice(prefix.length);
   return reference.includes('/') ? '' : reference;
