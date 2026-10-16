@@ -600,6 +600,19 @@ async function hydrateCustomerOrder(order: any, supabase: any) {
   const rawCharges = order.charges_breakdown ?? order.appliedCharges ?? order.charges ?? [];
   const charges = Array.isArray(rawCharges) ? rawCharges : [];
   const items = Array.isArray(order.items) ? order.items : [];
+  const courierId = String(order.courier_id || order.courierId || order.courier?.id || '').trim();
+  let courierRecord: any = null;
+
+  // Older orders may have a courier ID but no saved courier name. Resolve the
+  // display name from the existing courier configuration without rewriting history.
+  if (courierId && !(order.courier_name || order.courierName || order.courier?.name)) {
+    const { data: matchedCourier } = await supabase
+      .from('couriers')
+      .select('id,name,logo,type,tracking_url_pattern')
+      .eq('id', courierId)
+      .maybeSingle();
+    courierRecord = matchedCourier || null;
+  }
 
   const productIds = Array.from(new Set(items
     .map((item: any) => String(item?.productId || item?.product_id || '').trim())
@@ -642,6 +655,17 @@ async function hydrateCustomerOrder(order: any, supabase: any) {
     orderNumber: order.order_number || order.orderNumber || order.id,
     receiverName: order.receiver_name || order.receiverName || order.customer_name || order.customerName || '',
     receiverPhone: order.receiver_phone || order.receiverPhone || order.customer_phone || order.customerPhone || '',
+    courierId,
+    courierName: order.courier_name || order.courierName || order.courier?.name || courierRecord?.name || '',
+    courier: order.courier?.name
+      ? order.courier
+      : {
+          id: courierId,
+          name: order.courier_name || order.courierName || courierRecord?.name || '',
+          logo: order.courier?.logo || courierRecord?.logo || '',
+          type: order.courier?.type || courierRecord?.type || '',
+          trackingUrlPattern: order.courier?.trackingUrlPattern || courierRecord?.tracking_url_pattern || '',
+        },
     items: hydratedItems,
     appliedCharges: charges,
     chargesBreakdown: charges,
