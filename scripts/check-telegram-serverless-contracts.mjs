@@ -213,3 +213,6 @@ assert.match(mediaImporter, /String\(botPayload\.result\?\.id\) !== String\(mani
 assert.match(mediaImporter, /chatPayload\.result\?\.type !== 'private'/, 'Media importer must recheck private storage chat');
 assert.match(mediaImporter, /endpoints\/manageMediaAssets/, 'Media importer must use the admin-only idempotent mapping endpoint');
 assert.match(mediaImporter, /TELEGRAM_ADMIN_USER_ID/, 'Media importer must require the configured admin identity');
+
+assert.match(mediaTransfer, /publicVideoMediaPaths/, 'Media transfer must retain visibility for published gallery assets');
+assert.match(mediaImporter, /entry\.visibility === 'public'/, 'Media importer must preserve the manifest visibility classification');
