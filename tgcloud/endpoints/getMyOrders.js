@@ -1,6 +1,7 @@
 import { db, EndpointError } from 'sdk';
 import { asc, desc, eq, or } from 'sdk/db';
 import { customers, orders } from '../schema.js';
+import { findMediaAsset } from '../lib/media.js';
 
 export default async function (_input, ctx) {
   const telegramId = ctx?.initData?.user?.id == null ? '' : String(ctx.initData.user.id);
@@ -23,7 +24,11 @@ export default async function (_input, ctx) {
     .limit(100)
     .all();
 
-  return rows.map((order) => ({
+  return await Promise.all(rows.map(async (order) => {
+    const receiptAsset = order.paymentProofImage ? await findMediaAsset(order.paymentProofImage) : null;
+    const receiptAssetId = receiptAsset && receiptAsset.visibility === 'private' &&
+      String(receiptAsset.orderId || '') === String(order.id) ? receiptAsset.id : null;
+    return ({
     id: order.id,
     orderNumber: order.orderNumber,
     status: order.status,
@@ -37,5 +42,7 @@ export default async function (_input, ctx) {
     referredByMemberId: order.referredByMemberId,
     referralPointsStatus: order.referralPointsStatus,
     customerName: order.customerName,
+    receiptAssetId,
+  });
   }));
 }
