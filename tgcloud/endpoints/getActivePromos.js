@@ -1,5 +1,5 @@
 import { db } from 'sdk';
-import { eq } from 'sdk/db';
+import { desc, eq } from 'sdk/db';
 import { deserializePromo } from '../lib/promos.js';
 import { promos } from '../schema.js';
 
@@ -12,6 +12,7 @@ export default async function () {
   const now = Date.now();
   const rows = await db.select().from(promos)
     .where(eq(promos.isActive, true))
+    .orderBy(desc(promos.createdAt))
     .all();
 
   const valid = rows.map(deserializePromo).filter((promo) => {
