@@ -362,3 +362,9 @@ Added `tgcloud/endpoints/validatePromo.js` with verified Telegram identity, stor
 
 The official Telegram Serverless module model documents update handlers, Mini App endpoints, shared library modules, and schema, but no native cron/scheduled-job trigger. The live Supabase project has a five-minute `prime-loyalty-referral-maturity` job, and the app also needs unpaid-order expiry. Neither is ported as an opportunistic endpoint or client poller. Preserving the exact timing requires a supported external scheduler or an explicitly approved redesign; until then, referral maturity and unpaid-order expiry are cutover blockers. Reference: https://blogfork.telegram.org/bots/serverless
 
+### Media migration tooling — code only
+
+Added a target-only `media_assets` table (17 target tables total: the 16 live Supabase application tables plus this Telegram media index), `manageMediaAssets.js` for admin-only mapping import/visibility controls, and `getMediaContent.js` for content retrieval without exposing Telegram file IDs. Public catalog references are rewritten to `tgmedia:<asset-id>` only when the mapping exists; unmapped Supabase storage URLs are blanked rather than leaking a live Supabase dependency. Private receipt proof content requires an admin or a verified owner of the linked order.
+
+Added `scripts/migrate-media-to-telegram.mjs` to upload verified snapshot objects as documents into a verified private chat, checking the expected bot identity and source checksums and writing an encrypted, resumable mapping. Added `scripts/import-telegram-media-map.mjs` to import those mappings through the admin-only endpoint in idempotent batches. Neither script has been executed; no media has been uploaded or imported. Frontend decoding of `tgmedia:` references and target runtime tests are still required. Telegram file-content retrieval is capped at 20 MiB per item, so larger media requires an alternate playback strategy.
+
