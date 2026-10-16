@@ -216,3 +216,5 @@ assert.match(mediaImporter, /TELEGRAM_ADMIN_USER_ID/, 'Media importer must requi
 
 assert.match(mediaTransfer, /publicVideoMediaPaths/, 'Media transfer must retain visibility for published gallery assets');
 assert.match(mediaImporter, /entry\.visibility === 'public'/, 'Media importer must preserve the manifest visibility classification');
+
+assert.doesNotMatch(publicVideos, /telegramFileId|telegramMessageId/, 'Public video gallery must not expose raw Telegram identifiers');
