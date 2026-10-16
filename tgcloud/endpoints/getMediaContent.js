@@ -1,6 +1,6 @@
 import { api, db, EndpointError } from 'sdk';
-import { eq } from 'sdk/db';
-import { customers, mediaAssets, orders } from '../schema.js';
+import { and, eq } from 'sdk/db';
+import { customers, mediaAssets, orders, videos } from '../schema.js';
 import { isAdminUser } from '../lib/auth.js';
 
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -50,8 +50,27 @@ async function canReadPrivateAsset(asset, ctx) {
 
 export default async function (input, ctx) {
   const id = String(input?.id || '').trim();
-  if (!id) throw new EndpointError('Media asset ID is required.', { code: 'INVALID_INPUT' });
-  const asset = await db.select().from(mediaAssets).where(eq(mediaAssets.id, id)).get();
+  const videoId = String(input?.videoId || '').trim();
+  if (!id && !videoId) throw new EndpointError('Media asset ID is required.', { code: 'INVALID_INPUT' });
+
+  let asset;
+  if (id) {
+    asset = await db.select().from(mediaAssets).where(eq(mediaAssets.id, id)).get();
+  } else {
+    const video = await db.select().from(videos)
+      .where(and(eq(videos.id, videoId), eq(videos.isPublished, true))).get();
+    if (video?.telegramFileId) {
+      asset = {
+        id: video.id,
+        fileId: video.telegramFileId,
+        contentType: 'video/mp4',
+        size: Number(video.fileSize) || 0,
+        sha256: null,
+        visibility: 'public',
+        orderId: null,
+      };
+    }
+  }
   if (!asset) throw new EndpointError('Media not found.', { code: 'NOT_FOUND' });
 
   if (asset.visibility !== 'public' && !(await canReadPrivateAsset(asset, ctx))) {
