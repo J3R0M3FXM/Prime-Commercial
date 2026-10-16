@@ -321,3 +321,9 @@ The shared automation chat upsert deliberately leaves `botPaused` unchanged unle
 
 Runtime tests are still required for Telegram Business permissions, callback/edit payload compatibility, timestamp conversion, and concurrent composite-key upserts. The existing admin UI is not yet wired to `manageAutomation`; its allowlist bootstrap remains required. No handler has been pushed to a bot or activated in production.
 
+### Newly confirmed source-app / live-database drift — blocker
+
+A live `information_schema.columns` query confirmed that the current app code expects customer fields that do **not** exist in the active Supabase `public.customers` table: `photo_url`, `has_custom_photo`, `referred_by_name`, `referred_by_username`, and `role`. Specifically, `app/api/account/route.ts` selects/writes the profile-photo and referral-name fields, while `app/api/auth/telegram/validate/route.ts` reads `role`. The live table currently contains 19 columns and none of those names.
+
+Do not silently add these fields to the live project or drop the corresponding UI behavior. Before porting account/auth, reconcile this with checked-in SQL migrations and the actual deployed migration history, then decide whether to add compatible columns to the target schema and/or fix stale app code. The customer account/profile endpoint has therefore **not** been ported yet. This is a real parity issue, not merely a Telegram Serverless limitation.
+
