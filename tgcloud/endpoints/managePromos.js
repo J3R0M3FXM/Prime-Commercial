@@ -82,13 +82,13 @@ function normalize(input, current = {}) {
   return { ...current, ...values };
 }
 
-function toDatabaseRow(promo, id, creating) {
+function toDatabaseRow(promo, id, creating, existingDescription = '') {
   const now = new Date();
   return {
     id,
     code: promo.code,
     title: promo.title,
-    description: serializePromoDescription(promo),
+    description: serializePromoDescription(promo, existingDescription),
     discountType: promo.discountType || 'fixed',
     discountValue: Number(promo.discountValue) || 0,
     maxDiscountAmount: promo.maxDiscountAmount ?? null,
@@ -171,7 +171,7 @@ export default async function (input, ctx) {
       const duplicate = await db.select({ id: promos.id }).from(promos).where(eq(promos.code, promo.code)).get();
       if (duplicate && duplicate.id !== id) throw new EndpointError('A promo with this code already exists.', { code: 'DUPLICATE_CODE' });
     }
-    const values = toDatabaseRow(promo, id, false);
+    const values = toDatabaseRow(promo, id, false, row.description);
     delete values.id;
     delete values.createdAt;
     const [updated] = await db.update(promos).set(values).where(eq(promos.id, id)).returning().run();
