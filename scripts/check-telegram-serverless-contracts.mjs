@@ -17,7 +17,7 @@ const requiredEndpoints = [
   'getPublicCharges.js', 'getPublicCouriers.js', 'getPublicVideos.js', 'getDeliveryQuote.js',
   'getMyOrders.js', 'validatePromo.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js',
   'managePaymentMethods.js', 'manageProducts.js', 'managePromos.js', 'manageVideos.js',
-  'manageAutomation.js',
+  'manageAutomation.js', 'getMediaContent.js', 'manageMediaAssets.js',
 ];
 for (const name of requiredEndpoints) {
   assert.ok(existsSync('tgcloud/endpoints/' + name), 'Missing public endpoint: ' + name);
@@ -194,3 +194,16 @@ assert.match(mediaTransfer, /chat\.type !== 'private'/, 'Media transfer must ref
 assert.match(mediaTransfer, /sha256\(bytes\) !== object\.sha256/, 'Media transfer must verify every source object checksum');
 assert.match(mediaTransfer, /PCMMAP1/, 'Media transfer map must be encrypted separately');
 assert.doesNotMatch(mediaTransfer, /console\.log\([^\n]*botToken/, 'Media transfer must never log the bot token');
+
+const mediaContent = readFileSync('tgcloud/endpoints/getMediaContent.js', 'utf8');
+assert.match(mediaContent, /asset\.visibility !== 'public'/, 'Private media must require ownership/admin authorization');
+assert.match(mediaContent, /canReadPrivateAsset/, 'Receipt media must be scoped to an owning order or admin');
+assert.doesNotMatch(mediaContent, /return \{[^}]*fileId/, 'Media responses must never disclose Telegram file IDs');
+const mediaAssetsAdmin = readFileSync('tgcloud/endpoints/manageMediaAssets.js', 'utf8');
+assert.match(mediaAssetsAdmin, /await requireAdmin\(ctx\)/, 'Media mapping changes must require admin authorization');
+assert.match(mediaAssetsAdmin, /bucket === 'receipt-proofs' \? 'private'/, 'Receipt proof mappings must always remain private');
+assert.match(mediaAssetsAdmin, /target: \[mediaAssets\.bucket, mediaAssets\.path\]/, 'Media import must be idempotent by source bucket/path');
+const mediaCore = readFileSync('tgcloud/lib/media.js', 'utf8');
+assert.match(mediaCore, /asset\.visibility === 'public' \? 'tgmedia:'/, 'Only public media assets may become public Mini App references');
+assert.match(mediaCore, /value\.includes\('\/storage\/v1\/object\/'\)\) return ''/, 'Unmapped Supabase storage URLs must not leak into the target Mini App');
+assert.match(readFileSync('tgcloud/schema.js', 'utf8'), /table\('media_assets'/, 'Target schema must include the media asset index');
