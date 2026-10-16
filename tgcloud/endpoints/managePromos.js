@@ -59,14 +59,17 @@ function normalize(input, current = {}) {
       values[key] = numberValue(value, key);
     } else if (key === 'maxDiscountAmount' || key === 'cappedShippingDiscount') {
       values[key] = numberValue(value, key, { nullable: true });
+      if (values[key] === 0) values[key] = null;
     } else if (key === 'cashbackPercentage') {
       values[key] = numberValue(value, key, { nullable: true, max: 100 });
     } else if (key === 'minItemQuantity' || key === 'minPreviousOrders') {
       values[key] = numberValue(value, key, { integer: true, nullable: true });
+      if (values[key] === 0) values[key] = null;
     } else if (key === 'flashHourStart' || key === 'flashHourEnd') {
       values[key] = numberValue(value, key, { integer: true, nullable: true, max: 23 });
     } else if (key === 'totalUsageLimit') {
-      values[key] = numberValue(value, key, { integer: true, nullable: true, min: 1 });
+      values[key] = numberValue(value, key, { integer: true, nullable: true, min: 0 });
+      if (values[key] === 0) values[key] = null;
     } else if (key === 'usageCount') {
       values[key] = numberValue(value, key, { integer: true });
     } else if (key === 'usageLimitPerCustomer') {
