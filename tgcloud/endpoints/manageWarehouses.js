@@ -1,5 +1,5 @@
 import { db, EndpointError } from 'sdk';
-import { asc, eq, and, ne } from 'sdk/db';
+import { asc, eq } from 'sdk/db';
 import { warehouses } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
 
@@ -43,11 +43,11 @@ function normalize(input, creating) {
 
 async function ensureDefaultAvailable(isDefault, id) {
   if (!isDefault) return;
-  const currentDefault = await db.select({ id: warehouses.id })
+  const currentDefaults = await db.select({ id: warehouses.id })
     .from(warehouses)
     .where(eq(warehouses.isDefault, true))
-    .get();
-  if (currentDefault && currentDefault.id !== id) {
+    .all();
+  if (currentDefaults.some((row) => row.id !== id)) {
     throw new EndpointError('Another warehouse is already the default. Unset it before selecting a different default.', { code: 'DEFAULT_WAREHOUSE_EXISTS' });
   }
 }
