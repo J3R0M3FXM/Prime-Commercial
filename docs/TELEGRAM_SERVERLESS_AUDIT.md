@@ -331,3 +331,12 @@ Do not silently add these fields to the live project or drop the corresponding U
 
 Added `tgcloud/endpoints/getMyOrders.js`, which uses the platform-verified Telegram user ID, scopes results to that ID plus matching customer/member IDs for legacy orders, orders newest-first, and caps the response at 100 rows. It does not accept a customer ID from the caller and cannot request another customer's history by changing payload fields. The app's combined account endpoint is still blocked by the confirmed customer-column drift above.
 
+### Additional customer-safe reads
+
+- `getMyOrders.js` returns at most 100 orders scoped to the verified Telegram identity and legacy customer/member references.
+- `getPublicCouriers.js` exposes only active courier options and delivery-rate fields; it does not expose warehouse location details.
+- `getDeliveryQuote.js` validates destination coordinates, chooses an active configured warehouse server-side, calculates an estimated distance and fee using the existing pricing formula, and returns no warehouse coordinates. It marks the result `estimated: true`; the future order-creation endpoint must recalculate the fee and never trust this quote or a client-submitted fee.
+- `getActivePromos.js` filters inactive, not-yet-started, expired, and globally exhausted promos while omitting internal usage counters from its public response.
+
+These reads do not complete checkout. Atomic stock reservation, promo-redemption enforcement, payment deadline handling, loyalty award/reversal logic, and order creation remain blocked until transaction/concurrency semantics and the full data contract are tested.
+
