@@ -6,7 +6,7 @@
  * Telegram Serverless SQLite does not enforce foreign keys: validate references
  * in endpoint logic and in migration reconciliation.
  */
-import { table, text, integer, numeric, json, boolean, sql } from 'sdk/db';
+import { table, text, integer, numeric, json, boolean, uniqueIndex, sql } from 'sdk/db';
 
 const createdAt = () => integer('created_at', { mode: 'timestamp' }).default(sql\`(unixepoch())\`);
 const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).default(sql\`(unixepoch())\`);
@@ -157,4 +157,58 @@ export const pointTransactions = table('point_transactions', {
 
 export const systemSettings = table('system_settings', {
   key: text('key').primaryKey(), value: json('value').notNull(), updatedAt: updatedAt(),
+});
+
+export const telegramAutomationFlows = table('telegram_automation_flows', {
+  id: text('id').primaryKey(), name: text('name').notNull(),
+  active: boolean('active').notNull().default(true),
+  triggerType: text('trigger_type').notNull().default('message'),
+  triggerValue: text('trigger_value').notNull().default(''),
+  matchMode: text('match_mode').notNull().default('contains'),
+  responseText: text('response_text').notNull().default(''),
+  buttons: json('buttons').notNull().default([]),
+  priority: integer('priority').notNull().default(100),
+  createdAt: createdAt(), updatedAt: updatedAt(),
+});
+
+export const telegramAutomationSettings = table('telegram_automation_settings', {
+  id: text('id').primaryKey(),
+  enabled: boolean('enabled').notNull().default(false),
+  fallbackEnabled: boolean('fallback_enabled').notNull().default(false),
+  fallbackResponse: text('fallback_response').notNull().default(''),
+  updatedAt: updatedAt(),
+  businessConnectionId: text('business_connection_id'),
+  businessUserId: integer('business_user_id'),
+  businessUserChatId: integer('business_user_chat_id'),
+  welcomeFlowId: text('welcome_flow_id'),
+});
+
+export const telegramAutomationChats = table('telegram_automation_chats', {
+  businessConnectionId: text('business_connection_id').notNull(),
+  chatId: integer('chat_id').notNull(),
+  lastCustomerMessageAt: integer('last_customer_message_at', { mode: 'timestamp' }),
+  lastHumanMessageAt: integer('last_human_message_at', { mode: 'timestamp' }),
+  lastBotMessageAt: integer('last_bot_message_at', { mode: 'timestamp' }),
+  humanTakeoverUntil: integer('human_takeover_until', { mode: 'timestamp' }),
+  createdAt: createdAt(), updatedAt: updatedAt(),
+  botPaused: boolean('bot_paused').notNull().default(false),
+}, (t) => ({
+  connectionChatUnique: uniqueIndex('uq_telegram_automation_chats_connection_chat')
+    .on(t.businessConnectionId, t.chatId),
+}));
+
+export const mayaWebhookEvents = table('maya_webhook_events', {
+  id: text('id').primaryKey(),
+  eventKey: text('event_key').notNull(),
+  paymentId: text('payment_id'),
+  requestReferenceNumber: text('request_reference_number'),
+  receiptNumber: text('receipt_number'),
+  paymentStatus: text('payment_status').notNull(),
+  channel: text('channel').notNull().default('unknown'),
+  amount: numeric('amount'), currency: text('currency'), fundSourceType: text('fund_source_type'),
+  orderId: text('order_id'),
+  processingStatus: text('processing_status').notNull().default('RECEIVED'),
+  processingError: text('processing_error'),
+  payload: json('payload').notNull().default({}),
+  receivedAt: createdAt(), processedAt: integer('processed_at', { mode: 'timestamp' }),
 });
