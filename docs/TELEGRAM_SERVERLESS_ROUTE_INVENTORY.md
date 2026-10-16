@@ -98,3 +98,11 @@ The target now has admin-only CRUD endpoints for `products`, `charges`, `courier
 
 These are backend modules only. The current Next.js Admin Panel has not yet been connected to `Telegram.WebApp.Serverless.call`, and the `admin_telegram_user_id` setting must be bootstrapped into the target's `system_settings` before any admin endpoint can authorize a user. The live table was empty at last inspection, so access correctly remains denied until that secure setup is done. Product, warehouse, and payment-method behaviors still need runtime tests against the target SDK before use with real data.
 
+### Telegram Business secretary port — code-only
+
+Added Serverless handlers for `business_connection`, `business_message`, and `callback_query`, plus `tgcloud/lib/telegram-automation.js`. The port covers persisted business connection details, active flow priority/matching, welcome and fallback responses, template variables, per-chat 24-hour human takeover, explicit bot-pause preservation, inline keyboards, compact/legacy Secretary callback parsing, and text/media/caption/markup/flow edit actions. Added the admin-only `manageAutomation` endpoint for settings, flow CRUD, chat listing, and pause toggles.
+
+The shared automation chat upsert deliberately leaves `botPaused` unchanged unless the admin explicitly changes it, so a customer message cannot silently unpause a conversation. These handlers use Telegram Serverless's platform-routed updates and `api` rather than a second custom webhook receiver.
+
+Runtime tests are still required for Telegram Business permissions, callback/edit payload compatibility, timestamp conversion, and concurrent composite-key upserts. The existing admin UI is not yet wired to `manageAutomation`; its allowlist bootstrap remains required. No handler has been pushed to a bot or activated in production.
+
