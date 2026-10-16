@@ -30,5 +30,5 @@ export default async function () {
     .orderBy(asc(products.sortOrder))
     .all();
 
-  return { products: rows };
+  return rows;
 }
