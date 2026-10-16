@@ -1,5 +1,5 @@
 import { api, db } from 'sdk';
-import { asc, eq } from 'sdk/db';
+import { asc, desc, eq } from 'sdk/db';
 import { telegramAutomationChats, telegramAutomationFlows, telegramAutomationSettings } from '../schema.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -228,4 +228,104 @@ export async function executeSecretaryAction(context, action) {
 
 export async function answerSecretaryCallback(callbackId) {
   return await api.answerCallbackQuery({ callback_query_id: callbackId });
+}
+
+export async function getAutomationChats(limit = 100) {
+  return await db.select().from(telegramAutomationChats)
+    .orderBy(desc(telegramAutomationChats.updatedAt)).limit(Math.max(1, Math.min(500, Number(limit) || 100))).all();
+}
+
+export async function setAutomationChatPaused(connectionId, chatId, paused) {
+  await updateAutomationChatState(connectionId, chatId, { botPaused: Boolean(paused) });
+  return await getAutomationChatState(connectionId, chatId);
+}
+
+export async function updateAutomationSettings(input) {
+  const now = new Date();
+  const businessUserId = input.businessUserId === '' || input.businessUserId == null ? null : Number(input.businessUserId);
+  const businessUserChatId = input.businessUserChatId === '' || input.businessUserChatId == null ? null : Number(input.businessUserChatId);
+  if (businessUserId !== null && !Number.isSafeInteger(businessUserId)) throw new Error('businessUserId must be a safe integer.');
+  if (businessUserChatId !== null && !Number.isSafeInteger(businessUserChatId)) throw new Error('businessUserChatId must be a safe integer.');
+  const values = {
+    id: 'default',
+    enabled: Boolean(input.enabled),
+    fallbackEnabled: Boolean(input.fallbackEnabled),
+    fallbackResponse: String(input.fallbackResponse || ''),
+    businessConnectionId: String(input.businessConnectionId || '') || null,
+    businessUserId,
+    businessUserChatId,
+    welcomeFlowId: String(input.welcomeFlowId || '') || null,
+    updatedAt: now,
+  };
+  await db.insert(telegramAutomationSettings).values(values).onConflictDoUpdate({
+    target: telegramAutomationSettings.id,
+    set: {
+      enabled: values.enabled,
+      fallbackEnabled: values.fallbackEnabled,
+      fallbackResponse: values.fallbackResponse,
+      businessConnectionId: values.businessConnectionId,
+      businessUserId: values.businessUserId,
+      businessUserChatId: values.businessUserChatId,
+      welcomeFlowId: values.welcomeFlowId,
+      updatedAt: now,
+    },
+  }).run();
+  return await getAutomationSettings();
+}
+
+export async function createAutomationFlow(input) {
+  const now = new Date();
+  const matchMode = ['exact', 'contains', 'starts_with'].includes(input.matchMode) ? input.matchMode : 'contains';
+  const flow = {
+    id: String(input.id || 'auto_' + Date.now()),
+    name: String(input.name || 'Automation').trim(),
+    active: input.active !== false,
+    triggerType: input.triggerType === 'callback' ? 'callback' : 'message',
+    triggerValue: String(input.triggerValue || '').trim(),
+    matchMode,
+    responseText: String(input.responseText || ''),
+    buttons: Array.isArray(input.buttons) ? input.buttons : [],
+    priority: Number.isSafeInteger(Number(input.priority)) ? Number(input.priority) : 100,
+    createdAt: now,
+    updatedAt: now,
+  };
+  if (!flow.name) throw new Error('Automation name is required.');
+  await db.insert(telegramAutomationFlows).values(flow).run();
+  return flow;
+}
+
+export async function updateAutomationFlow(id, input) {
+  const values = { updatedAt: new Date() };
+  if (input.name !== undefined) {
+    if (typeof input.name !== 'string' || !input.name.trim()) throw new Error('Automation name is required.');
+    values.name = input.name.trim();
+  }
+  if (input.active !== undefined) {
+    if (typeof input.active !== 'boolean') throw new Error('active must be a boolean.');
+    values.active = input.active;
+  }
+  if (input.triggerType !== undefined) values.triggerType = input.triggerType === 'callback' ? 'callback' : 'message';
+  if (input.triggerValue !== undefined) values.triggerValue = String(input.triggerValue).trim();
+  if (input.matchMode !== undefined) values.matchMode = ['exact', 'contains', 'starts_with'].includes(input.matchMode) ? input.matchMode : 'contains';
+  if (input.responseText !== undefined) values.responseText = String(input.responseText);
+  if (input.buttons !== undefined) {
+    if (!Array.isArray(input.buttons)) throw new Error('buttons must be an array.');
+    values.buttons = input.buttons;
+  }
+  if (input.priority !== undefined) {
+    const priority = Number(input.priority);
+    if (!Number.isSafeInteger(priority)) throw new Error('priority must be an integer.');
+    values.priority = priority;
+  }
+  const result = await db.update(telegramAutomationFlows).set(values)
+    .where(eq(telegramAutomationFlows.id, id)).returning().run();
+  if (!result[0]) throw new Error('Automation flow not found.');
+  return result[0];
+}
+
+export async function deleteAutomationFlow(id) {
+  const result = await db.delete(telegramAutomationFlows)
+    .where(eq(telegramAutomationFlows.id, id)).returning().run();
+  if (!result[0]) throw new Error('Automation flow not found.');
+  return { success: true, id };
 }
