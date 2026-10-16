@@ -597,39 +597,64 @@ export async function updateProductInDb(id: string, updates: any) {
   cacheStore.invalidateProducts();
 
   if (isSupabaseAdminConfigured()) {
-    try {
-      const supabase = getSupabaseAdmin()!;
-      const payload = {
-        id: updatedProduct.id,
-        name: updatedProduct.name || '',
-        price: Number(updatedProduct.price) || 0,
-        stock: Number(updatedProduct.stock) || 0,
-        category: updatedProduct.category || 'General',
-        image_url: updatedProduct.imageUrl || '',
-        description: updatedProduct.description || '',
-        is_active: updatedProduct.active !== undefined ? updatedProduct.active : (updatedProduct.isActive !== undefined ? updatedProduct.isActive : true),
-        is_featured: Boolean(updatedProduct.isFeatured),
-        sort_order: Number(updatedProduct.sortOrder) || 0,
-        bundle_config: updatedProduct.bundleConfig || {
-          variants: updatedProduct.variants || [],
-          lowStockThreshold: Number(updatedProduct.lowStockThreshold || 10),
-        },
-        tags: updatedProduct.tags || [],
-        gallery: updatedProduct.gallery || [],
-        updated_at: updatedProduct.updatedAt,
-      };
+    // IMPORTANT: Updates must be sparse. Never upsert a reconstructed in-memory
+    // product here: serverless instances may not have the current DB row loaded,
+    // and a sort-only update could otherwise overwrite real product data with
+    // empty/default values.
+    const supabase = getSupabaseAdmin()!;
+    const payload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
 
-      const { error: upsertErr } = await supabase.from('products').upsert([payload]);
-      if (upsertErr) {
-        console.warn("Supabase product upsert failed, trying update:", upsertErr.message);
-        const { error: updateErr } = await supabase.from('products').update(payload).eq('id', id);
-        if (updateErr) {
-          console.error("Supabase product update error:", updateErr.message);
-        }
-      }
-    } catch (err) {
-      console.warn("Supabase product upsert error in update:", err);
+    if (sanitizedUpdates.name !== undefined) payload.name = sanitizedUpdates.name;
+    if (sanitizedUpdates.price !== undefined) payload.price = Number(sanitizedUpdates.price);
+    if (sanitizedUpdates.stock !== undefined) payload.stock = Number(sanitizedUpdates.stock);
+    if (sanitizedUpdates.category !== undefined) payload.category = sanitizedUpdates.category;
+    if (finalImageUrl !== undefined) payload.image_url = finalImageUrl;
+    else if (sanitizedUpdates.image_url !== undefined) payload.image_url = sanitizedUpdates.image_url;
+    if (sanitizedUpdates.description !== undefined) payload.description = sanitizedUpdates.description;
+    if (sanitizedUpdates.isActive !== undefined || sanitizedUpdates.active !== undefined) {
+      payload.is_active = sanitizedUpdates.isActive !== undefined
+        ? Boolean(sanitizedUpdates.isActive)
+        : Boolean(sanitizedUpdates.active);
     }
+    if (sanitizedUpdates.isFeatured !== undefined) payload.is_featured = Boolean(sanitizedUpdates.isFeatured);
+    if (sanitizedUpdates.sortOrder !== undefined) payload.sort_order = Number(sanitizedUpdates.sortOrder);
+    if (sanitizedUpdates.bundleConfig !== undefined) {
+      payload.bundle_config = {
+        ...sanitizedUpdates.bundleConfig,
+        ...(processedVariants !== undefined ? { variants: processedVariants } : {}),
+      };
+    } else if (processedVariants !== undefined) {
+      payload.bundle_config = {
+        variants: processedVariants,
+        lowStockThreshold: Number(sanitizedUpdates.lowStockThreshold ?? 10),
+      };
+    } else if (sanitizedUpdates.lowStockThreshold !== undefined) {
+      // Preserve other JSON settings when changing only the threshold.
+      const { data: current, error: readError } = await supabase
+        .from('products')
+        .select('bundle_config')
+        .eq('id', id)
+        .maybeSingle();
+      if (readError) throw readError;
+      payload.bundle_config = {
+        ...((current?.bundle_config && typeof current.bundle_config === 'object') ? current.bundle_config : {}),
+        lowStockThreshold: Number(sanitizedUpdates.lowStockThreshold),
+      };
+    }
+    if (sanitizedUpdates.tags !== undefined) payload.tags = sanitizedUpdates.tags;
+    if (sanitizedUpdates.gallery !== undefined) payload.gallery = sanitizedUpdates.gallery;
+
+    const { data, error } = await supabase
+      .from('products')
+      .update(payload)
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error(`Product not found for update: ${id}`);
   }
 
   return { success: true, product: updatedProduct };
