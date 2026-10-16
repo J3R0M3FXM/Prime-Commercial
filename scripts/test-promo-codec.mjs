@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { deserializePromo, serializePromoDescription } from '../tgcloud/lib/promos.js';
+import { calculatePromoDiscount, deserializePromo, serializePromoDescription } from '../tgcloud/lib/promos.js';
 
 const original = {
   description: 'Weekend offer',
@@ -49,3 +49,12 @@ assert.equal(decoded.discountValue, 10);
 assert.equal(decoded.usageCount, 7);
 assert.equal(decoded.totalUsageLimit, 100);
 console.log('Promo metadata round-trip tests passed.');
+
+assert.equal(calculatePromoDiscount({ discountType: 'fixed', discountValue: 80 }, 50, 20).discount, 50,
+  'Fixed promo discount must not exceed item subtotal');
+assert.equal(calculatePromoDiscount({ discountType: 'percentage', discountValue: 20, maxDiscountAmount: 30 }, 500, 20).discount, 30,
+  'Percentage promo discount must respect its cap');
+assert.equal(calculatePromoDiscount({ discountType: 'shipping_discount', discountValue: 50 }, 500, 120).shippingSubsidy, 50,
+  'Shipping promo must cap the subsidy');
+assert.equal(calculatePromoDiscount({ discountType: 'coins_cashback', cashbackPercentage: 5 }, 999, 20).cashbackPoints, 49,
+  'Cashback promo must floor points without reducing upfront discount');
