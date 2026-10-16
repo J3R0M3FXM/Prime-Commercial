@@ -13,11 +13,13 @@ export default async function () {
       name: paymentMethods.name,
       logo: paymentMethods.logo,
       paymentType: paymentMethods.paymentType,
+      publicKey: paymentMethods.publicKey,
       qrCodeImage: paymentMethods.qrCodeImage,
       walletAddress: paymentMethods.walletAddress,
       accountName: paymentMethods.accountName,
       accountNumber: paymentMethods.accountNumber,
       sortOrder: paymentMethods.sortOrder,
+      isActive: paymentMethods.isActive,
     })
     .from(paymentMethods)
     .where(eq(paymentMethods.isActive, true))
