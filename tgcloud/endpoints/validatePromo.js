@@ -48,9 +48,12 @@ export default async function (input, ctx) {
     return fail('This flash voucher is not within its Philippine Time active window.');
   }
 
-  const subtotal = Math.max(0, Number(input?.itemsSubtotal) || 0);
-  const itemQuantity = Math.max(0, Number(input?.itemQuantity || input?.totalItems) || 0);
-  const deliveryFee = Math.max(0, Number(input?.deliveryFee) || 0);
+  const subtotalRaw = Number(input?.itemsSubtotal);
+  const quantityRaw = Number(input?.itemQuantity ?? input?.totalItems);
+  const deliveryRaw = Number(input?.deliveryFee);
+  const subtotal = Number.isFinite(subtotalRaw) ? Math.max(0, subtotalRaw) : 0;
+  const itemQuantity = Number.isFinite(quantityRaw) ? Math.max(0, quantityRaw) : 0;
+  const deliveryFee = Number.isFinite(deliveryRaw) ? Math.max(0, deliveryRaw) : 0;
   if (promo.minSpend > 0 && subtotal < promo.minSpend) {
     return fail('Minimum spend of ₱' + Number(promo.minSpend).toLocaleString() + ' on items is required for this promo.');
   }
