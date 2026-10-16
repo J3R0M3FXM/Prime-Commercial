@@ -105,3 +105,18 @@ for (const name of requiredIndexes) {
   assert.ok(schema.includes("index('" + name + "')") || schema.includes("uniqueIndex('" + name + "')"),
     'Missing target index mapping: ' + name);
 }
+
+const automationCore = readFileSync('tgcloud/lib/telegram-automation.js', 'utf8');
+assert.match(automationCore, /onConflictDoUpdate/, 'Automation chat state must use upsert semantics');
+assert.match(automationCore, /humanTakeoverUntil/, 'Automation must preserve human takeover state');
+assert.match(automationCore, /botPaused/, 'Automation must preserve per-chat pause state');
+assert.doesNotMatch(automationCore, /botPaused: false/, 'Customer activity must not unpause an explicitly paused bot');
+for (const file of ['business_message.js', 'business_connection.js', 'callback_query.js']) {
+  assert.ok(existsSync('tgcloud/handlers/' + file), 'Missing Telegram automation handler: ' + file);
+}
+const businessMessageHandler = readFileSync('tgcloud/handlers/business_message.js', 'utf8');
+assert.match(businessMessageHandler, /recordHumanTakeover/, 'Business owner messages must enable human takeover');
+assert.match(businessMessageHandler, /recordCustomerMessage/, 'Business messages must update customer activity');
+const callbackHandler = readFileSync('tgcloud/handlers/callback_query.js', 'utf8');
+assert.match(callbackHandler, /answerSecretaryCallback/, 'Secretary callbacks must always answer the callback query');
+assert.match(callbackHandler, /executeSecretaryAction/, 'Secretary callbacks must execute configured actions');
