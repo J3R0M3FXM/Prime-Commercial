@@ -69,3 +69,33 @@ export function serializePromoDescription(promo, existingDescription = '') {
     cashbackPercentage: promo.cashbackPercentage !== undefined ? promo.cashbackPercentage : null,
   });
 }
+
+
+export function calculatePromoDiscount(promo, itemsSubtotal, deliveryFee = 0) {
+  const subtotal = Math.max(0, Number(itemsSubtotal) || 0);
+  const fee = Math.max(0, Number(deliveryFee) || 0);
+  if (promo.discountType === 'free_shipping') {
+    return { discount: fee, isFreeShipping: true, shippingSubsidy: fee, cashbackPoints: 0 };
+  }
+  if (promo.discountType === 'shipping_discount') {
+    const cap = Number(promo.cappedShippingDiscount || promo.discountValue) || fee;
+    const subsidy = Math.min(fee, Math.max(0, cap));
+    return { discount: subsidy, isFreeShipping: subsidy >= fee && fee > 0, shippingSubsidy: subsidy, cashbackPoints: 0 };
+  }
+  if (promo.discountType === 'fixed') {
+    return { discount: Math.min(subtotal, Number(promo.discountValue) || 0), isFreeShipping: false, shippingSubsidy: 0, cashbackPoints: 0 };
+  }
+  if (promo.discountType === 'percentage') {
+    const percent = Math.max(0, Number(promo.discountValue) || 0);
+    let calculated = subtotal * percent / 100;
+    if (promo.maxDiscountAmount && promo.maxDiscountAmount > 0) calculated = Math.min(calculated, Number(promo.maxDiscountAmount));
+    return { discount: Math.min(subtotal, calculated), isFreeShipping: false, shippingSubsidy: 0, cashbackPoints: 0 };
+  }
+  if (promo.discountType === 'coins_cashback') {
+    const percent = Math.max(0, Number(promo.discountValue || promo.cashbackPercentage) || 0);
+    let points = Math.floor(subtotal * percent / 100);
+    if (promo.maxDiscountAmount && promo.maxDiscountAmount > 0) points = Math.min(points, Number(promo.maxDiscountAmount));
+    return { discount: 0, isFreeShipping: false, shippingSubsidy: 0, cashbackPoints: points };
+  }
+  return { discount: 0, isFreeShipping: false, shippingSubsidy: 0, cashbackPoints: 0 };
+}
