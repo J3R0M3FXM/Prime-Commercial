@@ -1,7 +1,7 @@
 import { db, EndpointError } from 'sdk';
 import { desc, eq } from 'sdk/db';
 import { requireAdmin } from '../lib/auth.js';
-import { deserializePromo, serializePromoDescription } from '../lib/promos.js';
+import { deserializePromo, generatePromoCode, serializePromoDescription } from '../lib/promos.js';
 import { promoRedemptions, promos } from '../schema.js';
 
 const fields = new Set([
@@ -132,7 +132,7 @@ export default async function (input, ctx) {
   if (action === 'list') return await listPromos();
 
   if (action === 'create') {
-    const code = String(input.code || ('PRIME' + Date.now().toString(36))).trim().toUpperCase();
+    const code = String(input.code || generatePromoCode('PRIME')).trim().toUpperCase();
     const duplicate = await db.select({ id: promos.id }).from(promos).where(eq(promos.code, code)).get();
     if (duplicate) throw new EndpointError('A promo with this code already exists.', { code: 'DUPLICATE_CODE' });
     const base = {
