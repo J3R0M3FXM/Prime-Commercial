@@ -69,3 +69,16 @@ A valid encrypted file is not yet a restore rehearsal. Before cutover, restore t
 - both unpaid-order expiry and referral-maturity behavior have a tested trigger strategy.
 
 Do not cut over merely because the export and checksum verification pass. No production bot push, target schema migration, data import, or production cutover is authorized by these scripts.
+
+## 6. Prepare Telegram media transfer (not executed)
+
+The repository includes `scripts/migrate-media-to-telegram.mjs`. It decrypts the verified snapshot, checks each media object's checksum, verifies the configured Bot API token against `EXPECTED_TELEGRAM_BOT_ID` or `EXPECTED_TELEGRAM_BOT_USERNAME`, requires the configured storage chat to be a **private chat**, then uploads objects sequentially as documents. It writes an encrypted, resumable `*.pcmmapping` manifest with each object's original bucket/path, Telegram `file_id`, message ID, MIME type, size, and SHA-256. The script refuses to upload if the expected bot identity or private chat check fails.
+
+Locally configure `TELEGRAM_BOT_TOKEN`, `TELEGRAM_STORAGE_CHAT_ID`, one expected bot identity variable, and `BACKUP_ENCRYPTION_PASSPHRASE`. Then run:
+
+```bash
+node scripts/migrate-media-to-telegram.mjs ./migration-backups/pre-cutover.pcmbak ./migration-backups/telegram-media-map.pcmmapping
+```
+
+This script has **not** been run. Do not run it until the exact Telegram Serverless bot is confirmed and the storage chat is controlled by the business owner. The encrypted mapping is only an inventory/transfer artifact; a target `media_assets` table, authenticated media-content endpoint, and frontend URL adapter still need to be implemented and tested. Receipt proofs must remain private and must never be bundled into the public static Mini App.
+
