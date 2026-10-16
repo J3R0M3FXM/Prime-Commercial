@@ -22,6 +22,7 @@ on:
       - "scripts/check-telegram-serverless-contracts.mjs"
       - "scripts/export-supabase-snapshot.mjs"
       - "scripts/verify-supabase-snapshot.mjs"
+      - "scripts/test-delivery-fee.mjs"
       - ".github/workflows/telegram-serverless-schema-check.yml"
 
 jobs:
