@@ -61,3 +61,26 @@ A target capability below is a required migration work item, not a claim that a 
 - [ ] Test success, invalid input, unauthorized access, replay/idempotency, and concurrent stock/points changes.
 - [ ] Verify scheduler capability and job semantics before replacing cron.
 - [ ] Run non-production smoke tests and a backup restore rehearsal before cutover.
+
+## Implementation status update — 2026-10-17
+
+### Public read-only vertical slice
+
+The first public configuration endpoint slice is now implemented in `tgcloud/endpoints/`:
+
+- `getCatalog.js` reads active products only and returns the original array response shape.
+- `getPublicPaymentMethods.js` reads active payment methods and preserves the existing public `publicKey` field and array response shape. It deliberately never selects `secretKey` or `webhookUrl`.
+- `getPublicCharges.js` provides active charge configuration as an array and is read-only.
+- `getActivePromos.js` filters active promos by their start/end window and returns an array; checkout still must independently enforce usage limits, eligibility, and computed discounts.
+- `health.js` remains a non-sensitive smoke test.
+
+These endpoints are code-only; no production bot has been pushed and no database migration has been run. Public endpoint code is not a replacement for checkout validation or authorization on sensitive mutations.
+
+### Contract checks
+
+Added `scripts/check-telegram-serverless-contracts.mjs` and expanded the schema-check workflow to validate the 16 target table exports, expected public endpoint modules, read-only constraints, active-row filters, response shape, and the public payment-field allowlist. The schema syntax check had passed on commit `d79ad24f`; the new contract workflow and latest endpoint commits still require their own completed CI results.
+
+### Current parity remaining
+
+The target still does not implement the 43 route handlers, authenticated Telegram initData/session validation, admin CRUD, atomic checkout/inventory/loyalty operations, private receipt handling, video streaming, or the scheduled expiry/referral jobs. Do not treat the public read-only slice as app migration completion. Production cutover remains blocked on verified bot identity, CLI schema diff, export/import/restore rehearsal, authorization and concurrency tests, and end-to-end checks.
+
