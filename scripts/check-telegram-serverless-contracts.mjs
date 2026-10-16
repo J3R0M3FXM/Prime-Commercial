@@ -207,3 +207,9 @@ const mediaCore = readFileSync('tgcloud/lib/media.js', 'utf8');
 assert.match(mediaCore, /asset\.visibility === 'public' \? 'tgmedia:'/, 'Only public media assets may become public Mini App references');
 assert.match(mediaCore, /value\.includes\('\/storage\/v1\/object\/'\)\) return ''/, 'Unmapped Supabase storage URLs must not leak into the target Mini App');
 assert.match(readFileSync('tgcloud/schema.js', 'utf8'), /table\('media_assets'/, 'Target schema must include the media asset index');
+
+const mediaImporter = readFileSync('scripts/import-telegram-media-map.mjs', 'utf8');
+assert.match(mediaImporter, /String\(botPayload\.result\?\.id\) !== String\(manifest\.botId\)/, 'Media importer must verify the map belongs to the configured bot');
+assert.match(mediaImporter, /chatPayload\.result\?\.type !== 'private'/, 'Media importer must recheck private storage chat');
+assert.match(mediaImporter, /endpoints\/manageMediaAssets/, 'Media importer must use the admin-only idempotent mapping endpoint');
+assert.match(mediaImporter, /TELEGRAM_ADMIN_USER_ID/, 'Media importer must require the configured admin identity');
