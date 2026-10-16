@@ -26,5 +26,5 @@ export default async function () {
     .orderBy(asc(paymentMethods.sortOrder))
     .all();
 
-  return { paymentMethods: rows };
+  return rows;
 }
