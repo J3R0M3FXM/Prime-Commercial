@@ -1,6 +1,7 @@
 import { db } from 'sdk';
 import { desc, eq } from 'sdk/db';
 import { videos } from '../schema.js';
+import { publicMediaReference } from '../lib/media.js';
 
 /** Public gallery metadata; unpublished items are never returned. */
 export default async function (input = {}) {
@@ -31,17 +32,16 @@ export default async function (input = {}) {
     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   });
 
-  return filtered.map((video) => ({
+  return await Promise.all(filtered.map(async (video) => ({
     id: video.id,
     title: video.title,
     description: video.description,
     category: video.category,
     tags: video.tags,
-    telegramFileId: video.telegramFileId,
-    telegramMessageId: video.telegramMessageId,
+    mediaId: video.id,
     storageType: video.storageType,
-    directUrl: video.directUrl,
-    thumbnailUrl: video.thumbnailUrl,
+    directUrl: await publicMediaReference(video.directUrl),
+    thumbnailUrl: await publicMediaReference(video.thumbnailUrl),
     duration: video.duration,
     fileSize: video.fileSize,
     width: video.width,
@@ -51,5 +51,5 @@ export default async function (input = {}) {
     featured: video.featured,
     createdAt: video.createdAt,
     updatedAt: video.updatedAt,
-  }));
+  })));
 }
