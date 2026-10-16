@@ -71,6 +71,7 @@ A target capability below is a required migration work item, not a claim that a 
 | Admin courier CRUD | `manageCouriers.js` | Backend only; needs target runtime tests and UI adapter |
 | Admin warehouse CRUD | `manageWarehouses.js` | Backend only; needs target runtime tests and UI adapter |
 | Admin payment method CRUD | `managePaymentMethods.js` | Backend only; secret key never returned; needs target runtime tests and UI adapter |
+| Admin video metadata CRUD | `manageVideos.js` | Backend only; metadata only; upload and private media streaming still missing |
 | Admin automation settings / flows / chat pause | `manageAutomation.js` | Backend only; needs admin bootstrap and UI adapter |
 | Telegram Business automation | `handlers/business_connection.js`, `business_message.js`, `callback_query.js`, `lib/telegram-automation.js` | Code ported; needs BotFather runtime test |
 | All other listed routes | — | Not ported yet |
