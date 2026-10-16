@@ -164,3 +164,27 @@ Other public read policies exist for product/configuration tables. This is a sig
 - No production bot binding, deployment, payment configuration, or Supabase schema has been changed.
 - Maya/GCash webhook redesign remains outside the initial slice, as requested; existing payment/order state and audit records must still be preserved.
 - The current evidence supports continuing with schema/security reconciliation and migration tooling, not production cutover.
+
+
+## Application surface and runtime-port audit
+
+The current Next.js application tree contains **43 API route handlers**. The Telegram Serverless branch currently has only four public/read endpoints plus a health check, so backend parity is still very early. Route families that must be explicitly accounted for include:
+
+- Customer account, points conversion/transfer, Telegram authentication/session, referral validation.
+- Orders, checkout/delivery fees, promo validation, product/payment-method/charge reads.
+- Admin authentication and CRUD for products, promos, customers, orders, payments, payment methods, charges, warehouses, couriers, automation, diagnostics, and media.
+- Receipt upload and OCR, video gallery/view/stream/download, Geoapify address/routing services.
+- Scheduled unpaid-order expiry and loyalty/referral work.
+- Telegram Business secretary/automation webhook and Maya checkout/webhook endpoints.
+
+The current app's `next.config.mjs` does not configure static export, and `package.json` still builds/runs Next.js server routes. The migration cannot be completed by merely adding `static.source: "dist"` or copying the current API files: the frontend needs a real static build, while the 43 server handlers need a route-by-route replacement using the Serverless SDK/runtime constraints. Preserve one canonical mapping table from each current route to its target endpoint and its authorization/tests.
+
+### High-priority porting notes
+
+- The current admin CRUD handlers often rely on Next middleware for session gating rather than enforcing authorization within the handler. Serverless endpoint equivalents must be safe independently and must not assume Next middleware will run.
+- The current Telegram auth handler contains a preview fallback when init data or the bot token is missing. A production Serverless build must fail closed if its intended bot configuration is absent; preview identities must never become a production authentication path.
+- The current unpaid-order expiry endpoint is protected by `CRON_SECRET` and calls `expire_unpaid_orders`; the referral-maturity cron calls `process_matured_referrals`. Both behaviors need a supported trigger strategy in the new runtime, with no public unauthenticated trigger and no duplicate credit/stock release.
+- Media requires separate handling for public product imagery versus private payment receipts and Telegram-hosted videos. A Telegram `file_id` is not itself a browser-ready URL; verify the serving/download path and access checks rather than storing it directly as an image URL.
+- Do not include changes to product records/catalog content in this audit or migration tooling; preserve existing catalog data byte-for-byte/semantically and keep UI/content edits separate from the infrastructure migration.
+
+The route inventory is based on the tracked `main` application tree used as the current feature reference. Before implementation, compare it against the latest production branch/commit and the migration branch to ensure no newer admin or secretary work is omitted.
