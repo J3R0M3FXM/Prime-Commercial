@@ -78,8 +78,15 @@ export const orders = table('orders', {
   inventoryReleaseError: text('inventory_release_error'),
   storeCreditsReleasedAt: integer('store_credits_released_at', { mode: 'timestamp' }),
   createdAt: createdAt(), updatedAt: updatedAt(),
-});
-
+}, (t) => ({
+  mayaPaymentIdLookup: uniqueIndex('orders_maya_payment_id_uidx')
+    .on(t.mayaPaymentId).where(sql`${t.mayaPaymentId} IS NOT NULL AND ${t.mayaPaymentId} <> ''`),
+  mayaRequestReferenceUnique: uniqueIndex('orders_maya_request_reference_uidx')
+    .on(t.mayaRequestReferenceNumber).where(sql`${t.mayaRequestReferenceNumber} IS NOT NULL AND ${t.mayaRequestReferenceNumber} <> ''`),
+  paymentExpiryIdx: uniqueIndex('orders_payment_expiry_guard')
+    .on(t.paymentDeadlineAt).where(sql`${t.status} = 'Pending' AND ${t.paymentStatus} = 'Unpaid' AND ${t.paymentDeadlineAt} IS NOT NULL`),
+}));
+ 
 export const paymentMethods = table('payment_methods', {
   id: text('id').primaryKey(), name: text('name').notNull(), logo: text('logo'),
   paymentType: text('payment_type').notNull(), qrCodeImage: text('qr_code_image'),
@@ -199,7 +206,7 @@ export const telegramAutomationChats = table('telegram_automation_chats', {
 
 export const mayaWebhookEvents = table('maya_webhook_events', {
   id: text('id').primaryKey(),
-  eventKey: text('event_key').notNull(),
+  eventKey: text('event_key').notNull().unique(),
   paymentId: text('payment_id'),
   requestReferenceNumber: text('request_reference_number'),
   receiptNumber: text('receipt_number'),
