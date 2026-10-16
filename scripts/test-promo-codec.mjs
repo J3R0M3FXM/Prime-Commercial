@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calculatePromoDiscount, deserializePromo, serializePromoDescription } from '../tgcloud/lib/promos.js';
+import { calculatePromoDiscount, deserializePromo, generatePromoCode, serializePromoDescription } from '../tgcloud/lib/promos.js';
 import { calculateCustomerTier } from '../tgcloud/lib/loyalty.js';
 import { resolveTrustedFingerprint } from '../tgcloud/lib/fingerprints.js';
 
@@ -71,3 +71,6 @@ assert.equal(trusted.deviceFingerprintId, 'fp-1', 'Fingerprint resolution must r
 
 assert.equal(calculatePromoDiscount({ discountType: 'percentage', discountValue: 10 }, Infinity, Infinity).discount, 0,
   'Non-finite client-supplied amounts must not create an unbounded discount');
+
+assert.match(generatePromoCode('prime'), /^PRIME-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/,
+  'Generated promo codes must preserve the existing PRIME-XXXX format');
