@@ -4,6 +4,7 @@ import { videos } from '../schema.js';
 
 /** Public gallery metadata; unpublished items are never returned. */
 export default async function (input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) input = {};
   const rows = await db.select().from(videos)
     .where(eq(videos.isPublished, true))
     .orderBy(desc(videos.createdAt))
