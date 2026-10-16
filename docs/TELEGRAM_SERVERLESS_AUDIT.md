@@ -241,3 +241,10 @@ Static type-mapping review also found no additional column type mismatches under
 ### Static syntax blocker found and corrected — 2026-10-17
 
 A source inspection found escaped backticks in six SQL-template-literal positions in `tgcloud/schema.js`, which would make the JavaScript invalid. These have been corrected to actual template literals in commit `5a1fb0109320b31c92feb18a688cbd448002ea0c`. The `maya_webhook_events.received_at` target declaration now also restores the SQLite `unixepoch()` default matching the live table's `now()` default after timestamp conversion. This is a source-level correction; an actual CLI parse/diff and non-production migration dry-run are still required before treating the schema as valid.
+
+
+### Index parity review — 2026-10-17
+
+Live index metadata confirms uniqueness for customer Telegram/member/referral identifiers, order numbers, and Maya event keys. The target schema already declares the customer and order-number unique fields; it now also declares unique webhook event keys and partial unique guards for non-empty Maya payment IDs and request references. A pending/unpaid payment-expiry index is non-unique, matching the live database. Target code changes: `92febcb33e1adfecc6d3dd62d2d25c341e3477e9` and `44175b5848d136e3d6669abeaec18d29299e7203`.
+
+The live `telegram_automation_chats` table has a composite primary key (`business_connection_id`, `chat_id`); target code currently uses a composite unique index, so duplicate prevention is represented but primary-key parity is not exact. Verify the supported composite-key DSL before changing this. Other indexes, defaults, nullability, parser/CLI validation, and endpoint idempotency tests remain open.
