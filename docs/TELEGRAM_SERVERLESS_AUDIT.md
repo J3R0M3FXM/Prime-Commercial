@@ -193,3 +193,24 @@ The route inventory is based on the tracked `main` application tree used as the 
 ### Migration-history filename reconciliation correction
 
 A direct directory listing confirms the migration branch contains 18 checked-in SQL migration files. The live Supabase history reports 17 applied migrations, but the history version/name pairs do not directly match the filenames in the branch (for example, live version `20260920172105_runtime_schema_alignment_20260921` versus checked-in `20260921000100_runtime_schema_alignment.sql`). Therefore this finding is **version/name mismatch and incomplete direct traceability**, not proof that SQL content is absent. The next safe check is a semantic migration-by-migration comparison of the live records against checked-in files and live schema; no replacement SQL should be invented solely to align filenames.
+
+
+### Migration semantic matching — preliminary
+
+The current branch contains 18 SQL files under `supabase/migrations/`; Supabase reports 17 applied history rows. A filename-only comparison shows that the sets are not one-to-one. Live history entries needing an explicit semantic match include:
+
+- `20260920181620_logistics_configuration_fields_20260921`
+- `20260923022238_loyalty_points_backfill_fix_20260923`
+- `20260923022915_loyalty_referral_maturation_on_completion_20260923`
+- `20260923023430_loyalty_referral_pg_cron_20260923`
+- `20260923055439_fix_create_order_loyalty_unassigned_promo_record`
+
+Checked-in migration files not matched by a straightforward filename comparison include:
+
+- `20260921000300_telegram_automation_chat_state.sql`
+- `20260921000400_telegram_automation_welcome.sql`
+- `20260923055900_fix_unassigned_promo_record.sql`
+- `20260923110000_promo_redemption_expiry_release.sql`
+- `20260923120000_customer_fingerprint_hydration_and_server_enforcement.sql`
+
+This is a **preliminary filename-level diff only**. Some changes may have been consolidated, renamed, or applied through SQL not retained under the original filename. The safe next step is to compare each SQL file's DDL/function definitions to live columns, indexes, constraints, functions, triggers, and policies, then produce a reviewed mapping. Do not replay all migrations blindly against a populated database.
