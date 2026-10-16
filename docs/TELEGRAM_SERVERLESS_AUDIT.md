@@ -307,3 +307,9 @@ Added `scripts/export-supabase-snapshot.mjs` to export all 16 public application
 
 The custom snapshot contains data and media bytes, not the PostgreSQL schema, functions, triggers, RLS policies, or migration history. The runbook separately calls for a Supabase CLI schema dump and migration-history review. **No backup has been executed and no data has been moved**; the scripts require locally configured credentials and a separately stored encryption passphrase. CI syntax/contract checks for the backup utilities are pending for the latest commit.
 
+### Live index inventory reconciliation — 2026-10-17
+
+A live `pg_indexes` inspection found additional performance and integrity indexes missing from the target declaration. Added mappings for product active/category indexes; customer unique and lookup indexes; order status/customer/payment/created/expiry, Maya reference/receipt, and referral-pending indexes; active promo-redemption fingerprint/device/hardware indexes; promo-code uniqueness; warehouse default/single-default indexes; automation flow/chat indexes; and Maya webhook event lookup indexes. The single-default warehouse uniqueness rule is now also represented in the target schema, matching the live partial unique index.
+
+The contract check now asserts the presence of the live non-primary index names. Descending-index expressions use the documented SDK expression-index form and still require an official CLI schema diff. The live `telegram_automation_chats` composite primary key is represented as a unique index with the same name because the documented schema DSL only demonstrates column-level primary keys; exact primary-key metadata parity remains open. No production schema has been changed.
+
