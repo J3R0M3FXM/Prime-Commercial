@@ -14,7 +14,7 @@ for (const name of requiredTables) {
 
 const requiredEndpoints = [
   'health.js', 'getCatalog.js', 'getActivePromos.js',
-  'getPublicPaymentMethods.js', 'getPublicCharges.js',
+  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js',
 ];
 for (const name of requiredEndpoints) {
   assert.ok(existsSync('tgcloud/endpoints/' + name), 'Missing public endpoint: ' + name);
@@ -49,3 +49,21 @@ assert.match(manageCharges, /const writable = new Set/, 'Charge CRUD must use an
 assert.match(manageCharges, /action === 'create'/, 'Charge configurator must support create');
 assert.match(manageCharges, /action === 'update'/, 'Charge configurator must support update');
 assert.match(manageCharges, /action === 'delete'/, 'Charge configurator must support delete');
+
+const adminEndpoints = [
+  ['manageCharges.js', 'charges'],
+  ['manageCouriers.js', 'courier'],
+  ['manageWarehouses.js', 'warehouse'],
+  ['managePaymentMethods.js', 'payment method'],
+];
+for (const [file, label] of adminEndpoints) {
+  const source = readFileSync('tgcloud/endpoints/' + file, 'utf8');
+  assert.match(source, /await requireAdmin\(ctx\)/, file + ' must require admin authorization');
+  assert.match(source, /action === 'create'/, file + ' must support create');
+  assert.match(source, /action === 'update'/, file + ' must support update');
+  assert.match(source, /action === 'delete'/, file + ' must support delete');
+  assert.match(source, /const writable = new Set/, file + ' must use a field allowlist');
+}
+const managePayments = readFileSync('tgcloud/endpoints/managePaymentMethods.js', 'utf8');
+assert.match(managePayments, /secretKeyConfigured/, 'Admin payment list must indicate whether a secret exists');
+assert.doesNotMatch(managePayments, /return \{[^}]*secretKey[,}]/, 'Payment CRUD must not return raw secret keys');
