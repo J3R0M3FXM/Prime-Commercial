@@ -10,6 +10,8 @@ import { table, text, integer, numeric, json, boolean, index, uniqueIndex, sql }
 
 const createdAt = () => integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`);
 const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`);
+const requiredCreatedAt = () => integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`);
+const requiredUpdatedAt = () => integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`);
 const uuidDefault = () => sql`(lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(6))))`;
 
 export const products = table('products', {
@@ -176,7 +178,7 @@ export const telegramAutomationFlows = table('telegram_automation_flows', {
   responseText: text('response_text').notNull().default(''),
   buttons: json('buttons').notNull().default([]),
   priority: integer('priority').notNull().default(100),
-  createdAt: createdAt(), updatedAt: updatedAt(),
+  createdAt: requiredCreatedAt(), updatedAt: requiredUpdatedAt(),
 });
 
 export const telegramAutomationSettings = table('telegram_automation_settings', {
@@ -184,7 +186,7 @@ export const telegramAutomationSettings = table('telegram_automation_settings', 
   enabled: boolean('enabled').notNull().default(false),
   fallbackEnabled: boolean('fallback_enabled').notNull().default(false),
   fallbackResponse: text('fallback_response').notNull().default(''),
-  updatedAt: updatedAt(),
+  updatedAt: requiredUpdatedAt(),
   businessConnectionId: text('business_connection_id'),
   businessUserId: integer('business_user_id'),
   businessUserChatId: integer('business_user_chat_id'),
@@ -198,7 +200,7 @@ export const telegramAutomationChats = table('telegram_automation_chats', {
   lastHumanMessageAt: integer('last_human_message_at', { mode: 'timestamp' }),
   lastBotMessageAt: integer('last_bot_message_at', { mode: 'timestamp' }),
   humanTakeoverUntil: integer('human_takeover_until', { mode: 'timestamp' }),
-  createdAt: createdAt(), updatedAt: updatedAt(),
+  createdAt: requiredCreatedAt(), updatedAt: requiredUpdatedAt(),
   botPaused: boolean('bot_paused').notNull().default(false),
 }, (t) => ({
   connectionChatUnique: uniqueIndex('uq_telegram_automation_chats_connection_chat')
