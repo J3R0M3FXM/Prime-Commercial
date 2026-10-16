@@ -14,7 +14,7 @@ for (const name of requiredTables) {
 
 const requiredEndpoints = [
   'health.js', 'getCatalog.js', 'getActivePromos.js',
-  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
+  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'getMyOrders.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
 ];
 for (const name of requiredEndpoints) {
   assert.ok(existsSync('tgcloud/endpoints/' + name), 'Missing public endpoint: ' + name);
@@ -130,3 +130,9 @@ assert.match(automationCore, /updateAutomationSettings/, 'Automation core must p
 assert.match(automationCore, /createAutomationFlow/, 'Automation core must persist flow creation');
 assert.match(automationCore, /updateAutomationFlow/, 'Automation core must persist flow edits');
 assert.match(automationCore, /deleteAutomationFlow/, 'Automation core must persist flow deletion');
+
+const myOrders = readFileSync('tgcloud/endpoints/getMyOrders.js', 'utf8');
+assert.match(myOrders, /ctx\?\.initData\?\.user/, 'Order history must use platform-verified Telegram identity');
+assert.match(myOrders, /orders\.tgUserId, telegramId/, 'Order history must always scope results to the verified Telegram user');
+assert.match(myOrders, /ownership\.push\(eq\(orders\.customerId/, 'Order history may include customer-owned legacy orders');
+assert.match(myOrders, /limit\(100\)/, 'Order history must be bounded');
