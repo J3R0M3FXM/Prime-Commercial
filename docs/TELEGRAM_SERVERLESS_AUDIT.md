@@ -358,3 +358,7 @@ Added `tgcloud/endpoints/validatePromo.js` with verified Telegram identity, stor
 
 **Known gap:** the existing Next.js route also computes a server-side request/network fingerprint as a corroborating fallback when device identifiers are absent. Telegram Serverless handler context used here does not currently provide a verified client IP, so that server fingerprint fallback is not ported. Do not treat this endpoint as sufficient anti-fraud enforcement or as a substitute for atomic checkout validation. The customer account/auth endpoint and frontend adapter are still missing.
 
+### Scheduler capability check
+
+The official Telegram Serverless module model documents update handlers, Mini App endpoints, shared library modules, and schema, but no native cron/scheduled-job trigger. The live Supabase project has a five-minute `prime-loyalty-referral-maturity` job, and the app also needs unpaid-order expiry. Neither is ported as an opportunistic endpoint or client poller. Preserving the exact timing requires a supported external scheduler or an explicitly approved redesign; until then, referral maturity and unpaid-order expiry are cutover blockers. Reference: https://blogfork.telegram.org/bots/serverless
+
