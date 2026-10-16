@@ -10,6 +10,7 @@ on:
       - "scripts/check-telegram-serverless-contracts.mjs"
       - "scripts/export-supabase-snapshot.mjs"
       - "scripts/verify-supabase-snapshot.mjs"
+      - "scripts/test-delivery-fee.mjs"
       - ".github/workflows/telegram-serverless-schema-check.yml"
   pull_request:
     branches: [migration/telegram-serverless]
@@ -42,3 +43,5 @@ jobs:
         run: |
           node --check scripts/export-supabase-snapshot.mjs
           node --check scripts/verify-supabase-snapshot.mjs
+      - name: Test delivery pricing rules
+        run: node --experimental-default-type=module scripts/test-delivery-fee.mjs
