@@ -352,3 +352,9 @@ The latest completed Telegram Serverless schema/contract workflow passed on comm
 
 Added `scripts/test-promo-codec.mjs` and wired it into CI. It verifies round-trip preservation of advanced promo metadata stored inside `description` JSON. The completed Telegram Serverless schema/contract run on commit `2b9daf96` passed module syntax, contract/security assertions, backup utility syntax, delivery-fee regression tests, and promo metadata round-trip tests. These are code-level tests only; no live promo rows were changed.
 
+### Promo validation endpoint port — partial anti-abuse parity
+
+Added `tgcloud/endpoints/validatePromo.js` with verified Telegram identity, stored promo metadata decoding, Philippine-time active-day/payday/flash-hour checks, min spend/quantity, completed-order/tier eligibility, payment/courier restrictions, global/per-customer limits, active redemption checks, device/hardware/fingerprint cross-account checks, and shared discount calculations. It is read-only and returns validation/display results; the eventual create-order endpoint must independently repeat the critical checks and reserve redemption atomically.
+
+**Known gap:** the existing Next.js route also computes a server-side request/network fingerprint as a corroborating fallback when device identifiers are absent. Telegram Serverless handler context used here does not currently provide a verified client IP, so that server fingerprint fallback is not ported. Do not treat this endpoint as sufficient anti-fraud enforcement or as a substitute for atomic checkout validation. The customer account/auth endpoint and frontend adapter are still missing.
+
