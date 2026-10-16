@@ -1,40 +1,28 @@
 import { db } from 'sdk';
 import { eq } from 'sdk/db';
+import { deserializePromo } from '../lib/promos.js';
 import { promos } from '../schema.js';
 
 /**
- * Returns active, currently valid promo metadata for display.
- * Checkout must independently revalidate limits, eligibility, and discount
- * amounts on the server; client-provided discount values are never trusted.
+ * Public display metadata only. The checkout endpoint must independently
+ * enforce customer eligibility, payment/courier restrictions, and redemption
+ * limits using authoritative data.
  */
 export default async function () {
   const now = Date.now();
-  const rows = await db
-    .select({
-      id: promos.id,
-      code: promos.code,
-      title: promos.title,
-      description: promos.description,
-      discountType: promos.discountType,
-      discountValue: promos.discountValue,
-      maxDiscountAmount: promos.maxDiscountAmount,
-      minSpend: promos.minSpend,
-      startDate: promos.startDate,
-      endDate: promos.endDate,
-      totalUsageLimit: promos.totalUsageLimit,
-      usageCount: promos.usageCount,
-      isActive: promos.isActive,
-    })
-    .from(promos)
+  const rows = await db.select().from(promos)
     .where(eq(promos.isActive, true))
     .all();
 
-  const valid = rows.filter((promo) => {
+  const valid = rows.map(deserializePromo).filter((promo) => {
     const starts = promo.startDate instanceof Date ? promo.startDate.getTime() : null;
     const ends = promo.endDate instanceof Date ? promo.endDate.getTime() : null;
-    const underUsageLimit = promo.totalUsageLimit == null || Number(promo.usageCount || 0) < Number(promo.totalUsageLimit);
-    return (starts === null || starts <= now) && (ends === null || ends >= now) && underUsageLimit;
+    const underUsageLimit = promo.totalUsageLimit == null ||
+      Number(promo.usageCount || 0) < Number(promo.totalUsageLimit);
+    return (starts === null || starts <= now) &&
+      (ends === null || ends >= now) && underUsageLimit;
   });
 
+  // Do not expose global usage counters or limits to public callers.
   return valid.map(({ totalUsageLimit, usageCount, ...promo }) => promo);
 }
