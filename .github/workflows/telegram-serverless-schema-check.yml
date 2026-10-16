@@ -9,6 +9,7 @@ on:
       - "tgcloud/handlers/**"
       - "scripts/check-telegram-serverless-contracts.mjs"
       - "scripts/export-supabase-snapshot.mjs"
+      - "scripts/migrate-media-to-telegram.mjs"
       - "scripts/verify-supabase-snapshot.mjs"
       - "scripts/test-delivery-fee.mjs"
       - "scripts/test-promo-codec.mjs"
@@ -45,6 +46,7 @@ jobs:
       - name: Check backup utility syntax
         run: |
           node --check scripts/export-supabase-snapshot.mjs
+          node --check scripts/migrate-media-to-telegram.mjs
           node --check scripts/verify-supabase-snapshot.mjs
       - name: Test delivery pricing rules
         run: node --experimental-default-type=module scripts/test-delivery-fee.mjs
