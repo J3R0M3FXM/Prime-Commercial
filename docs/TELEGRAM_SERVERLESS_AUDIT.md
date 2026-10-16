@@ -340,3 +340,11 @@ Added `tgcloud/endpoints/getMyOrders.js`, which uses the platform-verified Teleg
 
 These reads do not complete checkout. Atomic stock reservation, promo-redemption enforcement, payment deadline handling, loyalty award/reversal logic, and order creation remain blocked until transaction/concurrency semantics and the full data contract are tested.
 
+### Promo and gallery admin endpoints extended
+
+Added `lib/promos.js` to round-trip advanced promo configuration that the existing app stores inside the `promos.description` JSON string, including voucher type, eligibility, tiers, payment/courier restrictions, active days, payday/flash-hour rules, shipping caps, and cashback metadata. Updated `getActivePromos.js` to deserialize that metadata before filtering and to omit internal usage counters from public responses. Added admin-only `managePromos.js` CRUD with field validation, duplicate-code checks, metadata preservation, redemption stats, and device/customer abuse flags.
+
+Added admin-only `manageVideos.js` for video metadata CRUD and `getPublicVideos.js` for published gallery metadata with category/search/featured filters. These modules do not yet implement upload, private media streaming, or view tracking; the admin upload path does not yet verify Telegram file metadata like the existing Next.js route does.
+
+The latest completed Telegram Serverless schema/contract workflow passed on commit `08aa3cab`: schema and module syntax checks, contract/security assertions, encrypted backup utility syntax, and delivery-fee regression tests all passed. This does not certify Telegram runtime behavior or the full app build/cutover.
+
