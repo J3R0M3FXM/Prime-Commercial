@@ -62,7 +62,7 @@ export async function updateAutomationChatState(connectionId, chatId, changes) {
     updatedAt: now,
     ...changes,
   };
-  const { createdAt, businessConnectionId, chatId, ...updates } = values;
+  const { createdAt: ignoredCreatedAt, businessConnectionId: ignoredConnectionId, chatId: ignoredChatId, ...updates } = values;
   await db.insert(telegramAutomationChats).values(values).onConflictDoUpdate({
     target: [telegramAutomationChats.businessConnectionId, telegramAutomationChats.chatId],
     set: { ...updates, updatedAt: now },
