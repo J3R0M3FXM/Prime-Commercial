@@ -65,10 +65,28 @@ async function telegram(method, body) {
   return payload.result;
 }
 
+function storagePathFromReference(value, bucket) {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  let reference = value.trim().split('?')[0];
+  try { reference = decodeURIComponent(reference); } catch {}
+  const marker = '/' + bucket + '/';
+  const index = reference.indexOf(marker);
+  if (index >= 0) return reference.slice(index + marker.length).replace(/^\\/+/, '');
+  const prefix = bucket + '/';
+  if (reference.startsWith(prefix)) return reference.slice(prefix.length);
+  return reference.includes('/') ? '' : reference;
+}
+
 const backupBytes = await readFile(backupPath);
 const snapshot = JSON.parse(decryptArtifact(backupBytes, 'PCMBK1').toString('utf8'));
 if (snapshot.format !== 'prime-commercial-encrypted-backup' || snapshot.version !== 1) {
   throw new Error('Input file is not a supported Prime Commercial snapshot.');
+}
+
+const receiptOrderByPath = new Map();
+for (const order of snapshot.tables?.orders?.rows || []) {
+  const path = storagePathFromReference(order.payment_proof_image || order.paymentProofImage, 'receipt-proofs');
+  if (path && order.id != null) receiptOrderByPath.set(path, String(order.id));
 }
 
 const me = await telegram('getMe');
@@ -108,7 +126,13 @@ for (const [bucket, bucketData] of Object.entries(snapshot.storage || {})) {
   for (const object of bucketData.objects || []) {
     const key = bucket + '/' + object.path;
     const existing = manifest.entries[key];
+    const linkedOrderId = bucket === 'receipt-proofs' ? receiptOrderByPath.get(object.path) || null : null;
     if (existing && existing.sha256 === object.sha256 && existing.fileId) {
+      if (existing.orderId !== linkedOrderId) {
+        existing.orderId = linkedOrderId;
+        manifest.updatedAt = new Date().toISOString();
+        await saveManifest(manifest);
+      }
       skipped++;
       continue;
     }
@@ -145,6 +169,7 @@ for (const [bucket, bucketData] of Object.entries(snapshot.storage || {})) {
       contentType: object.contentType || 'application/octet-stream',
       size: bytes.length,
       sha256: object.sha256,
+      orderId: linkedOrderId,
       uploadedAt: new Date().toISOString(),
     };
     manifest.updatedAt = new Date().toISOString();
