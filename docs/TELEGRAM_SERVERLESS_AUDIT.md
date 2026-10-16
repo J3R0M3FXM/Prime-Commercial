@@ -222,3 +222,10 @@ A code-only update was committed to `tgcloud/schema.js` on `migration/telegram-s
 The four live tables `telegram_automation_flows`, `telegram_automation_settings`, `telegram_automation_chats`, and `maya_webhook_events` are **still not represented** in the target schema. They must be mapped before the schema can be called complete. The chat-state table has a composite identity (`business_connection_id`, `chat_id`), so its primary/unique-key declaration must be implemented using a verified SDK-supported pattern rather than inventing an `id` column. The target schema also still needs a complete automated comparison of every live column, constraint, default, index, and nullability; the additions above are a partial reconciliation, not a green-light for import.
 
 Next safe implementation steps: map the four missing tables and their keys; verify the SDK timestamp and composite-key syntax; add schema parity tests; then create a repeatable export/import dry-run that writes only to a non-production target and reports row counts, key collisions, relationship gaps, timestamp drift, and money/loyalty reconciliation. No production cutover or data transfer is authorized by this code change.
+
+
+### Follow-up schema mapping — 2026-10-17
+
+A follow-up code-only commit (`a72f2a96f0970203eba15bc9c33b1b4056aa60fd`) adds declarations for `telegram_automation_flows`, `telegram_automation_settings`, `telegram_automation_chats`, and `maya_webhook_events`. The chat-state table uses a composite unique index over `business_connection_id` and `chat_id` instead of inventing an `id` column. This is an initial mapping from the live column inventory, not certified schema parity.
+
+Before any import, validate the target schema with the official CLI against the intended non-production bot. Specifically verify SDK handling of PostgreSQL `bigint` Telegram identifiers, timestamp round-tripping, JSON defaults, composite uniqueness, and generated/default ID behavior. `maya_webhook_events.event_key` is not declared unique until the matching live constraint is confirmed. Do not apply schema migrations to an unverified production bot.
