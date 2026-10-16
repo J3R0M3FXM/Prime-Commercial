@@ -7,7 +7,8 @@ export default async function (input) {
   const destinationLat = Number(input?.destinationLat);
   const destinationLon = Number(input?.destinationLon);
   const courierId = String(input?.courierId || '').trim();
-  if (!Number.isFinite(destinationLat) || destinationLat < -90 || destinationLat > 90 ||
+  if (input?.destinationLat == null || input?.destinationLon == null ||
+      !Number.isFinite(destinationLat) || destinationLat < -90 || destinationLat > 90 ||
       !Number.isFinite(destinationLon) || destinationLon < -180 || destinationLon > 180 || !courierId) {
     throw new EndpointError('A valid destination and courier are required.', { code: 'INVALID_INPUT' });
   }
