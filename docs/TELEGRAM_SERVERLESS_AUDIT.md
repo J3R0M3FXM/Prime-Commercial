@@ -188,3 +188,8 @@ The current app's `next.config.mjs` does not configure static export, and `packa
 - Do not include changes to product records/catalog content in this audit or migration tooling; preserve existing catalog data byte-for-byte/semantically and keep UI/content edits separate from the infrastructure migration.
 
 The route inventory is based on the tracked `main` application tree used as the current feature reference. Before implementation, compare it against the latest production branch/commit and the migration branch to ensure no newer admin or secretary work is omitted.
+
+
+### Migration-history filename reconciliation correction
+
+A direct directory listing confirms the migration branch contains 18 checked-in SQL migration files. The live Supabase history reports 17 applied migrations, but the history version/name pairs do not directly match the filenames in the branch (for example, live version `20260920172105_runtime_schema_alignment_20260921` versus checked-in `20260921000100_runtime_schema_alignment.sql`). Therefore this finding is **version/name mismatch and incomplete direct traceability**, not proof that SQL content is absent. The next safe check is a semantic migration-by-migration comparison of the live records against checked-in files and live schema; no replacement SQL should be invented solely to align filenames.
