@@ -14,7 +14,7 @@ for (const name of requiredTables) {
 
 const requiredEndpoints = [
   'health.js', 'getCatalog.js', 'getActivePromos.js',
-  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
+  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js', 'manageAutomation.js',
 ];
 for (const name of requiredEndpoints) {
   assert.ok(existsSync('tgcloud/endpoints/' + name), 'Missing public endpoint: ' + name);
@@ -120,3 +120,13 @@ assert.match(businessMessageHandler, /recordCustomerMessage/, 'Business messages
 const callbackHandler = readFileSync('tgcloud/handlers/callback_query.js', 'utf8');
 assert.match(callbackHandler, /answerSecretaryCallback/, 'Secretary callbacks must always answer the callback query');
 assert.match(callbackHandler, /executeSecretaryAction/, 'Secretary callbacks must execute configured actions');
+
+const manageAutomation = readFileSync('tgcloud/endpoints/manageAutomation.js', 'utf8');
+assert.match(manageAutomation, /await requireAdmin\(ctx\)/, 'Automation configuration must require admin authorization');
+assert.match(manageAutomation, /getAutomationSettings/, 'Automation endpoint must preserve settings reads');
+assert.match(manageAutomation, /getAutomationFlows/, 'Automation endpoint must preserve flow reads');
+assert.match(manageAutomation, /setAutomationChatPaused/, 'Automation endpoint must preserve per-chat pause controls');
+assert.match(automationCore, /updateAutomationSettings/, 'Automation core must persist configuration updates');
+assert.match(automationCore, /createAutomationFlow/, 'Automation core must persist flow creation');
+assert.match(automationCore, /updateAutomationFlow/, 'Automation core must persist flow edits');
+assert.match(automationCore, /deleteAutomationFlow/, 'Automation core must persist flow deletion');
