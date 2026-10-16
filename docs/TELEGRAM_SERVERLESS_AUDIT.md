@@ -348,3 +348,7 @@ Added admin-only `manageVideos.js` for video metadata CRUD and `getPublicVideos.
 
 The latest completed Telegram Serverless schema/contract workflow passed on commit `08aa3cab`: schema and module syntax checks, contract/security assertions, encrypted backup utility syntax, and delivery-fee regression tests all passed. This does not certify Telegram runtime behavior or the full app build/cutover.
 
+### Promo codec regression test passed
+
+Added `scripts/test-promo-codec.mjs` and wired it into CI. It verifies round-trip preservation of advanced promo metadata stored inside `description` JSON. The completed Telegram Serverless schema/contract run on commit `2b9daf96` passed module syntax, contract/security assertions, backup utility syntax, delivery-fee regression tests, and promo metadata round-trip tests. These are code-level tests only; no live promo rows were changed.
+
