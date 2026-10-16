@@ -187,3 +187,10 @@ assert.match(validatePromo, /isNull\(promoRedemptions\.releasedAt\)/, 'Promo lim
 assert.match(validatePromo, /resolveTrustedFingerprint/, 'Promo validation must use stored trusted fingerprint resolution');
 assert.match(validatePromo, /calculatePromoDiscount/, 'Promo validation must use shared discount rules');
 assert.doesNotMatch(validatePromo, /db\.(insert|update|delete)/, 'Promo validation must remain read-only');
+
+const mediaTransfer = readFileSync('scripts/migrate-media-to-telegram.mjs', 'utf8');
+assert.match(mediaTransfer, /EXPECTED_TELEGRAM_BOT_USERNAME/, 'Media transfer must verify expected bot identity');
+assert.match(mediaTransfer, /chat\.type !== 'private'/, 'Media transfer must refuse non-private storage chats');
+assert.match(mediaTransfer, /sha256\(bytes\) !== object\.sha256/, 'Media transfer must verify every source object checksum');
+assert.match(mediaTransfer, /PCMMAP1/, 'Media transfer map must be encrypted separately');
+assert.doesNotMatch(mediaTransfer, /console\.log\([^\n]*botToken/, 'Media transfer must never log the bot token');
