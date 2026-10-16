@@ -23,6 +23,7 @@ on:
       - "tgcloud/handlers/**"
       - "scripts/check-telegram-serverless-contracts.mjs"
       - "scripts/export-supabase-snapshot.mjs"
+      - "scripts/migrate-media-to-telegram.mjs"
       - "scripts/verify-supabase-snapshot.mjs"
       - "scripts/test-delivery-fee.mjs"
       - "scripts/test-promo-codec.mjs"
