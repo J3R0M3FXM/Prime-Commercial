@@ -327,3 +327,7 @@ A live `information_schema.columns` query confirmed that the current app code ex
 
 Do not silently add these fields to the live project or drop the corresponding UI behavior. Before porting account/auth, reconcile this with checked-in SQL migrations and the actual deployed migration history, then decide whether to add compatible columns to the target schema and/or fix stale app code. The customer account/profile endpoint has therefore **not** been ported yet. This is a real parity issue, not merely a Telegram Serverless limitation.
 
+### Customer-owned order history endpoint
+
+Added `tgcloud/endpoints/getMyOrders.js`, which uses the platform-verified Telegram user ID, scopes results to that ID plus matching customer/member IDs for legacy orders, orders newest-first, and caps the response at 100 rows. It does not accept a customer ID from the caller and cannot request another customer's history by changing payload fields. The app's combined account endpoint is still blocked by the confirmed customer-column drift above.
+
