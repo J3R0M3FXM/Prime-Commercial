@@ -156,26 +156,26 @@ export async function notifyOrderCreated(order: OrderNotification): Promise<bool
     : '';
 
   const message = [
-    '🛍️ <b>ORDER RECEIVED</b>',
+    '<b>ORDER RECEIVED</b>',
     '',
-    `Hello ${escapeHtml(order.customerName || 'Customer')}!`,
-    'Your order has been received and is now being processed.',
+    `Hello ${escapeHtml(order.customerName || 'Customer')},`,
+    'Your order has been received and is being processed.',
     '',
-    `🧾 <b>Order:</b> <code>${escapeHtml(order.orderNumber)}</code>`,
-    `📌 <b>Status:</b> ${escapeHtml(order.status)}`,
-    order.totalAmount !== undefined ? `💰 <b>Total:</b> ${money(order.totalAmount)}` : '',
-    order.payableNow !== undefined ? `💳 <b>Payable now:</b> ${money(order.payableNow)}` : '',
-    order.paymentDeadlineAt ? `⏳ <b>Payment proof deadline:</b> ${escapeHtml(formatPaymentDeadline(order.paymentDeadlineAt))}` : '',
-    items ? `\n<b>Items</b>\n${items}` : '',
+    `Order Number: <code>${escapeHtml(order.orderNumber)}</code>`,
+    `Status: ${escapeHtml(order.status)}`,
+    order.totalAmount !== undefined ? `Total Amount: ${money(order.totalAmount)}` : '',
+    order.payableNow !== undefined ? `Payable Now: ${money(order.payableNow)}` : '',
+    order.paymentDeadlineAt ? `Payment Proof Deadline: ${escapeHtml(formatPaymentDeadline(order.paymentDeadlineAt))}` : '',
+    items ? `\nItems\n${items}` : '',
     '',
-    'Please submit your payment proof before the deadline so your reserved stock is not released.',
-    'We will send you another Telegram notification whenever your order status changes.',
+    'Please submit your payment proof before the deadline to ensure your stock is reserved.',
+    'You will be notified regarding the status of your order.',
   ].filter(Boolean).join('\n');
 
   return sendTelegramMessage(
     order.chatId,
     message,
-    await buildOrderInlineKeyboard(order.orderNumber, '💳 Open Order & Upload Payment Proof')
+    await buildOrderInlineKeyboard(order.orderNumber, 'Upload Payment Proof')
   );
 }
 
@@ -183,18 +183,18 @@ export async function notifyOrderStatusChanged(order: OrderNotification): Promis
   if (!order.chatId) return false;
 
   const message = [
-    `${getStatusIcon(order.status)} <b>ORDER UPDATE</b>`,
+    `<b>ORDER UPDATE: ${escapeHtml(order.status.toUpperCase())}</b>`,
     '',
-    `🧾 <b>Order:</b> <code>${escapeHtml(order.orderNumber)}</code>`,
-    `📌 <b>New status:</b> ${escapeHtml(order.status)}`,
-    order.courierName ? `🚚 <b>Courier:</b> ${escapeHtml(order.courierName)}` : '',
-    order.trackingNumber ? `🔎 <b>Tracking:</b> <code>${escapeHtml(order.trackingNumber)}</code>` : '',
-    order.totalAmount !== undefined ? `💰 <b>Total:</b> ${money(order.totalAmount)}` : '',
+    `Order Number: <code>${escapeHtml(order.orderNumber)}</code>`,
+    `New Status: ${escapeHtml(order.status)}`,
+    order.courierName ? `Courier: ${escapeHtml(order.courierName)}` : '',
+    order.trackingNumber ? `Tracking Number: <code>${escapeHtml(order.trackingNumber)}</code>` : '',
+    order.totalAmount !== undefined ? `Total Amount: ${money(order.totalAmount)}` : '',
     order.status.toLowerCase() === 'expired'
-      ? '⚠️ Your one-hour payment proof window ended without a submitted receipt. The order has expired.'
+      ? 'Your payment proof was not received within the one-hour window. This order has been cancelled.'
       : '',
     '',
-    'Your order record has been updated. We will keep you informed of the next step.',
+    'Your order record has been updated. Please contact support if you have questions.',
   ].filter(Boolean).join('\n');
 
   return sendTelegramMessage(
@@ -203,8 +203,8 @@ export async function notifyOrderStatusChanged(order: OrderNotification): Promis
     await buildOrderInlineKeyboard(
       order.orderNumber,
       order.status.toLowerCase() === 'pending' && String(order.paymentStatus || '').toLowerCase() === 'unpaid'
-        ? '💳 Open Order & Upload Payment Proof'
-        : '📄 View Order Details'
+        ? 'Upload Payment Proof'
+        : 'View Order Details'
     )
   );
 }
@@ -213,12 +213,12 @@ export async function notifyPaymentUpdated(order: OrderNotification): Promise<bo
   if (!order.chatId) return false;
 
   const message = [
-    '💳 <b>PAYMENT UPDATE</b>',
+    '<b>PAYMENT UPDATE</b>',
     '',
-    `🧾 <b>Order:</b> <code>${escapeHtml(order.orderNumber)}</code>`,
-    `📌 <b>Order status:</b> ${escapeHtml(order.status)}`,
-    `💰 <b>Total:</b> ${money(order.totalAmount)}`,
-    `💳 <b>Payment status:</b> ${escapeHtml(order.paymentStatus || 'Updated')}`,
+    `Order Number: <code>${escapeHtml(order.orderNumber)}</code>`,
+    `Order Status: ${escapeHtml(order.status)}`,
+    `Total Amount: ${money(order.totalAmount || 0)}`,
+    `Payment Status: ${escapeHtml(order.paymentStatus || 'Updated')}`,
     '',
     'Your payment information has been received and is being reviewed.',
   ].join('\n');
@@ -226,7 +226,7 @@ export async function notifyPaymentUpdated(order: OrderNotification): Promise<bo
   return sendTelegramMessage(
     order.chatId,
     message,
-    await buildOrderInlineKeyboard(order.orderNumber, '📄 View Order Details')
+    await buildOrderInlineKeyboard(order.orderNumber, 'View Order Details')
   );
 }
 

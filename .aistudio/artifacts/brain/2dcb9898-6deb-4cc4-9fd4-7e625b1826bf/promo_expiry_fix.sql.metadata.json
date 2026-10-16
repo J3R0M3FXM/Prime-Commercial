@@ -1,0 +1,5 @@
+{
+  "summary": "SQL migration to update order expiry function to include promo reversal.",
+  "updatedAt": "2026-10-16T04:34:54.392194029Z",
+  "userFacing": true
+}
