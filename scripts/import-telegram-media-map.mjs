@@ -5,9 +5,11 @@ import { resolve } from 'node:path';
 
 const manifestPath = resolve(process.argv[2] || '');
 const passphrase = process.env.BACKUP_ENCRYPTION_PASSPHRASE;
+const botToken = process.env.TELEGRAM_BOT_TOKEN;
 const adminId = String(process.env.TELEGRAM_ADMIN_USER_ID || '');
 if (!process.argv[2]) throw new Error('Usage: node scripts/import-telegram-media-map.mjs <encrypted-map.pcmmapping>');
 if (!passphrase || passphrase.length < 20) throw new Error('Set BACKUP_ENCRYPTION_PASSPHRASE locally.');
+if (!botToken) throw new Error('Set TELEGRAM_BOT_TOKEN locally to verify the media map belongs to the intended bot.');
 if (!/^[0-9]+$/.test(adminId)) throw new Error('Set TELEGRAM_ADMIN_USER_ID to the authorized admin Telegram user ID.');
 if (!process.env.TGCLOUD_TOKEN) {
   console.warn('TGCLOUD_TOKEN is not set; the CLI must already be logged in with npx tgcloud login.');
@@ -33,6 +35,20 @@ const manifest = decryptManifest(await readFile(manifestPath));
 if (manifest.format !== 'prime-commercial-telegram-media-map' || manifest.version !== 1 ||
     !manifest.botId || !manifest.storageChatId || !manifest.entries) {
   throw new Error('Media map metadata is invalid.');
+}
+
+const botResponse = await fetch('https://api.telegram.org/bot' + botToken + '/getMe');
+const botPayload = await botResponse.json().catch(() => ({}));
+if (!botResponse.ok || botPayload.ok !== true || String(botPayload.result?.id) !== String(manifest.botId)) {
+  throw new Error('Media map bot identity does not match TELEGRAM_BOT_TOKEN. No database changes were made.');
+}
+const chatResponse = await fetch('https://api.telegram.org/bot' + botToken + '/getChat', {
+  method: 'POST',
+  body: new URLSearchParams({ chat_id: String(manifest.storageChatId) }),
+});
+const chatPayload = await chatResponse.json().catch(() => ({}));
+if (!chatResponse.ok || chatPayload.ok !== true || chatPayload.result?.type !== 'private') {
+  throw new Error('Media map storage chat is not a verified private chat. No database changes were made.');
 }
 
 const assets = Object.values(manifest.entries).map((entry) => ({
