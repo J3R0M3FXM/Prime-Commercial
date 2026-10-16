@@ -98,7 +98,7 @@ const requiredIndexes = [
   'promo_redemptions_active_device_idx', 'promo_redemptions_active_hardware_idx',
   'promo_redemptions_active_promo_idx', 'promo_redemptions_active_server_fp_idx',
   'promo_redemptions_promo_customer_idx', 'promo_redemptions_promo_device_idx',
-  'promos_code_key', 'telegram_automation_chats_activity_idx',
+  'promos_code_key', 'telegram_automation_chats_pkey', 'telegram_automation_chats_activity_idx',
   'telegram_automation_flows_active_priority_idx', 'warehouses_is_default_idx', 'warehouses_single_default_idx',
 ];
 for (const name of requiredIndexes) {
