@@ -166,11 +166,12 @@ export async function notifyOrderCreated(order: OrderNotification): Promise<bool
     `Status: ${escapeHtml(String(order.paymentStatus || '').toLowerCase() === 'unpaid' ? 'Awaiting Payment' : order.status)}`,
     order.totalAmount !== undefined ? `Total Amount: ${money(order.totalAmount)}` : '',
     order.payableNow !== undefined ? `Payable Now: ${money(order.payableNow)}` : '',
-    order.paymentDeadlineAt ? `Payment Proof Deadline: ${escapeHtml(formatPaymentDeadline(order.paymentDeadlineAt))}` : '',
+    order.paymentDeadlineAt ? `Expiration: ${escapeHtml(formatPaymentDeadline(order.paymentDeadlineAt))}` : '',
     items ? `\nItems\n${items}` : '',
     '',
-    'Please submit your payment proof before the deadline to ensure your stock is reserved.',
-    'You will be notified regarding the status of your order.',
+    'Please settle the payable amount and upload your payment proof before the expiration time to avoid cancellation.',
+    '',
+    'Thank you for choosing PRIME™ Sourcing &amp; Distribution Network!',
   ].filter(Boolean).join('\n');
 
   return sendTelegramMessage(
