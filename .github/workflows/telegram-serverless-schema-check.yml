@@ -4,6 +4,8 @@ on:
     branches: [migration/telegram-serverless]
     paths:
       - "tgcloud/schema.js"
+      - "tgcloud/endpoints/**"
+      - "scripts/check-telegram-serverless-contracts.mjs"
       - ".github/workflows/telegram-serverless-schema-check.yml"
   pull_request:
     branches: [migration/telegram-serverless]
@@ -21,3 +23,5 @@ jobs:
           node-version: 20
       - name: Check schema JavaScript syntax
         run: node --input-type=module --check < tgcloud/schema.js
+      - name: Check migration schema and public endpoint contracts
+        run: node scripts/check-telegram-serverless-contracts.mjs
