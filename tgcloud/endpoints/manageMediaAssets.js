@@ -65,19 +65,13 @@ export default async function (input, ctx) {
       ...asset,
       createdAt: new Date(),
     }));
-    await db.insert(mediaAssets).values(rows).onConflictDoUpdate({
-      target: [mediaAssets.bucket, mediaAssets.path],
-      set: {
-        fileId: rows[0].fileId,
-        messageId: rows[0].messageId,
-        contentType: rows[0].contentType,
-        size: rows[0].size,
-        sha256: rows[0].sha256,
-        visibility: rows[0].visibility,
-        orderId: rows[0].orderId,
-        updatedAt: new Date(),
-      },
-    }).run();
+    for (const row of rows) {
+      const { createdAt, ...updates } = row;
+      await db.insert(mediaAssets).values(row).onConflictDoUpdate({
+        target: [mediaAssets.bucket, mediaAssets.path],
+        set: { ...updates, updatedAt: new Date() },
+      }).run();
+    }
     return { success: true, imported: rows.length };
   }
 
