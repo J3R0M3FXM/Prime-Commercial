@@ -28,10 +28,10 @@ export const products = table('products', {
 }));
 
 export const customers = table('customers', {
-  id: text('id').primaryKey().default(uuidDefault()), tgUserId: text('tg_user_id').unique(),
+  id: text('id').primaryKey().default(uuidDefault()), tgUserId: text('tg_user_id'),
   tgName: text('tg_name'), tgUsername: text('tg_username'), phoneNumber: text('phone_number'),
-  primeMemberId: text('prime_member_id').unique(), points: numeric('points').default(0),
-  storeCredits: numeric('store_credits').default(0), referralCode: text('referral_code').unique(),
+  primeMemberId: text('prime_member_id'), points: numeric('points').default(0),
+  storeCredits: numeric('store_credits').default(0), referralCode: text('referral_code'),
   referredBy: text('referred_by'), totalOrders: integer('total_orders').default(0),
   lifetimeSpent: numeric('lifetime_spent').default(0), isBanned: boolean('is_banned').default(false),
   fingerprints: json('fingerprints').default([]),
@@ -39,13 +39,16 @@ export const customers = table('customers', {
   referredByUserId: text('referred_by_user_id'), referredByMemberId: text('referred_by_member_id'),
   createdAt: createdAt(), updatedAt: updatedAt(),
 }, (t) => ({
+  customersTgUserUnique: uniqueIndex('customers_tg_user_id_key').on(t.tgUserId),
   customersTgUserIdx: index('idx_customers_tg_user_id').on(t.tgUserId),
+  customersMemberUnique: uniqueIndex('customers_prime_member_id_key').on(t.primeMemberId),
   customersMemberIdx: index('idx_customers_prime_member_id').on(t.primeMemberId),
+  customersReferralUnique: uniqueIndex('customers_referral_code_key').on(t.referralCode),
   customersReferralIdx: index('idx_customers_referral_code').on(t.referralCode),
 }));
 
 export const orders = table('orders', {
-  id: text('id').primaryKey().default(uuidDefault()), orderNumber: text('order_number').notNull().unique(),
+  id: text('id').primaryKey().default(uuidDefault()), orderNumber: text('order_number').notNull(),
   customerId: text('customer_id'), customerName: text('customer_name'), customerPhone: text('customer_phone'),
   tgUserId: text('tg_user_id'), primeMemberId: text('prime_member_id'),
   items: json('items').notNull().default([]), subtotal: numeric('subtotal').notNull().default(0),
@@ -95,6 +98,7 @@ export const orders = table('orders', {
     .on(t.mayaRequestReferenceNumber).where(sql`${t.mayaRequestReferenceNumber} IS NOT NULL AND ${t.mayaRequestReferenceNumber} <> ''`),
   ordersCreatedAtIdx: index('idx_orders_created_at').on(sql`${t.createdAt} DESC`),
   ordersCustomerIdx: index('idx_orders_customer_id').on(t.customerId),
+  ordersOrderNumberUnique: uniqueIndex('orders_order_number_key').on(t.orderNumber),
   ordersOrderNumberIdx: index('idx_orders_order_number').on(t.orderNumber),
   ordersPaymentStatusIdx: index('idx_orders_payment_status').on(t.paymentStatus),
   ordersStatusIdx: index('idx_orders_status').on(t.status),
@@ -120,7 +124,7 @@ export const paymentMethods = table('payment_methods', {
 });
 
 export const promos = table('promos', {
-  id: text('id').primaryKey().default(uuidDefault()), code: text('code').notNull().unique(), title: text('title'),
+  id: text('id').primaryKey().default(uuidDefault()), code: text('code').notNull(), title: text('title'),
   description: text('description'), discountType: text('discount_type').notNull(),
   discountValue: numeric('discount_value').notNull().default(0),
   maxDiscountAmount: numeric('max_discount_amount'), minSpend: numeric('min_spend').default(0),
@@ -130,7 +134,7 @@ export const promos = table('promos', {
   startDate: integer('start_date', { mode: 'timestamp' }), endDate: integer('end_date', { mode: 'timestamp' }),
   createdAt: createdAt(), updatedAt: updatedAt(),
 }, (t) => ({
-  promosCodeLookup: uniqueIndex('promos_code_key').on(t.code),
+  promosCodeUnique: uniqueIndex('promos_code_key').on(t.code),
 }));
 
 export const promoRedemptions = table('promo_redemptions', {
@@ -237,14 +241,14 @@ export const telegramAutomationChats = table('telegram_automation_chats', {
   createdAt: requiredCreatedAt(), updatedAt: requiredUpdatedAt(),
   botPaused: boolean('bot_paused').notNull().default(false),
 }, (t) => ({
-  connectionChatUnique: uniqueIndex('uq_telegram_automation_chats_connection_chat')
+  connectionChatUnique: uniqueIndex('telegram_automation_chats_pkey')
     .on(t.businessConnectionId, t.chatId),
   automationChatActivityIdx: index('telegram_automation_chats_activity_idx').on(t.businessConnectionId, t.lastCustomerMessageAt),
 }));
 
 export const mayaWebhookEvents = table('maya_webhook_events', {
   id: text('id').primaryKey().default(sql`('mwe_' || lower(hex(randomblob(16))))`),
-  eventKey: text('event_key').notNull().unique(),
+  eventKey: text('event_key').notNull(),
   paymentId: text('payment_id'),
   requestReferenceNumber: text('request_reference_number'),
   receiptNumber: text('receipt_number'),
@@ -257,6 +261,7 @@ export const mayaWebhookEvents = table('maya_webhook_events', {
   payload: json('payload').notNull().default({}),
   receivedAt: integer('received_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`), processedAt: integer('processed_at', { mode: 'timestamp' }),
 }, (t) => ({
+  mayaEventKeyUnique: uniqueIndex('maya_webhook_events_event_key_key').on(t.eventKey),
   mayaEventOrderIdx: index('maya_webhook_events_order_id_idx').on(t.orderId),
   mayaEventPaymentIdx: index('maya_webhook_events_payment_id_idx').on(t.paymentId),
   mayaEventReceivedIdx: index('maya_webhook_events_received_at_idx').on(sql`${t.receivedAt} DESC`),
