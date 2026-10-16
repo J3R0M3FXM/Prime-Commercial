@@ -6,10 +6,33 @@ let supabaseAdminInstance: SupabaseClient | null = null;
 /**
  * Check if Supabase credentials are configured in the environment
  */
+function getSupabasePublicKey(): string {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    // Compatibility fallback for environments that have not yet migrated.
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    process.env.SUPABASE_ANON_KEY?.trim() ||
+    ''
+  );
+}
+
+function getSupabaseSecretKey(): string {
+  return (
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    // Compatibility fallback for environments that have not yet migrated.
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    ''
+  );
+}
+
+/**
+ * Check if Supabase credentials are configured in the environment.
+ * Prefer modern publishable keys; legacy anon keys may be disabled.
+ */
 export function isSupabaseConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  return Boolean(url && key && url.startsWith('http'));
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  return Boolean(url && getSupabasePublicKey() && url.startsWith('http'));
 }
 
 /**
@@ -18,9 +41,9 @@ export function isSupabaseConfigured(): boolean {
 export function getSupabaseClient(): SupabaseClient | null {
   if (!isSupabaseConfigured()) return null;
   if (!supabaseClientInstance) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    supabaseClientInstance = createClient(url, anonKey, {
+    const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)!;
+    const publicKey = getSupabasePublicKey();
+    supabaseClientInstance = createClient(url, publicKey, {
       auth: {
         persistSession: false,
       },
@@ -30,24 +53,23 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 /**
- * Admin database operations require the server-only service-role key.
- * The public anon key alone is not sufficient for these routes.
+ * Admin database operations require the server-only Supabase secret key.
+ * Never expose this key to client-side code.
  */
 export function isSupabaseAdminConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return Boolean(url && serviceRoleKey && url.startsWith('http'));
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  return Boolean(url && getSupabaseSecretKey() && url.startsWith('http'));
 }
 
 /**
  * Server-side / Admin Supabase Client with full privileges (Lazy Initialized)
  */
 export function getSupabaseAdmin(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRoleKey || !url.startsWith('http')) return null;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const secretKey = getSupabaseSecretKey();
+  if (!url || !secretKey || !url.startsWith('http')) return null;
   if (!supabaseAdminInstance) {
-    supabaseAdminInstance = createClient(url, serviceRoleKey, {
+    supabaseAdminInstance = createClient(url, secretKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
