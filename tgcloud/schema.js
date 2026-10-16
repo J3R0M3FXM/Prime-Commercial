@@ -22,7 +22,10 @@ export const products = table('products', {
   isFeatured: boolean('is_featured').default(false), sortOrder: integer('sort_order').default(0),
   bundleConfig: json('bundle_config').default({}), tags: json('tags').default([]),
   gallery: json('gallery').default([]), createdAt: createdAt(), updatedAt: updatedAt(),
-});
+}, (t) => ({
+  productsActiveIdx: index('idx_products_active').on(t.isActive),
+  productsCategoryIdx: index('idx_products_category').on(t.category),
+}));
 
 export const customers = table('customers', {
   id: text('id').primaryKey().default(uuidDefault()), tgUserId: text('tg_user_id').unique(),
@@ -35,7 +38,11 @@ export const customers = table('customers', {
   referralPoints: numeric('referral_points').notNull().default(0),
   referredByUserId: text('referred_by_user_id'), referredByMemberId: text('referred_by_member_id'),
   createdAt: createdAt(), updatedAt: updatedAt(),
-});
+}, (t) => ({
+  customersTgUserIdx: index('idx_customers_tg_user_id').on(t.tgUserId),
+  customersMemberIdx: index('idx_customers_prime_member_id').on(t.primeMemberId),
+  customersReferralIdx: index('idx_customers_referral_code').on(t.referralCode),
+}));
 
 export const orders = table('orders', {
   id: text('id').primaryKey().default(uuidDefault()), orderNumber: text('order_number').notNull().unique(),
@@ -86,6 +93,17 @@ export const orders = table('orders', {
     .on(t.mayaPaymentId).where(sql`${t.mayaPaymentId} IS NOT NULL AND ${t.mayaPaymentId} <> ''`),
   mayaRequestReferenceUnique: uniqueIndex('orders_maya_request_reference_uidx')
     .on(t.mayaRequestReferenceNumber).where(sql`${t.mayaRequestReferenceNumber} IS NOT NULL AND ${t.mayaRequestReferenceNumber} <> ''`),
+  ordersCreatedAtIdx: index('idx_orders_created_at').on(sql`${t.createdAt} DESC`),
+  ordersCustomerIdx: index('idx_orders_customer_id').on(t.customerId),
+  ordersOrderNumberIdx: index('idx_orders_order_number').on(t.orderNumber),
+  ordersPaymentStatusIdx: index('idx_orders_payment_status').on(t.paymentStatus),
+  ordersStatusIdx: index('idx_orders_status').on(t.status),
+  ordersTelegramUserIdx: index('idx_orders_tg_user_id').on(t.tgUserId),
+  ordersCustomerStatusCreatedIdx: index('orders_customer_status_created_idx').on(t.customerId, t.status, sql`${t.createdAt} DESC`),
+  ordersMayaPaymentIdx: index('orders_maya_payment_id_idx').on(t.mayaPaymentId).where(sql`${t.mayaPaymentId} IS NOT NULL`),
+  ordersMayaReceiptIdx: index('orders_maya_receipt_number_idx').on(t.mayaReceiptNumber).where(sql`${t.mayaReceiptNumber} IS NOT NULL`),
+  ordersMayaReferenceIdx: index('orders_maya_request_reference_number_idx').on(t.mayaRequestReferenceNumber).where(sql`${t.mayaRequestReferenceNumber} IS NOT NULL`),
+  ordersReferralPendingIdx: index('orders_referral_pending_idx').on(t.referralPointsStatus, t.referralPointsCreditAfter).where(sql`${t.referralPointsStatus} = 'pending_30m'`),
   paymentExpiryIdx: index('idx_orders_payment_expiry')
     .on(t.paymentDeadlineAt).where(sql`${t.status} = 'Pending' AND ${t.paymentStatus} = 'Unpaid' AND ${t.paymentDeadlineAt} IS NOT NULL`),
 }));
@@ -111,7 +129,9 @@ export const promos = table('promos', {
   isActive: boolean('is_active').default(true),
   startDate: integer('start_date', { mode: 'timestamp' }), endDate: integer('end_date', { mode: 'timestamp' }),
   createdAt: createdAt(), updatedAt: updatedAt(),
-});
+}, (t) => ({
+  promosCodeLookup: uniqueIndex('promos_code_key').on(t.code),
+}));
 
 export const promoRedemptions = table('promo_redemptions', {
   id: text('id').primaryKey().default(uuidDefault()), promoCode: text('promo_code').notNull(), promoId: text('promo_id'),
@@ -121,7 +141,16 @@ export const promoRedemptions = table('promo_redemptions', {
   releasedAt: integer('released_at', { mode: 'timestamp' }),
   hardwareId: text('hardware_id'), deviceFingerprintId: text('device_fingerprint_id'),
   serverFingerprintId: text('server_fingerprint_id'),
-});
+}, (t) => ({
+  promoRedemptionsActiveCustomerIdx: index('promo_redemptions_active_customer_idx').on(t.promoId, t.customerId).where(sql`${t.releasedAt} IS NULL`),
+  promoRedemptionsActiveDeviceFpIdx: index('promo_redemptions_active_device_fp_idx').on(t.promoId, t.deviceFingerprintId).where(sql`${t.releasedAt} IS NULL AND ${t.deviceFingerprintId} IS NOT NULL`),
+  promoRedemptionsActiveDeviceIdx: index('promo_redemptions_active_device_idx').on(t.promoId, t.deviceId).where(sql`${t.releasedAt} IS NULL`),
+  promoRedemptionsActiveHardwareIdx: index('promo_redemptions_active_hardware_idx').on(t.promoId, t.hardwareId).where(sql`${t.releasedAt} IS NULL AND ${t.hardwareId} IS NOT NULL`),
+  promoRedemptionsActivePromoIdx: index('promo_redemptions_active_promo_idx').on(t.promoId).where(sql`${t.releasedAt} IS NULL`),
+  promoRedemptionsActiveServerFpIdx: index('promo_redemptions_active_server_fp_idx').on(t.promoId, t.serverFingerprintId).where(sql`${t.releasedAt} IS NULL AND ${t.serverFingerprintId} IS NOT NULL`),
+  promoRedemptionsPromoCustomerIdx: index('promo_redemptions_promo_customer_idx').on(t.promoId, t.customerId),
+  promoRedemptionsPromoDeviceIdx: index('promo_redemptions_promo_device_idx').on(t.promoId, t.deviceId),
+}));
 
 export const warehouses = table('warehouses', {
   id: text('id').primaryKey().default(uuidDefault()), name: text('name').notNull(), code: text('code'), address: text('address'),
@@ -129,7 +158,10 @@ export const warehouses = table('warehouses', {
   isDefault: boolean('is_default').notNull().default(false),
   latitude: numeric('latitude'), longitude: numeric('longitude'),
   createdAt: createdAt(), updatedAt: updatedAt(),
-});
+}, (t) => ({
+  warehousesDefaultIdx: index('warehouses_is_default_idx').on(t.isDefault),
+  warehousesSingleDefaultIdx: uniqueIndex('warehouses_single_default_idx').on(t.isDefault).where(sql`${t.isDefault} = 1`),
+}));
 
 export const couriers = table('couriers', {
   id: text('id').primaryKey().default(uuidDefault()), name: text('name').notNull(), trackingUrlPattern: text('tracking_url_pattern'),
@@ -179,7 +211,9 @@ export const telegramAutomationFlows = table('telegram_automation_flows', {
   buttons: json('buttons').notNull().default([]),
   priority: integer('priority').notNull().default(100),
   createdAt: requiredCreatedAt(), updatedAt: requiredUpdatedAt(),
-});
+}, (t) => ({
+  automationActivePriorityIdx: index('telegram_automation_flows_active_priority_idx').on(t.active, t.priority),
+}));
 
 export const telegramAutomationSettings = table('telegram_automation_settings', {
   id: text('id').primaryKey().default('default'),
@@ -205,6 +239,7 @@ export const telegramAutomationChats = table('telegram_automation_chats', {
 }, (t) => ({
   connectionChatUnique: uniqueIndex('uq_telegram_automation_chats_connection_chat')
     .on(t.businessConnectionId, t.chatId),
+  automationChatActivityIdx: index('telegram_automation_chats_activity_idx').on(t.businessConnectionId, t.lastCustomerMessageAt),
 }));
 
 export const mayaWebhookEvents = table('maya_webhook_events', {
@@ -221,4 +256,9 @@ export const mayaWebhookEvents = table('maya_webhook_events', {
   processingError: text('processing_error'),
   payload: json('payload').notNull().default({}),
   receivedAt: integer('received_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`), processedAt: integer('processed_at', { mode: 'timestamp' }),
-});
+}, (t) => ({
+  mayaEventOrderIdx: index('maya_webhook_events_order_id_idx').on(t.orderId),
+  mayaEventPaymentIdx: index('maya_webhook_events_payment_id_idx').on(t.paymentId),
+  mayaEventReceivedIdx: index('maya_webhook_events_received_at_idx').on(sql`${t.receivedAt} DESC`),
+  mayaEventReferenceIdx: index('maya_webhook_events_request_reference_idx').on(t.requestReferenceNumber),
+}));
