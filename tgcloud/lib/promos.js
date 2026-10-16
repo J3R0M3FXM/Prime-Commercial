@@ -72,8 +72,10 @@ export function serializePromoDescription(promo, existingDescription = '') {
 
 
 export function calculatePromoDiscount(promo, itemsSubtotal, deliveryFee = 0) {
-  const subtotal = Math.max(0, Number(itemsSubtotal) || 0);
-  const fee = Math.max(0, Number(deliveryFee) || 0);
+  const subtotalValue = Number(itemsSubtotal);
+  const feeValue = Number(deliveryFee);
+  const subtotal = Number.isFinite(subtotalValue) ? Math.max(0, subtotalValue) : 0;
+  const fee = Number.isFinite(feeValue) ? Math.max(0, feeValue) : 0;
   if (promo.discountType === 'free_shipping') {
     return { discount: fee, isFreeShipping: true, shippingSubsidy: fee, cashbackPoints: 0 };
   }
