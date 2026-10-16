@@ -14,7 +14,7 @@ for (const name of requiredTables) {
 
 const requiredEndpoints = [
   'health.js', 'getCatalog.js', 'getActivePromos.js',
-  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'getPublicCouriers.js', 'getDeliveryQuote.js', 'getMyOrders.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
+  'getPublicPaymentMethods.js', 'getPublicCharges.js', 'getPublicCouriers.js', 'getPublicVideos.js', 'getDeliveryQuote.js', 'getMyOrders.js', 'manageCharges.js', 'manageCouriers.js', 'manageWarehouses.js', 'managePaymentMethods.js', 'manageProducts.js',
 ];
 for (const name of requiredEndpoints) {
   assert.ok(existsSync('tgcloud/endpoints/' + name), 'Missing public endpoint: ' + name);
@@ -154,3 +154,8 @@ assert.match(deliveryQuote, /calculateRoadDistanceFallback/, 'Delivery quote mus
 assert.match(deliveryQuote, /calculateDeliveryFee/, 'Delivery quote must calculate fees server-side');
 assert.doesNotMatch(deliveryQuote, /input\?\.deliveryFee|input\.deliveryFee/, 'Delivery quote must not trust a client-supplied fee');
 assert.doesNotMatch(deliveryQuote, /return \{[^}]*latitude|return \{[^}]*longitude/, 'Delivery quote must not return warehouse coordinates');
+
+const publicVideos = readFileSync('tgcloud/endpoints/getPublicVideos.js', 'utf8');
+assert.match(publicVideos, /eq\(videos\.isPublished, true\)/, 'Public video gallery must exclude unpublished media');
+assert.doesNotMatch(publicVideos, /input\.includeAll|input\?\.includeAll/, 'Public video gallery must not allow clients to expose unpublished media');
+assert.doesNotMatch(publicVideos, /db\.(insert|update|delete)/, 'Public video gallery must remain read-only');
