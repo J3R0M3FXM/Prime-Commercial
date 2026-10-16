@@ -83,6 +83,15 @@ if (snapshot.format !== 'prime-commercial-encrypted-backup' || snapshot.version 
   throw new Error('Input file is not a supported Prime Commercial snapshot.');
 }
 
+const publicVideoMediaPaths = new Set();
+for (const video of snapshot.tables?.videos?.rows || []) {
+  if (video.is_published !== true && video.isPublished !== true) continue;
+  for (const reference of [video.direct_url || video.directUrl, video.thumbnail_url || video.thumbnailUrl]) {
+    const path = storagePathFromReference(reference, 'media-gallery');
+    if (path) publicVideoMediaPaths.add(path);
+  }
+}
+
 const receiptOrderByPath = new Map();
 for (const order of snapshot.tables?.orders?.rows || []) {
   const path = storagePathFromReference(order.payment_proof_image || order.paymentProofImage, 'receipt-proofs');
@@ -128,8 +137,11 @@ for (const [bucket, bucketData] of Object.entries(snapshot.storage || {})) {
     const existing = manifest.entries[key];
     const linkedOrderId = bucket === 'receipt-proofs' ? receiptOrderByPath.get(object.path) || null : null;
     if (existing && existing.sha256 === object.sha256 && existing.fileId) {
-      if (existing.orderId !== linkedOrderId) {
+      const visibility = bucket === 'product-images' ? 'public'
+        : bucket === 'media-gallery' && publicVideoMediaPaths.has(object.path) ? 'public' : 'private';
+      if (existing.orderId !== linkedOrderId || existing.visibility !== visibility) {
         existing.orderId = linkedOrderId;
+        existing.visibility = visibility;
         manifest.updatedAt = new Date().toISOString();
         await saveManifest(manifest);
       }
@@ -170,6 +182,8 @@ for (const [bucket, bucketData] of Object.entries(snapshot.storage || {})) {
       size: bytes.length,
       sha256: object.sha256,
       orderId: linkedOrderId,
+      visibility: bucket === 'product-images' ? 'public'
+        : bucket === 'media-gallery' && publicVideoMediaPaths.has(object.path) ? 'public' : 'private',
       uploadedAt: new Date().toISOString(),
     };
     manifest.updatedAt = new Date().toISOString();
