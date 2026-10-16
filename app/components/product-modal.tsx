@@ -8,7 +8,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
   const { cart, addToCart, updateQuantity } = useCart();
   
   // Extract variants
-  const fallbackImage = product?.imageUrl || "https://picsum.photos/seed/prime/600/600";
+  const fallbackImage = product?.imageUrl || product?.image_url || "https://picsum.photos/seed/prime/600/600";
   const rawVariants = Array.isArray(product?.variants) && product.variants.length > 0
     ? product.variants
     : [{

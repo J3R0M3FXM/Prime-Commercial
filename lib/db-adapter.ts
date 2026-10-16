@@ -1,4 +1,6 @@
-import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase';
+import fs from 'fs';
+import path from 'path';
+import { getSupabaseAdmin, isSupabaseAdminConfigured, uploadToSupabaseStorage } from '@/lib/supabase';
 import { cacheStore } from '@/lib/cache';
 
 export function toSnakeCase(obj: Record<string, any>): Record<string, any> {
@@ -176,9 +178,6 @@ const DEFAULT_PRODUCTS = [
   },
 ];
 
-import fs from 'fs';
-import path from 'path';
-
 const DATA_DIR = path.join(process.cwd(), '.data');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
 
@@ -353,23 +352,25 @@ export async function getProductsFromDb() {
       if (!error && data && data.length > 0) {
         return data.map(p => {
           const bundleConfig = (p.bundle_config && typeof p.bundle_config === 'object') ? p.bundle_config : {};
+          const variants = Array.isArray(bundleConfig.variants) ? bundleConfig.variants : [];
           return {
             id: p.id,
             name: p.name,
             price: Number(p.price),
             stock: Number(p.stock),
             category: p.category,
-            imageUrl: p.image_url,
-            description: p.description,
-            isActive: p.is_active,
-            active: p.is_active,
-            isFeatured: p.is_featured,
-            sortOrder: p.sort_order,
+            imageUrl: p.image_url || '',
+            image_url: p.image_url || '',
+            description: p.description || '',
+            isActive: p.is_active !== false,
+            active: p.is_active !== false,
+            isFeatured: Boolean(p.is_featured),
+            sortOrder: Number(p.sort_order) || 0,
             bundleConfig,
-            variants: Array.isArray(bundleConfig.variants) ? bundleConfig.variants : [],
+            variants,
             lowStockThreshold: Number(bundleConfig.lowStockThreshold ?? 10),
-            tags: p.tags,
-            gallery: p.gallery,
+            tags: p.tags || [],
+            gallery: p.gallery || [],
             createdAt: p.created_at,
             updatedAt: p.updated_at,
           };
@@ -382,22 +383,88 @@ export async function getProductsFromDb() {
   return [...inMemoryProducts];
 }
 
+async function processProductImage(imageUrl: string | undefined, productId: string, prefix = 'prod'): Promise<string> {
+  if (!imageUrl || typeof imageUrl !== 'string') return '';
+  const trimmed = imageUrl.trim();
+  if (!trimmed) return '';
+
+  // If already an HTTP/HTTPS or relative path, return as is
+  if (!trimmed.startsWith('data:image/')) {
+    return trimmed;
+  }
+
+  // Handle Base64 image
+  // 1. Try Supabase Storage if configured
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const ext = trimmed.includes('image/png') ? 'png' : 'jpg';
+      const contentType = trimmed.includes('image/png') ? 'image/png' : 'image/jpeg';
+      const filename = `${prefix}-${String(productId).replace(/[^a-zA-Z0-9_-]/g, '_')}-${Date.now()}.${ext}`;
+      const res = await uploadToSupabaseStorage({
+        bucket: 'product-images',
+        path: filename,
+        data: trimmed,
+        contentType,
+        upsert: true,
+      });
+      if (res && res.url) {
+        return res.url;
+      }
+      if (res?.error) {
+        console.warn(`Supabase Storage upload warning for ${productId}:`, res.error);
+      }
+    } catch (storageErr) {
+      console.warn(`Supabase Storage upload exception for ${productId}:`, storageErr);
+    }
+  }
+
+  // 2. Fallback to direct self-contained Base64 Data URL.
+  // Base64 Data URLs display reliably across all browsers/WebViews, persist in Postgres TEXT and local JSON,
+  // and prevent 404 broken image states from container filesystem restarts.
+  return trimmed;
+}
+
 export async function createProductInDb(productData: any) {
   const id = productData.id || `prod-${Date.now()}`;
+  const rawImage = productData.imageUrl !== undefined ? productData.imageUrl : (productData.image_url || '');
+  const finalImageUrl = await processProductImage(rawImage, id, 'prod');
+
+  // Process variant images if any
+  let processedVariants = Array.isArray(productData.variants) ? [...productData.variants] : [];
+  for (let i = 0; i < processedVariants.length; i++) {
+    const v = processedVariants[i];
+    if (v && v.imageUrl && typeof v.imageUrl === 'string' && v.imageUrl.startsWith('data:image/')) {
+      v.imageUrl = await processProductImage(v.imageUrl, `${id}-v${i + 1}`, 'variant');
+    }
+    v.stock = Math.max(0, Math.floor(Number(v.stock) || 0));
+    v.price = Number(v.price) || Number(productData.price) || 0;
+  }
+
+  // Synchronize product stock with sum of variant stocks to respect database triggers
+  let totalStock = Number(productData.stock) || 0;
+  if (processedVariants.length > 0) {
+    totalStock = processedVariants.reduce((sum: number, v: any) => sum + (v.stock || 0), 0);
+  }
+
   const newProduct = {
     id,
     name: productData.name || '',
     price: Number(productData.price) || 0,
-    stock: Number(productData.stock) || 0,
+    stock: totalStock,
     category: productData.category || 'General',
-    imageUrl: productData.imageUrl || '',
+    imageUrl: finalImageUrl,
+    image_url: finalImageUrl,
     description: productData.description || '',
     isActive: productData.isActive !== false,
     active: productData.isActive !== false,
     isFeatured: Boolean(productData.isFeatured),
     sortOrder: Number(productData.sortOrder) || inMemoryProducts.length + 1,
-    bundleConfig: productData.bundleConfig || {},
-    variants: Array.isArray(productData.variants) ? productData.variants : [],
+    bundleConfig: {
+      ...(productData.bundleConfig || {}),
+      variants: processedVariants,
+      lowStockThreshold: Number(productData.lowStockThreshold || 5),
+    },
+    variants: processedVariants,
     lowStockThreshold: Number(productData.lowStockThreshold || 5),
     tags: productData.tags || [],
     gallery: productData.gallery || [],
@@ -423,21 +490,21 @@ export async function createProductInDb(productData: any) {
         price: newProduct.price,
         stock: newProduct.stock,
         category: newProduct.category,
-        image_url: newProduct.imageUrl,
+        image_url: finalImageUrl,
         description: newProduct.description,
         is_active: newProduct.isActive,
         is_featured: newProduct.isFeatured,
         sort_order: newProduct.sortOrder,
-        bundle_config: {
-          ...newProduct.bundleConfig,
-          variants: newProduct.variants,
-          lowStockThreshold: newProduct.lowStockThreshold,
-        },
+        bundle_config: newProduct.bundleConfig,
         tags: newProduct.tags,
         gallery: newProduct.gallery,
         updated_at: newProduct.updatedAt,
       };
-      await supabase.from('products').upsert([payload]);
+      const { error: upsertErr } = await supabase.from('products').upsert([payload]);
+      if (upsertErr) {
+        console.warn("Supabase product upsert failed, trying update:", upsertErr.message);
+        await supabase.from('products').update(payload).eq('id', id);
+      }
     } catch (err) {
       console.warn("Supabase product upsert fallback to local:", err);
     }
@@ -448,22 +515,74 @@ export async function createProductInDb(productData: any) {
 
 export async function updateProductInDb(id: string, updates: any) {
   const idx = inMemoryProducts.findIndex(p => p.id === id);
+
+  // Process main product image if provided
+  let finalImageUrl: string | undefined = undefined;
+  if (updates.imageUrl !== undefined || updates.image_url !== undefined) {
+    const rawImage = updates.imageUrl !== undefined ? updates.imageUrl : updates.image_url;
+    finalImageUrl = await processProductImage(rawImage, id, 'prod');
+  }
+
+  // Process variant images if provided
+  let processedVariants: any[] | undefined = undefined;
+  if (Array.isArray(updates.variants)) {
+    processedVariants = [...updates.variants];
+    for (let i = 0; i < processedVariants.length; i++) {
+      const v = processedVariants[i];
+      if (v && v.imageUrl && typeof v.imageUrl === 'string' && v.imageUrl.startsWith('data:image/')) {
+        v.imageUrl = await processProductImage(v.imageUrl, `${id}-v${i + 1}`, 'variant');
+      }
+      v.stock = Math.max(0, Math.floor(Number(v.stock) || 0));
+      v.price = Number(v.price) || Number(updates.price) || 0;
+    }
+  }
+
   let updatedProduct: any;
   if (idx !== -1) {
+    const existing = inMemoryProducts[idx];
+    const variants = processedVariants !== undefined ? processedVariants : (existing.variants || []);
+    let calculatedStock = Number(updates.stock !== undefined ? updates.stock : existing.stock) || 0;
+    if (variants.length > 0) {
+      calculatedStock = variants.reduce((sum: number, v: any) => sum + (v.stock || 0), 0);
+    }
+
     inMemoryProducts[idx] = {
-      ...inMemoryProducts[idx],
+      ...existing,
       ...updates,
-      imageUrl: updates.imageUrl !== undefined ? updates.imageUrl : (updates.image_url !== undefined ? updates.image_url : (inMemoryProducts[idx].imageUrl || '')),
+      stock: calculatedStock,
+      ...(finalImageUrl !== undefined ? { imageUrl: finalImageUrl, image_url: finalImageUrl } : {}),
+      variants,
+      bundleConfig: {
+        ...(existing.bundleConfig || {}),
+        ...(updates.bundleConfig || {}),
+        variants,
+        lowStockThreshold: Number(updates.lowStockThreshold ?? existing.lowStockThreshold ?? 10),
+      },
       ...(updates.active !== undefined ? { isActive: Boolean(updates.active) } : {}),
       ...(updates.isActive !== undefined ? { active: Boolean(updates.isActive) } : {}),
       updatedAt: new Date().toISOString(),
     };
     updatedProduct = inMemoryProducts[idx];
   } else {
+    const variants = processedVariants || updates.variants || [];
+    let calculatedStock = Number(updates.stock) || 0;
+    if (variants.length > 0) {
+      calculatedStock = variants.reduce((sum: number, v: any) => sum + (v.stock || 0), 0);
+    }
+    const img = finalImageUrl !== undefined ? finalImageUrl : (updates.imageUrl || updates.image_url || '');
+
     updatedProduct = { 
       id, 
       ...updates, 
-      imageUrl: updates.imageUrl || updates.image_url || '',
+      stock: calculatedStock,
+      imageUrl: img,
+      image_url: img,
+      variants,
+      bundleConfig: {
+        ...(updates.bundleConfig || {}),
+        variants,
+        lowStockThreshold: Number(updates.lowStockThreshold || 10),
+      },
       updatedAt: new Date().toISOString() 
     };
     inMemoryProducts.push(updatedProduct);
@@ -485,8 +604,7 @@ export async function updateProductInDb(id: string, updates: any) {
         is_active: updatedProduct.active !== undefined ? updatedProduct.active : (updatedProduct.isActive !== undefined ? updatedProduct.isActive : true),
         is_featured: Boolean(updatedProduct.isFeatured),
         sort_order: Number(updatedProduct.sortOrder) || 0,
-        bundle_config: {
-          ...(updatedProduct.bundleConfig || {}),
+        bundle_config: updatedProduct.bundleConfig || {
           variants: updatedProduct.variants || [],
           lowStockThreshold: Number(updatedProduct.lowStockThreshold || 10),
         },
@@ -495,7 +613,14 @@ export async function updateProductInDb(id: string, updates: any) {
         updated_at: updatedProduct.updatedAt,
       };
 
-      await supabase.from('products').upsert([payload]);
+      const { error: upsertErr } = await supabase.from('products').upsert([payload]);
+      if (upsertErr) {
+        console.warn("Supabase product upsert failed, trying update:", upsertErr.message);
+        const { error: updateErr } = await supabase.from('products').update(payload).eq('id', id);
+        if (updateErr) {
+          console.error("Supabase product update error:", updateErr.message);
+        }
+      }
     } catch (err) {
       console.warn("Supabase product upsert error in update:", err);
     }

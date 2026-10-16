@@ -88,16 +88,33 @@ export async function uploadToSupabaseStorage(params: {
     fileBuffer = data;
   }
 
-  const { error: uploadError } = await supabase.storage
+  let uploadResult = await supabase.storage
     .from(bucket)
     .upload(path, fileBuffer, {
       contentType,
       upsert,
     });
 
-  if (uploadError) {
-    console.error(`Supabase Storage Upload Error (${bucket}/${path}):`, uploadError);
-    return { url: '', path: '', error: uploadError.message };
+  if (uploadResult.error && (uploadResult.error.message?.includes('not found') || uploadResult.error.message?.includes('Bucket'))) {
+    try {
+      await supabase.storage.createBucket(bucket, {
+        public: true,
+        fileSizeLimit: 10485760,
+      });
+      uploadResult = await supabase.storage
+        .from(bucket)
+        .upload(path, fileBuffer, {
+          contentType,
+          upsert,
+        });
+    } catch (bucketCreateErr) {
+      console.warn(`Could not auto-create storage bucket ${bucket}:`, bucketCreateErr);
+    }
+  }
+
+  if (uploadResult.error) {
+    console.error(`Supabase Storage Upload Error (${bucket}/${path}):`, uploadResult.error);
+    return { url: '', path: '', error: uploadResult.error.message };
   }
 
   const { data: publicUrlData } = supabase.storage

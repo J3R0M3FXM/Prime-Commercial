@@ -208,11 +208,13 @@ const ImageUploadField = ({
 }: {
   label: string;
   value: string;
-  onChange: (base64: string) => void;
+  onChange: (val: string) => void;
   className?: string;
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [inputMode, setInputMode] = useState<"file" | "url">("file");
+  const [urlDraft, setUrlDraft] = useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
@@ -256,9 +258,9 @@ const ImageUploadField = ({
         ctx.imageSmoothingQuality = "high";
         ctx.drawImage(img, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 600, 600);
 
-        const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
-        const quality = outputType === "image/jpeg" ? 0.92 : undefined;
-        onChange(canvas.toDataURL(outputType, quality));
+        // Always compress to high-quality JPEG (0.85) to produce lightweight payload (~30-50KB)
+        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.85);
+        onChange(compressedBase64);
       };
       img.onerror = () => setErrorMessage("Unable to read image. Please try another file.");
       img.src = reader.result;
@@ -292,13 +294,48 @@ const ImageUploadField = ({
     }
   };
 
+  const handleApplyUrl = () => {
+    const trimmed = urlDraft.trim();
+    if (!trimmed) {
+      setErrorMessage("Please enter an image URL.");
+      return;
+    }
+    if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://") && !trimmed.startsWith("/")) {
+      setErrorMessage("Please enter a valid HTTP or HTTPS image URL.");
+      return;
+    }
+    setErrorMessage("");
+    onChange(trimmed);
+    setUrlDraft("");
+  };
+
   return (
-    <div className={`space-y-1 ${className}`}>
+    <div className={`space-y-1.5 ${className}`}>
       <div className="flex items-center justify-between">
         <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-widest">
           {label}
         </label>
-        <span className="text-[9px] font-mono text-slate-400">600 × 600 PX · 1:1 · MAX 10MB</span>
+        <div className="flex items-center gap-2">
+          {!value && (
+            <div className="flex items-center bg-slate-100 p-0.5 rounded text-[9px] font-mono font-bold uppercase">
+              <button
+                type="button"
+                onClick={() => setInputMode("file")}
+                className={`px-1.5 py-0.5 rounded ${inputMode === "file" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"}`}
+              >
+                Upload File
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMode("url")}
+                className={`px-1.5 py-0.5 rounded ${inputMode === "url" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"}`}
+              >
+                Paste URL
+              </button>
+            </div>
+          )}
+          <span className="text-[9px] font-mono text-slate-400">1:1 · MAX 10MB</span>
+        </div>
       </div>
       
       {value ? (
@@ -306,24 +343,52 @@ const ImageUploadField = ({
           <img
             src={value}
             alt="Preview"
-            className="w-16 h-16 object-cover rounded-none border border-slate-200 bg-white"
+            className="w-16 h-16 object-cover rounded-none border border-slate-200 bg-white shrink-0"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src = "https://picsum.photos/seed/prime/100";
             }}
           />
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider font-mono">Image Selected</p>
-            <p className="text-[9px] text-slate-400 font-mono truncate max-w-[200px]">Normalized to 600 × 600 px · 1:1</p>
+            <p className="text-[9px] text-slate-400 font-mono truncate max-w-[200px]">
+              {value.startsWith("data:") ? "Uploaded Image (Optimized 600×600)" : value}
+            </p>
           </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMessage("");
+                onChange("");
+                setUrlDraft("");
+              }}
+              className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-none text-[9px] font-bold uppercase tracking-wider font-mono cursor-pointer"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ) : inputMode === "url" ? (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="url"
+            value={urlDraft}
+            onChange={(e) => setUrlDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleApplyUrl();
+              }
+            }}
+            placeholder="Paste image URL (e.g. https://...)"
+            className="flex-1 p-2 bg-slate-50 border border-slate-200 text-[11px] font-mono focus:outline-none focus:border-slate-900"
+          />
           <button
             type="button"
-            onClick={() => {
-              setErrorMessage("");
-              onChange("");
-            }}
-            className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-none text-[9px] font-bold uppercase tracking-wider font-mono cursor-pointer"
+            onClick={handleApplyUrl}
+            className="px-3 py-2 bg-slate-900 hover:bg-black text-white text-[10px] font-mono font-bold uppercase tracking-wider shrink-0 cursor-pointer"
           >
-            Remove
+            Apply
           </button>
         </div>
       ) : (
@@ -1121,11 +1186,17 @@ export default function AdminPage() {
         throw new Error(errData.error || `HTTP error ${res.status}`);
       }
       savedData = await res.json().catch(() => null);
+      const returnedProduct = savedData?.product || (savedData?.id ? savedData : null);
 
       if (editingProduct?.id) {
-        setProducts(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...productData, id: editingProduct.id } : p));
-      } else if (savedData && savedData.id) {
-        setProducts(prev => [savedData, ...prev]);
+        setProducts(prev => prev.map(p => p.id === editingProduct.id ? { 
+          ...p, 
+          ...productData, 
+          ...(returnedProduct && typeof returnedProduct === 'object' ? returnedProduct : {}), 
+          id: editingProduct.id 
+        } : p));
+      } else if (returnedProduct && returnedProduct.id) {
+        setProducts(prev => [returnedProduct, ...prev.filter(p => p.id !== returnedProduct.id)]);
       } else {
         fetchAllData();
       }
@@ -1133,7 +1204,7 @@ export default function AdminPage() {
       setProductModalOpen(false);
       setEditingProduct(null);
       showAlert("Product saved successfully.", "Success", "success");
-      setTimeout(() => fetchAllData(), 300);
+      setTimeout(() => fetchAllData(), 1200);
     } catch (e: any) {
       console.error(e);
       showAlert(`Failed to save product: ${e.message || String(e)}`, "Error", "error");
@@ -5403,7 +5474,11 @@ export default function AdminPage() {
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
-                      const finalProduct = { ...editingProduct };
+                      const finalProduct = { 
+                        ...editingProduct,
+                        imageUrl: editingProduct?.imageUrl || editingProduct?.image_url || "",
+                        image_url: editingProduct?.imageUrl || editingProduct?.image_url || ""
+                      };
                       if (finalProduct.variants && finalProduct.variants.length > 0) {
                         finalProduct.stock = finalProduct.variants.reduce((acc: number, v: any) => acc + (v.stock || 0), 0);
                         const prices = finalProduct.variants.map((v: any) => v.price || 0);
@@ -5506,8 +5581,8 @@ export default function AdminPage() {
 
                     <ImageUploadField
                       label="Product Image"
-                      value={editingProduct?.imageUrl || ""}
-                      onChange={(base64) => setEditingProduct({ ...editingProduct, imageUrl: base64 })}
+                      value={editingProduct?.imageUrl || editingProduct?.image_url || ""}
+                      onChange={(val) => setEditingProduct({ ...editingProduct, imageUrl: val, image_url: val })}
                     />
 
                     <div>
@@ -5574,10 +5649,10 @@ export default function AdminPage() {
                                 <div className="col-span-2">
                                   <ImageUploadField
                                     label="Variant Image (Optional)"
-                                    value={v.imageUrl || ""}
-                                    onChange={(base64) => {
+                                    value={v.imageUrl || v.image_url || ""}
+                                    onChange={(val) => {
                                       const updated = [...(editingProduct?.variants || [])];
-                                      updated[index] = { ...updated[index], imageUrl: base64 };
+                                      updated[index] = { ...updated[index], imageUrl: val, image_url: val };
                                       setEditingProduct({ ...editingProduct, variants: updated });
                                     }}
                                   />

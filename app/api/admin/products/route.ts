@@ -37,9 +37,9 @@ export async function PUT(request: Request) {
     }
 
     const { id, ...data } = body;
-    await updateProductInDb(id, data);
+    const result = await updateProductInDb(id, data);
     cacheStore.invalidateProducts();
-    return NextResponse.json({ success: true });
+    return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
