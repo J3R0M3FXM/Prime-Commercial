@@ -83,3 +83,25 @@ const backupVerifier = readFileSync('scripts/verify-supabase-snapshot.mjs', 'utf
 assert.match(backupVerifier, /setAuthTag/, 'Snapshot verifier must authenticate the encrypted file');
 assert.match(backupVerifier, /Table checksum mismatch/, 'Snapshot verifier must validate table checksums');
 assert.match(backupVerifier, /Storage checksum mismatch/, 'Snapshot verifier must validate media checksums');
+
+const requiredIndexes = [
+  'customers_prime_member_id_key', 'customers_referral_code_key', 'customers_tg_user_id_key',
+  'idx_customers_prime_member_id', 'idx_customers_referral_code', 'idx_customers_tg_user_id',
+  'maya_webhook_events_event_key_key', 'maya_webhook_events_order_id_idx', 'maya_webhook_events_payment_id_idx',
+  'maya_webhook_events_received_at_idx', 'maya_webhook_events_request_reference_idx',
+  'idx_orders_created_at', 'idx_orders_customer_id', 'idx_orders_order_number', 'idx_orders_payment_expiry',
+  'idx_orders_payment_status', 'idx_orders_status', 'idx_orders_tg_user_id', 'orders_customer_status_created_idx',
+  'orders_maya_payment_id_idx', 'orders_maya_payment_id_uidx', 'orders_maya_receipt_number_idx',
+  'orders_maya_request_reference_number_idx', 'orders_maya_request_reference_uidx', 'orders_referral_pending_idx',
+  'idx_products_active', 'idx_products_category',
+  'promo_redemptions_active_customer_idx', 'promo_redemptions_active_device_fp_idx',
+  'promo_redemptions_active_device_idx', 'promo_redemptions_active_hardware_idx',
+  'promo_redemptions_active_promo_idx', 'promo_redemptions_active_server_fp_idx',
+  'promo_redemptions_promo_customer_idx', 'promo_redemptions_promo_device_idx',
+  'promos_code_key', 'telegram_automation_chats_activity_idx',
+  'telegram_automation_flows_active_priority_idx', 'warehouses_is_default_idx', 'warehouses_single_default_idx',
+];
+for (const name of requiredIndexes) {
+  assert.ok(schema.includes("index('" + name + "')") || schema.includes("uniqueIndex('" + name + "')"),
+    'Missing target index mapping: ' + name);
+}
