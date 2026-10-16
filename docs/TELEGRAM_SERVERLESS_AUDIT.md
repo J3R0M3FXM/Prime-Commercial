@@ -301,3 +301,9 @@ The target now has admin-only CRUD endpoints for `products`, `charges`, `courier
 
 These are backend modules only. The current Next.js Admin Panel has not yet been connected to `Telegram.WebApp.Serverless.call`, and the `admin_telegram_user_id` setting must be bootstrapped into the target's `system_settings` before any admin endpoint can authorize a user. The live table was empty at last inspection, so access correctly remains denied until that secure setup is done. Product, warehouse, and payment-method behaviors still need runtime tests against the target SDK before use with real data.
 
+### Encrypted backup tooling added — not yet executed
+
+Added `scripts/export-supabase-snapshot.mjs` to export all 16 public application tables plus objects from `product-images`, `receipt-proofs`, and `media-gallery` into an AES-256-GCM-encrypted local artifact. Added `scripts/verify-supabase-snapshot.mjs` to authenticate/decrypt that artifact and validate row/object counts and SHA-256 checksums. Backup artifacts are gitignored. Added `docs/TELEGRAM_SERVERLESS_BACKUP_RUNBOOK.md` with schema dump, capture/reconciliation, and restore-rehearsal gates.
+
+The custom snapshot contains data and media bytes, not the PostgreSQL schema, functions, triggers, RLS policies, or migration history. The runbook separately calls for a Supabase CLI schema dump and migration-history review. **No backup has been executed and no data has been moved**; the scripts require locally configured credentials and a separately stored encryption passphrase. CI syntax/contract checks for the backup utilities are pending for the latest commit.
+
