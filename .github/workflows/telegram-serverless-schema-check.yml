@@ -1,0 +1,23 @@
+name: Telegram Serverless Schema Check
+on:
+  push:
+    branches: [migration/telegram-serverless]
+    paths:
+      - "tgcloud/schema.js"
+      - ".github/workflows/telegram-serverless-schema-check.yml"
+  pull_request:
+    branches: [migration/telegram-serverless]
+    paths:
+      - "tgcloud/schema.js"
+      - ".github/workflows/telegram-serverless-schema-check.yml"
+
+jobs:
+  schema-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check schema JavaScript syntax
+        run: node --input-type=module --check < tgcloud/schema.js
