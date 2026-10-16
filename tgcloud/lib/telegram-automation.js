@@ -60,7 +60,6 @@ export async function updateAutomationChatState(connectionId, chatId, changes) {
     chatId: Number(chatId),
     createdAt: now,
     updatedAt: now,
-    botPaused: false,
     ...changes,
   };
   const { createdAt, businessConnectionId, chatId, ...updates } = values;
