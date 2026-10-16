@@ -37,3 +37,15 @@ assert.match(charges, /eq\(charges\.isActive, true\)/, 'Public charges must filt
 assert.doesNotMatch(charges, /db\.(insert|update|delete)/, 'Public charges endpoint must remain read-only');
 
 console.log('Telegram Serverless contracts OK: ' + requiredTables.length + ' tables, ' + requiredEndpoints.length + ' endpoint modules, public-field safeguards.');
+
+const adminGuard = readFileSync('tgcloud/lib/auth.js', 'utf8');
+assert.match(adminGuard, /ctx\?\.initData\?\.user/, 'Admin guard must use platform-verified initData');
+assert.match(adminGuard, /admin_telegram_user_id/, 'Admin guard must use a server-side allowlist');
+assert.match(adminGuard, /if \(!adminId[\s\S]*userId !== adminId\)/, 'Admin guard must fail closed when allowlist is absent or mismatched');
+
+const manageCharges = readFileSync('tgcloud/endpoints/manageCharges.js', 'utf8');
+assert.match(manageCharges, /await requireAdmin\(ctx\)/, 'Charge mutations must require admin authorization');
+assert.match(manageCharges, /const writable = new Set/, 'Charge CRUD must use an explicit field allowlist');
+assert.match(manageCharges, /action === 'create'/, 'Charge configurator must support create');
+assert.match(manageCharges, /action === 'update'/, 'Charge configurator must support update');
+assert.match(manageCharges, /action === 'delete'/, 'Charge configurator must support delete');
