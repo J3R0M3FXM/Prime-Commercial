@@ -7,10 +7,11 @@ const manifestPath = resolve(process.argv[3] || './migration-backups/telegram-me
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
 const storageChatId = process.env.TELEGRAM_STORAGE_CHAT_ID;
 const expectedBotId = String(process.env.EXPECTED_TELEGRAM_BOT_ID || '');
+const expectedBotUsername = String(process.env.EXPECTED_TELEGRAM_BOT_USERNAME || '').replace(/^@/, '').toLowerCase();
 const passphrase = process.env.BACKUP_ENCRYPTION_PASSPHRASE;
 if (!process.argv[2]) throw new Error('Usage: node scripts/migrate-media-to-telegram.mjs <encrypted-backup.pcmbak> [encrypted-map.pcmmapping]');
-if (!botToken || !storageChatId || !expectedBotId) {
-  throw new Error('Set TELEGRAM_BOT_TOKEN, TELEGRAM_STORAGE_CHAT_ID, and EXPECTED_TELEGRAM_BOT_ID locally.');
+if (!botToken || !storageChatId || (!expectedBotId && !expectedBotUsername)) {
+  throw new Error('Set TELEGRAM_BOT_TOKEN, TELEGRAM_STORAGE_CHAT_ID, and EXPECTED_TELEGRAM_BOT_ID or EXPECTED_TELEGRAM_BOT_USERNAME locally.');
 }
 if (!passphrase || passphrase.length < 20) throw new Error('Set the same BACKUP_ENCRYPTION_PASSPHRASE used for the snapshot.');
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -71,8 +72,9 @@ if (snapshot.format !== 'prime-commercial-encrypted-backup' || snapshot.version 
 }
 
 const me = await telegram('getMe');
-if (String(me.id) !== expectedBotId) {
-  throw new Error('Bot identity mismatch. Expected ID ' + expectedBotId + ', got ' + me.id + '. No files were uploaded.');
+if ((expectedBotId && String(me.id) !== expectedBotId) ||
+    (expectedBotUsername && String(me.username || '').toLowerCase() !== expectedBotUsername)) {
+  throw new Error('Bot identity mismatch. No files were uploaded. Actual bot: @' + (me.username || '(no username)') + ', ID ' + me.id + '.');
 }
 const chat = await telegram('getChat', new URLSearchParams({ chat_id: storageChatId }));
 if (chat.type !== 'private' || String(chat.id) !== String(storageChatId)) {
@@ -154,5 +156,5 @@ for (const [bucket, bucketData] of Object.entries(snapshot.storage || {})) {
 
 console.log('Media transfer finished. Uploaded: ' + uploaded + '; already mapped: ' + skipped + '.');
 console.log('Encrypted mapping saved at: ' + manifestPath);
-console.log('Bot ID verified: ' + me.id + '; storage chat type verified as private.');
+console.log('Bot identity verified: @' + (me.username || '(no username)') + ' (' + me.id + '); storage chat type verified as private.');
 console.log('This script only creates a mapping; target DB import and media endpoint wiring are separate steps.');
