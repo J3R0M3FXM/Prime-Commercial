@@ -213,15 +213,17 @@ export async function notifyPaymentUpdated(order: OrderNotification): Promise<bo
   if (!order.chatId) return false;
 
   const message = [
-    '<b>PAYMENT UPDATE</b>',
+    '<b>PRIME™ ORDER MANAGEMENT</b>',
     '',
-    `Order Number: <code>${escapeHtml(order.orderNumber)}</code>`,
-    `Order Status: ${escapeHtml(order.status)}`,
-    `Total Amount: ${money(order.totalAmount || 0)}`,
-    `Payment Status: ${escapeHtml(order.paymentStatus || 'Updated')}`,
+    `Order No.: <code>${escapeHtml(order.orderNumber)}</code>`,
+    `Status: ${escapeHtml(order.status)}`,
+    `Payment Status: ${escapeHtml(order.paymentStatus || 'Pending Review')}`,
+    order.totalAmount !== undefined ? `Total Amount: ${money(order.totalAmount)}` : null,
     '',
-    'Your payment information has been received and is being reviewed.',
-  ].join('\n');
+    'We have received your payment proof.',
+    '',
+    'Your submission is now awaiting review. We will notify you once the review status is updated.',
+  ].filter((line) => line !== null).join('\n');
 
   return sendTelegramMessage(
     order.chatId,
