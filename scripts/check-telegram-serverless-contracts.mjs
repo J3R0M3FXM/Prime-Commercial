@@ -25,10 +25,12 @@ assert.match(paymentMethods, /publicKey:\s*paymentMethods\.publicKey/, 'Public p
 assert.doesNotMatch(paymentMethods, /secretKey:\s*paymentMethods\.secretKey/, 'Never expose payment secret keys from a public endpoint');
 assert.doesNotMatch(paymentMethods, /webhookUrl:\s*paymentMethods\.webhookUrl/, 'Never expose payment webhook URLs from a public endpoint');
 assert.match(paymentMethods, /eq\(paymentMethods\.isActive, true\)/, 'Public payment methods must filter inactive rows');
+assert.match(paymentMethods, /return rows;/, 'Payment methods endpoint must preserve the existing array response shape');
 
 const catalog = readFileSync('tgcloud/endpoints/getCatalog.js', 'utf8');
 assert.match(catalog, /eq\(products\.isActive, true\)/, 'Public catalog must filter inactive products');
 assert.doesNotMatch(catalog, /db\.(insert|update|delete)/, 'Public catalog endpoint must remain read-only');
+assert.match(catalog, /return rows;/, 'Catalog endpoint must preserve the existing array response shape');
 
 const charges = readFileSync('tgcloud/endpoints/getPublicCharges.js', 'utf8');
 assert.match(charges, /eq\(charges\.isActive, true\)/, 'Public charges must filter inactive rows');
