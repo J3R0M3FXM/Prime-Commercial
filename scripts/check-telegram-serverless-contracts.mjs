@@ -164,3 +164,16 @@ assert.doesNotMatch(publicVideos, /db\.(insert|update|delete)/, 'Public video ga
 const manageVideos = readFileSync('tgcloud/endpoints/manageVideos.js', 'utf8');
 assert.doesNotMatch(manageVideos, /'views'\s*,|'views'\]/, 'Video views must not be writable through metadata CRUD');
 assert.match(manageVideos, /await requireAdmin\(ctx\)/, 'Video metadata mutations must require admin authorization');
+
+const promoCodec = readFileSync('tgcloud/lib/promos.js', 'utf8');
+assert.match(promoCodec, /realDescription/, 'Promo description metadata must preserve the human-readable description');
+assert.match(promoCodec, /activeDaysOfWeek/, 'Promo metadata must preserve active-day restrictions');
+assert.match(promoCodec, /allowedPaymentMethods/, 'Promo metadata must preserve payment restrictions');
+assert.match(promoCodec, /allowedCourierIds/, 'Promo metadata must preserve courier restrictions');
+const managePromos = readFileSync('tgcloud/endpoints/managePromos.js', 'utf8');
+assert.match(managePromos, /await requireAdmin\(ctx\)/, 'Promo mutations must require admin authorization');
+assert.match(managePromos, /serializePromoDescription/, 'Promo mutations must preserve advanced metadata in description JSON');
+assert.match(managePromos, /action === 'create'/, 'Promo CRUD must support create');
+assert.match(managePromos, /action === 'update'/, 'Promo CRUD must support update');
+assert.match(managePromos, /action === 'delete'/, 'Promo CRUD must support delete');
+assert.match(activePromos, /deserializePromo/, 'Public promo display must decode the stored metadata JSON');
