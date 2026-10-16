@@ -86,3 +86,26 @@ The GitHub branch alone cannot prove which bot is currently selected in the loca
 ## Audit conclusion
 
 The migration branch is an initial scaffold, not a completed migration. The immediate blockers are the missing tracked Telegram Serverless project config/static build, incomplete live-schema mapping, unverified bot binding, and absence of a verified data/media backup and restore rehearsal. Production remains untouched.
+
+
+## Additional live infrastructure findings (read-only)
+
+### Supabase Storage snapshot
+
+The live Storage bucket query returned 19 objects totalling approximately 5,692,799 bytes (about 5.43 MiB), excluding metadata overhead:
+
+| Bucket | Public | Objects | Total bytes |
+| --- | --- | ---: | ---: |
+| product-images | yes | 13 | 2,161,510 |
+| receipt-proofs | yes | 6 | 3,530,289 |
+| media-gallery | yes | 0 | 0 |
+
+The receipt bucket is currently configured as public. Treat that as a privacy risk to review before copying receipts into Telegram channel storage or another target. Inventory exact object paths, MIME types, sizes, and references before transfer; confirm all migrated URLs resolve before changing product/order records.
+
+### Scheduled work and database functions
+
+- One active Supabase Cron job was found: `prime-loyalty-referral-maturity`, scheduled every 5 minutes, invoking `public.process_matured_referrals()`.
+- Twelve public database functions were listed, including order creation/inventory, loyalty awards, point conversion, referral maturity, payment expiry, promo-redemption release, fingerprint enforcement, and product inventory validation.
+- These are business logic, not optional infrastructure details. The migration must preserve their observable behavior and idempotency. Because the immediate plan is to defer Maya/GCash webhook changes, do not implement new webhook plumbing as part of the first vertical slice; still preserve existing schema/data and document which payment behaviors remain active.
+- The five-minute referral task is a concrete migration requirement. Do not replace it with frequent client polling. First check whether Telegram Serverless offers a supported scheduled-task mechanism for the selected bot; otherwise design an event-driven/on-demand alternative that preserves maturation timing and does not double-award points.
+
