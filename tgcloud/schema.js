@@ -10,9 +10,10 @@ import { table, text, integer, numeric, json, boolean, index, uniqueIndex, sql }
 
 const createdAt = () => integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`);
 const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`);
+const uuidDefault = () => sql`(lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(6))))`;
 
 export const products = table('products', {
-  id: text('id').primaryKey(), name: text('name').notNull(),
+  id: text('id').primaryKey().default(uuidDefault()), name: text('name').notNull(),
   price: numeric('price').notNull().default(0), stock: integer('stock').notNull().default(0),
   category: text('category').default('General'), imageUrl: text('image_url'),
   description: text('description'), isActive: boolean('is_active').default(true),
@@ -22,7 +23,7 @@ export const products = table('products', {
 });
 
 export const customers = table('customers', {
-  id: text('id').primaryKey(), tgUserId: text('tg_user_id').unique(),
+  id: text('id').primaryKey().default(uuidDefault()), tgUserId: text('tg_user_id').unique(),
   tgName: text('tg_name'), tgUsername: text('tg_username'), phoneNumber: text('phone_number'),
   primeMemberId: text('prime_member_id').unique(), points: numeric('points').default(0),
   storeCredits: numeric('store_credits').default(0), referralCode: text('referral_code').unique(),
@@ -35,7 +36,7 @@ export const customers = table('customers', {
 });
 
 export const orders = table('orders', {
-  id: text('id').primaryKey(), orderNumber: text('order_number').notNull().unique(),
+  id: text('id').primaryKey().default(uuidDefault()), orderNumber: text('order_number').notNull().unique(),
   customerId: text('customer_id'), customerName: text('customer_name'), customerPhone: text('customer_phone'),
   tgUserId: text('tg_user_id'), primeMemberId: text('prime_member_id'),
   items: json('items').notNull().default([]), subtotal: numeric('subtotal').notNull().default(0),
@@ -88,7 +89,7 @@ export const orders = table('orders', {
 }));
  
 export const paymentMethods = table('payment_methods', {
-  id: text('id').primaryKey(), name: text('name').notNull(), logo: text('logo'),
+  id: text('id').primaryKey().default(uuidDefault()), name: text('name').notNull(), logo: text('logo'),
   paymentType: text('payment_type').notNull(), qrCodeImage: text('qr_code_image'),
   webhookUrl: text('webhook_url'), publicKey: text('public_key'),
   // Server-only secret. Never expose this table directly to the Mini App.
@@ -99,7 +100,7 @@ export const paymentMethods = table('payment_methods', {
 });
 
 export const promos = table('promos', {
-  id: text('id').primaryKey(), code: text('code').notNull().unique(), title: text('title'),
+  id: text('id').primaryKey().default(uuidDefault()), code: text('code').notNull().unique(), title: text('title'),
   description: text('description'), discountType: text('discount_type').notNull(),
   discountValue: numeric('discount_value').notNull().default(0),
   maxDiscountAmount: numeric('max_discount_amount'), minSpend: numeric('min_spend').default(0),
@@ -111,7 +112,7 @@ export const promos = table('promos', {
 });
 
 export const promoRedemptions = table('promo_redemptions', {
-  id: text('id').primaryKey(), promoCode: text('promo_code').notNull(), promoId: text('promo_id'),
+  id: text('id').primaryKey().default(uuidDefault()), promoCode: text('promo_code').notNull(), promoId: text('promo_id'),
   customerId: text('customer_id'), orderId: text('order_id'), deviceId: text('device_id'),
   discountAmount: numeric('discount_amount').default(0),
   usedAt: integer('used_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
@@ -121,7 +122,7 @@ export const promoRedemptions = table('promo_redemptions', {
 });
 
 export const warehouses = table('warehouses', {
-  id: text('id').primaryKey(), name: text('name').notNull(), code: text('code'), address: text('address'),
+  id: text('id').primaryKey().default(uuidDefault()), name: text('name').notNull(), code: text('code'), address: text('address'),
   isActive: boolean('is_active').default(true), sortOrder: integer('sort_order').default(0),
   isDefault: boolean('is_default').notNull().default(false),
   latitude: numeric('latitude'), longitude: numeric('longitude'),
@@ -129,7 +130,7 @@ export const warehouses = table('warehouses', {
 });
 
 export const couriers = table('couriers', {
-  id: text('id').primaryKey(), name: text('name').notNull(), trackingUrlPattern: text('tracking_url_pattern'),
+  id: text('id').primaryKey().default(uuidDefault()), name: text('name').notNull(), trackingUrlPattern: text('tracking_url_pattern'),
   isActive: boolean('is_active').default(true), sortOrder: integer('sort_order').default(0),
   logo: text('logo'), type: text('type').default('Standard'), baseFare: numeric('base_fare').default(0),
   firstMile: numeric('first_mile').default(0), firstMileFee: numeric('first_mile_fee').default(0),
@@ -138,7 +139,7 @@ export const couriers = table('couriers', {
 });
 
 export const videos = table('videos', {
-  id: text('id').primaryKey(), title: text('title').notNull(), description: text('description').default(''),
+  id: text('id').primaryKey().default(uuidDefault()), title: text('title').notNull(), description: text('description').default(''),
   category: text('category').default('Product Demos'), tags: json('tags').default([]),
   telegramFileId: text('telegram_file_id').default(''), telegramMessageId: text('telegram_message_id').default(''),
   storageType: text('storage_type').default('telegram'), directUrl: text('direct_url').default(''),
@@ -150,14 +151,14 @@ export const videos = table('videos', {
 });
 
 export const charges = table('charges', {
-  id: text('id').primaryKey(), name: text('name').notNull(),
+  id: text('id').primaryKey().default(uuidDefault()), name: text('name').notNull(),
   type: text('type').notNull().default('percentage'), rate: numeric('rate').notNull().default(0),
   isActive: boolean('is_active').default(true), sortOrder: integer('sort_order').default(0),
   description: text('description'), createdAt: createdAt(), updatedAt: updatedAt(),
 });
 
 export const pointTransactions = table('point_transactions', {
-  id: text('id').primaryKey(), userId: text('user_id').notNull(), type: text('type').notNull(),
+  id: text('id').primaryKey().default(uuidDefault()), userId: text('user_id').notNull(), type: text('type').notNull(),
   amount: numeric('amount').notNull(), orderId: text('order_id'), description: text('description'),
   createdAt: createdAt(),
 });
@@ -167,7 +168,7 @@ export const systemSettings = table('system_settings', {
 });
 
 export const telegramAutomationFlows = table('telegram_automation_flows', {
-  id: text('id').primaryKey(), name: text('name').notNull(),
+  id: text('id').primaryKey().default(uuidDefault()), name: text('name').notNull(),
   active: boolean('active').notNull().default(true),
   triggerType: text('trigger_type').notNull().default('message'),
   triggerValue: text('trigger_value').notNull().default(''),
@@ -179,7 +180,7 @@ export const telegramAutomationFlows = table('telegram_automation_flows', {
 });
 
 export const telegramAutomationSettings = table('telegram_automation_settings', {
-  id: text('id').primaryKey(),
+  id: text('id').primaryKey().default('default'),
   enabled: boolean('enabled').notNull().default(false),
   fallbackEnabled: boolean('fallback_enabled').notNull().default(false),
   fallbackResponse: text('fallback_response').notNull().default(''),
@@ -205,7 +206,7 @@ export const telegramAutomationChats = table('telegram_automation_chats', {
 }));
 
 export const mayaWebhookEvents = table('maya_webhook_events', {
-  id: text('id').primaryKey(),
+  id: text('id').primaryKey().default(sql`('mwe_' || lower(hex(randomblob(16))))`),
   eventKey: text('event_key').notNull().unique(),
   paymentId: text('payment_id'),
   requestReferenceNumber: text('request_reference_number'),
