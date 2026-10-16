@@ -34,3 +34,4 @@ yarn-error.log*
 # Local encrypted database/media snapshots (never commit customer/payment data)
 /migration-backups/
 *.pcmbak
+*.pcmmapping
