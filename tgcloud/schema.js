@@ -267,3 +267,28 @@ export const mayaWebhookEvents = table('maya_webhook_events', {
   mayaEventReceivedIdx: index('maya_webhook_events_received_at_idx').on(sql`${t.receivedAt} DESC`),
   mayaEventReferenceIdx: index('maya_webhook_events_request_reference_idx').on(t.requestReferenceNumber),
 }));
+
+/**
+ * Telegram-only media index. This is a target extension, not a source Supabase
+ * table. Populate it only after the encrypted media transfer manifest is
+ * verified; receipt proofs default to private visibility.
+ */
+export const mediaAssets = table('media_assets', {
+  id: text('id').primaryKey().default(uuidDefault()),
+  bucket: text('bucket').notNull(),
+  path: text('path').notNull(),
+  fileId: text('file_id').notNull(),
+  messageId: integer('message_id'),
+  contentType: text('content_type').notNull().default('application/octet-stream'),
+  size: integer('size').notNull().default(0),
+  sha256: text('sha256').notNull(),
+  visibility: text('visibility').notNull().default('private'),
+  orderId: text('order_id'),
+  createdAt: requiredCreatedAt(),
+  updatedAt: requiredUpdatedAt(),
+}, (t) => ({
+  mediaAssetBucketPathUnique: uniqueIndex('media_assets_bucket_path_key').on(t.bucket, t.path),
+  mediaAssetOrderIdx: index('media_assets_order_id_idx').on(t.orderId),
+  mediaAssetVisibilityIdx: index('media_assets_visibility_idx').on(t.visibility),
+}));
+
