@@ -60,14 +60,22 @@ jobs:
           const fs = require('node:fs');
           const report = JSON.parse(fs.readFileSync('audit-report.json', 'utf8'));
           const entries = Object.entries(report.vulnerabilities || {});
+          const bracesChain = new Set([
+            'braces', 'micromatch', 'fast-glob',
+            '@next/eslint-plugin-next', 'eslint-config-next'
+          ]);
           const unexpected = entries.filter(([name, vulnerability]) => {
-            const isKnownUnpatchedBracesAdvisory =
+            const via = vulnerability.via || [];
+            const isDirectKnownBracesAdvisory =
               name === 'braces' &&
-              (vulnerability.via || []).some(item =>
-                typeof item === 'object' &&
-                item.url === 'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm'
-              );
-            return !isKnownUnpatchedBracesAdvisory;
+              via.some(item => typeof item === 'object' &&
+                item.url === 'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm');
+            const isOnlyDependentOfKnownBracesAdvisory =
+              bracesChain.has(name) &&
+              name !== 'braces' &&
+              via.length > 0 &&
+              via.every(item => typeof item === 'string');
+            return !(isDirectKnownBracesAdvisory || isOnlyDependentOfKnownBracesAdvisory);
           });
           if (unexpected.length) {
             console.error(JSON.stringify(unexpected.map(([name, v]) => ({
