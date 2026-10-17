@@ -1,3 +1,4 @@
+# Temporary validation trigger; remove after lockfile regeneration.
 name: Security dependency remediation
 
 on:
