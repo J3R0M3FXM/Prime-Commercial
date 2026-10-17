@@ -1,0 +1,83 @@
+name: Security dependency remediation
+
+on:
+  push:
+    branches:
+      - fix/security-audit-remediation-20261017
+    paths:
+      - package.json
+      - package-lock.json
+      - .github/workflows/security-dependency-remediation.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: security-dependency-remediation
+  cancel-in-progress: false
+
+jobs:
+  regenerate-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout remediation branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/security-audit-remediation-20261017
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Regenerate lockfile from declared dependencies
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+
+      - name: Commit regenerated lockfile
+        run: |
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore(security): reconcile dependency lockfile"
+            git push origin HEAD:fix/security-audit-remediation-20261017
+          fi
+
+      - name: Clean install
+        run: npm ci --ignore-scripts --no-audit
+
+      - name: Require production dependency audit to pass
+        run: npm audit --omit=dev
+
+      - name: Audit all dependencies; allow only the currently unpatched braces advisory
+        run: |
+          npm audit --json > audit-report.json || audit_status=$?
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('audit-report.json', 'utf8'));
+          const entries = Object.entries(report.vulnerabilities || {});
+          const unexpected = entries.filter(([name, vulnerability]) => {
+            const isKnownUnpatchedBracesAdvisory =
+              name === 'braces' &&
+              (vulnerability.via || []).some(item =>
+                typeof item === 'object' &&
+                item.url === 'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm'
+              );
+            return !isKnownUnpatchedBracesAdvisory;
+          });
+          if (unexpected.length) {
+            console.error(JSON.stringify(unexpected.map(([name, v]) => ({
+              name, severity: v.severity, via: v.via, fixAvailable: v.fixAvailable
+            })), null, 2));
+            process.exit(1);
+          }
+          console.log(entries.length
+            ? 'Only the documented, currently unpatched braces advisory remains in development tooling.'
+            : 'npm audit is clean.');
+          NODE
+
+      - name: Build production application
+        run: npm run build
