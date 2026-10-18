@@ -29,12 +29,19 @@ export async function GET(request: Request) {
     const userId = customer.id;
     const finalMemberId = customer.prime_member_id || '';
 
+    // Build only valid PostgREST filters. Some legacy customer rows have no
+    // prime_member_id; emitting "prime_member_id.eq." makes the OR expression
+    // malformed and can prevent the entire account profile from hydrating.
+    const orderIdentityFilters = [`customer_id.eq.${userId}`];
+    if (finalMemberId) orderIdentityFilters.push(`prime_member_id.eq.${finalMemberId}`);
+    if (customer.tg_user_id) orderIdentityFilters.push(`tg_user_id.eq.${customer.tg_user_id}`);
+
     const [{ data: ordersData, error: ordersError }, { data: tierOrdersData, error: tierOrdersError }] =
       await Promise.all([
         supabase
           .from('orders')
           .select('*')
-          .or(`customer_id.eq.${userId},prime_member_id.eq.${finalMemberId},tg_user_id.eq.${customer.tg_user_id || ''}`)
+          .or(orderIdentityFilters.join(','))
           .order('created_at', { ascending: false })
           .limit(100),
         supabase
