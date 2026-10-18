@@ -60,6 +60,15 @@ These counts are a baseline only, not a backup or a migration reconciliation. Th
 - Supabase security advisors currently report nine RLS-enabled tables with no policies: customers, maya_webhook_events, orders, point_transactions, promo_redemptions, system_settings, telegram_automation_chats, telegram_automation_flows, and telegram_automation_settings. Review actual access paths, grants, and server-role usage before making policy changes; do not add broad policies just to silence the advisory.
 - Current row counts and a healthy project status do not prove the customer profile, order history, checkout, admin writes, or payment callbacks work end to end.
 
+## Live database behavior beyond table rows
+
+A read-only inventory of the live PostgreSQL project also found 12 public functions and 7 triggers. These are part of the business contract and must be ported or deliberately replaced before any backend/database cutover:
+
+- Functions: award_order_loyalty, convert_points_to_store_credits, create_order_with_inventory, create_order_with_loyalty, current_customer_tier, enforce_promo_device_fingerprint, expire_unpaid_orders, handle_order_loyalty_status, process_matured_referrals, release_promo_redemptions_for_order, set_order_payment_deadline, validate_product_inventory.
+- Triggers: order loyalty status (INSERT/UPDATE), order payment deadline (INSERT/UPDATE), product inventory validation (INSERT/UPDATE), and promo device-fingerprint enforcement (INSERT).
+- Public read policies exist on charges, couriers, payment_methods, products, promos, videos, and warehouses. The other nine RLS-enabled tables have no policies, consistent with the security advisor. The inventory shows RLS is enabled but not FORCE RLS on all 16 public tables. Any role/grant review must distinguish direct Data API access from server-only service-role access.
+- Live Storage buckets: product-images (10 MiB limit; JPEG/PNG/WebP/GIF), media-gallery (50 MiB; JPEG/PNG/WebP/MP4/WebM), and receipt-proofs (10 MiB; JPEG/PNG/WebP/HEIC). All three currently report public=true. Receipt privacy and upload/update permissions require explicit review before migration; preserve object paths and verify references if Storage is moved.
+
 ## Oracle Always Free compatibility
 
 Official OCI documentation: [Always Free Resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) and [OCI Free Tier](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm).
