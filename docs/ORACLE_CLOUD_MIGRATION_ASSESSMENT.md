@@ -69,6 +69,13 @@ A read-only inventory of the live PostgreSQL project also found 12 public functi
 - Public read policies exist on charges, couriers, payment_methods, products, promos, videos, and warehouses. The other nine RLS-enabled tables have no policies, consistent with the security advisor. The inventory shows RLS is enabled but not FORCE RLS on all 16 public tables. Any role/grant review must distinguish direct Data API access from server-only service-role access.
 - Live Storage buckets: product-images (10 MiB limit; JPEG/PNG/WebP/GIF), media-gallery (50 MiB; JPEG/PNG/WebP/MP4/WebM), and receipt-proofs (10 MiB; JPEG/PNG/WebP/HEIC). All three currently report public=true. Receipt privacy and upload/update permissions require explicit review before migration; preserve object paths and verify references if Storage is moved.
 
+## CI findings discovered during assessment
+
+- The existing GitHub Actions workflow failed before installing dependencies because setup-node's npm cache option requires a lockfile, and the repository has no package-lock.json/yarn.lock. Removed that cache setting on this assessment branch so the existing npm-install workflow can run.
+- The next CI run exposed a real peer-dependency conflict: React 19 with react-leaflet 4.2.1 (which declares a React 18 peer). Updated react-leaflet to the React-19-compatible v5 line on this branch. GitHub Actions then completed both dependency installation and next build successfully at commit 88845b0b637a6ed8987f8ace76f9354dad235373.
+- The repository still lacks a lockfile, so dependency resolution can change over time. Before production deployment, add and review a lockfile and use npm ci; do not treat a green build from an unlocked dependency tree as a fully reproducible release.
+- next.config.mjs currently sets typescript.ignoreBuildErrors=true and eslint.ignoreDuringBuilds=true. Therefore, a green next build does **not** prove type checking or linting passes. Run explicit type/lint checks and resolve existing issues before a production cutover; do not silently remove those flags without first measuring the existing error set.
+
 ## Oracle Always Free compatibility
 
 Official OCI documentation: [Always Free Resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) and [OCI Free Tier](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm).
