@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured, isSupabaseConfigured } from '@/lib/supabase';
 import { cacheStore } from '@/lib/cache';
 import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 import { notifyOrderCreated, notifyPaymentUpdated } from '@/lib/telegram-notifications';
@@ -276,6 +276,22 @@ export async function POST(request: Request) {
         orderNumber: newOrder.orderNumber,
         order: newOrder,
       });
+    }
+
+    if (!isSupabaseAdminConfigured()) {
+      console.error('Order API unavailable: server-side Supabase credentials are not configured.');
+      return NextResponse.json(
+        { error: 'Order data is temporarily unavailable. Please try again later.' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      console.error('Order API unavailable: Supabase admin client could not be initialized.');
+      return NextResponse.json(
+        { error: 'Order data is temporarily unavailable. Please try again later.' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     const body = await request.json();
@@ -679,7 +695,21 @@ export async function GET(request: Request) {
       }
       return NextResponse.json(orders, { headers: { 'Cache-Control': 'no-store' } });
     }
-    const supabase = getSupabaseAdmin()!;
+    if (!isSupabaseAdminConfigured()) {
+      console.error('Order API unavailable: server-side Supabase credentials are not configured.');
+      return NextResponse.json(
+        { error: 'Order data is temporarily unavailable. Please try again later.' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      console.error('Order API unavailable: Supabase admin client could not be initialized.');
+      return NextResponse.json(
+        { error: 'Order data is temporarily unavailable. Please try again later.' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
 
     if (orderId || orderNumber) {
       const target = orderId || orderNumber;
@@ -711,10 +741,11 @@ export async function GET(request: Request) {
     });
 
   } catch (error: any) {
-    if (cacheStore.orders) {
-      return NextResponse.json(cacheStore.orders);
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Failed to load authenticated customer order history:', error);
+    return NextResponse.json(
+      { error: 'Failed to load order history. Please try again.' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 }
 
@@ -749,7 +780,21 @@ export async function PUT(request: Request) {
       });
       return NextResponse.json({ success: true });
     }
-    const supabase = getSupabaseAdmin()!;
+    if (!isSupabaseAdminConfigured()) {
+      console.error('Order API unavailable: server-side Supabase credentials are not configured.');
+      return NextResponse.json(
+        { error: 'Order data is temporarily unavailable. Please try again later.' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      console.error('Order API unavailable: Supabase admin client could not be initialized.');
+      return NextResponse.json(
+        { error: 'Order data is temporarily unavailable. Please try again later.' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
 
     const { data: currentOrder, error: currentOrderError } = await supabase
       .from('orders')
