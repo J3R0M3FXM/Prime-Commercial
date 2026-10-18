@@ -295,7 +295,6 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const supabase = getSupabaseAdmin()!;
 
     const deliveryAddress = body?.deliveryAddress && typeof body.deliveryAddress === 'object'
       ? body.deliveryAddress
