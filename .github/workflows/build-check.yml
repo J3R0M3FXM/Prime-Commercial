@@ -21,3 +21,5 @@ jobs:
       - run: npx tsc --noEmit --pretty false
       - run: npm run build
       - run: npm run test:security
+      - name: Verify OCI production container builds
+        run: docker build --build-arg NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ci_placeholder -t prime-commercial:ci .
