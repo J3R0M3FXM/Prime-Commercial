@@ -9,6 +9,7 @@ const COURIERS_CACHE_TTL_MS = 60000;
 
 export async function GET() {
   try {
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin credentials are not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     const now = Date.now();
     if (cachedCouriers && (now - lastCouriersFetchTime < COURIERS_CACHE_TTL_MS)) {
       return NextResponse.json(cachedCouriers, { headers: { "Cache-Control": "no-store, max-age=0" } });
