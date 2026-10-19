@@ -37,6 +37,12 @@ const checks = [
   ['GET', '/api/products', undefined, 401],
   ['GET', '/api/payment-methods', undefined, 401],
   ['GET', '/api/charges', undefined, 401],
+  ['POST', '/api/maya/checkout', {}, 401],
+  ['POST', '/api/referral/validate', {}, 401],
+  ['GET', '/api/cron/loyalty', undefined, 401],
+  ['GET', '/api/cron/orders', undefined, 401],
+  ['POST', '/api/telegram/business/webhook', {}, 401],
+  ['POST', '/api/webhooks/maya', {}, 403],
 ];
 
 async function waitForServer() {
