@@ -42,7 +42,7 @@ jobs:
           images: ghcr.io/j3r0m3fxm/prime-commercial
           tags: |
             type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha,prefix=sha-
+            type=sha,format=long,prefix=sha-
 
       - uses: docker/build-push-action@v6
         with:
