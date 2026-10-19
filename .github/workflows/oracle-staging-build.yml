@@ -17,21 +17,21 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: oracle-staging-build-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  lock-and-validate:
+  validate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout staging branch
+      - name: Checkout reviewed branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -43,42 +43,24 @@ jobs:
         with:
           bun-version: 1.4.3
 
-      - name: Synchronize Bun lockfile and pin any floating direct dependencies
+      - name: Install from committed lockfile
+        run: bun install --frozen-lockfile
+
+      - name: Reject floating direct dependency versions
         run: |
-          set -euo pipefail
-          bun install
           node <<'NODE'
           const fs = require('node:fs');
-          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const lock = fs.readFileSync('bun.lock', 'utf8');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           for (const section of ['dependencies', 'devDependencies', 'optionalDependencies']) {
-            for (const [name, spec] of Object.entries(manifest[section] || {})) {
-              if (spec === 'latest') {
-                console.error('Floating dependency remains in package.json:', name);
+            for (const [name, version] of Object.entries(p[section] || {})) {
+              if (version === 'latest' || version === '*') {
+                console.error('Unpinned direct dependency:', name, version);
                 process.exit(1);
               }
             }
           }
-          if (lock.includes('"@telegram-apps/sdk": "latest"')) {
-            console.error('Bun lock still contains floating Telegram SDK dependency');
-            process.exit(1);
-          }
-          console.log('Bun lockfile generated and direct dependency ranges checked.');
+          console.log('No floating direct dependency versions found.');
           NODE
-          if ! git diff --quiet -- package.json bun.lock; then
-            if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-              echo "Lockfile differs on PR checkout; validated with regenerated lock, push workflow will commit the update."
-            else
-              git config user.name "github-actions[bot]"
-              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-              git add package.json bun.lock
-              git commit -m "build: synchronize Bun dependency lockfile"
-              git push origin HEAD:${GITHUB_REF_NAME}
-            fi
-          fi
-
-      - name: Install exactly from lockfile
-        run: bun install --frozen-lockfile
 
       - name: Lint
         run: bun run lint
