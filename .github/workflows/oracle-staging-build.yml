@@ -44,7 +44,6 @@ jobs:
           bun-version: 1.2.22
 
       - name: Synchronize Bun lockfile and pin any floating direct dependencies
-        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           bun install
@@ -67,11 +66,15 @@ jobs:
           console.log('Bun lockfile generated and direct dependency ranges checked.');
           NODE
           if ! git diff --quiet -- package.json bun.lock; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package.json bun.lock
-            git commit -m "build: synchronize Bun dependency lockfile"
-            git push origin HEAD:${GITHUB_REF_NAME}
+            if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+              echo "Lockfile differs on PR checkout; validated with regenerated lock, push workflow will commit the update."
+            else
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add package.json bun.lock
+              git commit -m "build: synchronize Bun dependency lockfile"
+              git push origin HEAD:${GITHUB_REF_NAME}
+            fi
           fi
 
       - name: Install exactly from lockfile
