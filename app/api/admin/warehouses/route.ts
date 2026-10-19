@@ -56,11 +56,6 @@ export async function PUT(request: Request) {
     if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
 
     const isDefault = data.isDefault === true;
-    if (isDefault) {
-      const { error: clearDefaultError } = await supabase.from('warehouses').update({ is_default: false }).eq('is_default', true).neq('id', id);
-      if (clearDefaultError) throw clearDefaultError;
-    }
-
     const payload = {
       name: String(data.name || '').trim(),
       code: String(data.code || '').trim(),
@@ -72,6 +67,14 @@ export async function PUT(request: Request) {
       sort_order: Number(data.sortOrder) || 0,
       updated_at: new Date().toISOString(),
     };
+    
+    if (!payload.name || !payload.address) {
+      return NextResponse.json({ error: 'Warehouse name and address are required' }, { status: 400 });
+    }
+    if (isDefault) {
+      const { error: clearDefaultError } = await supabase.from('warehouses').update({ is_default: false }).eq('is_default', true).neq('id', id);
+      if (clearDefaultError) throw clearDefaultError;
+    }
 
     const { error } = await supabase.from('warehouses').update(payload).eq('id', id);
     if (error) throw error;
