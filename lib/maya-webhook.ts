@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase';
 import { notifyPaymentUpdated } from '@/lib/telegram-notifications';
 
 export type MayaWebhookChannel = 'card' | 'wallet' | 'unknown';
@@ -29,14 +29,16 @@ const HANDLED_STATUSES = new Set([
 ]);
 
 function getClientIp(request: Request): string {
-  // Vercel overwrites x-forwarded-for with the public client IP, which makes
-  // it suitable for Maya's documented IP allowlist.
-  return (
-    request.headers.get('x-vercel-forwarded-for') ||
-    request.headers.get('x-forwarded-for') ||
-    request.headers.get('x-real-ip') ||
-    ''
-  ).split(',')[0].trim();
+  // Vercel's dedicated header is authoritative on Vercel. On other hosts,
+  // prefer X-Real-IP set by the trusted reverse proxy; do not trust the first
+  // X-Forwarded-For value because a caller can prepend a spoofed address.
+  if (process.env.VERCEL === '1') {
+    return (request.headers.get('x-vercel-forwarded-for') || '').split(',')[0].trim();
+  }
+  const realIp = request.headers.get('x-real-ip')?.trim();
+  if (realIp) return realIp;
+  const forwarded = (request.headers.get('x-forwarded-for') || '').split(',').map(v => v.trim()).filter(Boolean);
+  return forwarded.length ? forwarded[forwarded.length - 1] : '';
 }
 
 export function isAllowedMayaIp(request: Request): boolean {
@@ -341,7 +343,7 @@ export async function processMayaWebhook(
   const paymentStatus = String(payload?.paymentStatus || payload?.status || '').toUpperCase();
   const channel = detectMayaWebhookChannel(payload);
 
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseAdminConfigured()) {
     console.error('[MAYA WEBHOOK] Supabase is not configured');
     return { status: 500, body: { received: false, error: 'Webhook storage unavailable' } };
   }
