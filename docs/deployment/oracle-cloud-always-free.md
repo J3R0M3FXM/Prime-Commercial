@@ -13,7 +13,7 @@ This is the alternative runtime path for Prime Commercial while the existing Ver
 
 The OCI tenancy is approved, but this repository has no OCI compute instance, reserved public IP, firewall/security-list configuration, or deploy credentials yet. Do not point the production domain at OCI until the container has been deployed and smoke-tested.
 
-Create one OCI Ampere A1 Compute VM only if it is available within your Always Free allocation. The published image is multi-architecture and supports the A1 VM's ARM64 architecture. Install Docker Engine and the Docker Compose plugin. Allow inbound TCP 80/443 at the OCI network security layer; keep port 3000 private to the VM or reverse proxy. Use a reverse proxy with HTTPS (for example, Caddy) before exposing the app publicly. Do not expose SSH to the entire internet.
+Create one OCI Ampere A1 Compute VM only if it is available within your Always Free allocation. The published image is multi-architecture and supports the A1 VM's ARM64 architecture. Install Docker Engine and the Docker Compose plugin. Allow inbound TCP 80/443 at the OCI network security layer; keep port 3000 private to the VM or reverse proxy. Use a domain you own, point its DNS A record to the OCI VM's public IP, and use a reverse proxy with HTTPS (for example, Caddy) before exposing the app publicly. The existing `*.vercel.app` alias cannot simply be repointed to OCI. `deploy/oci/Caddyfile.example` is the reverse-proxy template; set `PRIME_DOMAIN` to the domain you control. Do not expose SSH to the entire internet.
 
 ## GitHub Container Registry
 
