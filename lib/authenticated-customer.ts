@@ -48,10 +48,10 @@ export async function getAuthenticatedCustomer(request: Request) {
   const headerInitData = request.headers.get('x-telegram-init-data') || '';
   let initDataSession: { tgUserId: string; isAdmin: boolean } | null = null;
   if (headerInitData === 'preview') {
-    if (process.env.NODE_ENV === 'production') {
-      return { customer: null, error: 'Valid Telegram authentication is required.' as string, status: 401 };
+    if (process.env.NODE_ENV !== 'production') {
+      initDataSession = { tgUserId: '100000001', isAdmin: false };
     }
-    initDataSession = { tgUserId: '100000001', isAdmin: false };
+    // In production, ignore the preview sentinel and allow a valid signed cookie to be checked below.
   } else if (headerInitData) {
     try {
       const params = new URLSearchParams(headerInitData);
