@@ -768,7 +768,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Missing order ID" }, { status: 400 });
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseConfigured() && process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true') {
       await updateOrderInDb(orderId, {
         paymentStatus: 'Pending Review',
         paymentProofImage: paymentProofImage || '',
