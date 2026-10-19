@@ -710,11 +710,19 @@ export async function GET(request: Request) {
       headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
     });
 
-  } catch (error: any) {
-    if (cacheStore.orders) {
-      return NextResponse.json(cacheStore.orders);
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    // Customer order history must never fall back to a shared process-local cache.
+    console.error('Customer order history lookup failed:', error instanceof Error ? error.name : 'unknown');
+    return NextResponse.json(
+      { error: 'Unable to load order history. Please try again.' },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      }
+    );
   }
 }
 
