@@ -33,7 +33,12 @@ function getClientIp(request: Request): string {
   // prefer X-Real-IP set by the trusted reverse proxy; do not trust the first
   // X-Forwarded-For value because a caller can prepend a spoofed address.
   if (process.env.VERCEL === '1') {
-    return (request.headers.get('x-vercel-forwarded-for') || '').split(',')[0].trim();
+    return (
+      request.headers.get('x-vercel-forwarded-for') ||
+      request.headers.get('x-forwarded-for') ||
+      request.headers.get('x-real-ip') ||
+      ''
+    ).split(',')[0].trim();
   }
   const realIp = request.headers.get('x-real-ip')?.trim();
   if (realIp) return realIp;
