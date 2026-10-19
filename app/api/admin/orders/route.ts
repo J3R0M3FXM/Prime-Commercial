@@ -49,15 +49,7 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin credentials are not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
-    const now = Date.now();
     const { searchParams } = new URL(request.url);
-    const forceFresh = searchParams.has('_fresh');
-    if (!forceFresh && cacheStore.adminOrders && (now - cacheStore.lastAdminOrdersFetchTime < 60000)) {
-      return NextResponse.json(cacheStore.adminOrders, {
-        headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
-      });
-    }
-
     if (!isSupabaseAdminConfigured()) {
       return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
     }
@@ -146,9 +138,6 @@ export async function GET(request: Request) {
     });
 
     const hydratedOrders = await hydrateAdminOrders(ordersWithIdentity, supabase);
-    cacheStore.adminOrders = hydratedOrders;
-    cacheStore.lastAdminOrdersFetchTime = now;
-
     return NextResponse.json(hydratedOrders, {
       headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
     });
