@@ -236,7 +236,7 @@ export async function POST(request: Request) {
     if (auth.error || !auth.customer) {
       return NextResponse.json(
         { error: auth.error || 'Telegram authentication required' },
-        { status: 401 }
+        { status: 'status' in auth && typeof auth.status === 'number' ? auth.status : 401 }
       );
     }
 
