@@ -25,8 +25,10 @@ const checks = [
   ['GET', '/api/auth/telegram/validate', undefined, 401],
   ['POST', '/api/auth/telegram/validate', { initData: 'preview' }, null],
   ['GET', '/api/account', undefined, 401],
+  ['GET', '/api/account', undefined, 401, { 'X-Telegram-Init-Data': 'preview' }],
   ['GET', '/api/orders', undefined, 401],
   ['POST', '/api/orders', {}, 401],
+  ['POST', '/api/orders', {}, 401, { 'X-Telegram-Init-Data': 'preview' }],
   ['GET', '/api/admin/warehouses', undefined, 401],
   ['POST', '/api/admin/warehouses', {}, 401],
   ['GET', '/api/admin/couriers', undefined, 401],
@@ -62,10 +64,12 @@ async function waitForServer() {
 try {
   await waitForServer();
   const failures = [];
-  for (const [method, path, body, expected] of checks) {
+  for (const [method, path, body, expected, extraHeaders] of checks) {
+    const headers = new Headers(extraHeaders || {});
+    if (body !== undefined) headers.set('content-type', 'application/json');
     const response = await fetch(`${base}${path}`, {
       method,
-      headers: body === undefined ? {} : { 'content-type': 'application/json' },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       redirect: 'manual',
     });
