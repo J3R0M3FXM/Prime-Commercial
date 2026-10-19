@@ -19,6 +19,10 @@ function secret(): string {
       .digest('base64url');
   }
 
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Session signing requires SESSION_SECRET or TELEGRAM_BOT_TOKEN.');
+  }
+
   return 'prime_default_preview_session_secret_32_characters_minimum';
 }
 
