@@ -21,11 +21,6 @@ export async function POST(request: Request) {
     const data = await request.json();
     const isDefault = data.isDefault === true;
 
-    if (isDefault) {
-      const { error: clearDefaultError } = await supabase.from('warehouses').update({ is_default: false }).neq('id', '0');
-      if (clearDefaultError) throw clearDefaultError;
-    }
-
     const payload = {
       name: String(data.name || '').trim(),
       code: String(data.code || '').trim(),
@@ -40,6 +35,10 @@ export async function POST(request: Request) {
 
     if (!payload.name || !payload.address) {
       return NextResponse.json({ error: 'Warehouse name and address are required' }, { status: 400 });
+    }
+    if (isDefault) {
+      const { error: clearDefaultError } = await supabase.from('warehouses').update({ is_default: false }).eq('is_default', true);
+      if (clearDefaultError) throw clearDefaultError;
     }
     const { data: inserted, error } = await supabase.from('warehouses').insert([payload]).select().single();
     if (error) throw error;
@@ -58,7 +57,7 @@ export async function PUT(request: Request) {
 
     const isDefault = data.isDefault === true;
     if (isDefault) {
-      const { error: clearDefaultError } = await supabase.from('warehouses').update({ is_default: false }).neq('id', id);
+      const { error: clearDefaultError } = await supabase.from('warehouses').update({ is_default: false }).eq('is_default', true).neq('id', id);
       if (clearDefaultError) throw clearDefaultError;
     }
 
