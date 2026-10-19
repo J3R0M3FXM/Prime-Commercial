@@ -684,7 +684,7 @@ export async function GET(request: Request) {
     const orderId = searchParams.get('orderId') || searchParams.get('id');
     const orderNumber = searchParams.get('orderNumber');
 
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseConfigured() && process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true') {
       const orders = await getOrdersFromDb();
       if (orderId || orderNumber) {
         const target = orderId || orderNumber;
