@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getProductsFromDb } from '@/lib/db-adapter';
+import { isSupabaseAdminConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET() {
   try {
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Product data is temporarily unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     // Product configuration and stock are server-authoritative.
     // Do not serve process-local Vercel cache here: another instance may have
     // already received an admin configuration/stock update.

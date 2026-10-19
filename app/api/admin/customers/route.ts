@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase';
 import { calculateCustomerTier } from '@/lib/points-system';
 
 export const dynamic = 'force-dynamic';
@@ -58,7 +58,7 @@ function orderMatchesCustomer(o: any, c: any) {
 
 export async function GET(request: Request) {
   try {
-    if (!isSupabaseConfigured()) return noStore({ error: 'Supabase is not configured.' }, 400);
+    if (!isSupabaseAdminConfigured()) return noStore({ error: 'Supabase admin credentials are not configured.' }, 503);
     const supabase = getSupabaseAdmin()!;
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('id');

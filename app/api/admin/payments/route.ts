@@ -10,11 +10,7 @@ const PAYMENTS_CACHE_TTL_MS = 60000;
 
 export async function GET() {
   try {
-    const now = Date.now();
-    if (cachedPayments && (now - lastPaymentsFetchTime < PAYMENTS_CACHE_TTL_MS)) {
-      return NextResponse.json(cachedPayments, { headers: { "Cache-Control": "no-store, max-age=0" } });
-    }
-
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin credentials are not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     if (!isSupabaseAdminConfigured()) {
       return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     }
@@ -42,11 +38,8 @@ export async function GET() {
       isActive: p.is_active,
     }));
 
-    cachedPayments = paymentMethods;
-    lastPaymentsFetchTime = now;
     return NextResponse.json(paymentMethods);
   } catch (error: any) {
-    if (cachedPayments) return NextResponse.json({ error: error.message || "Failed to load payment methods; cached data is not being presented as current." }, { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase';
 import { getChargesFromDb } from '@/lib/db-adapter';
 import { normalizeCharge } from '@/lib/charges';
 
@@ -17,7 +17,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured.' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const data = await request.json();
     const normalized = normalizeCharge(data);
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
     const supabase = getSupabaseAdmin()!;
     const data = await request.json();
     const { id, ...updateData } = data;
@@ -68,7 +68,7 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase not configured' }, { status: 400 });
     const supabase = getSupabaseAdmin()!;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

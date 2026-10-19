@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase';
 import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ valid: false, error: 'You cannot use your own PRIME Member ID as a referral code.' });
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseAdminConfigured()) {
       return NextResponse.json({ valid: false, error: 'Supabase is not configured.' }, { status: 400 });
     }
     const supabase = getSupabaseAdmin()!;

@@ -6,9 +6,11 @@ const SESSION_DERIVATION_LABEL = 'PRIME_TELEGRAM_SESSION_V1';
 
 async function getTelegramSessionKey() {
   const configured = process.env.SESSION_SECRET?.trim();
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (process.env.NODE_ENV === 'production' && !(configured && configured.length >= 32) && !botToken) return null;
   const material = configured && configured.length >= 32
     ? configured
-    : (process.env.TELEGRAM_BOT_TOKEN?.trim() || 'prime_default_preview_session_secret_32_characters_minimum');
+    : (botToken || 'prime_default_preview_session_secret_32_characters_minimum');
 
   if (configured && configured.length >= 32) {
     return crypto.subtle.importKey(
@@ -56,7 +58,9 @@ async function verifyTelegramInitData(initData: string | undefined) {
   try {
     const raw = typeof initData === 'string' ? initData.trim() : '';
     if (raw === 'preview') {
-      return { tgUserId: '100000001', isAdmin: false };
+      return process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true'
+        ? { tgUserId: '100000001', isAdmin: false }
+        : null;
     }
     const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
     if (!raw || !botToken) return null;
@@ -265,8 +269,11 @@ export async function middleware(request: NextRequest) {
   if (initDataSession) return NextResponse.next();
 
   const session = await verifySession(request.cookies.get('prime_telegram_session')?.value);
+  if (session?.tgUserId === '100000001' && (process.env.NODE_ENV === 'production' || process.env.ALLOW_PREVIEW_AUTH !== 'true')) {
+    return NextResponse.json({ error: 'Telegram authentication required' }, { status: 401 });
+  }
   if (!session) {
-    if (request.headers.get('x-telegram-init-data') === 'preview') {
+    if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true' && request.headers.get('x-telegram-init-data') === 'preview') {
       return NextResponse.next();
     }
     return NextResponse.json({ error: 'Telegram authentication required' }, { status: 401 });

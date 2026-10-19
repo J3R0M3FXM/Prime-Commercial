@@ -5,6 +5,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: build-check-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,6 +17,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - run: npm install --no-audit --no-fund
+      - run: npx tsc --noEmit --pretty false
       - run: npm run build
+      - run: npm run test:security
+      - name: Verify OCI production container builds
+        run: docker build --build-arg NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ci_placeholder -t prime-commercial:ci .
