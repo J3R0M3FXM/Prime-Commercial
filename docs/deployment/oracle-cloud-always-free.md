@@ -27,7 +27,7 @@ If the GHCR package is private, create a dedicated GitHub token with read-only `
 
 ## Runtime environment
 
-Create `.env.production` on the OCI VM with the exact runtime variables listed in the repository's `.env.example` that are required for production. At minimum, verify the Supabase project URL and server-only secret key, Telegram bot token, a random `SESSION_SECRET` of at least 32 characters, `ADMIN_ACCESS_CODE`, and any enabled Geoapify/Maya integration secrets. Use the current approved values; do not copy secrets into GitHub source files. Do not set `ALLOW_PREVIEW_AUTH=true` in production.
+Create `.env.production` on the OCI VM with the exact runtime variables listed in the repository's `.env.example` that are required for production. At minimum, verify the Supabase project URL and server-only secret key, Telegram bot token, a random `SESSION_SECRET` of at least 32 characters, `ADMIN_ACCESS_CODE`, `CRON_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, and any enabled Geoapify/Maya integration secrets. Configure Telegram's webhook with the matching secret token. The Maya webhook IP allowlist on OCI relies on the reverse proxy setting a trustworthy `X-Real-IP` header. Use the current approved values; do not copy secrets into GitHub source files. Do not set `ALLOW_PREVIEW_AUTH=true` in production.
 
 Start and inspect:
 
