@@ -661,7 +661,10 @@ export async function GET(request: Request) {
   try {
     const auth = await getAuthenticatedCustomer(request);
     if (auth.error || !auth.customer) {
-      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
+      return NextResponse.json(
+        { error: auth.error || 'Telegram authentication required' },
+        { status: 'status' in auth && typeof auth.status === 'number' ? auth.status : 401 }
+      );
     }
     const authenticatedCustomer = auth.customer;
 
@@ -730,7 +733,10 @@ export async function PUT(request: Request) {
   try {
     const auth = await getAuthenticatedCustomer(request);
     if (auth.error || !auth.customer) {
-      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
+      return NextResponse.json(
+        { error: auth.error || 'Telegram authentication required' },
+        { status: 'status' in auth && typeof auth.status === 'number' ? auth.status : 401 }
+      );
     }
 
     const data = await request.json();
