@@ -4,7 +4,7 @@ const COOKIE_NAME = 'prime_telegram_session';
 const MAX_AGE = 86400;
 const FALLBACK_DERIVATION_LABEL = 'PRIME_TELEGRAM_SESSION_V1';
 
-function secret(): string {
+function secret(): string | null {
   const configured = process.env.SESSION_SECRET?.trim();
   if (configured && configured.length >= 32) return configured;
 
@@ -19,11 +19,15 @@ function secret(): string {
       .digest('base64url');
   }
 
-  return 'prime_default_preview_session_secret_32_characters_minimum';
+  if (process.env.NODE_ENV === 'production') return null;
+  if (process.env.ALLOW_PREVIEW_AUTH === 'true') return 'prime_default_preview_session_secret_32_characters_minimum';
+  return null;
 }
 
 function sign(value: string) {
-  return crypto.createHmac('sha256', secret()).update(value).digest('base64url');
+  const key = secret();
+  if (!key) throw new Error('SESSION_SECRET or TELEGRAM_BOT_TOKEN must be configured to sign Telegram sessions.');
+  return crypto.createHmac('sha256', key).update(value).digest('base64url');
 }
 
 export function createTelegramSessionCookie(tgUserId: string, isAdmin = false) {
@@ -55,6 +59,7 @@ export function verifyTelegramSessionCookie(value: string | undefined) {
     const now = Math.floor(Date.now() / 1000);
     if (!Number.isSafeInteger(issued) || issued > now || now - issued > MAX_AGE) return null;
 
+    if (!secret()) return null;
     const payload = `${tgUserId}|${issuedRaw}|${adminRaw}`;
     const expected = sign(payload);
     const a = Buffer.from(expected);
