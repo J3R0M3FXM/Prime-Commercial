@@ -42,9 +42,9 @@ export async function POST(request: NextRequest) {
     const heartbeat = Boolean(body.heartbeat);
 
     const previewEnabled = process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true';
-    const isPreview = previewEnabled && (!initData || initData === 'preview' || Boolean(body.isPreview) || !process.env.TELEGRAM_BOT_TOKEN?.trim());
+    const previewRequested = !initData || initData === 'preview' || Boolean(body.isPreview) || !process.env.TELEGRAM_BOT_TOKEN?.trim();
 
-    if (isPreview) {
+    if (previewRequested && previewEnabled) {
       const tgUserId = '100000001';
       const primeMemberId = 'PRIME-PREVIEW-01';
       const fullName = 'Preview Customer';
@@ -73,9 +73,13 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
+    if (initData === 'preview' || Boolean(body.isPreview)) {
+      return json({ error: 'Telegram authentication required' }, 401);
+    }
+
     const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN?.trim();
     if (!BOT_TOKEN) {
-      return json({ error: 'Server configuration error: TELEGRAM_BOT_TOKEN is missing.' }, 500);
+      return json({ error: 'Telegram authentication is temporarily unavailable.' }, 503);
     }
 
     const params = new URLSearchParams(initData);
