@@ -43,7 +43,7 @@ The health check expects the unauthenticated Telegram validation endpoint to ret
 ## Safe release and rollback
 
 1. Publish the container from a reviewed, green `main` commit.
-2. Deploy by pinning the compose image to the immutable `sha-<commit>` tag, not only `main`.
+2. Deploy by pinning the compose image to the immutable `sha-<commit>` tag, not only `main`, by exporting `IMAGE_TAG=sha-<commit>` before running Compose.
 3. Verify health, Telegram login, customer profile, order history, points, fingerprint history, public payment-method filtering, warehouse/courier selection, charges, and admin CRUD using authorized test accounts.
 4. Confirm a read-only Supabase count/integrity snapshot matches the pre-deploy snapshot.
 5. For rollback, change the image tag to the previous known-good `sha-<commit>`, then run `docker compose -f docker-compose.oci.yml pull && docker compose -f docker-compose.oci.yml up -d`.
