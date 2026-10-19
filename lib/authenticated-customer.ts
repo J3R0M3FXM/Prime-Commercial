@@ -9,6 +9,9 @@ function generateMemberId() {
 export async function getAuthenticatedCustomer(request: Request) {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
+    if (process.env.NODE_ENV === 'production' || process.env.ALLOW_PREVIEW_AUTH !== 'true') {
+      return { customer: null, error: 'Server-side Supabase credentials are not configured' as string };
+    }
     return {
       customer: {
         id: 'cust-preview-001',
