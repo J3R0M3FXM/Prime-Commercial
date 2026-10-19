@@ -240,7 +240,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseConfigured() && process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true') {
       const body = await request.json();
       const orderNumber = getOrderNumber();
       const newOrder = await createOrderInDb({
