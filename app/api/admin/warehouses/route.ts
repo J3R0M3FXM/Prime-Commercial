@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin credentials are not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     const warehouses = await getWarehousesFromDb();
     return NextResponse.json(warehouses, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error: any) {
