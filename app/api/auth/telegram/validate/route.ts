@@ -20,13 +20,10 @@ export async function GET(request: NextRequest) {
   const session = verifyTelegramSessionCookie(request.cookies.get('prime_telegram_session')?.value);
 
   if (!session) {
-    return json({
-      authenticated: true,
-      sessionReady: true,
-      tgUserId: '100000001',
-      isAdmin: false,
-      isPreview: true,
-    }, 200);
+    if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true') {
+      return json({ authenticated: true, sessionReady: true, tgUserId: '100000001', isAdmin: false, isPreview: true }, 200);
+    }
+    return json({ authenticated: false, sessionReady: false, error: 'Telegram authentication required' }, 401);
   }
 
   return json({
@@ -44,7 +41,8 @@ export async function POST(request: NextRequest) {
     const fingerprint = body.fingerprint;
     const heartbeat = Boolean(body.heartbeat);
 
-    const isPreview = !initData || initData === 'preview' || Boolean(body.isPreview) || !process.env.TELEGRAM_BOT_TOKEN?.trim();
+    const previewEnabled = process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true';
+    const isPreview = previewEnabled && (!initData || initData === 'preview' || Boolean(body.isPreview) || !process.env.TELEGRAM_BOT_TOKEN?.trim());
 
     if (isPreview) {
       const tgUserId = '100000001';
