@@ -42,7 +42,7 @@ export async function getAuthenticatedCustomer(request: Request) {
 
   const headerInitData = request.headers.get('x-telegram-init-data') || '';
   let initDataSession: { tgUserId: string; isAdmin: boolean } | null = null;
-  if (headerInitData === 'preview') {
+  if (headerInitData === 'preview' && process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true') {
     initDataSession = { tgUserId: '100000001', isAdmin: false };
   } else if (headerInitData) {
     try {
@@ -79,6 +79,9 @@ export async function getAuthenticatedCustomer(request: Request) {
   }
   const session = initDataSession || verifyTelegramSessionCookie(cookieValue);
   if (!session) return { customer: null, error: 'Telegram authentication required' as string };
+  if (session.tgUserId === '100000001' && (process.env.NODE_ENV === 'production' || process.env.ALLOW_PREVIEW_AUTH !== 'true')) {
+    return { customer: null, error: 'Telegram authentication required' as string };
+  }
 
   const { data: customer, error } = await supabase
     .from('customers')
