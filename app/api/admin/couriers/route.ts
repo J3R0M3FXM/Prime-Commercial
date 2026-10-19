@@ -10,11 +10,6 @@ const COURIERS_CACHE_TTL_MS = 60000;
 export async function GET() {
   try {
     if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin credentials are not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
-    const now = Date.now();
-    if (cachedCouriers && (now - lastCouriersFetchTime < COURIERS_CACHE_TTL_MS)) {
-      return NextResponse.json(cachedCouriers, { headers: { "Cache-Control": "no-store, max-age=0" } });
-    }
-
     if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin client is not configured; check SUPABASE_SERVICE_ROLE_KEY' }, { status: 503 });
     const supabase = getSupabaseAdmin()!;
     const { data, error } = await supabase.from('couriers').select('*');
@@ -37,12 +32,8 @@ export async function GET() {
 
     couriers.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
 
-    cachedCouriers = couriers;
-    lastCouriersFetchTime = now;
-
     return NextResponse.json(couriers);
   } catch (error: any) {
-    if (cachedCouriers) return NextResponse.json({ error: error.message || "Failed to load couriers; cached data is not being presented as current." }, { status: 503, headers: { "Cache-Control": "no-store, max-age=0" } });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
