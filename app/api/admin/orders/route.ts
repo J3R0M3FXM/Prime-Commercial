@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase';
 import { cacheStore } from '@/lib/cache';
 import { notifyOrderStatusChanged, notifyPaymentUpdated } from '@/lib/telegram-notifications';
 
@@ -15,7 +15,7 @@ function getOrderNumber(): string {
 
 export async function POST(request: Request) {
   try {
-    if (!isSupabaseConfigured()) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin credentials are not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     const body = await request.json();
     if (!body.customerId) return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
     if (!Array.isArray(body.items) || body.items.length === 0) return NextResponse.json({ error: 'Cart items are required' }, { status: 400 });
@@ -48,6 +48,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin credentials are not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     const now = Date.now();
     const { searchParams } = new URL(request.url);
     const forceFresh = searchParams.has('_fresh');
@@ -152,12 +153,8 @@ export async function GET(request: Request) {
       headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
     });
   } catch (error: any) {
-    if (cacheStore.adminOrders) {
-      return NextResponse.json(cacheStore.adminOrders, {
-        headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
-      });
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Failed to load current admin orders:', error);
+    return NextResponse.json({ error: 'Failed to load current orders. Please retry.' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
