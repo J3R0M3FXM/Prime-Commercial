@@ -19,7 +19,7 @@ function json(data: Record<string, unknown>, status = 200) {
 export async function GET(request: NextRequest) {
   const session = verifyTelegramSessionCookie(request.cookies.get('prime_telegram_session')?.value);
 
-  if (!session) {
+  if (!session || (session.tgUserId === '100000001' && (process.env.NODE_ENV === 'production' || process.env.ALLOW_PREVIEW_AUTH !== 'true'))) {
     if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true') {
       return json({ authenticated: true, sessionReady: true, tgUserId: '100000001', isAdmin: false, isPreview: true }, 200);
     }
