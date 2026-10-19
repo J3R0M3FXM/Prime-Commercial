@@ -6,14 +6,14 @@ This is the alternative runtime path for Prime Commercial while the existing Ver
 
 - `Dockerfile`: builds and runs the Next.js app as a production container.
 - `docker-compose.oci.yml`: runs the container with a host-managed `.env.production` file and a health check.
-- `.github/workflows/container-publish.yml`: builds and publishes the container to GitHub Container Registry (GHCR) when `main` changes, or when manually dispatched.
+- `.github/workflows/container-publish.yml`: builds and publishes AMD64 and ARM64 container images to GitHub Container Registry (GHCR) when `main` changes, or when manually dispatched.
 - `scripts/security-smoke-check.mjs`: CI check for unauthenticated API paths and production preview-auth rejection.
 
 ## Infrastructure still required
 
 The OCI tenancy is approved, but this repository has no OCI compute instance, reserved public IP, firewall/security-list configuration, or deploy credentials yet. Do not point the production domain at OCI until the container has been deployed and smoke-tested.
 
-Create one OCI Ampere A1 Compute VM only if it is available within your Always Free allocation. Install Docker Engine and the Docker Compose plugin. Allow inbound TCP 80/443 at the OCI network security layer; keep port 3000 private to the VM or reverse proxy. Use a reverse proxy with HTTPS (for example, Caddy) before exposing the app publicly. Do not expose SSH to the entire internet.
+Create one OCI Ampere A1 Compute VM only if it is available within your Always Free allocation. The published image is multi-architecture and supports the A1 VM's ARM64 architecture. Install Docker Engine and the Docker Compose plugin. Allow inbound TCP 80/443 at the OCI network security layer; keep port 3000 private to the VM or reverse proxy. Use a reverse proxy with HTTPS (for example, Caddy) before exposing the app publicly. Do not expose SSH to the entire internet.
 
 ## GitHub Container Registry
 
