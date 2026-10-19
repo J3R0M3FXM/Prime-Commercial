@@ -230,8 +230,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) {
+      return NextResponse.json({ error: 'Account updates are temporarily unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     }
     const auth = await getAuthenticatedCustomer(request);
     if (auth.error || !auth.customer) {
