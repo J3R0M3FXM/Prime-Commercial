@@ -14,7 +14,7 @@ export function getLiveTelegramInitData(): string {
   } catch {
     // ignore storage access errors
   }
-  return 'preview';
+  return process.env.NODE_ENV === 'production' ? '' : 'preview';
 }
 
 async function bootstrapTelegramSession(initData: string): Promise<void> {
