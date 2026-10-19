@@ -58,7 +58,7 @@ export async function GET(request: Request) {
       });
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseAdminConfigured()) {
       return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
     }
     const supabase = getSupabaseAdmin()!;
@@ -217,7 +217,7 @@ async function hydrateAdminOrders(orders: any[], supabase: any) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseAdminConfigured()) {
       return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
     }
     const supabase = getSupabaseAdmin()!;
@@ -339,7 +339,7 @@ export async function DELETE(request: Request) {
     const { id } = await request.json();
     if (!id) return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
 
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseAdminConfigured()) {
       return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
     }
     const supabase = getSupabaseAdmin()!;
