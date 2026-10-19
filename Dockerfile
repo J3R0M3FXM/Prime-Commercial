@@ -1,14 +1,14 @@
-FROM node:22.16.0-bookworm-slim AS deps
+FROM oven/bun:1.2.22 AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
-FROM node:22.16.0-bookworm-slim AS builder
+FROM oven/bun:1.2.22 AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN bun run build
 
 FROM node:22.16.0-bookworm-slim AS runner
 WORKDIR /app
