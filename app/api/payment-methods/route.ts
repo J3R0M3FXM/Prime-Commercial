@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getPaymentMethodsFromDb } from '@/lib/db-adapter';
+import { isSupabaseAdminConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET() {
   try {
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Payment methods are temporarily unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     const paymentMethods = await getPaymentMethodsFromDb();
 
     // This endpoint is consumed by the public checkout and order-history UI.
