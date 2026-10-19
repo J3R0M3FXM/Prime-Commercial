@@ -269,6 +269,9 @@ export async function middleware(request: NextRequest) {
   if (initDataSession) return NextResponse.next();
 
   const session = await verifySession(request.cookies.get('prime_telegram_session')?.value);
+  if (session?.tgUserId === '100000001' && (process.env.NODE_ENV === 'production' || process.env.ALLOW_PREVIEW_AUTH !== 'true')) {
+    return NextResponse.json({ error: 'Telegram authentication required' }, { status: 401 });
+  }
   if (!session) {
     if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true' && request.headers.get('x-telegram-init-data') === 'preview') {
       return NextResponse.next();
