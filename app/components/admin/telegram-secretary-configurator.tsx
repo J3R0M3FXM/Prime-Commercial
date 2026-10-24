@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, ChevronRight, GitBranch, MessageSquare, Plus, Power, RefreshCw, Save, Trash2 } from "lucide-react";
 
-type Action = "flow" | "reply" | "url";
+type Action = "flow" | "reply" | "url" | "media" | "caption" | "markup";
 
 type Button = {
   id: string;
@@ -12,6 +12,9 @@ type Button = {
   response: string;
   url: string;
   targetFlowId: string;
+  mediaUrl: string;
+  mediaType: "photo" | "video" | "animation" | "audio" | "document";
+  caption: string;
 };
 
 type Flow = {
@@ -54,6 +57,9 @@ function makeButton(index: number): Button {
     response: "",
     url: "",
     targetFlowId: "",
+    mediaUrl: "",
+    mediaType: "photo",
+    caption: "",
   };
 }
 
@@ -72,10 +78,11 @@ function makeFlow(): Flow {
 }
 
 function normalizeButton(raw: any, index: number): Button {
-  const action = raw?.url
+  const allowedActions: Action[] = ["flow", "reply", "url", "media", "caption", "markup"];
+  const action: Action = raw?.url
     ? "url"
-    : raw?.action === "flow"
-      ? "flow"
+    : allowedActions.includes(raw?.action)
+      ? raw.action
       : "reply";
 
   return {
@@ -85,6 +92,9 @@ function normalizeButton(raw: any, index: number): Button {
     response: String(raw?.response || ""),
     url: String(raw?.url || ""),
     targetFlowId: String(raw?.targetFlowId || ""),
+    mediaUrl: String(raw?.mediaUrl || raw?.media_url || raw?.media?.url || ""),
+    mediaType: (["photo", "video", "animation", "audio", "document"].includes(raw?.mediaType || raw?.media_type || raw?.media?.type) ? (raw?.mediaType || raw?.media_type || raw?.media?.type) : "photo"),
+    caption: String(raw?.caption || ""),
   };
 }
 
@@ -226,6 +236,16 @@ export default function TelegramSecretaryConfigurator() {
       setNotice("SELECT A TARGET STEP FOR " + invalidTarget.text.toUpperCase() + ".");
       return;
     }
+    const invalidMedia = selected.buttons.find((button) => button.action === "media" && !button.mediaUrl.trim());
+    if (invalidMedia) {
+      setNotice("MEDIA URL IS REQUIRED FOR " + invalidMedia.text.toUpperCase() + ".");
+      return;
+    }
+    const invalidUrl = selected.buttons.find((button) => button.action === "url" && !/^https?:\/\//i.test(button.url.trim()));
+    if (invalidUrl) {
+      setNotice("ENTER A VALID HTTP(S) URL FOR " + invalidUrl.text.toUpperCase() + ".");
+      return;
+    }
 
     const longCallback = selected.buttons.find(
       (button) => callbackBytes(selected.id || "new", button.id) > 64,
@@ -252,6 +272,9 @@ export default function TelegramSecretaryConfigurator() {
             response: String(button.response || ""),
             url: String(button.url || "").trim(),
             targetFlowId: String(button.targetFlowId || "").trim(),
+            mediaUrl: String(button.mediaUrl || "").trim(),
+            mediaType: button.mediaType || "photo",
+            caption: String(button.caption || ""),
           })),
         }),
       });
@@ -551,6 +574,9 @@ export default function TelegramSecretaryConfigurator() {
                                 <option value="flow">GO TO STEP</option>
                                 <option value="reply">REPLY IN PLACE</option>
                                 <option value="url">OPEN URL</option>
+                                <option value="media">EDIT TO MEDIA</option>
+                                <option value="caption">EDIT CAPTION</option>
+                                <option value="markup">EDIT BUTTONS ONLY</option>
                               </select>
                               <button
                                 type="button"
@@ -591,6 +617,25 @@ export default function TelegramSecretaryConfigurator() {
                                       placeholder="Message after click. Same bubble is edited."
                                     />
                                   </label>
+                                )}
+
+                                {button.action === "media" && (
+                                  <div className="space-y-1.5">
+                                    <label>
+                                      <span className="label-mini">Media URL (public HTTPS URL)</span>
+                                      <input value={button.mediaUrl} onChange={(event) => updateButton(index, { mediaUrl: event.target.value })} className="control-mini" placeholder="https://.../image.jpg" />
+                                    </label>
+                                    <label>
+                                      <span className="label-mini">Media type</span>
+                                      <select value={button.mediaType} onChange={(event) => updateButton(index, { mediaType: event.target.value as Button["mediaType"] })} className="control-mini">
+                                        <option value="photo">Photo</option><option value="video">Video</option><option value="animation">Animation</option><option value="audio">Audio</option><option value="document">Document</option>
+                                      </select>
+                                    </label>
+                                    <label><span className="label-mini">Optional caption</span><textarea value={button.caption} onChange={(event) => updateButton(index, { caption: event.target.value })} className="w-full min-h-[44px] border border-slate-200 px-2 py-1.5 text-[10px]" placeholder="Optional media caption" /></label>
+                                  </div>
+                                )}
+                                {button.action === "caption" && (
+                                  <label><span className="label-mini">Replacement caption</span><textarea value={button.caption || button.response} onChange={(event) => updateButton(index, { caption: event.target.value, response: event.target.value })} className="w-full min-h-[54px] border border-slate-200 px-2 py-1.5 text-[10px]" placeholder="Caption for the existing media message" /></label>
                                 )}
 
                                 {button.action === "url" && (
