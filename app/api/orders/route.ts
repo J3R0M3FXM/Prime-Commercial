@@ -7,6 +7,7 @@ import { getChargesFromDb, createOrderInDb, getOrdersFromDb, updateOrderInDb } f
 import { buildDeviceFingerprintId, getRequestClientIp, getServerFingerprintId, resolveTrustedFingerprint } from '@/lib/fingerprint';
 import { calculateChargesBreakdown } from '@/lib/charges';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from '@/lib/delivery-fee';
+import { calculateRouteTomTom, isTomTomConfigured } from '@/lib/tomtom';
 
 export const dynamic = 'force-dynamic';
 
@@ -188,8 +189,24 @@ async function calculateServerDelivery(
   const originLon = Number(warehouse.longitude);
   let distanceKm: number | null = null;
 
+  // 1. Try TomTom motorcycle route calculation with live traffic
+  if (isTomTomConfigured()) {
+    try {
+      const tomtomRoute = await calculateRouteTomTom(originLat, originLon, destinationLat, destinationLon, {
+        travelMode: 'motorcycle',
+        traffic: true,
+      });
+      if (tomtomRoute && Number.isFinite(tomtomRoute.distanceKm)) {
+        distanceKm = tomtomRoute.distanceKm;
+      }
+    } catch (error) {
+      console.warn('TomTom routing unavailable for order; checking fallback.', error);
+    }
+  }
+
+  // 2. Fallback to Geoapify if TomTom was not available
   const apiKey = process.env.GEOAPIFY_API_KEY;
-  if (apiKey) {
+  if (distanceKm === null && apiKey) {
     try {
       const routingUrl =
         'https://api.geoapify.com/v1/routing' +

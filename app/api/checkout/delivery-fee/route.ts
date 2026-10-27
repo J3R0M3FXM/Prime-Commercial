@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from '@/lib/delivery-fee';
 import { getWarehousesFromDb, getCouriersFromDb } from '@/lib/db-adapter';
+import { calculateRouteTomTom, isTomTomConfigured } from '@/lib/tomtom';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,9 +81,30 @@ export async function POST(request: Request) {
 
     let distanceKm: number | null = null;
     let routingSource = 'geodesic-fallback';
-    const apiKey = process.env.GEOAPIFY_API_KEY;
+    let durationMinutes: number | undefined = undefined;
+    let trafficDelaySeconds: number | undefined = undefined;
 
-    if (apiKey) {
+    // 1. Prioritize TomTom Motorcycle Routing with Live Traffic
+    if (isTomTomConfigured()) {
+      try {
+        const tomtomRoute = await calculateRouteTomTom(originLat, originLon, destinationLat, destinationLon, {
+          travelMode: 'motorcycle',
+          traffic: true,
+        });
+        if (tomtomRoute && Number.isFinite(tomtomRoute.distanceKm)) {
+          distanceKm = tomtomRoute.distanceKm;
+          durationMinutes = tomtomRoute.durationMinutes;
+          trafficDelaySeconds = tomtomRoute.trafficDelaySeconds;
+          routingSource = tomtomRoute.source;
+        }
+      } catch (error) {
+        console.warn('TomTom routing unavailable; checking secondary providers.', error);
+      }
+    }
+
+    // 2. Fallback to Geoapify if TomTom was not available
+    const apiKey = process.env.GEOAPIFY_API_KEY;
+    if (distanceKm === null && apiKey) {
       try {
         const routingUrl =
           'https://api.geoapify.com/v1/routing' +
@@ -128,6 +150,8 @@ export async function POST(request: Request) {
         lon: originLon,
       },
       distanceKm: roundedDistance,
+      durationMinutes,
+      trafficDelaySeconds,
       fee: targetCourier.calculatedFee,
       courier: targetCourier,
       couriers: computedCouriers,

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { searchAddressesTomTom, isTomTomConfigured } from '@/lib/tomtom';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,21 @@ export async function GET(request: Request) {
   const text = (searchParams.get('text') || '').trim().replace(/\s+/g, ' ');
   if (text.length < 3) return NextResponse.json({ results: [] }, { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } });
   if (text.length > 180) return NextResponse.json({ error: 'Search text is too long.', results: [] }, { status: 400 });
+
+  // 1. Prioritize TomTom Search API
+  if (isTomTomConfigured()) {
+    try {
+      const tomtomResults = await searchAddressesTomTom(text, { limit: 8 });
+      if (tomtomResults.length > 0) {
+        return NextResponse.json(
+          { results: tomtomResults, source: 'tomtom-search' },
+          { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } }
+        );
+      }
+    } catch (e) {
+      console.warn('TomTom address search error:', e);
+    }
+  }
 
   const apiKey = process.env.GEOAPIFY_API_KEY?.trim();
   // Business names may be absent from generic address indexes. Retry this

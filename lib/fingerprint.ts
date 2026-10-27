@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { reverseGeocodeTomTom, isTomTomConfigured } from '@/lib/tomtom';
 
 export interface FingerprintPayload {
   deviceId?: string;
@@ -134,8 +135,26 @@ export async function enrichFingerprintData(ip: string, lat?: number, lon?: numb
   const iplocateKey = process.env.IPLOCATE_API_KEY;
 
   if (hasGps && lat && lon) {
-    let geoapifySuccess = false;
-    if (geoapifyKey) {
+    let geoResolved = false;
+
+    // 1. Try TomTom Reverse Geocode first
+    if (isTomTomConfigured()) {
+      try {
+        const tomtomRes = await reverseGeocodeTomTom(lat, lon);
+        if (tomtomRes && tomtomRes.formatted) {
+          address = tomtomRes.formatted || address;
+          city = tomtomRes.city || city;
+          region = tomtomRes.state || region;
+          country = 'Philippines';
+          geoResolved = true;
+        }
+      } catch (tomtomErr) {
+        console.warn('TomTom fingerprint reverse-geocode error:', tomtomErr);
+      }
+    }
+
+    // 2. Fallback to Geoapify if TomTom was not available
+    if (!geoResolved && geoapifyKey) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -150,7 +169,7 @@ export async function enrichFingerprintData(ip: string, lat?: number, lon?: numb
             city = result.city || result.municipality || result.suburb || result.county || city;
             region = result.state || result.state_district || result.region || region;
             country = result.country || country;
-            geoapifySuccess = true;
+            geoResolved = true;
           }
         }
       } catch (geoErr) {
@@ -158,7 +177,7 @@ export async function enrichFingerprintData(ip: string, lat?: number, lon?: numb
       }
     }
 
-    if (!geoapifySuccess) {
+    if (!geoResolved) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3500);

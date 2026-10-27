@@ -1559,7 +1559,7 @@ export default function CheckoutModal({
                 {isLoadingCouriers ? (
                   <div className="p-8 text-center bg-gray-50 rounded-none border border-gray-200 flex flex-col items-center justify-center gap-2 text-xs font-mono text-gray-500">
                     <Loader2 className="w-6 h-6 animate-spin text-black" />
-                    <span>Calculating real-time rates with Geoapify routing...</span>
+                    <span>Calculating real-time rates with TomTom motorcycle routing...</span>
                   </div>
                 ) : availableCouriers.length === 0 ? (
                   <div className="p-6 text-center bg-amber-50 rounded-none border border-amber-200 text-xs font-mono text-amber-800">
