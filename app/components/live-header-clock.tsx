@@ -9,9 +9,12 @@ export default function LiveHeaderClock() {
     setMounted(true);
     const updateTime = () => {
       const now = new Date();
-      const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+      const months = [
+        "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+        "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
+      ];
       const month = months[now.getMonth()];
-      const day = String(now.getDate()).padStart(2, '0');
+      const day = now.getDate();
       const year = now.getFullYear();
       const hour24 = now.getHours();
       const period = hour24 >= 12 ? "PM" : "AM";
@@ -19,7 +22,7 @@ export default function LiveHeaderClock() {
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const seconds = String(now.getSeconds()).padStart(2, '0');
       
-      setTimeStr(`${day}-${month}-${year} | ${hours}:${minutes}:${seconds} ${period}`);
+      setTimeStr(`${month} ${day}, ${year} • ${hours}:${minutes}:${seconds} ${period}`);
     };
     
     updateTime();
@@ -30,7 +33,7 @@ export default function LiveHeaderClock() {
   if (!mounted) {
     return (
       <div className="flex flex-col justify-center h-7 sm:h-[28px] text-center select-none shrink-0" id="live-clock-placeholder">
-        <div className="text-[12.5px] sm:text-[13.5px] font-mono font-bold text-gray-300 h-3.5 bg-gray-100 rounded animate-pulse w-36 mb-1" />
+        <div className="text-[12px] sm:text-[13px] font-bold text-gray-300 h-3.5 bg-gray-100 rounded animate-pulse w-48 mb-1" style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700 }} />
         <div className="w-full text-center text-[8.5px] sm:text-[9px] font-mono font-bold text-emerald-600 tracking-[0.14em]">
           SECURED CUSTOMER ACCESS
         </div>
@@ -40,7 +43,14 @@ export default function LiveHeaderClock() {
 
   return (
     <div className="flex flex-col justify-center h-7 sm:h-[28px] text-center select-none shrink-0" id="live-clock-container">
-      <div className="w-full text-center text-[12.5px] sm:text-[13.5px] font-mono font-bold text-slate-800 tracking-tight leading-none mb-0.5 whitespace-nowrap underline decoration-[1px] underline-offset-2">
+      <div 
+        className="w-full text-center text-[12px] sm:text-[13px] text-slate-800 tracking-tight leading-none mb-0.5 whitespace-nowrap underline decoration-[1px] underline-offset-2"
+        style={{ 
+          fontFamily: "'IBM Plex Mono', monospace", 
+          fontWeight: 700,
+          fontFeatureSettings: '"zero" 0' 
+        }}
+      >
         {timeStr}
       </div>
       <div className="w-full text-center text-[8.5px] sm:text-[9px] font-mono font-bold text-emerald-600 tracking-[0.14em] leading-none whitespace-nowrap">

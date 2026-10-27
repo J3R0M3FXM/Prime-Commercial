@@ -1,0 +1,69 @@
+PRIME COMMERCIAL — GOOGLE AI STUDIO HANDOFF
+Prepared: 2026-10-27
+
+You are taking over the Prime Commercial Telegram Mini App project. Continue from the existing source and deployment state. The owner has experienced repeated implementation drift and does not want unrequested UI or behavior changes. Follow the task exactly, trace screenshots to the actual code before editing, and preserve all work already present.
+
+PROJECT AND BRANCH
+- Main source workspace: /data/data/com.termux/files/home/Prime-Commercial
+- Git branch: fix/security-audit-remediation-20261017
+- Upstream: origin/fix/security-audit-remediation-20261017
+- HEAD: 2f1262eb68b63911137f3bf249c06c84ce2a040a (2026-10-17, “chore(security): remove temporary lockfile workflow”)
+- The branch currently has a large, intentional dirty worktree: 123 modified/untracked paths were present at handoff. The worktree contains the migration, shopfront/admin implementation, docs, static output, and prior work from more than one agent. The committed branch alone does NOT represent the complete current implementation.
+- Before doing anything, inspect `git status --short --branch`, the relevant diffs, and the five project handoff files below. Do not reset, clean, checkout another branch, rebase, or replace files wholesale. Preserve all existing tracked and untracked work. If your AI Studio environment only fetched the Git commit, it may be missing local changes; establish that before editing/deploying.
+
+READ FIRST
+1. /data/data/com.termux/files/home/Prime-Commercial/AGENTS.md
+2. docs/TELEGRAM_SERVERLESS_HANDOFF.md (latest entries are at the top; current decision/deployment log)
+3. docs/TELEGRAM_SERVERLESS_MIGRATION.md (historical entries; verify against source)
+4. docs/TELEGRAM_SERVERLESS_AUDIT.md (dated snapshots, not automatically current truth)
+5. TODO.md (contains open device checks and historical tasks; do not assume older revision numbers are current)
+
+DEPLOYED TARGET / INFRASTRUCTURE
+- Telegram Serverless app: app8830494959
+- Target bot: @primenetworkphbot. Owner previously verified its binding and active Secretary Telegram Business connection with reply permission. Do not ask them to reconfirm.
+- Public static host: https://app8830494959.tgcloud.ai/
+- TGCloud deployment workspace: /data/data/com.termux/files/home/primenetworkphbot (this folder is separate from the source Git repository and is linked to app8830494959).
+- Latest fetched/deployed revision: 201. Latest `tgcloud status`: 126 static files current. Latest `tgcloud webhook`: in sync, zero pending updates; allowed updates callback_query, business_connection, business_message.
+- In that deployment workspace, these local backend edits are pre-existing and NOT deployed: `tgcloud/lib/order-expiry.js`, `tgcloud/endpoints/createOrder.js`, `tgcloud/endpoints/geoapifyAddress.js`, `tgcloud/endpoints/getPublicOrderQueue.js`, `tgcloud/endpoints/getTelegramSession.js`, `tgcloud/endpoints/validateReferral.js`; `tgcloud/handlers/message.js` is a new, unrelated undeployed handler; local `tgcloud/endpoints/setShopMenuButton.js` is deleted while still present remotely. Preserve them and do not include them in a scoped push unless the exact task requires it and the deployed snapshot has been reconciled first.
+- `.tgcloud/remote/` in the target workspace is the fetched clean server snapshot. For any endpoint deployment, compare against that snapshot and deploy only the intended endpoint(s), not the entire project.
+- BotFather links must not be changed. Do not deploy the whole project. Do not expose or copy tokens, keys, credentials, customer data, delivery addresses, phone numbers, or receipt contents into prompts/docs/logs.
+
+CURRENT ARCHITECTURE
+- One Telegram Mini App contains the PRIME Commercial storefront and Admin/Secretary configurator.
+- Source is a Next.js 15 / React 19 / TypeScript app. The active Telegram static app is bundled with Vite: `npm run build:miniapp -- --outDir <temporary-output>`. `vite.config.ts` uses browser shims for `next/navigation` and `next/dynamic`; Vite outputs `dist/`.
+- `tgcloud.jsonc` publishes `dist/` as a TGCloud SPA, with `/assets/*` immutable. The deployed app is therefore the static Vite bundle, not a Next.js server deployment.
+- Active customer/admin backend calls use the Telegram Serverless bridge in `lib/telegram-serverless-client.ts` and JavaScript endpoints in `tgcloud/endpoints/`; Telegram update handling is in `tgcloud/handlers/`. The target data model is Telegram Serverless SQLite via TGCloud `sdk/db` / Drizzle (`tgcloud/schema.js`). Legacy Next.js API routes in `app/api/` are not necessarily active in the TGCloud static flow; trace the actual call path before changing one.
+- Supabase files/migrations remain historical/source context. Do not apply a Supabase migration to the TGCloud target. Schema work must be explicit, additive/safe where possible, and verified against TGCloud’s actual schema before deploy.
+- `primeintegratedbot/` and app8843706118 are Command Center UI source/reference; app8830494959 is the accepted production/beta target.
+
+CURRENT SHOPFRONT / OWNER DECISIONS
+- Checkout is inline in the shopfront cart page, under the PRIME app header, inside the 430px portrait shell. It is not intended to be a full-viewport fixed overlay.
+- The app’s bottom tab bar must remain visible and clickable during an ongoing checkout. Switching tabs hides checkout while preserving its mounted state; returning to Cart should resume the same checkout step and entered values. Never hide/disable the tabs without a direct owner instruction.
+- The owner explicitly asked to remove checkout step counters and redundant copy. This explicit request overrides the older checkout counter rule in AGENTS.md for this screen. Current step titles: DELIVERY DETAILS, DELIVERY & HANDLING, REVIEW. Removed repeated section titles/descriptions, the traffic disclaimer paragraph, and redundant “Final Total” heading. Keep distance/time figures and TOTAL PAYABLE NOW.
+- Current checkout source is `app/components/checkout-modal.tsx`; mounting/state bridge is in `app/components/cart-drawer.tsx` and `app/page.tsx`. Trace all three together before modifying checkout layout/navigation.
+- Preserve 430px portrait width on storefront/admin and all sheets. Technical labels/numbers use Lato Condensed; headings use Roboto Condensed Regular.
+
+LATEST SCREENSHOT / OPEN ISSUE
+- Latest supplied screenshot: `/sdcard/Download/Screenshot_2026-10-27-21-12-32-745_org.telegram.messenger.web.jpg`.
+- It shows Telegram’s native load failure `net::ERR_NAME_NOT_RESOLVED`; PRIME HTML/JavaScript did not render. This occurs before application code runs.
+- Investigation from the Termux deployment environment: DNS resolved `app8830494959.tgcloud.ai`; `curl -fsS --connect-timeout 10 --max-time 20 https://app8830494959.tgcloud.ai/` succeeded; downloaded live `index.html` had the same SHA-256 as deployed local `dist/index.html` (`ec403a10d0d6de07f888b243c5a7c30b71453725aaba92d11feb1cc637a0c663`). TGCloud remained revision 201 / 126 static files current / webhook in sync.
+- This verifies the host from the deployment environment only; it does not test DNS on the owner’s phone. No code change or deployment was made for this screenshot because app code cannot repair DNS resolution before the page is fetched. Next useful step is to reproduce on the phone using Wi-Fi vs mobile data or another device/network. Do not make a no-op deploy or change the TGCloud/BotFather hostname without a concrete diagnosis and owner authorization.
+
+SYSTEMS / ACTIVE PLANS
+- Delivery: TomTom motorcycle routing is used for route duration/traffic estimates. Couriers have a configurable TIME-BASED FEE (currency/minute); current fee engine is existing distance fee + configured per-minute rate × route minutes, rounded to whole pesos (.50 rounds up). Existing courier rates default to zero until configured. Owner intends to compare the same destination at different times; motorcycle route quality and fee movement still need owner runtime confirmation. See `docs/TRAFFIC_PRICING_PLAN.md` and handoff.
+- GPS/address: explicit delivery GPS requires a fresh device reading and currently accepts device-reported accuracy <=20m. GPS coordinates remain the delivery pin. Reverse geocoding requests a building-level match then falls back to the best general address; mapping data may lack a house/lot record even when the GPS point is accurate. Customers can enter missing house/lot/unit details manually. IP-derived location is approximate investigative context only, not precise delivery GPS.
+- Fraud investigation: order flow captures permitted device location/fingerprint/IP observations as separate signals. They are leads, not proof of identity or intent. Do not add covert collection or represent these signals as definitive. Review current implementation and privacy wording before changing.
+- Visitors: Admin Visitors module exists. PRIME Member ID is assigned after first successful Completed/Delivered order; referral eligibility requires successful order history. Runtime behavior still needs review on device.
+- POS: Admin POS supports store/delivery, product variants, existing customer or guest recipient, server-side order validation, stock reservation, and payment/status notifications. Never create a live sale or message a test customer unless the owner explicitly authorizes the safe test customer/product/payment flow.
+- Telegram business messages/order notifications, Order History, queue monitor, address picker, variant UI, and checkout have received prior fixes. Consult current source and the top of the handoff before repeating any historical issue as current.
+
+WORKFLOW FOR THE NEXT TASK
+1. Read the five required documents and inspect the latest screenshot(s) in `/sdcard/Download`. Do not repeat customer names, phone numbers, order IDs, addresses, or receipt data from screenshots in logs/docs/prompt.
+2. State the observed issue, trace the exact component/call path and deployed snapshot, and make only the requested change. Do not redesign nearby flows or alter controls/behavior not requested.
+3. Keep source edits in `/data/data/com.termux/files/home/Prime-Commercial`. Build static output into a unique temporary path, e.g. `/data/data/com.termux/files/usr/tmp/prime-<task>`. Run scoped `git diff --check`; syntax-check only touched backend JS as appropriate. Do not treat old whole-project TypeScript errors as caused by a scoped UI change.
+4. Before deploy, check target `tgcloud status` and fetched revision in `/data/data/com.termux/files/home/primenetworkphbot`. Preserve unrelated local target changes. Copy the built static output into target `dist/` without deleting old hashed assets, then use a static-only `tgcloud push dist` when appropriate. For backend changes, stage/deploy only exact required module(s) based on `.tgcloud/remote/`; never deploy all modules/project by default.
+5. After deployment, run `tgcloud fetch` and `tgcloud status`; verify revision, static count and webhook status. Report any network/probe failure distinctly from deploy success. Do not claim device verification unless the owner tests it.
+6. Update `docs/TELEGRAM_SERVERLESS_HANDOFF.md`, the relevant audit/migration doc, and TODO with exact files/commands/results, verification limits, risks, and next step. Do not store secrets or customer data.
+7. Final response: concise, name the exact fix and changed files, checks/build, deployment revision/status (or clearly say why deployment was not possible), and unresolved device verification.
+
+The immediate open issue is the phone-side DNS report above. Continue from it only after confirming whether the owner has a newer screenshot or a reproducible network result. Preserve all current changes and avoid speculative code changes to a failure that happens before PRIME loads.
