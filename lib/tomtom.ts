@@ -18,8 +18,26 @@ export interface TomTomAddressResult {
   confidence?: number;
 }
 
+let runtimeTomTomApiKey: string | null = null;
+
+export function setRuntimeTomTomApiKey(key: string) {
+  runtimeTomTomApiKey = key.trim();
+  if (typeof process !== 'undefined' && process.env) {
+    process.env.TOMTOM_API_KEY = runtimeTomTomApiKey;
+  }
+}
+
 export function getTomTomApiKey(): string | undefined {
-  return (process.env.TOMTOM_API_KEY || process.env.NEXT_PUBLIC_TOMTOM_API_KEY)?.trim();
+  if (runtimeTomTomApiKey) return runtimeTomTomApiKey;
+  const envKey = (process.env.TOMTOM_API_KEY || process.env.NEXT_PUBLIC_TOMTOM_API_KEY)?.trim();
+  if (envKey) return envKey;
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('prime_tomtom_api_key');
+      if (stored && stored.trim()) return stored.trim();
+    } catch {}
+  }
+  return undefined;
 }
 
 export function isTomTomConfigured(): boolean {

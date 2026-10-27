@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { Plus, MapPin, Building2, Truck, Check, Search, X, Loader2, Star, Settings, AlertCircle, Trash2, Sparkles } from "lucide-react";
+import { Plus, MapPin, Building2, Truck, Check, Search, X, Loader2, Star, Settings, AlertCircle, Trash2, Sparkles, Key, Eye, EyeOff } from "lucide-react";
 
 const WarehouseMap = dynamic(() => import("./warehouse-map"), {
   ssr: false,
@@ -41,6 +41,15 @@ export default function LogisticsModule() {
   // Couriers State
   const [couriers, setCouriers] = useState<any[]>([]);
   const [loadingCouriers, setLoadingCouriers] = useState(true);
+
+  // TomTom Routing & Geocoding Provider State
+  const [tomtomApiKeyInput, setTomtomApiKeyInput] = useState("");
+  const [tomtomConfigured, setTomtomConfigured] = useState(false);
+  const [maskedTomtomKey, setMaskedTomtomKey] = useState("");
+  const [savingTomtomKey, setSavingTomtomKey] = useState(false);
+  const [tomtomKeyStatus, setTomtomKeyStatus] = useState<string | null>(null);
+  const [tomtomKeyError, setTomtomKeyError] = useState<string | null>(null);
+  const [showTomtomKey, setShowTomtomKey] = useState(false);
 
   // Courier Config Modal State
   const [showCourierModal, setShowCourierModal] = useState(false);
@@ -251,7 +260,73 @@ export default function LogisticsModule() {
   useEffect(() => {
     fetchWarehouses();
     fetchCouriers();
+    fetchLogisticsSettings();
   }, []);
+
+  const fetchLogisticsSettings = async () => {
+    try {
+      const res = await fetch("/api/admin/logistics/settings", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.configured) {
+          setTomtomConfigured(true);
+          setMaskedTomtomKey(data.maskedKey || "••••••••");
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load logistics settings from server:", e);
+    }
+
+    try {
+      const local = typeof window !== "undefined" ? localStorage.getItem("prime_tomtom_api_key") : null;
+      if (local && local.trim()) {
+        setTomtomConfigured(true);
+        if (!maskedTomtomKey) {
+          setMaskedTomtomKey(local.length > 8 ? `${local.slice(0, 4)}••••••••${local.slice(-4)}` : "••••••••");
+        }
+      }
+    } catch {}
+  };
+
+  const handleSaveTomTomKey = async () => {
+    const key = tomtomApiKeyInput.trim();
+    if (!key) {
+      setTomtomKeyError("Please enter your TomTom API Key.");
+      return;
+    }
+
+    setSavingTomtomKey(true);
+    setTomtomKeyError(null);
+    setTomtomKeyStatus(null);
+
+    try {
+      // 1. Save to local storage for immediate client accessibility
+      try {
+        localStorage.setItem("prime_tomtom_api_key", key);
+      } catch {}
+
+      // 2. Persist to server logistics settings
+      const res = await fetch("/api/admin/logistics/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: key }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to verify or save TomTom API key.");
+      }
+
+      setTomtomConfigured(true);
+      setMaskedTomtomKey(key.length > 8 ? `${key.slice(0, 4)}••••••••${key.slice(-4)}` : "••••••••");
+      setTomtomApiKeyInput("");
+      setTomtomKeyStatus("✓ TomTom API Key verified and active for motorcycle routing, live traffic, and address autocomplete.");
+    } catch (err: any) {
+      setTomtomKeyError(err.message || "Failed to save TomTom API Key.");
+    } finally {
+      setSavingTomtomKey(false);
+    }
+  };
 
   const fetchWarehouses = async () => {
     try {
@@ -515,6 +590,80 @@ export default function LogisticsModule() {
             <a href="#admin-add-courier" role="button" className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer">
               <Plus className="w-4 h-4" /> Add Courier
             </a>
+          </div>
+
+          {/* TomTom Routing & Geocoding Provider Engine */}
+          <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-emerald-600" />
+                <h4 className="font-heading font-black text-sm text-slate-900 uppercase">
+                  Routing & Geocoding Engine (TomTom)
+                </h4>
+              </div>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                tomtomConfigured ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+              }`}>
+                {tomtomConfigured ? 'Active' : 'Key Needed'}
+              </span>
+            </div>
+            
+            <p className="text-[11px] font-mono text-slate-500 mb-2.5">
+              Powers address autocomplete, reverse geocoding, motorcycle road routing, and live traffic travel times.
+            </p>
+
+            {maskedTomtomKey && (
+              <div className="mb-2 text-xs font-mono text-slate-600 bg-slate-50 px-2.5 py-1.5 border border-slate-100 flex items-center justify-between">
+                <span>Current Key: <strong className="text-slate-800">{maskedTomtomKey}</strong></span>
+                <span className="text-[10px] text-emerald-600 font-bold uppercase">Ready</span>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showTomtomKey ? "text" : "password"}
+                  value={tomtomApiKeyInput}
+                  onChange={(e) => {
+                    setTomtomApiKeyInput(e.target.value);
+                    if (tomtomKeyError) setTomtomKeyError(null);
+                    if (tomtomKeyStatus) setTomtomKeyStatus(null);
+                  }}
+                  placeholder={tomtomConfigured ? "Paste new key to replace..." : "Paste TomTom API Key..."}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 pr-9 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowTomtomKey(!showTomtomKey)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showTomtomKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveTomTomKey}
+                disabled={savingTomtomKey}
+                className="bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 shrink-0"
+              >
+                {savingTomtomKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
+                {savingTomtomKey ? "Saving..." : "Save Key"}
+              </button>
+            </div>
+
+            {tomtomKeyError && (
+              <p className="text-[11px] font-mono text-red-600 mt-2 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {tomtomKeyError}
+              </p>
+            )}
+
+            {tomtomKeyStatus && (
+              <p className="text-[11px] font-mono text-emerald-600 mt-2 flex items-center gap-1.5 font-bold">
+                <Check className="w-3.5 h-3.5 shrink-0" />
+                {tomtomKeyStatus}
+              </p>
+            )}
           </div>
 
           {courierError && !showCourierModal && (
