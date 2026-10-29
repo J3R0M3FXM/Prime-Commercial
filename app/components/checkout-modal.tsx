@@ -1573,7 +1573,7 @@ export default function CheckoutModal({
                     No couriers currently available for this route. Please re-adjust address or contact support.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                     {availableCouriers.map((courier) => {
                       const isSelected = selectedCourierId === courier.id;
                       return (
@@ -2230,9 +2230,9 @@ export default function CheckoutModal({
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    {/* Method Tiles Selection (4 columns per row, max 2 rows per page, swipe left/right + dot indicators) */}
+                    {/* Method Tiles Selection (3 columns per row, max 2 rows per page, swipe left/right + dot indicators) */}
                     {(() => {
-                      const itemsPerPage = 8;
+                      const itemsPerPage = 6;
                       const totalPages = Math.ceil(paymentMethods.length / itemsPerPage);
                       
                       // Safety: if the current page is out of bounds, clip it
@@ -2248,7 +2248,7 @@ export default function CheckoutModal({
                             onTouchMove={handleTouchMove}
                             onTouchEnd={() => handleTouchEnd(totalPages)}
                           >
-                            <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                               {slicedMethods.map((method) => {
                                 const isOffline = method.isActive === false;
                                 const isSelected = !isOffline && selectedPaymentMethod?.id === method.id;
