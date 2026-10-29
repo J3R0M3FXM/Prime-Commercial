@@ -1241,7 +1241,7 @@ export default function CheckoutModal({
   return (
     <div ref={overlayRef} className="prime-checkout w-full bg-gray-50 flex justify-center py-0">
       <div 
-        className="bg-white w-full max-w-[760px] shadow-sm border-x border-gray-200 overflow-hidden flex flex-col"
+        className="bg-white w-full max-w-[760px] h-auto max-h-[calc(100dvh-150px)] min-h-0 shadow-sm border-x border-gray-200 overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
       >
@@ -1293,7 +1293,7 @@ export default function CheckoutModal({
         )}
 
         {/* Modal Scrollable Content */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-2.5">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-3 space-y-2.5">
 
           {/* ================= STEP 1: IDENTITY & RECEIVER ================= */}
           {currentStep === 1 && (
