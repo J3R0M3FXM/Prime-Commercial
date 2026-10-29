@@ -1,0 +1,27 @@
+name: PRIME order notification dispatch
+
+on:
+  repository_dispatch:
+    types: [prime-order-notification-tick]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prime-order-notification-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: vars.PRIME_NOTIFICATION_DISPATCH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run the bounded Serverless notification dispatcher
+        env:
+          TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_TOKEN }}
+        run: npm exec --yes --package=@tgcloud/cli -- tgcloud run endpoints/dispatchOrderNotifications '{}'
