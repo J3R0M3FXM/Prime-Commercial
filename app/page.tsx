@@ -585,7 +585,7 @@ export default function Shopfront() {
           }`}
         >
           <Store className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">SHOP</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">SHOP</span>
         </button>
 
         {/* 2. CART */}
@@ -605,7 +605,7 @@ export default function Shopfront() {
               </span>
             )}
           </div>
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">CART</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">CART</span>
         </button>
 
         {/* 3. ORDERS */}
@@ -619,7 +619,7 @@ export default function Shopfront() {
           className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-500 hover:text-gray-900 cursor-pointer"
         >
           <Receipt className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">ORDERS</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">ORDERS</span>
         </button>
 
         {/* 4. NOTIFICATIONS */}
@@ -631,7 +631,7 @@ export default function Shopfront() {
           className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
         >
           <Bell className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">NOTIFICATIONS</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">NOTIFICATIONS</span>
         </button>
 
         {/* 5. MEDIA — CLICKABLE, CONTENT TEMPORARILY LOCKED */}
@@ -648,7 +648,7 @@ export default function Shopfront() {
           }`}
         >
           <Film className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">MEDIA</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">MEDIA</span>
         </button>
 
         {/* 6. ACCOUNT */}
@@ -661,7 +661,7 @@ export default function Shopfront() {
           className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-500 hover:text-gray-900 cursor-pointer"
         >
           <User className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">ACCOUNT</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">ACCOUNT</span>
         </button>
 
         {/* 7. SUPPORT */}
@@ -673,7 +673,7 @@ export default function Shopfront() {
           className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
         >
           <Headphones className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">SUPPORT</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">SUPPORT</span>
         </button>
       </nav>
     </div>
