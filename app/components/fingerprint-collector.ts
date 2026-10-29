@@ -585,23 +585,14 @@ async function getBrowserPreciseLocation(
   timeoutMs: number,
   allowPermissionPrompt: boolean,
 ): Promise<LocationResult | null> {
-  if (!navigator.geolocation) return null;
+  if (typeof navigator === "undefined" || !navigator.geolocation) return null;
 
-  // On a silent retry, only use the browser channel when the browser explicitly
-  // reports an already-granted permission. This prevents Step 4 from creating a
-  // second Android/WebView prompt.
+  // Silent callers may use browser geolocation only if permission is already granted.
   if (!allowPermissionPrompt) {
     try {
-      if (!navigator.permissions?.query) {
-        return { lat: 0, lon: 0, source: "Unavailable" };
-      }
-
-      const permission = await navigator.permissions.query({
-        name: "geolocation" as PermissionName,
-      });
-      if (permission.state !== "granted") {
-        return { lat: 0, lon: 0, source: "Unavailable" };
-      }
+      if (!navigator.permissions?.query) return { lat: 0, lon: 0, source: "Unavailable" };
+      const permission = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+      if (permission.state !== "granted") return { lat: 0, lon: 0, source: "Unavailable" };
     } catch {
       return { lat: 0, lon: 0, source: "Unavailable" };
     }
@@ -610,45 +601,63 @@ async function getBrowserPreciseLocation(
   return new Promise((resolve) => {
     let settled = false;
     let watchId: number | null = null;
+    let settleTimer: number | null = null;
+    let best: LocationResult | null = null;
 
+    const cleanup = () => {
+      window.clearTimeout(deadlineTimer);
+      if (settleTimer !== null) window.clearTimeout(settleTimer);
+      if (watchId !== null) {
+        try { navigator.geolocation.clearWatch(watchId); } catch { /* best effort */ }
+      }
+    };
     const finish = (result: LocationResult) => {
       if (settled) return;
       settled = true;
-      window.clearTimeout(timer);
-      if (watchId !== null) {
-        try {
-          navigator.geolocation.clearWatch(watchId);
-        } catch {
-          // ignore cleanup failures
-        }
-      }
+      cleanup();
       resolve(result);
     };
+    const bestAcceptableFix = (): LocationResult =>
+      best && Number.isFinite(best.accuracy) && Number(best.accuracy) <= 100
+        ? best
+        : { lat: 0, lon: 0, source: "Unavailable" };
 
-    const timer = window.setTimeout(() => {
-      finish({ lat: 0, lon: 0, source: "Unavailable" });
-    }, timeoutMs);
+    const deadlineTimer = window.setTimeout(() => finish(bestAcceptableFix()), timeoutMs);
 
     try {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
-          finish({
+          const accuracy = Number(pos.coords.accuracy);
+          const candidate: LocationResult = {
             lat: pos.coords.latitude,
             lon: pos.coords.longitude,
-            accuracy: Math.round(pos.coords.accuracy),
+            accuracy: Number.isFinite(accuracy) && accuracy > 0 ? Math.round(accuracy) : undefined,
             altitude: pos.coords.altitude ?? null,
             source: "Precise GPS",
-          });
+          };
+          if (!Number.isFinite(candidate.lat) || !Number.isFinite(candidate.lon) ||
+              (candidate.lat === 0 && candidate.lon === 0)) return;
+
+          if (!best || (Number.isFinite(candidate.accuracy) &&
+              (!Number.isFinite(best.accuracy) || Number(candidate.accuracy) < Number(best.accuracy)))) {
+            best = candidate;
+          }
+
+          if (Number.isFinite(candidate.accuracy) && Number(candidate.accuracy) <= 25) {
+            finish(candidate);
+            return;
+          }
+
+          // Sample briefly for an improved reading; avoid a fixed eight-second wait.
+          if (settleTimer === null) {
+            settleTimer = window.setTimeout(() => finish(bestAcceptableFix()), Math.min(2500, timeoutMs));
+          }
         },
         (err) => {
           console.warn("Browser GPS request failed:", err.message);
           finish({ lat: 0, lon: 0, source: "Unavailable" });
         },
-        {
-          enableHighAccuracy: true,
-          timeout: timeoutMs,
-          maximumAge: 0,
-        },
+        { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 },
       );
     } catch (error) {
       console.warn("Browser GPS request could not start:", error);
@@ -658,37 +667,35 @@ async function getBrowserPreciseLocation(
 }
 
 export async function getClientLocation(
-  timeoutMs = 60000,
+  timeoutMs = 30000,
   allowPermissionPrompt = true,
 ): Promise<LocationResult> {
   if (typeof window === "undefined") {
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  // IMPORTANT: Start the Android/WebView geolocation flow immediately.
-  // This is the permission channel surfaced by the embedded client. Do not
-  // wait on Telegram's native helper before initiating it, or the first
-  // permission dialog can be deferred until Step 4.
+  const telegramWebApp = (window as any)?.Telegram?.WebApp;
+  const manager = telegramWebApp?.LocationManager;
+  const hasTelegramLocationManager =
+    !!manager &&
+    typeof manager.init === "function" &&
+    typeof manager.getLocation === "function";
+
+  // Prefer Telegram's native provider inside a Mini App, but cap its wait.
+  if (hasTelegramLocationManager) {
+    const telegramLocation = await getTelegramPreciseLocation(
+      Math.min(12000, Math.max(5000, timeoutMs * 0.4)),
+      allowPermissionPrompt,
+    );
+    if (telegramLocation?.source === "Precise GPS") return telegramLocation;
+  }
+
+  // Browser fallback compares several fresh readings instead of trusting the first.
   const browserLocation = await getBrowserPreciseLocation(
-    Math.min(timeoutMs, 30000),
+    Math.min(18000, timeoutMs),
     allowPermissionPrompt,
   );
-
-  if (browserLocation?.source === "Precise GPS") {
-    return browserLocation;
-  }
-
-  // Telegram native fallback uses the already-existing helper and only runs
-  // after the direct WebView path had an opportunity to acquire a coordinate.
-  const remaining = Math.max(10000, timeoutMs - 30000);
-  const telegramLocation = await getTelegramPreciseLocation(
-    remaining,
-    allowPermissionPrompt,
-  );
-
-  if (telegramLocation?.source === "Precise GPS") {
-    return telegramLocation;
-  }
+  if (browserLocation?.source === "Precise GPS") return browserLocation;
 
   return { lat: 0, lon: 0, source: "Unavailable" };
 }
