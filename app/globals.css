@@ -31,6 +31,12 @@ h1, h2, h3, h4, h5, h6, .font-heading, label {
   font-family: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif !important;
 }
 
+/* Explicit semibold Roboto Condensed for Shopfront footer and navigation labels. */
+.font-roboto-condensed-semibold {
+  font-family: 'Roboto Condensed', sans-serif !important;
+  font-weight: 600 !important;
+}
+
 /* Universal Form Controls font inheritance */
 button, input, select, textarea, optgroup {
   font-family: inherit;
