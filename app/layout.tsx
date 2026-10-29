@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "@fontsource/lato/400.css";
 import "@fontsource/lato/700.css";
 import "@fontsource/roboto-condensed/400.css";
+import "@fontsource/roboto-condensed/600.css";
 import "./globals.css";
 import CartProvider from "./components/cart-context";
 import Script from "next/script";
