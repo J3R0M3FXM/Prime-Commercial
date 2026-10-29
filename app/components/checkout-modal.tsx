@@ -658,19 +658,26 @@ export default function CheckoutModal({
   const handleUseMyLocation = async () => {
     setIsLocating(true);
     setAddressError("");
+    // Clear any earlier reading so a failed retry cannot leave a stale fix selected.
+    setDeviceGps(null);
+    setDeviceGpsAddress("");
 
     try {
-      const location = await getClientLocation(60000, true);
+      const location = await getClientLocation(30000, true);
       const lat = Number(location?.lat);
       const lon = Number(location?.lon);
 
+      const accuracy = Number(location?.accuracy);
       if (
         location?.source !== "Precise GPS" ||
         !Number.isFinite(lat) ||
         !Number.isFinite(lon) ||
         (lat === 0 && lon === 0)
       ) {
-        throw new Error("Unable to retrieve your precise location. Please allow location access and try again.");
+        throw new Error("Could not get your location. Check location permission and GPS, then try again.");
+      }
+      if (Number.isFinite(accuracy) && accuracy > 100) {
+        throw new Error(`GPS accuracy is currently about ${Math.round(accuracy)} m. Move to an open area and try again; your delivery pin was not changed.`);
       }
 
       const capturedAt = new Date().toISOString();
