@@ -119,7 +119,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   return (
     <div className="w-full flex justify-center bg-gray-50 py-[4.8px]">
       {!isCheckoutOpen && (
-        <div className="w-full max-w-[760px] bg-white h-auto max-h-[calc(100vh-120px)] shadow-sm flex flex-col relative border-x border-slate-200">
+        <div className="w-full max-w-[760px] bg-white h-auto max-h-[calc(100dvh-150px)] min-h-0 shadow-sm flex flex-col relative border-x border-slate-200">
         
         {/* Header */}
         <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
@@ -136,7 +136,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         </div>
 
         {/* Cart Items */}
-        <div className="overflow-y-auto p-2.5 space-y-2 max-h-[calc(100vh-250px)]">
+        <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2 max-h-[calc(100dvh-250px)]">
           {safeCart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-3 py-12">
               <ShoppingCart className="w-12 h-12 opacity-20" />
