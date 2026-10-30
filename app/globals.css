@@ -104,6 +104,7 @@ body .prime-order-history .font-misans-regular { font-family: 'MiSans', sans-ser
 .prime-receipt-forensics__icon::after { content: ''; position: absolute; inset: 5px; border: 1px solid rgb(167 243 208 / 35%); border-radius: 6px; animation: prime-forensics-pulse 1.8s ease-in-out infinite; }
 .prime-receipt-forensics__ring { position: absolute; inset: 3px; border: 1px solid rgb(110 231 183 / 35%); border-top-color: #a7f3d0; border-radius: 50%; animation: prime-forensics-spin 2.2s linear infinite; }
 .prime-receipt-forensics__line { position: absolute; left: 4px; right: 4px; top: 16px; height: 2px; border-radius: 999px; background: #a7f3d0; box-shadow: 0 0 8px #34d399; animation: prime-forensics-scan 1.4s ease-in-out infinite; }
+.prime-receipt-forensics__complete { padding: 12px 8px; color: #064e3b; font: 12px/1.45 'MiSans', sans-serif; text-align: center; text-justify: inter-word; }
 @keyframes prime-forensics-spin { to { transform: rotate(360deg); } }
 @keyframes prime-forensics-scan { 0%, 100% { transform: translateY(-8px); opacity: .45; } 50% { transform: translateY(8px); opacity: 1; } }
 @keyframes prime-forensics-pulse { 50% { transform: scale(.82); opacity: .45; } }

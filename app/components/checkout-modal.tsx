@@ -2702,14 +2702,8 @@ export default function CheckoutModal({
 
                                 {/* Analysis-complete prompt */}
                                 {ocrAnalysis && !isAnalyzingReceipt && (
-                                  <div className="p-3.5 rounded-none border border-emerald-200 bg-emerald-50/80 space-y-2 animate-in fade-in zoom-in-98 duration-200 text-left">
-                                    <div className="flex items-center gap-1.5 border-b border-emerald-200/80 pb-2">
-                                      <FileCheck className="w-4 h-4 text-emerald-700" />
-                                      <span className="text-[11px] font-heading font-black uppercase tracking-wider text-emerald-950">Analysis Completed</span>
-                                    </div>
-                                    <p className="text-xs font-mono text-emerald-950">The receipt file hash and normalized pixel sample are recorded. Secure upload will compare for exact image reuse and replacement against prior evidence.</p>
-                                    <p className="text-[10px] font-mono text-amber-900">This analysis cannot prove a receipt is authentic or detect every edit. Staff will verify the payment manually; the scan never marks an order Paid.</p>
-                                    {ocrError && <p className="text-xs text-red-700">{ocrError}</p>}
+                                  <div className="prime-receipt-forensics__complete animate-in fade-in zoom-in-98 duration-200">
+                                    The receipt image file hash and normalized pixel-level fingerprint have been captured. Secure upload will store this metadata to ensure that this receipt will not be reused, edited, or tampered in any way in the future.
                                   </div>
                                 )}
                                 {ocrError && !ocrAnalysis && !isAnalyzingReceipt && <p className="p-2 text-xs text-red-700 bg-red-50 border border-red-200">{ocrError}</p>}
