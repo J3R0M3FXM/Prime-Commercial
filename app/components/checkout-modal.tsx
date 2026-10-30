@@ -2350,7 +2350,7 @@ export default function CheckoutModal({
                             onTouchMove={handleTouchMove}
                             onTouchEnd={() => handleTouchEnd(totalPages)}
                           >
-                            <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                            <div className="grid grid-cols-4 gap-x-1.5 gap-y-2 sm:gap-x-2 sm:gap-y-2">
                               {slicedMethods.map((method) => {
                                 const isOffline = method.isActive === false;
                                 const isSelected = !isOffline && selectedPaymentMethod?.id === method.id;
@@ -2404,7 +2404,7 @@ export default function CheckoutModal({
                                         </div>
                                       )}
                                     </button>
-                                    <span className={`text-xs sm:text-[13px] font-heading font-bold truncate w-full text-center leading-tight ${
+                                    <span className={`payment-method-label truncate w-full text-center leading-tight ${
                                       isOffline ? "text-gray-400" : "text-gray-900"
                                     }`}>
                                       {method.name}
