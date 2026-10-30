@@ -57,7 +57,7 @@ button, input, select, textarea, optgroup {
 .prime-checkout__review-warning { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 10px; border-radius: 10px; }
 .prime-checkout__review-warning-icon { display: flex; min-height: 100%; align-items: center; justify-content: center; }
 .prime-checkout__review-warning-icon svg { display: block; width: 52px; height: 52px; min-height: 52px; max-height: 100%; }
-.prime-checkout__review-warning p { align-self: center; margin: 0; text-align: left; line-height: 1.13; }
+.prime-checkout__review-warning p { align-self: center; margin: 0; text-align: center; line-height: 1.13; }
 .prime-checkout__actions > button, .prime-checkout__submit { box-sizing: border-box; width: 148px; min-width: 0; height: 36px; min-height: 36px; padding: 0 8px; border-radius: 8px; font-size: 13px; line-height: 1; letter-spacing: -0.025em; }
 .prime-checkout__actions > button, .prime-checkout__submit { font-family: 'Roboto Condensed', sans-serif !important; font-weight: 600 !important; }
 .prime-checkout__submit { width: 148px; }
@@ -99,6 +99,14 @@ body .prime-order-history .font-misans-regular { font-family: 'MiSans', sans-ser
 .prime-receipt-scan__icon { width: 18px; height: 20px; stroke-width: 1.6; }
 .prime-receipt-scan__line { position: absolute; top: 3px; left: 2px; right: 2px; height: 2px; border-radius: 999px; background: #6ee7b7; box-shadow: 0 0 7px rgb(52 211 153 / 90%); animation: prime-receipt-scan 1.5s ease-in-out infinite; }
 @keyframes prime-receipt-scan { 0%, 100% { transform: translateY(0); opacity: .7; } 50% { transform: translateY(19px); opacity: 1; } }
+.prime-receipt-forensics__icon { position: relative; display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid rgb(110 231 183 / 55%); border-radius: 10px; background: linear-gradient(145deg, #0f766e, #0f172a 68%); color: #d1fae5; box-shadow: 0 0 18px rgb(16 185 129 / 22%); overflow: hidden; }
+.prime-receipt-forensics__icon::after { content: ''; position: absolute; inset: 5px; border: 1px solid rgb(167 243 208 / 35%); border-radius: 6px; animation: prime-forensics-pulse 1.8s ease-in-out infinite; }
+.prime-receipt-forensics__ring { position: absolute; inset: 3px; border: 1px solid rgb(110 231 183 / 35%); border-top-color: #a7f3d0; border-radius: 50%; animation: prime-forensics-spin 2.2s linear infinite; }
+.prime-receipt-forensics__line { position: absolute; left: 4px; right: 4px; top: 16px; height: 2px; border-radius: 999px; background: #a7f3d0; box-shadow: 0 0 8px #34d399; animation: prime-forensics-scan 1.4s ease-in-out infinite; }
+@keyframes prime-forensics-spin { to { transform: rotate(360deg); } }
+@keyframes prime-forensics-scan { 0%, 100% { transform: translateY(-8px); opacity: .45; } 50% { transform: translateY(8px); opacity: 1; } }
+@keyframes prime-forensics-pulse { 50% { transform: scale(.82); opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .prime-receipt-forensics__ring, .prime-receipt-forensics__line, .prime-receipt-forensics__icon::after { animation: none; } }
 .prime-checkout__header > button { flex: 0 0 32px; width: 32px; height: 32px; padding: 4px; }
 .prime-checkout__header > button:first-child { margin-left: -3px; }
 .prime-checkout [class~="text-xs"] { font-size: 14px !important; line-height: 1.35; }

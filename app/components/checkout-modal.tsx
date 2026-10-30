@@ -2687,18 +2687,19 @@ export default function CheckoutModal({
 
                                 {/* Live receipt forensics state */}
                                 {isAnalyzingReceipt && (
-                                  <div className="p-3.5 bg-slate-900 text-white rounded-none border border-slate-800 space-y-2 animate-in fade-in duration-200">
+                                  <div className="prime-receipt-forensics p-3.5 bg-slate-950 text-white rounded-xl border border-slate-700/80 space-y-2.5 animate-in fade-in duration-200">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
-                                        <div className="prime-receipt-scan" aria-hidden="true">
+                                        <div className="prime-receipt-forensics__icon" aria-hidden="true">
                                           <Receipt className="prime-receipt-scan__icon" />
-                                          <span className="prime-receipt-scan__line" />
+                                          <span className="prime-receipt-forensics__ring" />
+                                          <span className="prime-receipt-forensics__line" />
                                         </div>
                                         <span className="text-[11px] font-heading font-bold uppercase tracking-wider text-slate-200">
                                           Automated Forensics Analysis
                                         </span>
                                       </div>
-                                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800 animate-pulse">
+                                      <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-700/80 animate-pulse">
                                         ANALYZING...
                                       </span>
                                     </div>
@@ -2772,7 +2773,7 @@ export default function CheckoutModal({
                                       <span>Uploading for Forensics &amp; Manual Review...</span>
                                     </>
                                   ) : (
-                                      <span>Submit Receipt</span>
+                                      <span>UPLOAD TO PRIME SERVERS</span>
                                   )}
                                 </button>
                               </div>
