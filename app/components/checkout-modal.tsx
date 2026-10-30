@@ -2687,7 +2687,7 @@ export default function CheckoutModal({
 
                                 {/* Live receipt forensics state */}
                                 {isAnalyzingReceipt && (
-                                  <div className="prime-receipt-forensics p-3.5 bg-slate-950 text-white rounded-xl border border-slate-700/80 space-y-2.5 animate-in fade-in duration-200">
+                                  <div className="prime-receipt-forensics p-3.5 bg-white text-slate-900 rounded-xl border border-slate-200 space-y-2.5 animate-in fade-in duration-200">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <div className="prime-receipt-forensics__icon" aria-hidden="true">
@@ -2695,7 +2695,7 @@ export default function CheckoutModal({
                                           <span className="prime-receipt-forensics__ring" />
                                           <span className="prime-receipt-forensics__line" />
                                         </div>
-                                        <span className="text-[11px] font-heading font-bold uppercase tracking-wider text-slate-200">
+                                        <span className="text-[11px] font-heading font-bold uppercase tracking-wider text-slate-800">
                                           Automated Forensics Analysis
                                         </span>
                                       </div>
@@ -2703,10 +2703,10 @@ export default function CheckoutModal({
                                         ANALYZING...
                                       </span>
                                     </div>
-                                    <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                                       <div className="bg-emerald-400 h-full w-2/3 animate-[pulse_1s_ease-in-out_infinite]" />
                                     </div>
-                                    <p className="text-[10px] font-mono text-slate-400">
+                                    <p className="text-[10px] font-mono text-slate-500">
                                       Automated Image Forensics Analysis is in progress. Do not minimize or close this page. Please wait patiently as this could take up to 30 seconds.
                                     </p>
                                   </div>
