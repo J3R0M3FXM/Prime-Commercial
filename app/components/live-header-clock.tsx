@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 
-export default function LiveHeaderClock({ caption = "SECURED CUSTOMER ACCESS" }: { caption?: string }) {
+export default function LiveHeaderClock() {
   const [mounted, setMounted] = useState(false);
   const [timeStr, setTimeStr] = useState("");
 
@@ -27,7 +27,6 @@ export default function LiveHeaderClock({ caption = "SECURED CUSTOMER ACCESS" }:
     return (
       <div className="prime-live-clock" id="live-clock-placeholder">
         <div className="prime-live-clock__time prime-live-clock__placeholder" />
-        <div className="prime-live-clock__caption">{caption}</div>
       </div>
     );
   }
@@ -37,7 +36,6 @@ export default function LiveHeaderClock({ caption = "SECURED CUSTOMER ACCESS" }:
       <div className="prime-live-clock__time">
         {timeStr}
       </div>
-      <div className="prime-live-clock__caption">{caption}</div>
     </div>
   );
 }
