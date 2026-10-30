@@ -435,8 +435,8 @@ function toBase64Url(bytes: Uint8Array): string {
 
 async function prepareJpegUpload(
   file: File,
-  options: { maxDimension?: number; maxBytes?: number } = {},
-): Promise<{ id: string; data: string }> {
+  options: { maxDimension?: number; maxBytes?: number; preserveTransparency?: boolean } = {},
+): Promise<{ id: string; data: string; contentType: string }> {
   if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error('Choose a JPG, PNG, or WEBP image.');
   const loaded = await loadImage(file);
   let blob: Blob;
@@ -454,19 +454,20 @@ async function prepareJpegUpload(
     canvas.height = Math.max(1, Math.round(height * scale));
     const context = canvas.getContext('2d');
     if (!context) throw new Error('This image could not be prepared. Please choose it again.');
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
+    if (!options.preserveTransparency) { context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height); }
     context.drawImage(loaded.image, 0, 0, canvas.width, canvas.height);
-    blob = await canvasJpeg(canvas, 0.82);
+    blob = options.preserveTransparency
+      ? await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('This image could not be prepared.')), 'image/png'))
+      : await canvasJpeg(canvas, 0.82);
     for (const quality of [0.72, 0.62, 0.52, 0.42, 0.32, 0.24, 0.18]) {
-      if (blob.size <= maxBytes) break;
+      if (options.preserveTransparency || blob.size <= maxBytes) break;
       blob = await canvasJpeg(canvas, quality);
     }
   } finally { loaded.release(); }
   if (!blob || blob.size > Math.max(32_000, Number(options.maxBytes) || 600_000)) throw new Error('This image is too large to upload. Choose a smaller image.');
   const data = toBase64Url(new Uint8Array(await blob.arrayBuffer()));
   const id = 'img-' + (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`);
-  return { id, data };
+  return { id, data, contentType: options.preserveTransparency ? 'image/png' : 'image/jpeg' };
 }
 
 async function prepareQrUpload(file: File): Promise<{ id: string; data: string; contentType: string }> {
@@ -496,7 +497,7 @@ export async function uploadProductImage(file: File): Promise<string> {
   const upload = await prepareJpegUpload(file);
   const result = await callServerless<{ success: boolean; reference: string }>('uploadProductImage', {
     id: upload.id,
-    contentType: 'image/jpeg',
+    contentType: upload.contentType,
     data: upload.data,
   }, 60_000);
   if (!result?.success || !result.reference) throw new Error('The product image upload was not confirmed. Try again.');
@@ -505,10 +506,10 @@ export async function uploadProductImage(file: File): Promise<string> {
 
 export async function uploadPaymentImage(file: File, bucket: 'payment-method-logos' | 'payment-qr-codes'): Promise<string> {
   const upload = await prepareJpegUpload(file, bucket === 'payment-method-logos'
-    ? { maxDimension: 768, maxBytes: 200_000 }
+    ? { maxDimension: 768, maxBytes: 200_000, preserveTransparency: true }
     : {});
   const result = await callServerless<{ success: boolean; reference: string }>('uploadPaymentImage', {
-    id: upload.id, bucket, contentType: 'image/jpeg', data: upload.data,
+    id: upload.id, bucket, contentType: upload.contentType, data: upload.data,
   }, 60_000);
   if (!result?.success || !result.reference) throw new Error('The payment image upload was not confirmed. Try again.');
   return result.reference;

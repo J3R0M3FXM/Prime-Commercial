@@ -131,5 +131,5 @@ function UploadedPreview({ reference, label, brand = false }: { reference: strin
   const [src, setSrc] = useState("");
   useEffect(() => { let objectUrl = ""; let active = true; resolveTelegramMedia(reference).then((url) => { if (!active) { if (url.startsWith("blob:")) URL.revokeObjectURL(url); return; } objectUrl = url.startsWith("blob:") ? url : ""; setSrc(url); }).catch(() => setSrc("")); return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); }; }, [reference]);
   if (!reference) return <span className="grid h-10 w-10 shrink-0 place-items-center border bg-white text-[8px] text-slate-500">No image</span>;
-  return src ? <span className={`mt-1 flex h-16 max-w-40 items-center justify-center overflow-hidden rounded border p-2 ${brand ? "bg-slate-950" : "bg-white"}`}><img src={src} alt={label} className="max-h-full max-w-full object-contain"/></span> : <span className="mt-1 block text-xs font-normal text-emerald-700">Uploaded image saved</span>;
+  return src ? <span className={`mt-1 flex h-16 max-w-40 items-center justify-center overflow-hidden rounded border p-2 ${brand ? "bg-gradient-to-br from-slate-50 via-emerald-50 to-sky-50" : "bg-white"}`}><img src={src} alt={label} className="max-h-full max-w-full object-contain"/></span> : <span className="mt-1 block text-xs font-normal text-emerald-700">Uploaded image saved</span>;
 }
