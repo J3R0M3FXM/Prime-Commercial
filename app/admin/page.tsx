@@ -100,6 +100,8 @@ import TelegramServerlessPosPanel from "@/app/components/admin/telegram-serverle
 import PrimeIdentityHeader from "@/app/components/prime-identity-header";
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { StaticOrderMap } from "@/app/components/static-order-map";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import dynamic from 'next/dynamic';
 import AutomationModule from '@/app/components/admin/automation-module';
 import LogisticsModule from "@/app/components/admin/logistics-module";
@@ -206,6 +208,17 @@ function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promi
           className="mt-2.5 w-full h-11 rounded-none bg-slate-900 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50"
         >
           {submitting ? "VERIFYING..." : "VERIFY ADMIN ACCESS"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const url = "https://t.me/primenetworkphbot?startapp=admin";
+            if (Capacitor.isNativePlatform()) void Browser.open({ url });
+            else window.open(url, "_blank", "noopener,noreferrer");
+          }}
+          className="mt-2.5 w-full h-11 rounded-none border border-slate-300 bg-white text-slate-800 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
+        >
+          OPEN PRIME IN TELEGRAM
         </button>
       </form>
     </div>
