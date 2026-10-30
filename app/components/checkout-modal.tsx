@@ -2447,18 +2447,6 @@ export default function CheckoutModal({
 
                       return (
                         <div className="p-2.5 rounded-none border border-gray-200 bg-white space-y-2.5 animate-in fade-in slide-in-from-top-3 duration-200 text-left">
-                          <div className="border-b border-gray-100 pb-2 flex items-center justify-between">
-                            <h5 className="text-xs font-heading font-black uppercase text-gray-900">
-                              Instructions for {selectedPaymentMethod.name}
-                            </h5>
-                            <span className="text-[10px] font-mono text-gray-400 uppercase">
-                              {isQr && "Static QR"}
-                              {isManual && "Manual Transfer"}
-                              {isCrypto && "Wallet Deposit"}
-                              {isApi && "Integrated Webhook"}
-                            </span>
-                          </div>
-
                           {/* Manual Transfer (Bank / E-Wallet) Block */}
                           {isManual && (
                             <div className="space-y-3">

@@ -123,13 +123,12 @@ function MapControls({
             e.stopPropagation();
             onPinDropArmedChange(!pinDropArmed);
           }}
-          className={`min-h-8 px-2 bg-white/95 hover:bg-white active:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 ${pinDropArmed ? "ring-2 ring-amber-500" : ""}`}
+          className={`w-8 h-8 bg-white/95 hover:bg-white active:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center cursor-pointer transition-all active:scale-95 ${pinDropArmed ? "ring-2 ring-amber-500" : ""}`}
           title={pinDropArmed ? "Tap the map to place the pin" : "Enable pin placement"}
           aria-label={pinDropArmed ? "Cancel pin placement" : "Drop Pin"}
           aria-pressed={pinDropArmed}
         >
           <MapPin className="w-4 h-4 text-red-500" />
-          <span className="text-[11px] font-semibold">{pinDropArmed ? "Tap Map" : "Drop Pin"}</span>
         </button>
       </div>
 
