@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, ChevronRight, GitBranch, MessageSquare, Plus, Power, RefreshCw, Save, Trash2 } from "lucide-react";
+import { ArrowRight, ChevronRight, ImagePlus, Loader2, MessageSquare, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { AdminDisclosure, AdminSwitch } from "./admin-ui";
+import { callServerless, uploadStaffImage } from "@/lib/telegram-serverless-client";
+import TelegramMediaImage from "@/app/components/telegram-media-image";
 
 type Action = "flow" | "reply" | "url";
 
@@ -22,6 +25,7 @@ type Flow = {
   triggerValue: string;
   matchMode: "exact" | "contains" | "starts_with";
   responseText: string;
+  mediaUrl: string;
   buttons: Button[];
   priority: number;
 };
@@ -46,6 +50,8 @@ const DEFAULT_SETTINGS: Settings = {
   businessUserChatId: "",
 };
 
+const FLOW_MEDIA_MARKER = "__secretary_step_media__";
+
 function makeButton(index: number): Button {
   return {
     id: "b_" + Date.now().toString(36) + "_" + index,
@@ -66,6 +72,7 @@ function makeFlow(): Flow {
     triggerValue: "",
     matchMode: "contains",
     responseText: "Enter the message shown in this bubble.",
+    mediaUrl: "",
     buttons: [],
     priority: 100,
   };
@@ -89,6 +96,8 @@ function normalizeButton(raw: any, index: number): Button {
 }
 
 function normalizeFlow(raw: any): Flow {
+  const rawButtons = Array.isArray(raw?.buttons) ? raw.buttons : [];
+  const mediaMarker = rawButtons.find((button: any) => button?.id === FLOW_MEDIA_MARKER);
   return {
     id: String(raw?.id || ""),
     name: String(raw?.name || "Secretary Step"),
@@ -99,9 +108,9 @@ function normalizeFlow(raw: any): Flow {
       ? raw.matchMode
       : "contains",
     responseText: String(raw?.responseText || ""),
-    buttons: Array.isArray(raw?.buttons)
-      ? raw.buttons.map((button: any, index: number) => normalizeButton(button, index))
-      : [],
+    mediaUrl: String(raw?.mediaUrl || mediaMarker?.mediaUrl || ""),
+    buttons: rawButtons.filter((button: any) => button?.id !== FLOW_MEDIA_MARKER)
+      .map((button: any, index: number) => normalizeButton(button, index)),
     priority: Number(raw?.priority) || 100,
   };
 }
@@ -110,15 +119,39 @@ function callbackBytes(flowId: string, buttonId: string) {
   return new TextEncoder().encode("sec:" + flowId + ":" + buttonId).length;
 }
 
-export default function TelegramSecretaryConfigurator() {
+function normalizeChat(raw: any) {
+  return {
+    ...raw,
+    business_connection_id: String(raw?.businessConnectionId ?? raw?.business_connection_id ?? ""),
+    chat_id: raw?.chatId ?? raw?.chat_id,
+    last_customer_message_at: raw?.lastCustomerMessageAt ?? raw?.last_customer_message_at,
+    bot_paused: raw?.botPaused ?? raw?.bot_paused ?? false,
+  };
+}
+
+export default function TelegramSecretaryConfigurator({ serverless = false, onBack }: { serverless?: boolean; onBack?: () => void }) {
   const [flows, setFlows] = useState<Flow[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [chats, setChats] = useState<any[]>([]);
   const [selected, setSelected] = useState<Flow | null>(null);
   const [expandedButton, setExpandedButton] = useState("");
+  const [stepTab, setStepTab] = useState<"trigger" | "reply" | "buttons">("trigger");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [testMode, setTestMode] = useState(false);
+  const [testChatId, setTestChatId] = useState("");
+  const [monoMode, setMonoMode] = useState(false);
+
+  async function requestAutomation(action: string, payload: Record<string, unknown> = {}, legacyRequest?: RequestInit, legacyUrl = "/api/admin/automation") {
+    if (serverless) return await callServerless<any>("manageAutomation", { action, ...payload }, 20_000);
+    const response = await fetch(legacyUrl, { cache: "no-store", ...legacyRequest });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error || "Secretary request failed.");
+    return data;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -126,9 +159,7 @@ export default function TelegramSecretaryConfigurator() {
     async function loadData() {
       try {
         setLoading(true);
-        const response = await fetch("/api/admin/automation", { cache: "no-store" });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data?.error || "Failed to load Secretary configuration.");
+        const data = await requestAutomation("list", {}, { method: "GET" });
         if (cancelled) return;
 
         const loaded = Array.isArray(data?.flows)
@@ -136,12 +167,9 @@ export default function TelegramSecretaryConfigurator() {
           : [];
 
         setFlows(loaded);
-        setChats(Array.isArray(data?.chats) ? data.chats : []);
+        setChats(Array.isArray(data?.chats) ? data.chats.map(normalizeChat) : []);
         setSettings({ ...DEFAULT_SETTINGS, ...(data?.settings || {}) });
 
-        if (selected?.id) {
-          setSelected(loaded.find((flow: Flow) => flow.id === selected.id) || null);
-        }
       } catch (error: any) {
         if (!cancelled) setNotice(error?.message || "Failed to load configuration.");
       } finally {
@@ -154,7 +182,7 @@ export default function TelegramSecretaryConfigurator() {
     return () => {
       cancelled = true;
     };
-  }, [selected?.id]);
+  }, []);
 
   function updateSelected(patch: Partial<Flow>) {
     setSelected((current) => (current ? { ...current, ...patch } : current));
@@ -192,15 +220,13 @@ export default function TelegramSecretaryConfigurator() {
     setBusy(true);
     setNotice("");
     try {
-      const response = await fetch("/api/admin/automation", {
+      const data = await requestAutomation("settings", settings, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "settings", ...settings }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "Failed to save settings.");
       setSettings({ ...DEFAULT_SETTINGS, ...data });
-      setNotice("ENGINE SETTINGS SAVED.");
+      setNotice("AUTO REPLY SETTINGS SAVED.");
     } catch (error: any) {
       setNotice(error?.message || "Failed to save settings.");
     } finally {
@@ -214,8 +240,8 @@ export default function TelegramSecretaryConfigurator() {
     const name = selected.name.trim();
     const responseText = selected.responseText.trim();
 
-    if (!name || !responseText) {
-      setNotice("STEP NAME AND MESSAGE CONTENT ARE REQUIRED.");
+    if (!name || (!responseText && !selected.mediaUrl.trim())) {
+      setNotice("ADD A STEP NAME AND EITHER A MESSAGE OR AN IMAGE.");
       return;
     }
 
@@ -239,25 +265,26 @@ export default function TelegramSecretaryConfigurator() {
     setNotice("");
 
     try {
-      const response = await fetch("/api/admin/automation", {
-        method: selected.id ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const flowPayload = {
           ...selected,
           name,
           responseText,
-          buttons: selected.buttons.map((button) => ({
-            ...button,
-            text: String(button.text || "Option").trim().slice(0, 64),
-            response: String(button.response || ""),
-            url: String(button.url || "").trim(),
-            targetFlowId: String(button.targetFlowId || "").trim(),
-          })),
-        }),
+          buttons: [
+            ...selected.buttons.map((button) => ({
+              ...button,
+              text: String(button.text || "Option").trim().slice(0, 64),
+              response: String(button.response || ""),
+              url: String(button.url || "").trim(),
+              targetFlowId: String(button.targetFlowId || "").trim(),
+            })),
+            ...(selected.mediaUrl.trim() ? [{ id: FLOW_MEDIA_MARKER, mediaUrl: selected.mediaUrl.trim() }] : []),
+          ],
+        };
+      const data = await requestAutomation(selected.id ? "update" : "create", flowPayload, {
+        method: selected.id ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(flowPayload),
       });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "Failed to save step.");
 
       const saved = normalizeFlow(data);
       setFlows((current) =>
@@ -280,18 +307,11 @@ export default function TelegramSecretaryConfigurator() {
 
     setBusy(true);
     try {
-      const response = await fetch(
-        "/api/admin/automation?id=" + encodeURIComponent(selected.id),
-        { method: "DELETE" },
-      );
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "Delete failed.");
+      await requestAutomation("delete", { id: selected.id }, { method: "DELETE" }, "/api/admin/automation?id=" + encodeURIComponent(selected.id));
 
       setFlows((current) => current.filter((flow) => flow.id !== selected.id));
       setSelected(null);
-      if (settings.welcomeFlowId === selected.id) {
-        setSettings((current) => ({ ...current, welcomeFlowId: "" }));
-      }
+      if (settings.welcomeFlowId === selected.id) setSettings((current) => ({ ...current, welcomeFlowId: "" }));
       setNotice("SECRETARY STEP DELETED.");
     } catch (error: any) {
       setNotice(error?.message || "Delete failed.");
@@ -303,18 +323,15 @@ export default function TelegramSecretaryConfigurator() {
   async function toggleChat(chat: any) {
     const paused = !Boolean(chat?.bot_paused);
     try {
-      const response = await fetch("/api/admin/automation", {
+      await requestAutomation("pauseChat", {
+        businessConnectionId: chat.business_connection_id,
+        chatId: chat.chat_id,
+        paused,
+      }, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "chat_pause",
-          businessConnectionId: chat.business_connection_id,
-          chatId: chat.chat_id,
-          paused,
-        }),
+        body: JSON.stringify({ type: "chat_pause", businessConnectionId: chat.business_connection_id, chatId: chat.chat_id, paused }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "Failed to update chat.");
 
       setChats((current) =>
         current.map((item) =>
@@ -330,473 +347,156 @@ export default function TelegramSecretaryConfigurator() {
   }
 
   const parent = selected
-    ? flows.find((flow) =>
-        flow.buttons.some((button) => button.targetFlowId === selected.id),
-      ) || null
+    ? flows.find((flow) => flow.buttons.some((button) => button.targetFlowId === selected.id)) || null
     : null;
+  const displayedFlows = selected && !selected.id ? [...flows, selected] : flows;
 
   return (
-    <div className="admin-feature-module w-full space-y-1.5 text-slate-900">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-1">
+    <div className={`admin-feature-module secretary-configurator w-full min-w-0 space-y-3 text-slate-900${monoMode ? " is-mono" : ""}`}>
+      <header className="secretary-configurator__header">
         <div className="min-w-0">
-          <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">
-            Telegram Business Secretary
-          </div>
-          <h1 className="text-base font-heading font-black uppercase tracking-tight">
-            Inline Button Configurator
-          </h1>
-          <p className="text-[10px] text-slate-500">
-            One bubble · linked steps · 24h inactivity welcome.
-          </p>
+          {onBack && <button type="button" onClick={onBack} className="mb-2 border border-slate-300 bg-white px-3 py-2 text-xs font-bold uppercase text-slate-700">← Admin</button>}
+          <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-500">Telegram Business · {serverless ? "Serverless Secretary" : "Automation"}</div>
+          <h1>Secretary Configurator</h1>
+          <p>Set up automatic replies one step at a time. Open a section when you are ready to edit it; your changes only take effect after you save.</p>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="h-7 px-2 border border-slate-200 text-[10px] font-bold uppercase flex items-center gap-1"
-          >
-            <RefreshCw className="w-3 h-3" /> Reload
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSelected(makeFlow());
-              setExpandedButton("");
-              setNotice("");
-            }}
-            className="h-7 px-2.5 bg-slate-900 text-white text-[10px] font-bold uppercase flex items-center gap-1"
-          >
-            <Plus className="w-3 h-3" /> New Step
-          </button>
+        <div className="secretary-header-actions">
+          <button type="button" onClick={() => window.location.reload()}><RefreshCw className="w-4 h-4" /> Reload</button>
+          <button type="button" onClick={() => { setSelected(makeFlow()); setExpandedButton(""); setStepTab("trigger"); setNotice(""); }}><Plus className="w-4 h-4" /> New step</button>
         </div>
-      </div>
+      </header>
 
-      {notice && (
-        <div className="border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-mono uppercase">
-          {notice}
+      <AdminDisclosure title="How the Secretary works" meta="Quick guide">
+        <div className="secretary-help-card">
+          <p><strong>1. Create a reply step.</strong> Give it a name, choose what customer message should trigger it, and write the reply.</p>
+          <p><strong>2. Add buttons if needed.</strong> Buttons can open another step, change the current message, or open a link.</p>
+          <p><strong>3. Preview and save.</strong> Check the message preview, then save each step. Automatic replies also require a connected Telegram Business account and the Secretary switch to be enabled.</p>
         </div>
-      )}
+      </AdminDisclosure>
 
-      <div className="grid lg:grid-cols-[225px_minmax(0,1fr)_250px] border border-slate-200 bg-white">
-        <aside className="min-w-0 border-b lg:border-b-0 lg:border-r border-slate-200">
-          <div className="px-2 py-1.5 border-b border-slate-200 flex items-center justify-between">
-            <div>
-              <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Hierarchy</div>
-              <div className="text-[11px] font-black uppercase">Steps</div>
-            </div>
-            <GitBranch className="w-3.5 h-3.5 text-slate-400" />
-          </div>
+      <section className="secretary-display-option" aria-label="Text display options">
+        <div><strong>Message formatting</strong><span>Use fixed-width text when you need columns or aligned numbers in a reply.</span></div>
+        <AdminSwitch checked={monoMode} onChange={setMonoMode} label="Mono font" description={monoMode ? "Monospaced text is on" : "Monospaced text is off"} />
+      </section>
 
-          {loading ? (
-            <div className="p-2 text-[10px] font-mono text-slate-400">LOADING...</div>
-          ) : flows.length === 0 ? (
-            <div className="p-2 text-[10px] text-slate-400">NO STEPS CONFIGURED.</div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {flows.map((flow) => (
-                <button
-                  type="button"
-                  key={flow.id}
-                  onClick={() => {
-                    setSelected(flow);
-                    setExpandedButton("");
-                    setNotice("");
-                  }}
-                  className={`w-full text-left px-2 py-1.5 border-l-2 ${
-                    selected?.id === flow.id
-                      ? "border-l-slate-900 bg-slate-50"
-                      : "border-l-transparent hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-1">
-                    <span className={`w-1.5 h-1.5 ${flow.active ? "bg-emerald-500" : "bg-slate-300"}`} />
-                    <span className="text-[11px] font-bold truncate flex-1">{flow.name}</span>
-                    {settings.welcomeFlowId === flow.id && (
-                      <span className="text-[10px] bg-slate-900 text-white px-1">WELCOME</span>
-                    )}
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-400 mt-0.5">
-                    IN {flows.reduce((sum, item) => sum + item.buttons.filter((button) => button.targetFlowId === flow.id).length, 0)} · OUT {flow.buttons.filter((button) => button.targetFlowId).length}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+      {notice && <div role="status" className="border border-slate-200 bg-slate-50 px-2 py-2 text-[10px] font-mono uppercase break-words">{notice}</div>}
+      {error && <div role="alert" className="border border-red-200 bg-red-50 px-2 py-2 text-[10px] text-red-800 break-words">{error}</div>}
 
-          <div className="border-t border-slate-200 px-2 py-1.5">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Welcome</div>
-            <select
-              value={settings.welcomeFlowId}
-              onChange={(event) =>
-                setSettings((current) => ({ ...current, welcomeFlowId: event.target.value }))
-              }
-              className="w-full h-7 border border-slate-200 px-1.5 text-[10px] bg-white"
-            >
-              <option value="">Select welcome step</option>
-              {flows.filter((flow) => flow.active).map((flow) => (
-                <option value={flow.id} key={flow.id}>{flow.name}</option>
-              ))}
-            </select>
-          </div>
-        </aside>
+      <section className={`secretary-status ${settings.businessConnectionId ? "is-connected" : "is-disconnected"}`} role="status">
+        <span className="secretary-status__dot" />
+        <p>{settings.businessConnectionId ? "Business account connected · reply permission active. Incoming messages receive a matching step or fallback." : "Telegram Business is not connected. Connect an account and grant reply permission to activate automatic replies."}</p>
+        <button type="button" onClick={() => window.location.reload()}>Refresh status</button>
+      </section>
 
-        <main className="min-w-0 border-b lg:border-b-0 lg:border-r border-slate-200">
-          {!selected ? (
-            <div className="min-h-[220px] flex items-center justify-center p-2 text-center">
-              <div>
-                <MessageSquare className="w-7 h-7 mx-auto text-slate-300 mb-1" />
-                <div className="text-[10px] font-bold uppercase">Select a step</div>
-                <div className="text-[10px] text-slate-400">Create a step to build the message hierarchy.</div>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="px-2 py-1.5 border-b border-slate-200 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Editor</div>
-                  <div className="text-[11px] font-bold truncate">{selected.name}</div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <label className="h-7 px-1.5 border border-slate-200 flex items-center gap-1 text-[10px] uppercase font-bold">
-                    <input
-                      type="checkbox"
-                      checked={selected.active}
-                      onChange={(event) => updateSelected({ active: event.target.checked })}
-                    />
-                    Active
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => void deleteFlow()}
-                    disabled={!selected.id || busy}
-                    className="h-7 px-2 border border-red-200 text-red-600 text-[10px] font-bold uppercase flex items-center gap-1 disabled:opacity-40"
-                  >
-                    <Trash2 className="w-3 h-3" /> Delete
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-2 space-y-1.5">
-                <div className="grid sm:grid-cols-[1fr_100px] gap-1.5">
-                  <label>
-                    <span className="label-mini">Step name</span>
-                    <input
-                      value={selected.name}
-                      onChange={(event) => updateSelected({ name: event.target.value })}
-                      className="control-mini"
-                      placeholder="WELCOME / PRODUCTS / PAYMENT"
-                    />
-                  </label>
-                  <label>
-                    <span className="label-mini">Priority</span>
-                    <input
-                      type="number"
-                      value={selected.priority}
-                      onChange={(event) => updateSelected({ priority: Number(event.target.value) || 100 })}
-                      className="control-mini"
-                    />
-                  </label>
-                </div>
-
-                <label>
-                  <span className="label-mini">Message bubble content</span>
-                  <textarea
-                    value={selected.responseText}
-                    onChange={(event) => updateSelected({ responseText: event.target.value })}
-                    className="w-full min-h-[72px] border border-slate-200 px-2 py-1.5 text-[10px] outline-none resize-y focus:border-slate-900"
-                    placeholder="Hi {{name}}, welcome to PRIME."
-                  />
-                </label>
-
-                <div className="border-t border-slate-200">
-                  <div className="flex items-center justify-between py-1.5 gap-2">
-                    <div>
-                      <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Inline buttons</div>
-                      <div className="text-[10px] text-slate-500">GO TO STEP edits this same Telegram bubble.</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addButton}
-                      className="h-7 px-2 border border-slate-200 text-[10px] font-bold uppercase flex items-center gap-1"
-                    >
-                      <Plus className="w-3 h-3" /> Add
-                    </button>
-                  </div>
-
-                  <div className="border-t border-slate-200 divide-y divide-slate-200">
-                    {selected.buttons.length === 0 ? (
-                      <div className="p-2 text-[10px] text-slate-400">NO BUTTONS.</div>
-                    ) : (
-                      selected.buttons.map((button, index) => {
-                        const open = expandedButton === button.id;
-                        const bytes = callbackBytes(selected.id || "new", button.id);
-
-                        return (
-                          <div key={button.id} className="p-1.5 bg-white">
-                            <div className="grid grid-cols-[22px_minmax(0,1fr)_120px_26px] gap-1.5 items-center">
-                              <span className="text-[10px] font-mono text-slate-400 text-center">#{index + 1}</span>
-                              <input
-                                value={button.text}
-                                onChange={(event) => updateButton(index, { text: event.target.value })}
-                                className="control-mini"
-                                placeholder="Button label"
-                              />
-                              <select
-                                value={button.action}
-                                onChange={(event) =>
-                                  updateButton(index, { action: event.target.value as Action })
-                                }
-                                className="control-mini"
-                              >
-                                <option value="flow">GO TO STEP</option>
-                                <option value="reply">REPLY IN PLACE</option>
-                                <option value="url">OPEN URL</option>
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => setExpandedButton(open ? "" : button.id)}
-                                className="h-7 w-7 border border-slate-200 flex items-center justify-center"
-                              >
-                                <ChevronRight className={`w-3 h-3 ${open ? "rotate-90" : ""}`} />
-                              </button>
-                            </div>
-
-                            {open && (
-                              <div className="pt-1.5 space-y-1.5">
-                                {button.action === "flow" && (
-                                  <label>
-                                    <span className="label-mini">Target step</span>
-                                    <select
-                                      value={button.targetFlowId}
-                                      onChange={(event) => updateButton(index, { targetFlowId: event.target.value })}
-                                      className="control-mini"
-                                    >
-                                      <option value="">Select next step</option>
-                                      {flows
-                                        .filter((flow) => flow.id !== selected.id)
-                                        .map((flow) => (
-                                          <option value={flow.id} key={flow.id}>{flow.name}</option>
-                                        ))}
-                                    </select>
-                                  </label>
-                                )}
-
-                                {button.action === "reply" && (
-                                  <label>
-                                    <span className="label-mini">In-place response</span>
-                                    <textarea
-                                      value={button.response}
-                                      onChange={(event) => updateButton(index, { response: event.target.value })}
-                                      className="w-full min-h-[54px] border border-slate-200 px-2 py-1.5 text-[10px] outline-none focus:border-slate-900"
-                                      placeholder="Message after click. Same bubble is edited."
-                                    />
-                                  </label>
-                                )}
-
-                                {button.action === "url" && (
-                                  <label>
-                                    <span className="label-mini">Destination URL</span>
-                                    <input
-                                      value={button.url}
-                                      onChange={(event) => updateButton(index, { url: event.target.value })}
-                                      className="control-mini"
-                                      placeholder="https://..."
-                                    />
-                                  </label>
-                                )}
-
-                                <div className="flex items-center justify-between">
-                                  <span className={`text-[10px] font-mono ${bytes > 64 ? "text-red-600 font-bold" : "text-slate-400"}`}>
-                                    CALLBACK {bytes}/64 BYTES
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeButton(index)}
-                                    className="h-6 px-1.5 border border-red-200 text-red-600 text-[10px] font-bold uppercase"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-200 pt-1.5 flex items-center justify-between gap-2">
-                  <div className="text-[10px] font-mono text-slate-400 inline-flex items-center gap-1">
-                    {parent ? <>FROM {parent.name}<ArrowRight className="w-2.5 h-2.5" />{selected.name}</> : "ROOT STEP"}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void saveFlow()}
-                    disabled={busy}
-                    className="h-7 px-2.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 disabled:opacity-50"
-                  >
-                    {busy ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                    Save
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </main>
-
-        <section className="min-w-0 bg-slate-50">
-          <div className="px-2 py-1.5 border-b border-slate-200">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Preview</div>
-            <div className="text-[11px] font-black uppercase">Same bubble</div>
-          </div>
-
-          <div className="p-1.5 space-y-1.5">
-            <div className="border border-slate-300 bg-white p-1.5">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mb-1">CUSTOMER VIEW</div>
-              <div className="bg-slate-950 text-white p-2">
-                <div className="text-[10px] whitespace-pre-wrap break-words">
-                  {selected?.responseText || "Select a step to preview."}
-                </div>
-                {selected?.buttons.length ? (
-                  <div className="mt-1.5 border-t border-white/10 pt-1.5 grid gap-0.5">
-                    {selected.buttons.map((button) => (
-                      <div key={button.id} className="border border-white/10 px-1.5 py-1 text-[10px] flex items-center justify-between">
-                        <span className="truncate">{button.text}</span>
-                        <span className="text-[10px] font-mono text-slate-400">{button.action}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-1.5 text-[10px] text-slate-500">NO INLINE BUTTONS</div>
-                )}
-              </div>
-            </div>
-
-            <div className="border border-slate-200 bg-white">
-              <div className="px-1.5 py-1 border-b border-slate-200 text-[10px] font-bold uppercase tracking-widest">Engine</div>
-              <div className="p-1.5 text-[10px] font-mono space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">STATUS</span>
-                  <span className={settings.enabled ? "text-emerald-700 font-bold" : "text-slate-400"}>
-                    {settings.enabled ? "ENABLED" : "DISABLED"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-slate-500">WELCOME</span>
-                  <span className="truncate">{flows.find((flow) => flow.id === settings.welcomeFlowId)?.name || "NOT SET"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">COOLDOWN</span>
-                  <span>24H INACTIVITY</span>
-                </div>
-              </div>
-            </div>
-          </div>
+      <AdminDisclosure title="Test mode" meta={testMode ? "On" : "Off"}>
+        <section className="secretary-panel secretary-panel--inside">
+        <p className="secretary-help">Choose a recent conversation to preview how a reply will look. Previewing does not send a message.</p>
+        <label className="secretary-check-row"><input type="checkbox" checked={testMode} onChange={(event) => setTestMode(event.target.checked)} /><span>Preview replies for the selected account</span></label>
+        <label className="block"><span className="label-mini">Test account · choose a recent customer chat</span><span className="secretary-help">Select a conversation that has already messaged the business. Previewing does not send to them.</span>
+          <select value={testChatId} onChange={(event) => setTestChatId(event.target.value)} className="control-mini w-full"><option value="">Choose a recent chat</option>{chats.map((chat) => <option key={chat.business_connection_id + ":" + chat.chat_id} value={String(chat.chat_id)}>{chat.first_name || chat.username || "Customer"} · {chat.chat_id}</option>)}</select>
+        </label>
+        <p>Test mode previews the selected chat in the customer preview below. The normal 24-hour reply cooldown still applies.</p>
         </section>
-      </div>
+      </AdminDisclosure>
 
-      <div className="grid lg:grid-cols-[1fr_1fr] border border-slate-200 bg-white">
-        <section className="min-w-0 border-b lg:border-b-0 lg:border-r border-slate-200">
-          <div className="px-2 py-1.5 border-b border-slate-200">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Engine</div>
-            <div className="text-[11px] font-black uppercase">Welcome + 24H cooldown</div>
-          </div>
-
-          <div className="p-1.5 space-y-1.5">
-            <div className="grid sm:grid-cols-3 gap-1.5">
-              <input readOnly value={settings.businessUserId || "Not connected"} className="control-mini bg-slate-50" aria-label="Business user ID" />
-              <input readOnly value={settings.businessConnectionId || "Not connected"} className="control-mini bg-slate-50" aria-label="Business connection ID" />
-              <input readOnly value={settings.businessUserChatId || "Not connected"} className="control-mini bg-slate-50" aria-label="Business chat ID" />
-            </div>
-
-            <div className="grid sm:grid-cols-[1fr_auto_auto] gap-1.5 items-end">
-              <label>
-                <span className="label-mini">Fallback response</span>
-                <input
-                  value={settings.fallbackResponse}
-                  onChange={(event) =>
-                    setSettings((current) => ({ ...current, fallbackResponse: event.target.value }))
-                  }
-                  className="control-mini"
-                  placeholder="Optional fallback"
-                />
-              </label>
-
-              <label className="h-7 px-1.5 border border-slate-200 flex items-center gap-1 text-[10px] uppercase font-bold">
-                <input
-                  type="checkbox"
-                  checked={settings.fallbackEnabled}
-                  onChange={(event) =>
-                    setSettings((current) => ({ ...current, fallbackEnabled: event.target.checked }))
-                  }
-                />
-                Fallback
-              </label>
-
-              <button
-                type="button"
-                onClick={() => setSettings((current) => ({ ...current, enabled: !current.enabled }))}
-                className={`h-7 px-2 border text-[10px] font-bold uppercase flex items-center gap-1 ${
-                  settings.enabled
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-slate-50 text-slate-500"
-                }`}
-              >
-                <Power className="w-3 h-3" />
-                {settings.enabled ? "Enabled" : "Disabled"}
-              </button>
-            </div>
-
-            <div className="border border-slate-200 px-1.5 py-1 text-[10px] font-mono flex items-center gap-1">
-              <span className="font-bold">COOLDOWN</span>
-              <span className="text-slate-400">new welcome after the customer's latest incoming message is 24h old.</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => void saveSettings()}
-              disabled={busy}
-              className="h-7 px-2.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 disabled:opacity-50"
-            >
-              <Save className="w-3 h-3" /> Save Engine
-            </button>
-          </div>
+      <AdminDisclosure title="Auto reply settings" meta={settings.enabled ? "Enabled" : "Disabled"}>
+        <section className="secretary-panel secretary-panel--inside">
+        <p className="secretary-help">These options control whether saved steps can reply automatically and what to say when no step matches.</p>
+        <div className="secretary-panel__heading"><h2>Auto reply</h2></div>
+        <label className="block"><span className="label-mini">Fallback reply</span><span className="secretary-help">Optional message sent when an incoming customer message does not match any active reply step.</span><textarea value={settings.fallbackResponse} onChange={(event) => setSettings((current) => ({ ...current, fallbackResponse: event.target.value }))} className="control-mini min-h-[92px] w-full resize-y" placeholder="Thanks for your message. How can I help you?" /></label>
+        <label className="block"><span className="label-mini">Fallback photo · optional</span><span className="secretary-help">Photo fallback is not supported by the current automation API, so this field is unavailable.</span><input disabled className="control-mini w-full bg-slate-50" placeholder="Photo upload is not available yet" /></label>
+        <p className="secretary-muted">Fallback buttons and photo upload are not supported by the current automation API.</p>
+        <AdminSwitch checked={settings.enabled} onChange={(enabled) => setSettings((current) => ({ ...current, enabled }))} label="Secretary enabled" description="Customers receive one automatic reply per 24 hours. A human reply restarts the 24-hour wait." />
+        <label className="block"><span className="label-mini">Fallback behavior</span><span className="secretary-help">Turn on the fallback reply above for messages with no matching step.</span><select value={settings.fallbackEnabled ? "enabled" : "disabled"} onChange={(event) => setSettings((current) => ({ ...current, fallbackEnabled: event.target.value === "enabled" }))} className="control-mini w-full"><option value="disabled">Disabled</option><option value="enabled">Enabled</option></select></label>
+        <div className="flex justify-end border-t border-slate-200 pt-2"><button type="button" onClick={() => void saveSettings()} disabled={busy} className="h-9 px-3 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest disabled:opacity-50">{busy ? "Saving…" : "Save auto reply settings"}</button></div>
         </section>
+      </AdminDisclosure>
 
-        <section className="min-w-0">
-          <div className="px-2 py-1.5 border-b border-slate-200">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Live control</div>
-            <div className="text-[11px] font-black uppercase">Per-chat pause</div>
-          </div>
+      <section className="secretary-steps-section">
+        <div className="flex items-center justify-between gap-2 px-0.5">
+            <div><h2 className="text-lg font-normal uppercase tracking-wide">Reply steps</h2><p className="text-xs text-slate-500">Each step matches an incoming message and sends its saved reply. Open one step at a time to edit it.</p></div>
+          <span className="shrink-0 text-[10px] font-mono text-slate-500">{displayedFlows.length} TOTAL</span>
+        </div>
+        <label className="secretary-main-menu block"><span className="label-mini">Welcome step · sent after 24 hours</span><span className="secretary-help">Choose the first message to send when a customer becomes eligible again, or leave it off.</span><select value={settings.welcomeFlowId} onChange={(event) => setSettings((current) => ({ ...current, welcomeFlowId: event.target.value }))} className="control-mini w-full"><option value="">No welcome step</option>{flows.filter((flow) => flow.active).map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select></label>
+        {loading ? <div className="admin-empty"><p>Loading Secretary steps…</p></div> : displayedFlows.length === 0 ? <div className="admin-empty"><MessageSquare className="admin-empty__icon" /><strong>No steps configured</strong><p>Add a step to begin building the reply flow.</p></div> : displayedFlows.map((flow) => {
+          const isOpen = selected?.id === flow.id;
+          const inbound = flows.reduce((sum, item) => sum + item.buttons.filter((button) => button.targetFlowId === flow.id).length, 0);
+          return <details key={flow.id} open={isOpen} className="secretary-step-card" onToggle={(event) => { const open = event.currentTarget.open; if (open && selected?.id !== flow.id) { setSelected(flow); setExpandedButton(""); setStepTab("trigger"); } else if (!open && selected?.id === flow.id) setSelected(null); }}>
+            <summary className="secretary-step-summary">
+              <span className={`secretary-step-indicator ${flow.active ? "is-active" : ""}`} />
+              <span className="min-w-0 flex-1"><strong>{flow.name}</strong><small>{inbound} incoming · {flow.buttons.length} buttons{settings.welcomeFlowId === flow.id ? " · Welcome" : ""}</small></span>
+              <ChevronRight className="h-4 w-4 shrink-0 transition-transform" />
+            </summary>
+            {isOpen && selected && <div className="secretary-step-content">
+              <nav className="secretary-step-tabs" role="tablist" aria-label="Secretary step settings">
+                {([
+                  ["trigger", "1. Trigger"],
+                  ["reply", "2. Reply"],
+                  ["buttons", "3. Buttons"],
+                ] as const).map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={stepTab === id} onClick={() => setStepTab(id)} className={stepTab === id ? "is-active" : ""}>{label}</button>)}
+              </nav>
 
-          <div className="p-1.5">
-            {chats.length === 0 ? (
-              <div className="text-[10px] text-slate-400">NO CUSTOMER CHATS YET.</div>
-            ) : (
-              <div className="divide-y divide-slate-200 border border-slate-200">
-                {chats.map((chat) => (
-                  <div key={chat.business_connection_id + ":" + chat.chat_id} className="px-1.5 py-1 flex items-center justify-between gap-2">
-                    <div className="min-w-0 font-mono">
-                      <div className="text-[11px] font-bold truncate">CHAT {chat.chat_id}</div>
-                      <div className="text-[10px] text-slate-400 truncate">
-                        LAST CUSTOMER: {chat.last_customer_message_at ? new Date(chat.last_customer_message_at).toLocaleString() : "—"}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void toggleChat(chat)}
-                      className="h-6 px-1.5 border border-slate-200 text-[10px] font-bold uppercase"
-                    >
-                      {chat.bot_paused ? "Resume" : "Pause"}
-                    </button>
-                  </div>
-                ))}
+              {stepTab === "trigger" && <section className="secretary-step-fields" role="tabpanel">
+                <div className="secretary-step-intro"><strong>Choose when this reply runs</strong><p>Set the internal name and the customer message or button event that should activate this step.</p></div>
+                <label className="block"><span className="label-mini">Step name</span><span className="secretary-help">Private label for organizing your flow. Customers do not see this name.</span><input value={selected.name} onChange={(event) => updateSelected({ name: event.target.value })} className="control-mini w-full" placeholder="Welcome / Products" /></label>
+                <label className="block"><span className="label-mini">Priority</span><span className="secretary-help">When multiple steps match, the lower number is checked first.</span><input type="number" min="1" value={selected.priority} onChange={(event) => updateSelected({ priority: Number(event.target.value) || 100 })} className="control-mini w-full" /></label>
+                <AdminSwitch checked={selected.active} onChange={(active) => updateSelected({ active })} label="Step active" description="Inactive steps are skipped by the reply engine." />
+                <label className="block"><span className="label-mini">Trigger type</span><span className="secretary-help">Choose a customer message for normal replies, or a button callback when another button should return to this step.</span><select value={selected.triggerType} onChange={(event) => updateSelected({ triggerType: event.target.value as Flow["triggerType"] })} className="control-mini w-full"><option value="message">Incoming message</option><option value="callback">Button callback</option></select></label>
+                {selected.triggerType === "message" ? <>
+                  <label className="block"><span className="label-mini">Message matching</span><span className="secretary-help">Contains matches a phrase anywhere; Exact requires the whole message; Starts with checks only its beginning.</span><select value={selected.matchMode} onChange={(event) => updateSelected({ matchMode: event.target.value as Flow["matchMode"] })} className="control-mini w-full"><option value="contains">Contains</option><option value="exact">Exact match</option><option value="starts_with">Starts with</option></select></label>
+                  <label className="block"><span className="label-mini">Customer message to match</span><span className="secretary-help">Enter a word or phrase customers may send. Leave blank only when this step should match any incoming message.</span><input value={selected.triggerValue} onChange={(event) => updateSelected({ triggerValue: event.target.value })} className="control-mini w-full" placeholder="For example: product list" /></label>
+                </> : <p className="secretary-step-intro">This step runs when a reply button routes to it. Set that button’s target in the Buttons section.</p>}
+              </section>}
+
+              {stepTab === "reply" && <section className="secretary-step-fields" role="tabpanel">
+                <div className="secretary-step-intro"><strong>Write the customer reply</strong><p>This is the message shown when the trigger matches. Add an optional photo to appear in the same Telegram message bubble.</p></div>
+                <label className="block"><span className="label-mini">Reply message</span><span className="secretary-help">Text customers receive for this step. Use {'{{name}}'} to insert their Telegram first name.</span><textarea value={selected.responseText} onChange={(event) => updateSelected({ responseText: event.target.value })} className="control-mini min-h-[110px] w-full resize-y" placeholder="Hi {{name}}, welcome to PRIME." /></label>
+                <div className="block"><span className="label-mini">Reply photo · optional</span><span className="secretary-help">Choose an image file from this device. The uploaded photo is sent with this reply; it is not a URL field.</span><div className="mt-2 flex items-center gap-2">{selected.mediaUrl && <TelegramMediaImage src={selected.mediaUrl} alt="Secretary photo preview" className="h-16 w-24 shrink-0 border border-slate-200 object-cover"/>}<label className="control-mini flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-1.5">{uploadingPhoto ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <ImagePlus className="h-3.5 w-3.5"/>}{uploadingPhoto ? "Uploading photo…" : selected.mediaUrl ? "Replace photo" : "Choose image file"}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy || uploadingPhoto} onChange={async (event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return; setUploadingPhoto(true); setError(""); setNotice(""); try { const mediaUrl = await uploadStaffImage(file, "media-gallery"); updateSelected({ mediaUrl }); setNotice("Secretary photo uploaded and ready to save."); } catch (err: any) { setError(err?.message || "Could not upload Secretary photo."); } finally { setUploadingPhoto(false); } }}/></label>{selected.mediaUrl && <button type="button" className="control-mini" disabled={busy || uploadingPhoto} onClick={() => updateSelected({ mediaUrl: "" })}>Remove</button>}</div></div>
+                <div className="secretary-message-preview rounded-md bg-slate-950 p-3 text-white"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-300">Preview</span>{selected.mediaUrl && <TelegramMediaImage src={selected.mediaUrl} alt="Reply photo preview" className="secretary-message-preview__image" />}<div className="whitespace-pre-wrap break-words text-xs">{selected.responseText || "Your reply text will appear here."}</div></div>
+              </section>}
+
+              {stepTab === "buttons" && <section className="secretary-step-fields" role="tabpanel">
+                <div className="secretary-step-intro"><strong>Add optional reply buttons</strong><p>Buttons are attached below the message. Choose whether each one opens another step, edits this reply, or opens a website.</p></div>
+                <div className="space-y-2">
+                  {selected.buttons.map((button, index) => {
+                    const open = expandedButton === button.id;
+                    const bytes = callbackBytes(selected.id || "new", button.id);
+                    return <div key={button.id} className="secretary-button-card">
+                      <label className="block"><span className="label-mini">Button {index + 1} · label</span><span className="secretary-help">Short text displayed on the button in Telegram.</span><input value={button.text} onChange={(event) => updateButton(index, { text: event.target.value })} className="control-mini w-full" placeholder="Button label" /></label>
+                      <label className="block"><span className="label-mini">Button action</span><span className="secretary-help">Open a saved step, replace the current message with another reply, or open a web link.</span><select value={button.action} onChange={(event) => updateButton(index, { action: event.target.value as Action })} className="control-mini w-full"><option value="flow">Open another step</option><option value="reply">Edit this message</option><option value="url">Open a link</option></select></label>
+                      <button type="button" aria-expanded={open} onClick={() => setExpandedButton(open ? "" : button.id)} className="text-[10px] font-bold uppercase text-slate-700">{open ? "Hide action settings" : "Show action settings"}</button>
+                      {open && <div className="space-y-2">
+                        {button.action === "flow" && <label className="block"><span className="label-mini">Target step</span><span className="secretary-help">The step customers open after pressing this button.</span><select value={button.targetFlowId} onChange={(event) => updateButton(index, { targetFlowId: event.target.value })} className="control-mini w-full"><option value="">Select next step</option>{flows.filter((item) => item.id !== selected.id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+                        {button.action === "reply" && <label className="block"><span className="label-mini">In-place response</span><span className="secretary-help">New text that replaces the message in the same chat bubble when pressed.</span><textarea value={button.response} onChange={(event) => updateButton(index, { response: event.target.value })} className="control-mini min-h-[72px] w-full resize-y" placeholder="The same message bubble is edited." /></label>}
+                        {button.action === "url" && <label className="block"><span className="label-mini">Destination URL</span><span className="secretary-help">A complete website address opened when customers press this button.</span><input value={button.url} onChange={(event) => updateButton(index, { url: event.target.value })} className="control-mini w-full" placeholder="https://…" /></label>}
+                        <div className="flex items-center justify-between gap-2"><span className={`text-[10px] font-mono ${bytes > 64 ? "text-red-600 font-bold" : "text-slate-400"}`}>CALLBACK {bytes}/64 BYTES</span><button type="button" onClick={() => removeButton(index)} className="h-7 px-2 border border-red-200 text-red-600 text-[10px] font-bold uppercase">Remove button</button></div>
+                      </div>}
+                    </div>;
+                  })}
+                  <button type="button" onClick={addButton} className="h-9 w-full border border-dashed border-slate-300 text-[10px] font-bold uppercase flex items-center justify-center gap-1"><Plus className="h-3 w-3" /> Add button</button>
+                </div>
+              </section>}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
+                <div className="min-w-0 text-[10px] font-mono text-slate-400">{parent ? <span className="inline-flex items-center gap-1">FROM {parent.name}<ArrowRight className="h-2.5 w-2.5" />{selected.name}</span> : "ROOT STEP"}</div>
+                <div className="flex items-center gap-1.5"><button type="button" onClick={() => void deleteFlow()} disabled={!selected.id || busy} className="h-8 px-2 border border-red-200 text-red-600 text-[10px] font-bold uppercase disabled:opacity-40"><Trash2 className="mr-1 inline h-3 w-3" />Delete</button><button type="button" onClick={() => void saveFlow()} disabled={busy || uploadingPhoto} className="h-8 px-3 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 disabled:opacity-50">{busy ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}Save step</button></div>
               </div>
-            )}
-          </div>
-        </section>
-      </div>
+            </div>}
+          </details>;
+        })}
+      </section>
+
+      <AdminDisclosure title="Message preview" meta="Telegram message bubble">
+        <div className="secretary-message-preview rounded-md bg-slate-950 p-3 text-white">
+          {selected?.mediaUrl && <TelegramMediaImage src={selected.mediaUrl} alt="Secretary step preview" className="secretary-message-preview__image" />}
+          <div className="whitespace-pre-wrap break-words text-xs">{testMode && !testChatId ? "Choose a recent customer chat to preview." : selected?.responseText || "Select a reply step to preview."}</div>
+          {selected?.buttons.length ? <div className="mt-2 grid grid-cols-2 gap-1 border-t border-white/10 pt-2">{selected.buttons.map((button) => <div key={button.id} className="min-w-0 border border-white/10 px-2 py-1.5 text-[10px]"><span className="block truncate">{button.text}</span><span className="text-slate-400">{button.action === "flow" ? "Opens step" : button.action === "url" ? "Opens link" : "Edits message"}</span></div>)}</div> : <div className="mt-2 text-[10px] text-slate-500">No inline buttons.</div>}
+        </div>
+      </AdminDisclosure>
+
+      <AdminDisclosure title="Recent customer chats" meta={`${chats.length} tracked`}>
+        {chats.length === 0 ? <p className="text-[10px] text-slate-500">No customer chats yet.</p> : <div className="space-y-1.5">{chats.map((chat) => <div key={chat.business_connection_id + ":" + chat.chat_id} className="secretary-chat-card"><div className="min-w-0 flex-1"><strong>Chat {chat.chat_id}</strong><small>Last customer: {chat.last_customer_message_at ? new Date(chat.last_customer_message_at).toLocaleString() : "—"}</small></div><button type="button" onClick={() => void toggleChat(chat)} className="shrink-0"><span>{chat.bot_paused ? "Resume" : "Pause"}</span></button></div>)}</div>}
+      </AdminDisclosure>
     </div>
   );
 }

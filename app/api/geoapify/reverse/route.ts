@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reverseGeocodeTomTom, isTomTomConfigured } from '@/lib/tomtom';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,7 +16,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid lat/lon parameters" }, { status: 400 });
   }
 
-  // Provider 1: Geoapify if API Key present
+  // Provider 1: TomTom Reverse Geocoding
+  if (isTomTomConfigured()) {
+    try {
+      const tomtomResult = await reverseGeocodeTomTom(numLat, numLon);
+      if (tomtomResult && tomtomResult.formatted) {
+        return NextResponse.json({
+          results: [tomtomResult],
+          source: 'tomtom-reverse',
+        });
+      }
+    } catch (e) {
+      console.warn("TomTom reverse geocoding failed:", e);
+    }
+  }
+
+  // Provider 2: Geoapify if API Key present
   const apiKey = process.env.GEOAPIFY_API_KEY;
   if (apiKey) {
     try {

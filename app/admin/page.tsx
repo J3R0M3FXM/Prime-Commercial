@@ -85,7 +85,23 @@ import SplashScreen from "@/app/components/splash-screen";
 import ModifyOrderModal from "@/app/components/admin/modify-order-modal";
 import OrderPrintView from "@/app/components/admin/order-print-view";
 import ShareOrderModal from "@/app/components/admin/share-order-modal";
+import TelegramServerlessOrdersPanel from "@/app/components/admin/telegram-serverless-orders-panel";
+import TelegramServerlessCatalogPanel from "@/app/components/admin/telegram-serverless-catalog-panel";
+import TelegramServerlessLogisticsPanel from "@/app/components/admin/telegram-serverless-logistics-panel";
+import TelegramServerlessPaymentsPanel from "@/app/components/admin/telegram-serverless-payments-panel";
+import TelegramServerlessRulesPanel from "@/app/components/admin/telegram-serverless-rules-panel";
+import TelegramServerlessSystemPanel from "@/app/components/admin/telegram-serverless-system-panel";
+import TelegramServerlessNotificationsPanel from "@/app/components/admin/telegram-serverless-notifications-panel";
+import TelegramSecretaryConfigurator from "@/app/components/admin/telegram-secretary-configurator";
+import TelegramServerlessCustomersPanel from "@/app/components/admin/telegram-serverless-customers-panel";
+import TelegramServerlessVisitorsPanel from "@/app/components/admin/telegram-serverless-visitors-panel";
+import TelegramServerlessMediaPanel from "@/app/components/admin/telegram-serverless-media-panel";
+import TelegramServerlessPosPanel from "@/app/components/admin/telegram-serverless-pos-panel";
+import PrimeIdentityHeader from "@/app/components/prime-identity-header";
+import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { StaticOrderMap } from "@/app/components/static-order-map";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import dynamic from 'next/dynamic';
 import AutomationModule from '@/app/components/admin/automation-module';
 import LogisticsModule from "@/app/components/admin/logistics-module";
@@ -95,7 +111,6 @@ import {
   AdminSection,
   AdminStat,
   AdminSurface,
-  AdminTopbar,
 } from '@/app/components/admin/admin-ui';
 
 const ChargesModule = dynamic(() => import('@/app/components/admin/charges-module'), { ssr: false });
@@ -193,6 +208,17 @@ function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promi
           className="mt-2.5 w-full h-11 rounded-none bg-slate-900 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50"
         >
           {submitting ? "VERIFYING..." : "VERIFY ADMIN ACCESS"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const url = "https://t.me/primenetworkphbot?startapp=admin";
+            if (Capacitor.isNativePlatform()) void Browser.open({ url });
+            else window.open(url, "_blank", "noopener,noreferrer");
+          }}
+          className="mt-2.5 w-full h-11 rounded-none border border-slate-300 bg-white text-slate-800 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
+        >
+          OPEN PRIME IN TELEGRAM
         </button>
       </form>
     </div>
@@ -386,7 +412,26 @@ export default function AdminPage() {
     const viewport = document.getElementById("mobile-portrait-viewport");
     viewport?.classList.add("admin-viewport");
     document.body.classList.add("admin-mode");
+    const resetAdminScroll = () => {
+      if (viewport) viewport.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      window.scrollTo(0, 0);
+    };
+    resetAdminScroll();
+    const scrollResetFrame = window.requestAnimationFrame(resetAdminScroll);
+    const syncVisibleHeight = () => {
+      const visibleHeight = window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty("--admin-visible-height", `${Math.round(visibleHeight)}px`);
+    };
+    syncVisibleHeight();
+    window.visualViewport?.addEventListener("resize", syncVisibleHeight);
+    window.addEventListener("resize", syncVisibleHeight);
     return () => {
+      window.cancelAnimationFrame(scrollResetFrame);
+      window.visualViewport?.removeEventListener("resize", syncVisibleHeight);
+      window.removeEventListener("resize", syncVisibleHeight);
+      document.documentElement.style.removeProperty("--admin-visible-height");
       viewport?.classList.remove("admin-viewport");
       document.body.classList.remove("admin-mode");
     };
@@ -395,6 +440,20 @@ export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [adminUser, setAdminUser] = useState<any>(null);
+  const [serverlessAdminMode, setServerlessAdminMode] = useState(false);
+  const [serverlessCatalogOnly, setServerlessCatalogOnly] = useState(false);
+  const [serverlessCustomersOnly, setServerlessCustomersOnly] = useState(false);
+  const [serverlessVisitorsOnly, setServerlessVisitorsOnly] = useState(false);
+  const [serverlessInventoryOnly, setServerlessInventoryOnly] = useState(false);
+  const [serverlessLogisticsOnly, setServerlessLogisticsOnly] = useState(false);
+  const [serverlessLogisticsSection, setServerlessLogisticsSection] = useState<"warehouse" | "courier">("warehouse");
+  const [serverlessPaymentsOnly, setServerlessPaymentsOnly] = useState(false);
+  const [serverlessNotificationsOnly, setServerlessNotificationsOnly] = useState(false);
+  const [serverlessSystemOnly, setServerlessSystemOnly] = useState(false);
+  const [serverlessSecretaryOnly, setServerlessSecretaryOnly] = useState(false);
+  const [serverlessMediaOnly, setServerlessMediaOnly] = useState(false);
+  const [serverlessPosOnly, setServerlessPosOnly] = useState(false);
+  const [serverlessRulesOnly, setServerlessRulesOnly] = useState<"charges" | "promos" | "">("");
 
   // PWA install state
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -452,6 +511,21 @@ export default function AdminPage() {
   const [loadingCustomerDetail, setLoadingCustomerDetail] = useState(false);
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const orderNumber = params.get("view") === "order-detail" ? params.get("order") : null;
+    if (!orderNumber) return;
+    setSelectedOrderId(orderNumber);
+    setView("order-detail");
+  }, []);
+
+  const serverlessModuleOpen = serverlessAdminMode && (
+    serverlessCatalogOnly || serverlessCustomersOnly || serverlessInventoryOnly ||
+    serverlessLogisticsOnly || serverlessPaymentsOnly || serverlessNotificationsOnly || Boolean(serverlessRulesOnly) ||
+    serverlessSystemOnly || serverlessSecretaryOnly || serverlessMediaOnly || serverlessPosOnly ||
+    view === "orders" || view === "order-detail"
+  );
 
   // Data Collections
   const [customers, setCustomers] = useState<any[]>([]);
@@ -866,7 +940,7 @@ export default function AdminPage() {
 
   // Silent Real-Time Background Polling Effect (Gentle 2m interval when enabled)
   useEffect(() => {
-    if (!authorized || !silentSyncEnabled) return;
+    if (!authorized || serverlessAdminMode || !silentSyncEnabled) return;
 
     // 2 minutes gentle background poll interval when user explicitly enables live sync
     const pollInterval = 120000;
@@ -879,7 +953,7 @@ export default function AdminPage() {
     return () => {
       clearInterval(timer);
     };
-  }, [authorized, silentSyncEnabled, fetchSilentData]);
+  }, [authorized, serverlessAdminMode, silentSyncEnabled, fetchSilentData]);
 
   // Auto-dismiss live toast after 7s
   useEffect(() => {
@@ -966,6 +1040,50 @@ export default function AdminPage() {
     let cancelled = false;
 
     const restoreAdminSession = async () => {
+      const telegramWebApp = typeof window !== "undefined"
+        ? (window as any).Telegram?.WebApp
+        : null;
+
+      // Telegram users must pass the Serverless allowlist check. Do not let a
+      // legacy same-origin admin cookie bypass it through a direct /admin URL.
+      if (telegramWebApp) {
+        try {
+          const telegramSession = await getTelegramServerlessSession();
+          if (cancelled) return;
+          if (telegramSession?.authenticated && telegramSession?.isAdmin) {
+            void callServerless("setShopMenuButton").catch((error) => {
+              console.warn("Could not update Telegram shop menu button:", error);
+            });
+            setAuthorized(true);
+            setAdminUser(telegramSession.user || { id: telegramSession.tgUserId });
+            setServerlessAdminMode(true);
+            setCheckingAuth(false);
+            return;
+          }
+        } catch {
+          // A failed Telegram session is not eligible for the native-browser path.
+        }
+        if (!cancelled) window.location.replace("/");
+        return;
+      }
+
+      // Native-browser admins retain the existing signed-session/access-code flow.
+      try {
+        const telegramSession = await getTelegramServerlessSession();
+        if (!cancelled && telegramSession?.authenticated && telegramSession?.isAdmin) {
+          void callServerless("setShopMenuButton").catch((error) => {
+            console.warn("Could not update Telegram shop menu button:", error);
+          });
+          setAuthorized(true);
+          setAdminUser(telegramSession.user || { id: telegramSession.tgUserId });
+          setServerlessAdminMode(true);
+          setCheckingAuth(false);
+          return;
+        }
+      } catch {
+        // Continue through the existing signed native-browser session below.
+      }
+
       try {
         const res = await adminFetch("/api/admin/auth", {
           method: "GET",
@@ -1016,6 +1134,7 @@ export default function AdminPage() {
 
     setAuthorized(true);
     setAdminUser(data.user || { id: "admin" });
+    setServerlessAdminMode(false);
     await fetchAllData();
   };
 
@@ -2051,6 +2170,41 @@ export default function AdminPage() {
     return resolveOrderGpsStreetAddress(selectedOrder, resolvedGpsAddresses, loadingGpsOrderId);
   }, [selectedOrder, resolvedGpsAddresses, loadingGpsOrderId]);
 
+  const openAdminModule = (moduleId: string) => {
+    if (serverlessAdminMode) {
+      if (moduleId === "orders") setView("orders");
+      else if (moduleId === "customers") setServerlessCustomersOnly(true);
+      else if (moduleId === "visitors") setServerlessVisitorsOnly(true);
+      else if (moduleId === "products") setServerlessCatalogOnly(true);
+      else if (moduleId === "inventory") setServerlessInventoryOnly(true);
+      else if (moduleId === "warehouse" || moduleId === "couriers") { setServerlessLogisticsSection(moduleId === "warehouse" ? "warehouse" : "courier"); setServerlessLogisticsOnly(true); }
+      else if (moduleId === "payments") setServerlessPaymentsOnly(true);
+      else if (moduleId === "notifications") setServerlessNotificationsOnly(true);
+      else if (moduleId === "charges" || moduleId === "promos") setServerlessRulesOnly(moduleId);
+      else if (moduleId === "system") setServerlessSystemOnly(true);
+      else if (moduleId === "broadcast") setServerlessSecretaryOnly(true);
+      else if (moduleId === "media") setServerlessMediaOnly(true);
+      else if (moduleId === "pos") setServerlessPosOnly(true);
+      return;
+    }
+
+    if (moduleId === "orders") setView("orders");
+    else if (moduleId === "customers") setView("customers");
+    else if (moduleId === "inventory") setView("inventory");
+    else if (moduleId === "products") setView("products");
+    else if (moduleId === "warehouse" || moduleId === "couriers") setView("logistics");
+    else if (moduleId === "payments") setView("payments");
+    else if (moduleId === "charges") setView("charges");
+    else if (moduleId === "promos") setView("promos");
+    else if (moduleId === "media") setView("media");
+    else if (moduleId === "reports") setView("analytics");
+    else if (moduleId === "broadcast") setView("automation");
+    else if (moduleId === "system") setView("settings");
+  };
+
+  const serverlessModuleReady = (moduleId: string) =>
+    ["orders", "customers", "visitors", "products", "inventory", "warehouse", "couriers", "payments", "charges", "promos", "media", "system", "broadcast", "pos"].includes(moduleId);
+
   // Auth checking screen
   if (checkingAuth) {
     return <SplashScreen title="ADMIN ACCESS" subtitle="ENTER SERVER-SIDE ADMIN ACCESS CODE..." />;
@@ -2060,9 +2214,87 @@ export default function AdminPage() {
   if (!authorized) {
     return <AdminAccessGate onSubmit={handleAdminAccessCodeSubmit} />;
   }
+
+  // The order list and supported lifecycle actions share one Serverless database.
+  // The endpoint independently verifies Telegram admin identity for every call.
+  if (serverlessCatalogOnly) {
+    return <TelegramServerlessCatalogPanel inventoryMode={false} onBack={() => setServerlessCatalogOnly(false)} />;
+  }
+
+  if (serverlessCustomersOnly) {
+    return <TelegramServerlessCustomersPanel onBack={() => setServerlessCustomersOnly(false)} />;
+  }
+
+  if (serverlessVisitorsOnly) {
+    return <TelegramServerlessVisitorsPanel onBack={() => setServerlessVisitorsOnly(false)} />;
+  }
+
+  if (serverlessInventoryOnly) {
+    return <TelegramServerlessCatalogPanel inventoryMode onBack={() => setServerlessInventoryOnly(false)} />;
+  }
+
+  if (serverlessLogisticsOnly) {
+    return <TelegramServerlessLogisticsPanel key={serverlessLogisticsSection} initialSection={serverlessLogisticsSection} onBack={() => setServerlessLogisticsOnly(false)} />;
+  }
+
+  if (serverlessPaymentsOnly) {
+    return <TelegramServerlessPaymentsPanel onBack={() => setServerlessPaymentsOnly(false)} />;
+  }
+
+  if (serverlessRulesOnly) {
+    return <TelegramServerlessRulesPanel mode={serverlessRulesOnly} onBack={() => setServerlessRulesOnly("")} />;
+  }
+
+  if (serverlessSystemOnly) {
+    return <TelegramServerlessSystemPanel onBack={() => setServerlessSystemOnly(false)} />;
+  }
+
+  if (serverlessMediaOnly) {
+    return <TelegramServerlessMediaPanel onBack={() => setServerlessMediaOnly(false)} />;
+  }
+
+  if (serverlessPosOnly) {
+    return <TelegramServerlessPosPanel onBack={() => setServerlessPosOnly(false)} />;
+  }
+
+  if (serverlessSecretaryOnly) {
+    return (
+      <div className="admin-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased w-full" data-serverless-admin="true">
+        <TelegramSecretaryConfigurator serverless onBack={() => setServerlessSecretaryOnly(false)} />
+      </div>
+    );
+  }
+
+  if (serverlessAdminMode && (view === "orders" || view === "order-detail")) {
+    return (
+      <TelegramServerlessOrdersPanel
+        initialOrderId={view === "order-detail" ? selectedOrderId : null}
+        onBack={() => {
+          setSelectedOrderId(null);
+          setView("dashboard");
+        }}
+      />
+    );
+  }
+
   return (
-    <div className="admin-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased w-full">
-      <div className="flex-1 flex flex-col w-full">
+    <div className="admin-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased w-full" data-serverless-admin={serverlessAdminMode ? "true" : undefined}>
+      <header className="command-fixed-header" aria-label="Prime Command Center header">
+        <PrimeIdentityHeader caption="SECURED ADMIN ACCESS" />
+        {!serverlessAdminMode && <div className="command-fixed-header__status">
+          <span className="command-live-status"><span className="admin-live-dot" />{serverlessAdminMode ? "SECURE" : isSilentSyncing ? "SYNCING" : "LIVE"}</span>
+          <div className="command-header-actions">
+            {!serverlessAdminMode && <button type="button" onClick={() => setIsSoundSettingsModalOpen(true)} title="Notification sound settings" aria-label="Notification sound settings">{soundSettings.master ? <Volume2 /> : <VolumeX />}</button>}
+            {!serverlessAdminMode && <button type="button" onClick={fetchAllData} disabled={refreshing} title="Refresh data" aria-label="Refresh data"><RefreshCw className={refreshing ? "animate-spin" : ""} /></button>}
+            <button type="button" onClick={async () => {
+              if (serverlessAdminMode) { window.location.replace("/"); return; }
+              try { await adminFetch("/api/admin/auth", { method: "DELETE" }); }
+              finally { setAuthorized(false); setAdminUser(null); }
+            }} title="Lock admin panel" aria-label="Lock admin panel"><Lock /></button>
+          </div>
+        </div>}
+      </header>
+      <div className="admin-workspace flex-1 flex flex-col w-full">
         <AnimatePresence mode="wait">
         
         {/* ========================================================================= */}
@@ -2070,28 +2302,40 @@ export default function AdminPage() {
         {/* ========================================================================= */}
         {view === "dashboard" && (
           <motion.div key="view-dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} className="flex-1 w-full flex flex-col">
-            <AdminTopbar title="Control Center" section="PRIME ADMIN" actions={
-              <>
-                <span className="admin-command-live"><span className="admin-live-dot" />{isSilentSyncing ? "SYNC" : "LIVE"}</span>
-                <button type="button" onClick={() => setIsSoundSettingsModalOpen(true)} className="admin-icon-button" title="Notification sound settings" aria-label="Notification sound settings">{soundSettings.master ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}</button>
-                <button type="button" onClick={fetchAllData} disabled={refreshing} className="admin-icon-button" title="Refresh data" aria-label="Refresh data"><RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} /></button>
-                <button type="button" onClick={async () => { try { await adminFetch("/api/admin/auth", { method: "DELETE" }); } finally { setAuthorized(false); setAdminUser(null); } }} className="admin-icon-button" title="Lock admin panel" aria-label="Lock admin panel"><Lock className="h-4 w-4" /></button>
-              </>
-            } />
             <div className="admin-content admin-command-home">
-              {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (<AdminSurface className="admin-install-banner admin-install-banner--compact"><div className="admin-install-banner__copy"><div className="admin-eyebrow">WORKSPACE</div><strong>Install PRIME Admin</strong><p>Optional app-style access for staff devices.</p></div><div className="admin-install-banner__actions">{deferredPrompt ? <button type="button" className="admin-primary-button" onClick={handleInstallPWA}>Install</button> : null}{isIOSDevice ? <button type="button" className="admin-secondary-button" onClick={() => setShowIOSGuide(true)}>iOS Guide</button> : null}</div></AdminSurface>)}
-              <div className="admin-command-heading"><div><div className="admin-eyebrow">COMMAND / OVERVIEW</div><h2>Operations Overview</h2><p>Daily commerce operations, configuration, and service visibility.</p></div></div>
-              <div className="admin-kpi-rail"><div className="admin-kpi"><span>Customers</span><strong>{customers.length}</strong><small>Accounts</small></div><div className="admin-kpi"><span>Orders</span><strong>{orders.length}</strong><small>Queue</small></div><div className="admin-kpi admin-kpi--accent"><span>Stock Units</span><strong>{products.reduce((sum: number, product: any) => sum + (Number(product.stock) || 0), 0)}</strong><small>Catalog</small></div><div className="admin-kpi admin-kpi--warning"><span>Attention</span><strong>{orders.filter((order: any) => ["pending", "pending review"].includes(String(order.status || "").toLowerCase()) || String(order.paymentStatus || "").toLowerCase() === "pending review").length}</strong><small>Review</small></div></div>
-              <AdminSection title="Operations" eyebrow="01" description="Customers, orders, catalog, and inventory."><div className="admin-command-grid">{[
-                { id: "customers", name: "Customers", count: customers.length, icon: Users }, { id: "orders", name: "Orders", count: orders.length, icon: ClipboardList }, { id: "products", name: "Products", count: products.length, icon: Package }, { id: "inventory", name: "Inventory", count: `${products.reduce((a: number, p: any) => a + (Number(p.stock) || 0), 0)} units`, icon: Sliders },
-              ].map((item) => (<button key={item.id} type="button" onClick={() => setView(item.id as AdminView)} className="admin-command-item"><span className="admin-command-item__icon"><item.icon className="h-4 w-4" /></span><span className="admin-command-item__copy"><strong>{item.name}</strong><small>{item.count}</small></span><ChevronRight className="admin-command-item__arrow h-4 w-4" /></button>))}</div></AdminSection>
-              <AdminSection title="Configuration" eyebrow="02" description="Business rules, payments, promotions, media, and automation."><div className="admin-command-grid admin-command-grid--config">{[
-                { id: "settings", name: "Settings", meta: "Protected", icon: Lock }, { id: "logistics", name: "Logistics", meta: "Routes", icon: Truck }, { id: "charges", name: "Charges", meta: "Rules", icon: Receipt }, { id: "payments", name: "Payments", meta: "Methods", icon: CreditCard }, { id: "promos", name: "Promos", meta: "Vouchers", icon: Tag }, { id: "media", name: "Media", meta: "Gallery", icon: Film }, { id: "automation", name: "Secretary", meta: "Flows", icon: MessageSquare },
-              ].map((item) => (<button key={item.id} type="button" onClick={() => setView(item.id as AdminView)} className="admin-command-item"><span className="admin-command-item__icon"><item.icon className="h-4 w-4" /></span><span className="admin-command-item__copy"><strong>{item.name}</strong><small>{item.meta}</small></span><ChevronRight className="admin-command-item__arrow h-4 w-4" /></button>))}</div></AdminSection>
-              <AdminSection title="Observability" eyebrow="03" description="Telemetry, diagnostics, and live service checks."><div className="admin-command-grid admin-command-grid--observability">{[
-                { id: "analytics", name: "Analytics", meta: "Live", icon: TrendingUp }, { id: "diagnostics", name: "Diagnostics", meta: "Health", icon: Activity },
-              ].map((item) => (<button key={item.id} type="button" onClick={() => setView(item.id as AdminView)} className="admin-command-item"><span className="admin-command-item__icon"><item.icon className="h-4 w-4" /></span><span className="admin-command-item__copy"><strong>{item.name}</strong><small>{item.meta}</small></span><ChevronRight className="admin-command-item__arrow h-4 w-4" /></button>))}</div></AdminSection>
-              <div className="admin-connection-bar"><span className="admin-live-dot" /><div><strong>Live operations channel</strong><span>Customer telemetry and order activity sync in the background.</span></div><AdminBadge tone="success">{isSilentSyncing ? "SYNCING" : "CONNECTED"}</AdminBadge></div>
+              {(!isPWAInstalled && (deferredPrompt || isIOSDevice)) && (<AdminSurface className="admin-install-banner admin-install-banner--compact"><div className="admin-install-banner__copy"><div className="admin-eyebrow">WORKSPACE</div><strong>Install Prime Command Center</strong><p>Optional app-style access for staff devices.</p></div><div className="admin-install-banner__actions">{deferredPrompt ? <button type="button" className="admin-primary-button" onClick={handleInstallPWA}>Install</button> : null}{isIOSDevice ? <button type="button" className="admin-secondary-button" onClick={() => setShowIOSGuide(true)}>iOS Guide</button> : null}</div></AdminSurface>)}
+              <section className="command-systems command-systems--modules" aria-label="Admin modules">
+                <div className="command-system-grid">
+                  {[
+                    { id: "orders", name: "Orders", icon: ClipboardList, accent: "#b67935" },
+                    { id: "pos", name: "POS", icon: ShoppingBag, accent: "#12805c" },
+                    { id: "customers", name: "Customers", icon: Users, accent: "#27385f" },
+                    { id: "visitors", name: "Visitors", icon: User, accent: "#8a704c" },
+                    { id: "inventory", name: "Inventory", icon: Boxes, accent: "#384e6d" },
+                    { id: "products", name: "Products", icon: Package, accent: "#248078" },
+                    { id: "warehouse", name: "Warehouse", icon: Layers, accent: "#ad7942" },
+                    { id: "couriers", name: "Couriers", icon: Truck, accent: "#d2615e" },
+                    { id: "payments", name: "Payments", icon: CreditCard, accent: "#357c9d" },
+                    { id: "charges", name: "Charges", icon: Receipt, accent: "#4e5965" },
+                    { id: "promos", name: "Promos", icon: Tag, accent: "#51859b" },
+                    { id: "media", name: "Media", icon: Film, accent: "#1d7b66" },
+                    { id: "reports", name: "Reports", icon: TrendingUp, accent: "#438d78" },
+                    { id: "cashflows", name: "Cashflows", icon: ArrowUp, accent: "#bc9145" },
+                    { id: "broadcast", name: serverlessAdminMode ? "Secretary" : "Broadcast", icon: Send, accent: "#3978a0" },
+                    { id: "system", name: "System", icon: Sliders, accent: "#43556a" },
+                  ].filter((item) => item.id !== "pos" || serverlessAdminMode).map((item) => {
+                    const ready = item.id !== "cashflows" && (!serverlessAdminMode || serverlessModuleReady(item.id));
+                    return (
+                      <button key={item.id} type="button" onClick={() => openAdminModule(item.id)} disabled={!ready}
+                        className={`command-system-card command-admin-module${ready ? " command-admin-module--ready" : " command-admin-module--parked"}`}
+                        aria-label={ready ? `Open ${item.name}` : `${item.name} is not connected to this admin data source yet`}>
+                        <span className="command-system-card__icon" style={{ color: item.accent }}><item.icon aria-hidden="true" /></span>
+                        <span className="command-system-card__copy"><strong>{item.name}</strong></span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
             </div>
           </motion.div>
         )}
@@ -6302,7 +6546,7 @@ export default function AdminPage() {
                 <button onClick={() => setView("dashboard")} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer">
                   <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
                 </button>
-                <h2 className="text-base font-heading font-black tracking-wide uppercase text-slate-900">Telegram Automation</h2>
+                <h2 className="text-base font-heading font-normal tracking-wide uppercase text-slate-900">Secretary</h2>
               </div>
             </div>
             <div className="flex-1 w-full p-0"><AutomationModule /></div>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PRIME Services</string>
+    <string name="title_activity_main">PRIME Services</string>
+    <string name="package_name">ph.primenetwork.prime</string>
+    <string name="custom_url_scheme">ph.primenetwork.prime</string>
+</resources>

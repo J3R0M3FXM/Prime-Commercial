@@ -1,6 +1,7 @@
 "use client";
 
-import { authenticatedFetch } from "./telegram-auth-client";
+import { getServerlessVideos, resolveTelegramVideo } from "@/lib/telegram-serverless-client";
+import TelegramMediaImage from "@/app/components/telegram-media-image";
 
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -33,8 +34,11 @@ export interface GalleryVideo {
   telegramFileId?: string;
   directUrl?: string;
   thumbnailUrl?: string;
+  mediaId?: string;
   duration?: number;
   views?: number;
+  rating?: number;
+  publishedAt?: string;
   featured?: boolean;
   createdAt?: string;
 }
@@ -64,6 +68,10 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [copiedLink, setCopiedLink] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [galleryError, setGalleryError] = useState<string | null>(null);
+  const [streamUrl, setStreamUrl] = useState("");
+  const [streamAttempt, setStreamAttempt] = useState(0);
+  const [theaterFullscreen, setTheaterFullscreen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -71,12 +79,10 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
   const loadGallery = async () => {
     try {
       setLoading(true);
-      const res = await authenticatedFetch("/api/media/videos");
-      if (!res.ok) throw new Error("Failed to fetch gallery videos");
-      const data = await res.json();
-      setVideos(Array.isArray(data) ? data : []);
+      setGalleryError(null);
+      setVideos(await getServerlessVideos());
     } catch (err) {
-      console.error("Error loading video gallery:", err);
+      setGalleryError(err instanceof Error ? err.message : "The video gallery could not be loaded.");
     } finally {
       setLoading(false);
     }
@@ -91,21 +97,75 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
   // When active video changes, increment view count
   useEffect(() => {
     setVideoError(null);
+    setStreamUrl("");
+    setTheaterFullscreen(false);
     if (activeVideo) {
-      setIsPlaying(true);
-      // Fire view counter increment
-      authenticatedFetch(`/api/media/videos/${activeVideo.id}/view`, { method: "POST" }).catch(() => {});
+      setIsPlaying(false);
+      let cancelled = false;
+      const source = activeVideo.directUrl || (activeVideo.mediaId ? "" : activeVideo.telegramFileId || "");
+      (source && !source.startsWith("tgmedia:")
+        ? Promise.resolve(source)
+        : resolveTelegramVideo(source.startsWith("tgmedia:") ? source : activeVideo.mediaId || activeVideo.id)
+      ).then((url) => {
+        if (!cancelled) { setStreamUrl(url); setIsPlaying(true); }
+      }).catch((error) => {
+        if (!cancelled) setVideoError(error instanceof Error ? error.message : "Video stream unavailable.");
+      });
+      return () => { cancelled = true; };
     } else {
       setIsPlaying(false);
     }
+  }, [activeVideo, streamAttempt]);
+
+  useEffect(() => {
+    if (!activeVideo || typeof window === "undefined") return;
+    type TelegramFullscreenWebApp = {
+      isFullscreen?: boolean;
+      onEvent?: (event: string, handler: () => void) => void;
+      offEvent?: (event: string, handler: () => void) => void;
+    };
+    const webApp = (window as Window & { Telegram?: { WebApp?: TelegramFullscreenWebApp } }).Telegram?.WebApp;
+    const syncFullscreen = () => setTheaterFullscreen(Boolean(webApp?.isFullscreen));
+    webApp?.onEvent?.("fullscreenChanged", syncFullscreen);
+    return () => webApp?.offEvent?.("fullscreenChanged", syncFullscreen);
   }, [activeVideo]);
+
+  const toggleTheaterFullscreen = () => {
+    type TelegramFullscreenWebApp = {
+      isFullscreen?: boolean;
+      requestFullscreen?: () => void;
+      exitFullscreen?: () => void;
+    };
+    const webApp = (window as Window & { Telegram?: { WebApp?: TelegramFullscreenWebApp } }).Telegram?.WebApp;
+    if (theaterFullscreen) {
+      setTheaterFullscreen(false);
+      if (webApp?.isFullscreen) webApp.exitFullscreen?.();
+      return;
+    }
+    setTheaterFullscreen(true);
+    try { webApp?.requestFullscreen?.(); } catch { /* Keep the in-app theater fallback. */ }
+  };
+
+  const closeActiveVideo = () => {
+    if (theaterFullscreen) {
+      const webApp = (window as Window & { Telegram?: { WebApp?: { isFullscreen?: boolean; exitFullscreen?: () => void } } }).Telegram?.WebApp;
+      if (webApp?.isFullscreen) webApp.exitFullscreen?.();
+    }
+    setTheaterFullscreen(false);
+    setActiveVideo(null);
+  };
 
   // Format Duration
   const formatDuration = (seconds?: number) => {
-    if (!seconds || seconds <= 0) return "01:30";
+    if (!seconds || seconds <= 0) return "00:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+  const formatPublishedDate = (date?: string) => {
+    if (!date) return "Date unavailable";
+    const parsed = new Date(date);
+    return Number.isNaN(parsed.getTime()) ? "Date unavailable" : parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   };
 
   // Copy share link
@@ -139,25 +199,25 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
   if (!isOpen) return null;
 
   return (
-    <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
-      <div className="w-full max-w-[760px] min-h-[calc(100vh-120px)] bg-slate-950 flex flex-col overflow-hidden text-slate-100 shadow-sm relative sm:border-x sm:border-slate-800">
+      <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
+      <div className="w-full max-w-[430px] min-h-[calc(100vh-120px)] bg-gray-50 flex flex-col overflow-hidden text-slate-900 shadow-sm relative border-x border-slate-200">
         {/* 1. TOP NAVIGATION HEADER */}
-      <header className="sticky top-0 z-20 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 py-3 sm:px-6 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-20 bg-white/95 border-b border-slate-200 backdrop-blur-md px-4 py-3 flex items-center justify-between gap-3 shadow-sm">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-center">
             <Film className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-heading font-black text-sm uppercase tracking-wider text-white">
+              <span className="font-heading font-normal text-sm uppercase tracking-wider text-slate-900">
                 PRIME Media Vault
               </span>
-              <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-mono font-black uppercase">
+              <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] font-mono font-black uppercase">
                 FREE HD
               </span>
             </div>
-            <p className="text-[10px] font-mono text-slate-400 hidden sm:block">
-              Free streaming powered by Telegram Cloud CDN
+            <p className="text-[10px] font-mono text-slate-500">
+              Product videos and customer guides
             </p>
           </div>
         </div>
@@ -170,14 +230,14 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
             placeholder="Search videos, reviews, and product guides..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-xs font-mono text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 transition-colors"
+            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 placeholder-slate-400 focus:outline-hidden focus:border-emerald-700 transition-colors"
           />
         </div>
 
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
+          className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
           title="Back to Store"
         >
           <X className="w-5 h-5" />
@@ -185,52 +245,37 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
       </header>
 
       {/* 2. CATEGORY PILLS & MOBILE SEARCH */}
-      <div className="bg-slate-900/60 border-b border-slate-800/80 px-4 py-2.5 sm:px-6 space-y-2">
-        {/* Mobile Search */}
-        <div className="relative md:hidden">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      <div className="bg-white border-b border-slate-200 px-3 py-2.5">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(112px,0.72fr)] items-center gap-2">
+          <div className="relative min-w-0">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search videos..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 bg-slate-800/80 border border-slate-700 rounded-lg text-xs font-mono text-white placeholder-slate-400 focus:outline-hidden"
+            aria-label="Search videos"
+            className="h-10 w-full min-w-0 pl-8 pr-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-900 placeholder-slate-400 focus:outline-hidden focus:border-emerald-700"
           />
         </div>
-
-        {/* Category Scroll */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
-                selectedCategory === cat
-                  ? "bg-emerald-500 text-slate-950 shadow-xs"
-                  : "bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+          <select aria-label="Filter videos by category" value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} className="h-10 min-w-0 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-mono text-slate-700 focus:outline-hidden focus:border-emerald-700">
+            {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat === "All" ? "All categories" : cat}</option>)}
+          </select>
         </div>
       </div>
 
       {/* 3. MAIN GALLERY SCROLL AREA */}
-      <div className="flex-1 overflow-y-auto px-3 py-6 sm:px-3.5 max-w-7xl w-full mx-auto space-y-8">
+      <div className="flex-1 overflow-y-auto px-3 py-4 max-w-[430px] w-full mx-auto space-y-5">
         {/* HERO FEATURED VIDEO BANNER (if available and no specific search) */}
         {!searchQuery && selectedCategory === "All" && featuredVideo && (
-          <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-gradient-to-t from-slate-950 via-slate-900 to-slate-900/60 shadow-xl group">
+          <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-md group">
             <div className="relative aspect-video sm:aspect-21/9 max-h-[360px] w-full overflow-hidden">
-              <img
-                src={
-                  featuredVideo.thumbnailUrl ||
-                  "https://images.unsplash.com/photo-1544816155-12df9643f363?w=1200&q=80"
-                }
+              <TelegramMediaImage
+                src={featuredVideo.thumbnailUrl || "https://images.unsplash.com/photo-1544816155-12df9643f363?w=1200&q=80"}
                 alt={featuredVideo.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-60"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-45"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-white/70 to-transparent"></div>
 
               {/* Center Play Button */}
               <button
@@ -245,18 +290,18 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
             {/* Banner Caption */}
             <div className="p-4 sm:p-6 absolute bottom-0 left-0 right-0 space-y-2 pointer-events-none">
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 text-[10px] font-mono font-black uppercase flex items-center gap-1">
+                  <span className="px-2 py-0.5 rounded bg-amber-300 text-slate-900 text-[10px] font-mono font-black uppercase flex items-center gap-1">
                   <Sparkles className="w-3 h-3 fill-current" /> Featured Premiere
                 </span>
-                <span className="px-2 py-0.5 rounded bg-black/60 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono uppercase">
+                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-mono uppercase">
                   {featuredVideo.category}
                 </span>
               </div>
-              <h2 className="text-lg sm:text-2xl font-heading font-black text-white leading-tight">
+              <h2 className="text-lg font-heading font-normal text-slate-900 leading-tight">
                 {featuredVideo.title}
               </h2>
               {featuredVideo.description && (
-                <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 max-w-2xl font-sans">
+                <p className="text-xs text-slate-700 line-clamp-2 font-sans">
                   {featuredVideo.description}
                 </p>
               )}
@@ -268,13 +313,13 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-              <Film className="w-3.5 h-3.5 text-emerald-400" />
+              <Film className="w-3.5 h-3.5 text-emerald-700" />
               <span>
                 {selectedCategory === "All" ? "All Videos" : selectedCategory} ({filteredVideos.length})
               </span>
             </h3>
             <span className="text-[10px] font-mono text-slate-500">
-              100% Free Streaming • No Account Required
+              Product videos · Free to watch
             </span>
           </div>
 
@@ -283,31 +328,35 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
               <RefreshCw className="w-8 h-8 animate-spin mx-auto text-emerald-500 mb-3" />
               <p className="text-xs font-mono text-slate-400">Streaming Telegram Video Index...</p>
             </div>
+          ) : galleryError ? (
+            <div className="p-8 text-center border border-amber-900/60 bg-amber-950/20 rounded-2xl space-y-2">
+              <Film className="w-8 h-8 mx-auto text-amber-400" />
+              <p className="text-sm font-heading font-normal text-slate-200">Gallery unavailable</p>
+              <p className="text-xs font-mono text-slate-400">{galleryError}</p>
+              <button onClick={() => void loadGallery()} className="px-3 py-1.5 rounded-lg bg-slate-800 text-emerald-300 text-xs font-mono">Retry</button>
+            </div>
           ) : filteredVideos.length === 0 ? (
-            <div className="p-16 text-center border border-dashed border-slate-800 rounded-2xl space-y-2">
-              <Film className="w-10 h-10 mx-auto text-slate-600" />
-              <p className="text-sm font-heading font-bold text-slate-300">No Videos Found</p>
+            <div className="p-10 text-center border border-dashed border-slate-300 bg-white rounded-2xl space-y-2">
+              <Film className="w-10 h-10 mx-auto text-emerald-700" />
+              <p className="text-sm font-heading font-normal text-slate-800">No Videos Found</p>
               <p className="text-xs font-mono text-slate-500">
                 Check back soon or select a different category.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-2">
               {filteredVideos.map((video) => (
                 <div
                   key={video.id}
                   onClick={() => setActiveVideo(video)}
-                  className="bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-2xl overflow-hidden transition-all duration-200 flex flex-col group cursor-pointer shadow-xs hover:shadow-lg hover:-translate-y-0.5"
+                  className="min-w-0 bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-300 rounded-xl overflow-hidden transition-all duration-200 flex flex-col group cursor-pointer shadow-sm hover:shadow-md"
                 >
                   {/* Thumbnail / Aspect Ratio */}
-                  <div className="relative aspect-video bg-slate-950 overflow-hidden">
-                    <img
-                      src={
-                        video.thumbnailUrl ||
-                        "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&q=80"
-                      }
+                  <div className="relative aspect-video bg-slate-100 overflow-hidden">
+                    <TelegramMediaImage
+                      src={video.thumbnailUrl || "/primefinal.png"}
                       alt={video.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-80 group-hover:opacity-100"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90 group-hover:opacity-100"
                     />
 
                     {/* Dark gradient */}
@@ -332,23 +381,18 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
                   </div>
 
                   {/* Card Content */}
-                  <div className="p-4 flex-1 flex flex-col justify-between space-y-2">
-                    <div className="space-y-1">
-                      <h4 className="font-heading font-black text-sm text-white line-clamp-2 leading-snug group-hover:text-emerald-400 transition-colors">
+                  <div className="min-w-0 p-2.5 flex-1 flex flex-col justify-between gap-2">
+                    <div className="min-w-0 space-y-1">
+                      <h4 className="font-heading font-normal text-[13px] text-slate-900 line-clamp-2 leading-tight group-hover:text-emerald-800 transition-colors">
                         {video.title}
                       </h4>
-                      {video.description && (
-                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                          {video.description}
-                        </p>
-                      )}
+                      <p className="flex items-center gap-1 text-[9px] font-mono text-slate-500"><Clock className="h-3 w-3 shrink-0 text-emerald-700"/><span className="truncate">{formatPublishedDate(video.publishedAt || video.createdAt)}</span></p>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
-                      <span className="flex items-center gap-1 text-slate-400">
-                        <Eye className="w-3.5 h-3.5 text-emerald-400" /> {video.views || 0} views
-                      </span>
-                      <span className="text-emerald-400/80 text-[10px] font-bold">FREE VIEW</span>
+                    <div className="grid grid-cols-2 gap-x-1 gap-y-1 border-t border-slate-100 pt-1.5 text-[9px] font-mono text-slate-600">
+                      <span className="flex min-w-0 items-center gap-1"><Clock className="h-3 w-3 shrink-0 text-emerald-700"/><span>{formatDuration(video.duration)}</span></span>
+                      <span className="flex min-w-0 items-center gap-1"><Sparkles className="h-3 w-3 shrink-0 text-amber-500"/><span>{typeof video.rating === "number" && video.rating > 0 ? video.rating.toFixed(1) : "—"} rating</span></span>
+                      <span className="col-span-2 flex min-w-0 items-center gap-1"><Eye className="h-3 w-3 shrink-0 text-emerald-700"/><span>{(video.views || 0).toLocaleString()} views</span></span>
                     </div>
                   </div>
                 </div>
@@ -362,15 +406,15 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
       {/* 4. ACTIVE THEATER VIDEO PLAYER MODAL                                       */}
       {/* ========================================================================= */}
       {activeVideo && (
-        <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-[430px] overflow-hidden shadow-2xl flex flex-col max-h-[95vh]">
+        <div className={`fixed inset-0 z-60 flex justify-center animate-in fade-in duration-200 ${theaterFullscreen ? "bg-slate-950 p-0" : "items-center bg-slate-950/65 backdrop-blur-sm p-2"}`}>
+          <div role="dialog" aria-modal="true" aria-label={activeVideo.title} className={`bg-white border border-slate-200 w-full max-w-[430px] overflow-hidden shadow-2xl flex flex-col ${theaterFullscreen ? "h-[100dvh] max-h-[100dvh] rounded-none" : "max-h-[calc(100dvh-16px)] rounded-xl"}`}>
             {/* Top Bar */}
-            <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-3 text-white">
+            <div className="px-3 py-2.5 bg-white border-b border-slate-200 flex items-center justify-between gap-3 text-slate-900">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold shrink-0">
+                <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-mono font-bold shrink-0">
                   {activeVideo.category}
                 </span>
-                <h3 className="font-heading font-black text-sm uppercase tracking-wide truncate">
+                <h3 className="font-heading font-normal text-sm uppercase tracking-wide text-slate-900 truncate">
                   {activeVideo.title}
                 </h3>
               </div>
@@ -378,14 +422,15 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
                 <button
                   onClick={() => handleShare(activeVideo)}
                   title="Share video"
-                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-mono flex items-center gap-1 cursor-pointer"
                 >
-                  {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+                  {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-700" /> : <Share2 className="w-3.5 h-3.5" />}
                   <span className="hidden sm:inline">{copiedLink ? "Copied!" : "Share"}</span>
                 </button>
                 <button
-                  onClick={() => setActiveVideo(null)}
-                  className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+                  onClick={closeActiveVideo}
+                  aria-label="Close video"
+                  className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-900 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -393,25 +438,23 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
             </div>
 
             {/* Video Frame */}
-            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
+            <div className={`relative bg-slate-950 flex items-center justify-center overflow-hidden ${theaterFullscreen ? "flex-1 min-h-0" : "aspect-video"}`}>
               {videoError ? (
                 <div className="p-6 text-center space-y-2 max-w-sm">
-                  <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">
+                  <div className="w-10 h-10 rounded-full bg-red-50 border border-red-200 text-red-600 flex items-center justify-center mx-auto">
                     <Film className="w-5 h-5" />
                   </div>
-                  <p className="text-xs font-mono font-bold text-red-400">Stream Connection Notice</p>
-                  <p className="text-[11px] font-sans text-slate-300 leading-normal">
+                  <p className="text-xs font-mono font-bold text-red-300">Stream connection issue</p>
+                  <p className="text-[11px] font-sans text-white leading-normal">
                     {videoError}
                   </p>
                   <button
                     onClick={() => {
                       setVideoError(null);
-                      if (videoRef.current) {
-                        videoRef.current.load();
-                        videoRef.current.play().catch(() => {});
-                      }
+                      setStreamUrl("");
+                      setStreamAttempt((attempt) => attempt + 1);
                     }}
-                    className="mt-2 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-mono text-emerald-400 rounded-lg cursor-pointer inline-flex items-center gap-1.5"
+                    className="mt-2 px-3 py-1 bg-white hover:bg-emerald-50 text-xs font-mono text-emerald-800 rounded-lg cursor-pointer inline-flex items-center gap-1.5"
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> Retry Stream
                   </button>
@@ -423,43 +466,32 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
                   playsInline
                   preload="metadata"
                   className="w-full h-full object-contain"
-                  src={
-                    activeVideo.directUrl ||
-                    `/api/media/stream/${activeVideo.telegramFileId || activeVideo.id}`
-                  }
-                  onError={async () => {
-                    // Test stream API directly to get detailed error message
-                    try {
-                      const checkRes = await fetch(
-                        `/api/media/stream/${activeVideo.telegramFileId || activeVideo.id}`
-                      );
-                      if (!checkRes.ok) {
-                        const errMsg = await checkRes.text();
-                        setVideoError(errMsg || "Video stream unavailable from Telegram.");
-                      } else {
-                        setVideoError("Unable to decode video format in this browser.");
-                      }
-                    } catch {
-                      setVideoError("Network error while connecting to media stream.");
-                    }
-                  }}
+                  src={streamUrl || undefined}
+                  onError={() => setVideoError("Unable to play this video format in the current browser.")}
                 >
                   Your browser does not support HTML5 video streaming.
                 </video>
               )}
+              {!videoError && <button
+                type="button"
+                onClick={toggleTheaterFullscreen}
+                aria-label={theaterFullscreen ? "Exit fullscreen video" : "View video fullscreen"}
+                title={theaterFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-md bg-slate-950/75 text-white shadow hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              >{theaterFullscreen ? <X className="h-4 w-4"/> : <Maximize className="h-4 w-4"/>}</button>}
             </div>
 
             {/* Video Info & Controls Panel */}
-            <div className="p-4 sm:p-5 bg-slate-900/70 overflow-y-auto space-y-3">
+            {!theaterFullscreen && <div className="p-3 bg-slate-50 border-t border-slate-200 overflow-y-auto space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-mono text-slate-600">
                   <span className="flex items-center gap-1">
-                    <Eye className="w-3.5 h-3.5 text-emerald-400" /> {(activeVideo.views || 0) + 1} views
+                    <Eye className="w-3.5 h-3.5 text-emerald-700" /> {(activeVideo.views || 0) + 1} views
                   </span>
                   <span>•</span>
                   <span>Storage: Telegram Cloud CDN</span>
                   <span>•</span>
-                  <span className="text-emerald-400 font-bold">1080P HD Free</span>
+                  <span className="text-emerald-800 font-bold">1080P HD Free</span>
                 </div>
 
                 {/* Speed selector */}
@@ -475,7 +507,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
                         }
                       }}
                       className={`px-1.5 py-0.5 rounded cursor-pointer ${
-                        playbackSpeed === spd ? "bg-emerald-500 text-slate-950 font-bold" : "bg-slate-800 text-slate-400"
+                        playbackSpeed === spd ? "bg-emerald-600 text-white font-bold" : "bg-white border border-slate-200 text-slate-600"
                       }`}
                     >
                       {spd}x
@@ -485,7 +517,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
               </div>
 
               {activeVideo.description && (
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
+                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-sans">
                   {activeVideo.description}
                 </p>
               )}
@@ -495,7 +527,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
                   {activeVideo.tags.map((tag, idx) => (
                     <span
                       key={idx}
-                      className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/20 px-2 py-0.5 rounded"
+                      className="text-[10px] font-mono text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded"
                     >
                       #{tag}
                     </span>
@@ -505,8 +537,8 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
 
               {/* Up Next Recommendation Strip */}
               {videos.filter((v) => v.id !== activeVideo.id).length > 0 && (
-                <div className="pt-3 border-t border-slate-800 space-y-2">
-                  <p className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                <div className="pt-3 border-t border-slate-200 space-y-2">
+                  <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-bold">
                     Up Next in Gallery
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -516,23 +548,23 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
                       .map((rec) => (
                         <div
                           key={rec.id}
-                          onClick={() => setActiveVideo(rec)}
-                          className="bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl p-2 flex flex-col gap-1.5 cursor-pointer transition-colors"
+                  onClick={() => setActiveVideo(rec)}
+                          className="bg-white hover:bg-emerald-50 border border-slate-200 rounded-lg p-2 flex flex-col gap-1.5 cursor-pointer transition-colors"
                         >
-                          <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900">
-                            <img
+                          <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-100">
+                            <TelegramMediaImage
                               src={rec.thumbnailUrl || "https://images.unsplash.com/photo-1544816155-12df9643f363?w=400&q=80"}
                               alt={rec.title}
                               className="w-full h-full object-cover"
                             />
-                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-slate-950/25 flex items-center justify-center">
                               <Play className="w-3.5 h-3.5 text-white fill-current" />
                             </div>
                           </div>
-                          <p className="text-[11px] font-heading font-bold text-white truncate">
+                          <p className="text-[11px] font-heading font-normal text-slate-900 truncate">
                             {rec.title}
                           </p>
-                          <span className="text-[9px] font-mono text-slate-400">
+                          <span className="text-[9px] font-mono text-slate-500">
                             {formatDuration(rec.duration)}
                           </span>
                         </div>
@@ -540,7 +572,7 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
           </div>
         </div>
       )}

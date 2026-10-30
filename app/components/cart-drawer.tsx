@@ -1,6 +1,6 @@
 "use client";
 
-import { authenticatedFetch } from "./telegram-auth-client";
+import { getServerlessCatalog, callServerless } from "@/lib/telegram-serverless-client";
 
 import React, { useEffect, useState, useMemo, Component, ErrorInfo, ReactNode } from 'react';
 import { useCart } from './cart-context';
@@ -74,7 +74,7 @@ class CartErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
   }
 }
 
-function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: boolean; onClose: () => void; onCheckoutOpenChange?: (open: boolean) => void }) {
   const { cart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, cartTotal, cartCount, syncWithServerData } = useCart();
   const [activeCharges, setActiveCharges] = useState<any[]>([]);
   const [loadingCharges, setLoadingCharges] = useState(false);
@@ -82,50 +82,36 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
   useEffect(() => {
     if (isOpen) {
-      // Sync Products
-      authenticatedFetch("/api/products")
-        .then(res => res.json())
-        .then(data => {
-           if (data && Array.isArray(data) && typeof syncWithServerData === 'function') {
-             syncWithServerData(data);
-           }
-        })
-        .catch(err => console.warn("Failed to sync cart data", err));
-
-      // Fetch Active Charges Fresh with No Cache
+      // Read current cart data and applicable charges from Telegram Serverless.
       setLoadingCharges(true);
-      authenticatedFetch(`/api/charges?_t=${Date.now()}`, {
-        cache: "no-store",
-        headers: { "Pragma": "no-cache" }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setActiveCharges(data);
-          }
-        })
-        .catch(err => console.warn("Failed to fetch charges", err))
+      Promise.all([
+        getServerlessCatalog(),
+        callServerless<any[]>('getPublicCharges'),
+      ]).then(([products, charges]) => {
+        if (Array.isArray(products) && typeof syncWithServerData === 'function') syncWithServerData(products);
+        if (Array.isArray(charges)) setActiveCharges(charges);
+      }).catch(err => console.warn("Failed to refresh cart data", err))
         .finally(() => setLoadingCharges(false));
     }
   }, [isOpen]); 
 
   const safeCart = Array.isArray(cart) ? cart : [];
   const selectedItems = useMemo(() => {
-    return safeCart.filter((item: any) => item && typeof item === 'object' && item.selected !== false);
+    return safeCart.filter((item: any) => item && typeof item === 'object' && item.selected !== false && item.catalogUnavailable !== true);
   }, [safeCart]);
   
-  if (!isOpen) return null;
+  if (!isOpen && !isCheckoutOpen) return null;
 
   return (
-    <div className="w-full flex justify-center bg-gray-50 py-[4.8px]">
+    <div className={isOpen ? "prime-cart w-full flex justify-center bg-gray-50 py-[4.8px]" : "hidden"}>
       {!isCheckoutOpen && (
-        <div className="w-full max-w-[760px] bg-white h-auto max-h-[calc(100vh-120px)] shadow-sm flex flex-col relative border-x border-slate-200">
+        <div className="w-full max-w-[430px] bg-white h-auto max-h-[calc(100vh-120px)] shadow-sm flex flex-col relative border-x border-slate-200">
         
         {/* Header */}
         <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
           <div className="flex items-center gap-1.5">
             <ShoppingCart className="w-4 h-4 text-gray-900" />
-            <h2 className="text-base font-heading font-bold uppercase tracking-wide">Your Cart</h2>
+            <h2 className="text-base leading-5 font-heading font-bold uppercase tracking-wide">Your Cart</h2>
             <span className="bg-black text-white text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full ml-1">
               {cartCount || 0}
             </span>
@@ -155,7 +141,8 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                 <div key={item.id} className="flex gap-2 p-1.5 bg-gray-50 rounded-lg border border-gray-100 items-center">
                   <input 
                     type="checkbox" 
-                    checked={item.selected !== false}
+                    checked={item.selected !== false && item.catalogUnavailable !== true}
+                    disabled={item.catalogUnavailable === true}
                     onChange={(e) => toggleSelection && toggleSelection(item.id, e.target.checked)}
                     className="w-3.5 h-3.5 cursor-pointer accent-black shrink-0"
                   />
@@ -170,8 +157,11 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                   <div className="flex-1 min-w-0 flex flex-col justify-between">
                     <div className="flex justify-between items-start gap-1">
                       <div className="min-w-0">
-                        <h3 className="font-heading font-normal uppercase text-gray-900 line-clamp-1 text-[11px]">{item.name || "Product"}</h3>
-                        <p className="text-[11px] font-bold text-gray-800 font-mono mt-0.5">{formatPHP(item.price || 0)}</p>
+                        <h3 className="prime-cart__product-name uppercase text-gray-900 line-clamp-1 text-[11px]">{item.name || "Product"}</h3>
+                        <p className="prime-cart__value text-[11px] text-gray-800 font-mono mt-0.5">{formatPHP(item.price || 0)}</p>
+                        {item.catalogUnavailable === true && (
+                          <p className="mt-1 text-[10px] font-semibold text-red-600">{item.catalogUnavailableReason || 'No longer available. Remove this item to continue.'}</p>
+                        )}
                       </div>
                       <button 
                         onClick={() => removeFromCart && removeFromCart(item.id)}
@@ -190,7 +180,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                         >
                           <Minus className="w-2.5 h-2.5" />
                         </button>
-                        <span className="text-[11px] font-mono font-bold w-5 text-center">{item.quantity || 1}</span>
+                        <span className="prime-cart__value text-[11px] font-mono w-5 text-center">{item.quantity || 1}</span>
                         <button 
                           className="px-1.5 py-0.5 text-gray-500 hover:text-black hover:bg-gray-50 cursor-pointer"
                           onClick={() => updateQuantity && updateQuantity(item.id, (item.quantity || 1) + 1)}
@@ -213,7 +203,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             <div className="space-y-1">
               <div className="flex justify-between items-center text-sm">
                 <span className="font-heading font-bold uppercase tracking-wider text-gray-700 text-xs">Subtotal:</span>
-                <span className="font-mono font-bold text-base text-black">{formatPHP(cartTotal || 0)}</span>
+                <span className="prime-cart__value font-mono text-base text-black">{formatPHP(cartTotal || 0)}</span>
               </div>
               <p className="text-[10px] text-gray-400 font-mono">
                 Delivery & charges calculated at checkout.
@@ -222,7 +212,10 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
             <button 
               disabled={selectedItems.length === 0}
-              onClick={() => setIsCheckoutOpen(true)}
+              onClick={() => {
+                setIsCheckoutOpen(true);
+                onCheckoutOpenChange?.(true);
+              }}
               className="w-full py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-2xs text-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Proceed to Checkout ({selectedItems.length})
@@ -235,7 +228,10 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
       {/* Multi-Step Checkout Modal replaces the cart panel while checkout is open */}
       <CheckoutModal
         isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
+        onClose={() => {
+          setIsCheckoutOpen(false);
+          onCheckoutOpenChange?.(false);
+        }}
         selectedItems={selectedItems}
         onOrderSuccess={() => {
           if (typeof clearSelectedItems === 'function') {
@@ -247,8 +243,7 @@ function CartDrawerContent({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   );
 }
 
-export default function CartDrawer(props: { isOpen: boolean; onClose: () => void }) {
-  if (!props.isOpen) return null;
+export default function CartDrawer(props: { isOpen: boolean; onClose: () => void; onCheckoutOpenChange?: (open: boolean) => void }) {
   return (
     <CartErrorBoundary onClose={props.onClose}>
       <CartDrawerContent {...props} />

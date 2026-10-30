@@ -150,6 +150,7 @@ export interface LocationResult {
   lon: number;
   accuracy?: number; // meters
   altitude?: number | null;
+  capturedAt?: string;
   source: "Precise GPS" | "Approximate Location" | "Unavailable";
 }
 let physicalGpsWatchId: number | null = null;
@@ -170,6 +171,7 @@ function publishPhysicalGpsLocation(location: LocationResult | null): void {
 
   latestPhysicalGpsLocation = {
     ...location,
+    capturedAt: location.capturedAt || new Date().toISOString(),
     source: "Precise GPS",
   };
 
@@ -299,9 +301,8 @@ export function refreshPhysicalGpsTelemetry(
       return latestPhysicalGpsLocation;
     }
 
-    // If the native channel is unavailable or silent, keep a browser watcher
-    // running as a background fallback. It will not prompt in the Telegram path.
-    startBrowserPhysicalGpsWatcher();
+    // Never start browser geolocation in the background. A silent lookup can
+    // still trigger a platform prompt in embedded WebViews.
     return latestPhysicalGpsLocation;
   })();
 
@@ -348,10 +349,8 @@ export function startPhysicalGpsTelemetry(): void {
     // Ignore Telegram initialization issues.
   }
 
-  // Begin the native Mini App location flow immediately when PRIME opens.
-  // If the user has already granted access, Telegram should return location
-  // without displaying another permission prompt.
-  void refreshPhysicalGpsTelemetry(true);
+  // Location is requested only after a customer taps the location action in
+  // checkout. App startup and Telegram resume must never prompt for GPS.
 }
 
 export function stopPhysicalGpsTelemetry(): void {
@@ -389,13 +388,6 @@ export function waitForPhysicalGps(timeoutMs = 15000): Promise<LocationResult | 
     return Promise.resolve(null);
   }
 
-  // This is only a safety net for callers that mount before the app-level
-  // telemetry effect. It stays silent here; the permission-capable start path
-  // is handled at app/checkout entry, never at Step 4.
-  if (!physicalGpsTelemetryStarted && !physicalGpsRefreshInFlight) {
-    physicalGpsTelemetryStarted = true;
-    void refreshPhysicalGpsTelemetry(false);
-  }
 
   return new Promise((resolve) => {
     let settled = false;
@@ -489,6 +481,9 @@ async function requestTelegramLocationOnce(
 async function getTelegramPreciseLocation(
   timeoutMs: number,
   allowPermissionPrompt: boolean,
+  initTimeoutMs = 5000,
+  refineForMs = 5000,
+  targetAccuracyMeters = 25,
 ): Promise<LocationResult | null> {
   const webApp = (window as any)?.Telegram?.WebApp;
   const manager = webApp?.LocationManager;
@@ -522,7 +517,7 @@ async function getTelegramPreciseLocation(
         if (settled) return;
         settled = true;
         resolve();
-      }, 5000);
+      }, initTimeoutMs);
 
       try {
         manager.init(() => {
@@ -540,6 +535,7 @@ async function getTelegramPreciseLocation(
 
     const startedAt = Date.now();
     let lastState = "";
+    let bestResult: LocationResult | null = null;
 
     while (Date.now() - startedAt < timeoutMs) {
       const available = manager.isLocationAvailable !== false;
@@ -557,24 +553,36 @@ async function getTelegramPreciseLocation(
       }
 
       if (!allowPermissionPrompt && !accessGranted) {
-        return { lat: 0, lon: 0, source: "Unavailable" };
+        return bestResult || { lat: 0, lon: 0, source: "Unavailable" };
+      }
+      // Telegram reports accessRequested after the first permission decision.
+      // If it was denied, do not call getLocation repeatedly in later sessions.
+      if (allowPermissionPrompt && accessRequested && !accessGranted) {
+        return bestResult || { lat: 0, lon: 0, source: "Unavailable" };
       }
       if (!available) {
-        return { lat: 0, lon: 0, source: "Unavailable" };
+        return bestResult || { lat: 0, lon: 0, source: "Unavailable" };
       }
 
-      const slice = Math.min(8000, timeoutMs - (Date.now() - startedAt));
+      const slice = Math.min(3000, timeoutMs - (Date.now() - startedAt));
       if (slice <= 0) break;
 
       const result = await requestTelegramLocationOnce(manager, webApp, slice);
-      if (result) return result;
+      if (result) {
+        if (!bestResult || (result.accuracy ?? Infinity) <= (bestResult.accuracy ?? Infinity)) {
+          bestResult = result;
+        }
+        if ((bestResult.accuracy ?? Infinity) <= targetAccuracyMeters || (Date.now() - startedAt) >= refineForMs) {
+          return bestResult;
+        }
+      }
 
       if (Date.now() - startedAt < timeoutMs) {
-        await new Promise((resolve) => window.setTimeout(resolve, 750));
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
       }
     }
 
-    return { lat: 0, lon: 0, source: "Unavailable" };
+    return bestResult || { lat: 0, lon: 0, source: "Unavailable" };
   } catch (error) {
     console.warn("Telegram precise GPS acquisition failed:", error);
     return { lat: 0, lon: 0, source: "Unavailable" };
@@ -584,6 +592,7 @@ async function getTelegramPreciseLocation(
 async function getBrowserPreciseLocation(
   timeoutMs: number,
   allowPermissionPrompt: boolean,
+  refineForMs = 0,
 ): Promise<LocationResult | null> {
   if (!navigator.geolocation) return null;
 
@@ -610,6 +619,8 @@ async function getBrowserPreciseLocation(
   return new Promise((resolve) => {
     let settled = false;
     let watchId: number | null = null;
+    let refinementTimer: number | null = null;
+    let best: LocationResult | null = null;
 
     const finish = (result: LocationResult) => {
       if (settled) return;
@@ -622,27 +633,52 @@ async function getBrowserPreciseLocation(
           // ignore cleanup failures
         }
       }
+      if (refinementTimer !== null) window.clearTimeout(refinementTimer);
       resolve(result);
     };
 
+    const finishBest = () => finish(best || { lat: 0, lon: 0, source: "Unavailable" });
+
     const timer = window.setTimeout(() => {
-      finish({ lat: 0, lon: 0, source: "Unavailable" });
+      finishBest();
     }, timeoutMs);
 
     try {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
-          finish({
+          const positionAgeMs = Date.now() - pos.timestamp;
+          if (
+            !Number.isFinite(pos.timestamp) ||
+            pos.timestamp <= 0 ||
+            positionAgeMs < -5000 ||
+            positionAgeMs > 30000
+          ) {
+            console.info("[PRIME GPS] Ignoring a stale browser location reading.");
+            return;
+          }
+          const candidate: LocationResult = {
             lat: pos.coords.latitude,
             lon: pos.coords.longitude,
             accuracy: Math.round(pos.coords.accuracy),
             altitude: pos.coords.altitude ?? null,
+            capturedAt: new Date(pos.timestamp).toISOString(),
             source: "Precise GPS",
-          });
+          };
+          if ((candidate.accuracy ?? Infinity) <= (best?.accuracy ?? Infinity)) {
+            best = candidate;
+          }
+          if (refineForMs <= 0) {
+            finish(candidate);
+          } else if (refinementTimer === null) {
+            // Let Android's fused provider replace an initial stale/coarse fix
+            // before centering the delivery map, even when it reports a small
+            // accuracy radius on its first callback.
+            refinementTimer = window.setTimeout(finishBest, Math.min(refineForMs, 5000));
+          }
         },
         (err) => {
           console.warn("Browser GPS request failed:", err.message);
-          finish({ lat: 0, lon: 0, source: "Unavailable" });
+          finishBest();
         },
         {
           enableHighAccuracy: true,
@@ -665,29 +701,82 @@ export async function getClientLocation(
     return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  // IMPORTANT: Start the Android/WebView geolocation flow immediately.
-  // This is the permission channel surfaced by the embedded client. Do not
-  // wait on Telegram's native helper before initiating it, or the first
-  // permission dialog can be deferred until Step 4.
-  const browserLocation = await getBrowserPreciseLocation(
-    Math.min(timeoutMs, 30000),
-    allowPermissionPrompt,
-  );
-
-  if (browserLocation?.source === "Precise GPS") {
-    return browserLocation;
+  // In Telegram, use its native location permission/provider first. Telegram
+  // persists an allowed decision, so subsequent sessions can read location
+  // without showing the permission prompt again. Browser geolocation remains
+  // a silent fallback there, avoiding a second independent permission prompt.
+  const webApp = (window as any)?.Telegram?.WebApp;
+  const hasTelegramManager = typeof webApp?.LocationManager?.getLocation === "function";
+  if (hasTelegramManager) {
+    const browserFirst = await getBrowserPreciseLocation(
+      Math.min(timeoutMs, 30000),
+      false,
+      10000,
+    );
+    if (browserFirst?.source === "Precise GPS") return browserFirst;
+    const telegramLocation = await getTelegramPreciseLocation(timeoutMs, allowPermissionPrompt);
+    if (telegramLocation?.source === "Precise GPS") return telegramLocation;
+    const browserFallback = await getBrowserPreciseLocation(Math.min(timeoutMs, 15000), false, 5000);
+    if (browserFallback?.source === "Precise GPS") return browserFallback;
+    return { lat: 0, lon: 0, source: "Unavailable" };
   }
 
-  // Telegram native fallback uses the already-existing helper and only runs
-  // after the direct WebView path had an opportunity to acquire a coordinate.
-  const remaining = Math.max(10000, timeoutMs - 30000);
-  const telegramLocation = await getTelegramPreciseLocation(
-    remaining,
-    allowPermissionPrompt,
-  );
+  // Browser GPS is refined for up to 8 seconds; return the best accuracy fix
+  // received, or finish sooner when the sensor reports <=15m accuracy.
+  const browserLocation = await getBrowserPreciseLocation(Math.min(timeoutMs, 30000), allowPermissionPrompt, 8000);
+  if (browserLocation?.source === "Precise GPS") return browserLocation;
 
-  if (telegramLocation?.source === "Precise GPS") {
-    return telegramLocation;
+  return { lat: 0, lon: 0, source: "Unavailable" };
+}
+
+/**
+ * Use a very recent high-accuracy reading immediately, then request one fresh
+ * provider fix without waiting through an extended refinement window.
+ */
+export async function getFreshClientLocation(
+  timeoutMs = 60000,
+  allowPermissionPrompt = true,
+): Promise<LocationResult> {
+  if (typeof window === "undefined") {
+    return { lat: 0, lon: 0, source: "Unavailable" };
+  }
+
+  const recentFix = getLatestPhysicalGpsLocation();
+  const recentFixAge = Date.now() - Date.parse(String(recentFix?.capturedAt || ""));
+  if (
+    recentFix &&
+    Number(recentFix.accuracy) > 0 &&
+    Number(recentFix.accuracy) <= 20 &&
+    Number.isFinite(recentFixAge) &&
+    recentFixAge >= 0 &&
+    recentFixAge <= 15_000
+  ) {
+    return recentFix;
+  }
+
+  // Try Telegram's native provider first inside a Mini App, then fall back to
+  // a fresh timestamped WebView fix. Some Android Telegram WebViews expose
+  // navigator.geolocation even when it cannot return a position; treating
+  // that as final used to skip the working Telegram LocationManager channel.
+  const webApp = (window as any)?.Telegram?.WebApp;
+  if (typeof webApp?.LocationManager?.getLocation === "function") {
+    const telegramLocation = await getTelegramPreciseLocation(
+      Math.min(timeoutMs, 1200),
+      allowPermissionPrompt,
+      500,
+      0,
+      20,
+    ).catch(() => null);
+    if (telegramLocation?.source === "Precise GPS") return telegramLocation;
+  }
+
+  if (navigator.geolocation) {
+    const browserLocation = await getBrowserPreciseLocation(
+      Math.min(timeoutMs, 4500),
+      allowPermissionPrompt,
+      0,
+    ).catch(() => null);
+    if (browserLocation?.source === "Precise GPS") return browserLocation;
   }
 
   return { lat: 0, lon: 0, source: "Unavailable" };

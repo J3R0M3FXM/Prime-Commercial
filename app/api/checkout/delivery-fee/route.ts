@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from '@/lib/delivery-fee';
+import { getWarehousesFromDb, getCouriersFromDb } from '@/lib/db-adapter';
+import { calculateRouteTomTom, isTomTomConfigured } from '@/lib/tomtom';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,23 +19,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Valid destination coordinates are required.' }, { status: 400 });
     }
 
+    let warehouses: any[] = [];
+    let courierRows: any[] = [];
+
     if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Logistics database is not configured.' }, { status: 503 });
+      warehouses = await getWarehousesFromDb();
+      courierRows = await getCouriersFromDb();
+    } else {
+      const supabase = getSupabaseAdmin()!;
+
+      const { data: whData, error: warehouseError } = await supabase
+        .from('warehouses')
+        .select('id,name,address,latitude,longitude,is_active,is_default,sort_order')
+        .eq('is_active', true)
+        .order('is_default', { ascending: false })
+        .order('sort_order', { ascending: true });
+
+      if (warehouseError) throw warehouseError;
+      warehouses = whData || [];
+
+      const { data: crData, error: courierError } = await supabase
+        .from('couriers')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (courierError) throw courierError;
+      courierRows = crData || [];
     }
 
-    const supabase = getSupabaseAdmin()!;
-
-    const { data: warehouses, error: warehouseError } = await supabase
-      .from('warehouses')
-      .select('id,name,address,latitude,longitude,is_active,is_default,sort_order')
-      .eq('is_active', true)
-      .order('is_default', { ascending: false })
-      .order('sort_order', { ascending: true });
-
-    if (warehouseError) throw warehouseError;
-
     const warehouse = (warehouses || []).find(
-      (w: any) => Number.isFinite(Number(w.latitude)) && Number.isFinite(Number(w.longitude))
+      (w: any) => Number.isFinite(Number(w.latitude || w.lat)) && Number.isFinite(Number(w.longitude || w.lon))
     );
 
     if (!warehouse) {
@@ -43,16 +59,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const originLat = Number(warehouse.latitude);
-    const originLon = Number(warehouse.longitude);
-
-    const { data: courierRows, error: courierError } = await supabase
-      .from('couriers')
-      .select('*')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
-
-    if (courierError) throw courierError;
+    const originLat = Number(warehouse.latitude ?? warehouse.lat);
+    const originLon = Number(warehouse.longitude ?? warehouse.lon);
 
     const couriersList = (courierRows || []).map((c: any) => ({
       id: c.id,
@@ -73,9 +81,30 @@ export async function POST(request: Request) {
 
     let distanceKm: number | null = null;
     let routingSource = 'geodesic-fallback';
-    const apiKey = process.env.GEOAPIFY_API_KEY;
+    let durationMinutes: number | undefined = undefined;
+    let trafficDelaySeconds: number | undefined = undefined;
 
-    if (apiKey) {
+    // 1. Prioritize TomTom Motorcycle Routing with Live Traffic
+    if (isTomTomConfigured()) {
+      try {
+        const tomtomRoute = await calculateRouteTomTom(originLat, originLon, destinationLat, destinationLon, {
+          travelMode: 'motorcycle',
+          traffic: true,
+        });
+        if (tomtomRoute && Number.isFinite(tomtomRoute.distanceKm)) {
+          distanceKm = tomtomRoute.distanceKm;
+          durationMinutes = tomtomRoute.durationMinutes;
+          trafficDelaySeconds = tomtomRoute.trafficDelaySeconds;
+          routingSource = tomtomRoute.source;
+        }
+      } catch (error) {
+        console.warn('TomTom routing unavailable; checking secondary providers.', error);
+      }
+    }
+
+    // 2. Fallback to Geoapify if TomTom was not available
+    const apiKey = process.env.GEOAPIFY_API_KEY;
+    if (distanceKm === null && apiKey) {
       try {
         const routingUrl =
           'https://api.geoapify.com/v1/routing' +
@@ -121,6 +150,8 @@ export async function POST(request: Request) {
         lon: originLon,
       },
       distanceKm: roundedDistance,
+      durationMinutes,
+      trafficDelaySeconds,
       fee: targetCourier.calculatedFee,
       courier: targetCourier,
       couriers: computedCouriers,

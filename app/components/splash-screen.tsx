@@ -1,6 +1,5 @@
 "use client";
 import React from 'react';
-import { Smartphone } from 'lucide-react';
 import { useEffect } from 'react';
 
 interface SplashScreenProps {
@@ -23,43 +22,19 @@ export default function SplashScreen({
         
         {/* Top Section: Animation + Title/Subtitle */}
         <div className="flex flex-col items-center justify-center pt-4">
-          {/* Original rotating circle animation + static mobile device */}
-          <div className="relative w-44 h-44 sm:w-52 sm:h-52 flex items-center justify-center mb-6">
-            {/* Outer Ring 1 - Rotating clockwise */}
-            <div className="absolute inset-0 rounded-full border border-sky-500/20 animate-[spin_10s_linear_infinite]" />
-            {/* Outer Ring 2 - Rotating counter-clockwise with dash */}
-            <div className="absolute inset-2 rounded-full border-2 border-dashed border-indigo-500/30 animate-[spin_15s_linear_infinite_reverse]" />
-            {/* Middle Pulse Ring */}
-            <div className="absolute inset-6 rounded-full bg-gradient-to-tr from-sky-400/15 via-indigo-400/15 to-purple-400/15 animate-pulse blur-sm" />
-            {/* Inner Ring 3 */}
-            <div className="absolute inset-10 rounded-full border border-sky-500/40 animate-[spin_8s_linear_infinite]" />
-
-            {/* Center Mobile Device Container — static */}
-            <div className="relative z-10 w-16 h-28 sm:w-20 sm:h-36 bg-slate-900 border-2 border-sky-400/80 rounded-2xl shadow-xl shadow-sky-500/20 flex flex-col items-center p-2">
-              <div className="w-5 h-1 bg-slate-700 rounded-full mb-1.5" />
-              <div className="flex-1 w-full bg-slate-950 rounded-lg flex flex-col items-center justify-center p-1 overflow-hidden relative">
-                <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-sky-400 to-transparent animate-[pulse_1.5s_ease-in-out_infinite]" />
-                <div className="w-7 h-7 rounded-full bg-sky-500/20 flex items-center justify-center mb-1 border border-sky-400/40">
-                  <Smartphone className="w-3.5 h-3.5 text-sky-400" />
-                </div>
-                <div className="w-8 h-1 bg-sky-400/80 rounded-full mb-1 animate-pulse" />
-                <div className="w-5 h-1 bg-slate-700 rounded-full" />
-              </div>
-              <div className="w-6 h-0.5 bg-slate-600 rounded-full mt-1.5" />
+          <div className="prime-splash-network" role="img" aria-label="A phone securely exchanging data with a blinking PRIME server">
+            <div className="prime-splash-phone-rings" aria-hidden="true"><i /><i /><i /></div>
+            <div className="prime-splash-phone" aria-hidden="true">
+              <span className="prime-splash-phone-speaker" /><span className="prime-splash-phone-screen"><span /></span><span className="prime-splash-phone-home" />
             </div>
-
-            {/* Original orbiting dots + 2 additional circling elements */}
-            <div className="absolute inset-0 animate-[spin_6s_linear_infinite]">
-              <div className="w-2.5 h-2.5 bg-sky-500 rounded-full shadow-[0_0_10px_#0ea5e9] absolute -top-1 left-1/2 -translate-x-1/2" />
-            </div>
-            <div className="absolute inset-0 animate-[spin_9s_linear_infinite_reverse]">
-              <div className="w-2 h-2 bg-indigo-500 rounded-full shadow-[0_0_8px_#6366f1] absolute bottom-0 left-1/4" />
-            </div>
-            <div className="absolute inset-3 animate-[spin_12s_linear_infinite]">
-              <div className="w-2 h-2 bg-violet-500 rounded-full shadow-[0_0_8px_#8b5cf6] absolute top-1/2 -left-1 -translate-y-1/2" />
-            </div>
-            <div className="absolute inset-6 animate-[spin_14s_linear_infinite_reverse]">
-              <div className="w-1.5 h-1.5 bg-sky-400 rounded-full shadow-[0_0_7px_#38bdf8] absolute top-1 -right-0.5" />
+            <svg className="prime-splash-data-lines" viewBox="0 0 270 150" fill="none" aria-hidden="true">
+              <path d="M58 57 H212" className="prime-splash-line" /><path d="M58 93 H212" className="prime-splash-line" />
+              <circle r="3" className="prime-splash-packet prime-splash-packet-one"><animateMotion dur="1.65s" repeatCount="indefinite" path="M58 57 H212" /></circle>
+              <circle r="3" className="prime-splash-packet prime-splash-packet-two"><animateMotion dur="1.65s" begin="-.8s" repeatCount="indefinite" path="M212 93 H58" /></circle>
+            </svg>
+            <div className="prime-splash-server" aria-hidden="true">
+              <span className="prime-splash-server-core"><b /><b /><b /><b /><b /><b /></span>
+              <span className="prime-splash-server-base" />
             </div>
           </div>
 
@@ -98,10 +73,10 @@ export default function SplashScreen({
           </div>
 
           <div className="text-center font-mono uppercase tracking-[0.14em] text-[9.5px] sm:text-[10.5px] leading-relaxed text-slate-600">
-            <div>© 2026 | PRIME HOLDINGS PTY. LTD.</div>
-            <div>All Rights Reserved</div>
-            <div>DEVELOPED AND MAINTAINED BY</div>
-            <div>P R I M O</div>
+            <div>© 2026 PRIME BUSINESS VENTURES, LLC.</div>
+            <div>All rights reserved.</div>
+            <div>DEVELOPED, MANAGED, AND MAINTAINED BY</div>
+            <div>PRIMO</div>
           </div>
         </div>
 

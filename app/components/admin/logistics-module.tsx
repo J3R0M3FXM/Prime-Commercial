@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { Plus, MapPin, Building2, Truck, Check, Search, X, Loader2, Star, Settings, AlertCircle, Trash2, Sparkles } from "lucide-react";
+import { Plus, MapPin, Building2, Truck, Check, Search, X, Loader2, Star, Settings, AlertCircle, Trash2, Sparkles, Key, Eye, EyeOff } from "lucide-react";
 
 const WarehouseMap = dynamic(() => import("./warehouse-map"), {
   ssr: false,
@@ -40,6 +41,15 @@ export default function LogisticsModule() {
   // Couriers State
   const [couriers, setCouriers] = useState<any[]>([]);
   const [loadingCouriers, setLoadingCouriers] = useState(true);
+
+  // TomTom Routing & Geocoding Provider State
+  const [tomtomApiKeyInput, setTomtomApiKeyInput] = useState("");
+  const [tomtomConfigured, setTomtomConfigured] = useState(false);
+  const [maskedTomtomKey, setMaskedTomtomKey] = useState("");
+  const [savingTomtomKey, setSavingTomtomKey] = useState(false);
+  const [tomtomKeyStatus, setTomtomKeyStatus] = useState<string | null>(null);
+  const [tomtomKeyError, setTomtomKeyError] = useState<string | null>(null);
+  const [showTomtomKey, setShowTomtomKey] = useState(false);
 
   // Courier Config Modal State
   const [showCourierModal, setShowCourierModal] = useState(false);
@@ -181,7 +191,9 @@ export default function LogisticsModule() {
 
       const res = await fetch("/api/admin/couriers", {
         method,
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
         body: JSON.stringify(formData)
       });
 
@@ -204,7 +216,7 @@ export default function LogisticsModule() {
   const deleteCourier = async (id: string) => {
     if (!confirm("Delete this courier?")) return;
     try {
-      const res = await fetch(`/api/admin/couriers?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/couriers?id=${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include", cache: "no-store" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         alert(err.error || "Failed to delete courier");
@@ -217,14 +229,107 @@ export default function LogisticsModule() {
     }
   };
 
+  // Native hash navigation fallback for touch/WebView environments where React click events may not fire reliably.
+  useEffect(() => {
+    const openFromHash = () => {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (!hash.startsWith("admin-")) return;
+      if (hash === "admin-add-warehouse") { setActiveTab("warehouse"); resetWarehouseForm(); setShowWarehouseModal(true); }
+      else if (hash.startsWith("admin-edit-warehouse-")) {
+        const id = decodeURIComponent(hash.slice("admin-edit-warehouse-".length));
+        const wh = warehouses.find((item) => String(item.id) === id); if (!wh) return;
+        setActiveTab("warehouse"); setEditingWarehouse(wh); setWhName(wh.name || ""); setWhAddress(wh.address || "");
+        setWhLat(wh.lat ?? wh.latitude ?? 14.5995); setWhLon(wh.lon ?? wh.longitude ?? 120.9842);
+        setIsDefaultWh(Boolean(wh.isDefault)); setShowWarehouseModal(true);
+      } else if (hash === "admin-add-courier") { setActiveTab("courier"); resetCourierForm(); setShowCourierModal(true); }
+      else if (hash.startsWith("admin-edit-courier-")) {
+        const id = decodeURIComponent(hash.slice("admin-edit-courier-".length));
+        const courier = couriers.find((item) => String(item.id) === id); if (!courier) return;
+        setActiveTab("courier"); setEditingCourier(courier); setCourierName(courier.name || ""); setCourierLogo(courier.logo || "");
+        setCourierType(courier.type || "Standard"); setBaseFare(Number(courier.baseFare) || 0); setFirstMile(Number(courier.firstMile) || 0);
+        setFirstMileFee(Number(courier.firstMileFee) || 0); setExceedingKmFee(Number(courier.exceedingKmFee) || 0);
+        setSurcharge(Number(courier.surcharge) || 0); setNightDifferential(Number(courier.nightDifferential) || 0); setShowCourierModal(true);
+      } else return;
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    };
+    window.addEventListener("hashchange", openFromHash); openFromHash();
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, [warehouses, couriers]);
+
   useEffect(() => {
     fetchWarehouses();
     fetchCouriers();
+    fetchLogisticsSettings();
   }, []);
+
+  const fetchLogisticsSettings = async () => {
+    try {
+      const res = await fetch("/api/admin/logistics/settings", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.configured) {
+          setTomtomConfigured(true);
+          setMaskedTomtomKey(data.maskedKey || "••••••••");
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load logistics settings from server:", e);
+    }
+
+    try {
+      const local = typeof window !== "undefined" ? localStorage.getItem("prime_tomtom_api_key") : null;
+      if (local && local.trim()) {
+        setTomtomConfigured(true);
+        if (!maskedTomtomKey) {
+          setMaskedTomtomKey(local.length > 8 ? `${local.slice(0, 4)}••••••••${local.slice(-4)}` : "••••••••");
+        }
+      }
+    } catch {}
+  };
+
+  const handleSaveTomTomKey = async () => {
+    const key = tomtomApiKeyInput.trim();
+    if (!key) {
+      setTomtomKeyError("Please enter your TomTom API Key.");
+      return;
+    }
+
+    setSavingTomtomKey(true);
+    setTomtomKeyError(null);
+    setTomtomKeyStatus(null);
+
+    try {
+      // 1. Save to local storage for immediate client accessibility
+      try {
+        localStorage.setItem("prime_tomtom_api_key", key);
+      } catch {}
+
+      // 2. Persist to server logistics settings
+      const res = await fetch("/api/admin/logistics/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: key }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to verify or save TomTom API key.");
+      }
+
+      setTomtomConfigured(true);
+      setMaskedTomtomKey(key.length > 8 ? `${key.slice(0, 4)}••••••••${key.slice(-4)}` : "••••••••");
+      setTomtomApiKeyInput("");
+      setTomtomKeyStatus("✓ TomTom API Key verified and active for motorcycle routing, live traffic, and address autocomplete.");
+    } catch (err: any) {
+      setTomtomKeyError(err.message || "Failed to save TomTom API Key.");
+    } finally {
+      setSavingTomtomKey(false);
+    }
+  };
 
   const fetchWarehouses = async () => {
     try {
-      const res = await fetch("/api/admin/warehouses", { cache: "no-store" });
+      const res = await fetch("/api/admin/warehouses", { cache: "no-store", credentials: "include", headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } });
       const data = await res.json().catch(() => []);
       if (!res.ok) throw new Error(data?.error || `Failed to load warehouses (HTTP ${res.status})`);
       if (!Array.isArray(data)) throw new Error("Invalid warehouse response from server");
@@ -240,7 +345,7 @@ export default function LogisticsModule() {
 
   const fetchCouriers = async () => {
     try {
-      const res = await fetch("/api/admin/couriers", { cache: "no-store" });
+      const res = await fetch("/api/admin/couriers", { cache: "no-store", credentials: "include", headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } });
       const data = await res.json().catch(() => []);
       if (!res.ok) throw new Error(data?.error || `Failed to load couriers (HTTP ${res.status})`);
       if (!Array.isArray(data)) throw new Error("Invalid courier response from server");
@@ -307,7 +412,7 @@ export default function LogisticsModule() {
     setWhLat(lat);
     setWhLon(lon);
     try {
-      const res = await fetch(`/api/geoapify/reverse?lat=${lat}&lon=${lon}`);
+      const res = await fetch(`/api/geoapify/reverse?lat=${lat}&lon=${lon}`, { credentials: "include", cache: "no-store" });
       const data = await res.json();
       if (data.results && data.results.length > 0) {
         setWhAddress(data.results[0].formatted);
@@ -348,7 +453,9 @@ export default function LogisticsModule() {
 
       const res = await fetch("/api/admin/warehouses", {
         method,
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", "Pragma": "no-cache" },
         body: JSON.stringify(formData)
       });
       const resData = await res.json().catch(() => ({}));
@@ -368,7 +475,7 @@ export default function LogisticsModule() {
   const deleteWarehouse = async (id: string) => {
     if (!confirm("Delete this warehouse?")) return;
     try {
-      const res = await fetch(`/api/admin/warehouses?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/warehouses?id=${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include", cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Failed to delete warehouse (HTTP ${res.status})`);
       await fetchWarehouses();
@@ -408,14 +515,7 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg text-slate-900">Fulfillment Centers</h3>
               <p className="text-xs font-mono text-slate-500 mt-1">Manage physical locations where deliveries originate.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                resetWarehouseForm();
-                setShowWarehouseModal(true);
-              }}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
-            >
+            <button type="button" onClick={() => { setActiveTab("warehouse"); resetWarehouseForm(); setShowWarehouseModal(true); }} className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer">
               <Plus className="w-4 h-4" /> Add Warehouse
             </button>
           </div>
@@ -459,23 +559,9 @@ export default function LogisticsModule() {
                   </div>
                   
                   <div className="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingWarehouse(wh);
-                        setWhName(wh.name || "");
-                        setWhAddress(wh.address || "");
-                        setWhLat(wh.lat ?? wh.latitude ?? 14.5995);
-                        setWhLon(wh.lon ?? wh.longitude ?? 120.9842);
-                        setIsDefaultWh(Boolean(wh.isDefault));
-                        setSearchQuery("");
-                        setWarehouseError(null);
-                        setShowWarehouseModal(true);
-                      }}
-                      className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md cursor-pointer"
-                    >
+                    <a href={`#admin-edit-warehouse-${encodeURIComponent(String(wh.id))}`} role="button" className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md cursor-pointer">
                       Edit Details
-                    </button>
+                    </a>
                     {!wh.isDefault && (
                       <button
                         onClick={() => deleteWarehouse(wh.id)}
@@ -500,16 +586,83 @@ export default function LogisticsModule() {
               <h3 className="font-heading font-black text-lg text-slate-900">Courier Services</h3>
               <p className="text-xs font-mono text-slate-500 mt-1">Configure logistics partners and delivery fee calculators.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                resetCourierForm();
-                setShowCourierModal(true);
-              }}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
-            >
+            <a href="#admin-add-courier" role="button" className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer">
               <Plus className="w-4 h-4" /> Add Courier
-            </button>
+            </a>
+          </div>
+
+          {/* TomTom Routing & Geocoding Provider Engine */}
+          <div className="bg-white border border-slate-200 rounded-none p-3 shadow-none">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-emerald-600" />
+                <h4 className="font-heading font-black text-sm text-slate-900 uppercase">
+                  Routing & Geocoding Engine (TomTom)
+                </h4>
+              </div>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                tomtomConfigured ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+              }`}>
+                {tomtomConfigured ? 'Active' : 'Key Needed'}
+              </span>
+            </div>
+
+            <p className="text-[11px] font-mono text-slate-500 mb-2.5">
+              Powers address autocomplete, reverse geocoding, motorcycle road routing, and live traffic travel times.
+            </p>
+
+            {maskedTomtomKey && (
+              <div className="mb-2 text-xs font-mono text-slate-600 bg-slate-50 px-2.5 py-1.5 border border-slate-100 flex items-center justify-between">
+                <span>Current Key: <strong className="text-slate-800">{maskedTomtomKey}</strong></span>
+                <span className="text-[10px] text-emerald-600 font-bold uppercase">Ready</span>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showTomtomKey ? "text" : "password"}
+                  value={tomtomApiKeyInput}
+                  onChange={(e) => {
+                    setTomtomApiKeyInput(e.target.value);
+                    if (tomtomKeyError) setTomtomKeyError(null);
+                    if (tomtomKeyStatus) setTomtomKeyStatus(null);
+                  }}
+                  placeholder={tomtomConfigured ? "Paste new key to replace..." : "Paste TomTom API Key..."}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-none px-3 py-2 pr-9 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowTomtomKey(!showTomtomKey)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showTomtomKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveTomTomKey}
+                disabled={savingTomtomKey}
+                className="bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-none text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 shrink-0"
+              >
+                {savingTomtomKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
+                {savingTomtomKey ? "Saving..." : "Save Key"}
+              </button>
+            </div>
+
+            {tomtomKeyError && (
+              <p className="text-[11px] font-mono text-red-600 mt-2 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {tomtomKeyError}
+              </p>
+            )}
+
+            {tomtomKeyStatus && (
+              <p className="text-[11px] font-mono text-emerald-600 mt-2 flex items-center gap-1.5 font-bold">
+                <Check className="w-3.5 h-3.5 shrink-0" />
+                {tomtomKeyStatus}
+              </p>
+            )}
           </div>
 
           {courierError && !showCourierModal && (
@@ -537,7 +690,7 @@ export default function LogisticsModule() {
                 <div key={courier.id} className="bg-white border border-slate-200 rounded-none p-3 shadow-none relative group overflow-hidden">
                   <div className="flex items-center gap-2.5 mb-2.5">
                     {courier.logo ? (
-                      <img src={courier.logo} alt={courier.name} className="w-12 h-12 rounded-none object-contain bg-slate-50 border border-slate-100 p-1 shrink-0" />
+                      <img src={courier.logo} alt={courier.name} className="w-12 h-12 rounded-none object-contain bg-slate-50 border border-slate-100 p-1 shrink-0 shadow-none drop-shadow-none filter-none" />
                     ) : (
                       <div className="w-12 h-12 rounded-none bg-slate-100 flex items-center justify-center shrink-0">
                         <Truck className="w-5 h-5 text-slate-400" />
@@ -577,27 +730,9 @@ export default function LogisticsModule() {
                   </div>
                   
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingCourier(courier);
-                        setCourierName(courier.name || "");
-                        setCourierLogo(courier.logo || "");
-                        setCourierType(courier.type || "Standard");
-                        setBaseFare(Number(courier.baseFare) || 0);
-                        setFirstMile(Number(courier.firstMile) || 0);
-                        setFirstMileFee(Number(courier.firstMileFee) || 0);
-                        setExceedingKmFee(Number(courier.exceedingKmFee) || 0);
-                        setSurcharge(Number(courier.surcharge) || 0);
-                        setNightDifferential(Number(courier.nightDifferential) || 0);
-                        setCourierError(null);
-                        if (courierFileInputRef.current) courierFileInputRef.current.value = "";
-                        setShowCourierModal(true);
-                      }}
-                      className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md cursor-pointer"
-                    >
+                    <a href={`#admin-edit-courier-${encodeURIComponent(String(courier.id))}`} role="button" className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-emerald-600 transition-colors bg-slate-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md cursor-pointer">
                       Edit Config
-                    </button>
+                    </a>
                     <button
                       onClick={() => deleteCourier(courier.id)}
                       className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
@@ -613,8 +748,8 @@ export default function LogisticsModule() {
       )}
 
       {/* Warehouse Modal */}
-      {showWarehouseModal && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
+      {showWarehouseModal && typeof document !== "undefined" && createPortal(
+        <div role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowWarehouseModal(false); }} className="fixed inset-0 z-[2147483000] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
           <div className="bg-white rounded-none shadow-none w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
             <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
@@ -735,12 +870,13 @@ export default function LogisticsModule() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Courier Modal */}
-      {showCourierModal && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
+      {showCourierModal && typeof document !== "undefined" && createPortal(
+        <div role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCourierModal(false); }} className="fixed inset-0 z-[2147483000] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-2.5">
           <div className="bg-white rounded-none shadow-none w-full max-w-[430px] overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
             <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <h3 className="font-heading font-black text-lg uppercase tracking-wide text-slate-900">
@@ -800,7 +936,7 @@ export default function LogisticsModule() {
                       </div>
                     ) : courierLogo ? (
                       <>
-                        <img src={courierLogo} alt="Logo" className="w-full h-full object-contain p-2" />
+                        <img src={courierLogo} alt="Logo" className="w-full h-full object-contain p-2 shadow-none drop-shadow-none filter-none" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold uppercase">
                           Change
                         </div>
@@ -942,7 +1078,8 @@ export default function LogisticsModule() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

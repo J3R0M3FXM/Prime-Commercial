@@ -1,109 +1,109 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getClientFingerprint } from "./components/fingerprint-collector";
 import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
 import AccountModal from "./components/account-modal";
 import { useCart } from "./components/cart-context";
-import LiveHeaderClock from "./components/live-header-clock";
+import PrimeIdentityHeader from "./components/prime-identity-header";
 import SplashScreen from "./components/splash-screen";
+import VideoGalleryModal from "./components/video-gallery-modal";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Bell, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { authenticatedFetch } from "./components/telegram-auth-client";
-import { getSupabaseClient } from "@/lib/supabase";
+import { callServerless, getServerlessCatalog, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
+
+type PublicOrderQueue = {
+  ordersInQueue: number;
+  ordersInProcessing: number;
+  averageReadyMinutes: number | null;
+  trafficFlowStatus: string;
+};
 
 export default function Shopfront() {
-
-
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [checking, setChecking] = useState(true);
   const [routingToAdmin, setRoutingToAdmin] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
+  const [catalogError, setCatalogError] = useState("");
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckoutActive, setIsCheckoutActive] = useState(false);
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [initialOrderIdFromLink, setInitialOrderIdFromLink] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("shop");
+  const [publicOrderQueue, setPublicOrderQueue] = useState<PublicOrderQueue | null>(null);
+  const queueRequestInFlight = useRef(false);
 
   const { cart, cartCount, addToCart, updateQuantity } = useCart();
 
-  const normalizeProductRow = (row: any) => {
-    const bundleConfig = row?.bundle_config && typeof row.bundle_config === "object" ? row.bundle_config : {};
-    return {
-      id: row.id,
-      name: row.name,
-      price: Number(row.price) || 0,
-      stock: Number(row.stock) || 0,
-      category: row.category,
-      imageUrl: row.image_url || "",
-      description: row.description || "",
-      isActive: row.is_active !== false,
-      active: row.is_active !== false,
-      isFeatured: Boolean(row.is_featured),
-      sortOrder: Number(row.sort_order) || 0,
-      bundleConfig,
-      variants: Array.isArray(bundleConfig.variants) ? bundleConfig.variants : [],
-      lowStockThreshold: Number(bundleConfig.lowStockThreshold ?? 10),
-      tags: row.tags || [],
-      gallery: row.gallery || [],
-      updatedAt: row.updated_at,
-    };
-  };
-
-  // Stream product configuration and stock changes directly from Postgres.
-  // The REST route is still the canonical snapshot; Realtime keeps the UI current.
-  useEffect(() => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel("prime-products-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "products" },
-        (payload) => {
-          if (payload.eventType === "DELETE") {
-            const deletedId = String((payload.old as any)?.id || "");
-            if (!deletedId) return;
-            setProducts(prev => prev.filter(p => String(p.id) !== deletedId));
-            setSelectedProduct((prev: any) => String(prev?.id || "") === deletedId ? null : prev);
-            return;
-          }
-
-          const incoming = normalizeProductRow(payload.new);
-          if (!incoming.id) return;
-
-          setProducts(prev => {
-            const found = prev.some(p => String(p.id) === String(incoming.id));
-            const next = found
-              ? prev.map(p => String(p.id) === String(incoming.id) ? { ...p, ...incoming } : p)
-              : [...prev, incoming];
-            return next.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
-          });
-
-          setSelectedProduct((prev: any) => {
-            if (String(prev?.id || "") !== String(incoming.id)) return prev;
-            return { ...prev, ...incoming };
-          });
-        }
-      )
-      .subscribe((status) => {
-        if (status !== "SUBSCRIBED") console.warn("Product realtime status:", status);
-      });
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
+  const loadCatalog = useCallback(async () => {
+    setCatalogLoading(true);
+    try {
+      const latest = await getServerlessCatalog();
+      setProducts(latest);
+      setCatalogError("");
+      setSelectedProduct((selected: any) => selected
+        ? latest.find(product => String(product.id) === String(selected.id)) || null
+        : null);
+    } catch (error) {
+      setCatalogError(error instanceof Error ? error.message : "Could not load the product catalog.");
+    } finally {
+      setCatalogLoading(false);
+    }
   }, []);
+
+  const loadPublicOrderQueue = useCallback(async () => {
+    if (queueRequestInFlight.current) return;
+    queueRequestInFlight.current = true;
+    try {
+      const result = await callServerless<Partial<PublicOrderQueue>>("getPublicOrderQueue", {}, 10_000);
+      setPublicOrderQueue({
+        ordersInQueue: Math.max(0, Number(result?.ordersInQueue) || 0),
+        ordersInProcessing: Math.max(0, Number(result?.ordersInProcessing) || 0),
+        averageReadyMinutes: result?.averageReadyMinutes == null
+          ? null
+          : Math.max(0, Number(result.averageReadyMinutes) || 0),
+        trafficFlowStatus: String(result?.trafficFlowStatus || "Updating").slice(0, 32),
+      });
+    } catch {
+      setPublicOrderQueue(null);
+    } finally {
+      queueRequestInFlight.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authorized) return;
+    void loadPublicOrderQueue();
+    const interval = window.setInterval(() => { void loadPublicOrderQueue(); }, 15_000);
+    return () => window.clearInterval(interval);
+  }, [authorized, loadPublicOrderQueue]);
+
+  // Refresh the Serverless catalog periodically in place of the former Supabase Realtime subscription.
+  useEffect(() => {
+    if (!authorized) return;
+    let cancelled = false;
+    const refreshCatalog = () => {
+      if (!cancelled) void loadCatalog();
+    };
+    const interval = window.setInterval(refreshCatalog, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [authorized, loadCatalog]);
 
   useEffect(() => {
     async function checkAuth() {
@@ -118,7 +118,7 @@ export default function Shopfront() {
 
       try {
         let initDataRaw = "";
-        
+
         // Wait for the next tick to ensure Telegram has injected the data
         await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -158,44 +158,22 @@ export default function Shopfront() {
           setActiveTab("media");
         }
 
-        const fingerprintData = await getClientFingerprint();
-        
-        const response = await fetch("/api/auth/telegram/validate", {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            initData: initDataRaw,
-            fingerprint: fingerprintData
-          }),
-        });
+        const authData = await getTelegramServerlessSession();
 
-        if (response.ok) {
-          const authData = await response.json();
-
-          // Protected storefront APIs send live Telegram initData directly; the HttpOnly cookie is only a fallback.
+        if (authData?.authenticated) {
 
           // If connection is from authorized Telegram Admin
           if (authData.isAdmin) {
-            const shopMode = typeof window !== "undefined"
-              && new URLSearchParams(window.location.search).get("mode") === "shop";
-
-            if (shopMode) {
-              setAuthorized(true);
-              setIsAdmin(true);
-              const productsRes = await authenticatedFetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
-              const pData = await productsRes.json();
-              setProducts(Array.isArray(pData) ? pData : []);
-              await ensure10Sec();
-              return;
-            }
-
             setRoutingToAdmin(true);
             if (typeof window !== 'undefined') {
               const hash = window.location.hash;
+              const startParam = String(telegramWebApp?.initDataUnsafe?.start_param || '');
+              const adminOrder = startParam.match(/^admin_order_(.+)$/i)?.[1] || '';
               await ensure10Sec();
-              router.replace(`/admin${hash ? hash : ''}`);
+              const adminTarget = adminOrder
+                ? `/admin?view=order-detail&order=${encodeURIComponent(adminOrder)}`
+                : '/admin';
+              router.replace(`${adminTarget}${hash ? hash : ''}`);
             }
             return;
           }
@@ -233,12 +211,9 @@ export default function Shopfront() {
           }
 
           setAuthorized(true);
-          const productsRes = await authenticatedFetch(`/api/products?_t=${Date.now()}`, { cache: "no-store" });
-          const pData = await productsRes.json();
-          setProducts(Array.isArray(pData) ? pData : []);
+          await loadCatalog();
         } else {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || `Server responded with ${response.status}`);
+          throw new Error(authData?.error || 'Telegram session could not be verified.');
         }
       } catch (e: any) {
         console.error("Auth check failed", e);
@@ -250,55 +225,22 @@ export default function Shopfront() {
     }
 
     checkAuth();
-  }, [router]);
-
-  // Keep the customer's active Telegram session fresh in Supabase.
-  // Heartbeats only touch the current fingerprint session; they do not trigger external geolocation lookups.
-  useEffect(() => {
-    if (!authorized || isAdmin) return;
-    let stopped = false;
-
-    const sendHeartbeat = async () => {
-      if (stopped || typeof window === "undefined") return;
-      try {
-        const webApp = (window as any).Telegram?.WebApp;
-        const initData = typeof webApp?.initData === "string" ? webApp.initData.trim() : "";
-        if (!initData) return;
-
-        const fingerprint = await getClientFingerprint();
-        if (stopped) return;
-
-        const response = await fetch("/api/auth/telegram/validate", {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData, fingerprint, heartbeat: true }),
-        });
-
-        if (!response.ok && response.status !== 401) {
-          console.warn("Telegram session heartbeat returned", response.status);
-        }
-      } catch (err) {
-        console.warn("Telegram session heartbeat skipped:", err);
-      }
-    };
-
-    void sendHeartbeat();
-    const timer = window.setInterval(sendHeartbeat, 60000);
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-    };
-  }, [authorized, isAdmin]);
+  }, [loadCatalog, router]);
 
   const safeProducts = Array.isArray(products) ? products : [];
   const categories = ["All", ...Array.from(new Set(safeProducts.map(p => p?.category || "General")))];
 
-  const filteredProducts = safeProducts.filter(p => 
+  const filteredProducts = safeProducts.filter(p =>
     p && (selectedCategory === "All" || (p?.category || "General") === selectedCategory) &&
     ((p?.name || "").toLowerCase().includes(searchTerm.toLowerCase()))
   );
+  const hasActiveOrders = Boolean(publicOrderQueue && (
+    publicOrderQueue.ordersInQueue + publicOrderQueue.ordersInProcessing > 0
+  ));
+  const trafficFlowClass = !hasActiveOrders ? "text-slate-500"
+    : publicOrderQueue?.trafficFlowStatus === "LIGHT" ? "text-emerald-700"
+      : publicOrderQueue?.trafficFlowStatus === "MODERATE" ? "text-orange-600"
+        : publicOrderQueue?.trafficFlowStatus === "HEAVY" ? "text-red-700" : "text-slate-500";
 
   if (routingToAdmin) {
     return <SplashScreen title="ADMIN CREDENTIALS VERIFIED" subtitle="ROUTING TO SECURE ADMIN CONSOLE..." />;
@@ -312,6 +254,17 @@ export default function Shopfront() {
         <AlertCircle className="w-16 h-16 text-red-500 mb-6" />
         <h1 className="text-2xl font-heading font-bold text-gray-900 mb-2 uppercase tracking-wide">Access Denied</h1>
         <p className="text-gray-600 mb-6 max-w-sm">This shopfront is exclusively secured for use within the Telegram environment.</p>
+        <button
+          type="button"
+          onClick={() => {
+            const url = "https://t.me/primenetworkphbot?startapp=shop";
+            if (Capacitor.isNativePlatform()) void Browser.open({ url });
+            else window.open(url, "_blank", "noopener,noreferrer");
+          }}
+          className="w-full max-w-sm rounded-lg bg-slate-900 px-4 py-3 text-xs font-heading font-bold uppercase tracking-wider text-white shadow-sm"
+        >
+          OPEN PRIME IN TELEGRAM
+        </button>
       </div>
     );
   }
@@ -334,51 +287,51 @@ export default function Shopfront() {
           </button>
         </div>
       )}
-      
+
       {/* Sticky Header */}
-      <header className="sticky top-0 z-45 h-[38px] bg-white border-b border-gray-100 shadow-sm">
-        <div className="h-full px-2 flex items-center justify-between">
-          <div className="flex items-center">
-            <img 
-              src="/primefinal.png" 
-              alt="PRIME" 
-              className="h-7 sm:h-[28px] w-auto object-contain shrink-0 drop-shadow-xs" 
-            />
+      <header className="sticky top-0 z-45 bg-white border-b border-gray-100 shadow-[0_3px_5px_rgba(15,23,42,0.2)]">
+        <PrimeIdentityHeader>
+          {isAdmin && (
+            <button
+              onClick={() => router.push("/admin")}
+              className="bg-slate-900 hover:bg-black text-white px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
+            >Admin Panel</button>
+          )}
+        </PrimeIdentityHeader>
+        <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+        <div aria-label="Live order status" className="grid h-[38.5px] grid-cols-4 border-t border-gray-100 bg-slate-50">
+          <div className="flex min-w-0 flex-col items-center justify-center border-r border-gray-200 px-1">
+            <span className="truncate text-[9.5px] font-bold uppercase leading-3 tracking-wide text-slate-500">On queue</span><strong className="mt-0.5 min-h-4 font-mono text-[13.5px] leading-4 text-slate-900">{publicOrderQueue?.ordersInQueue ?? "—"}</strong>
           </div>
-          <div className="flex items-center gap-3">
-            <LiveHeaderClock />
-            {isAdmin && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    router.push("/admin");
-                  }}
-                  className="bg-slate-900 hover:bg-black text-white px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
-                >
-                  Admin Panel
-                </button>
-              </div>
-            )}
+          <div className="flex min-w-0 flex-col items-center justify-center border-r border-gray-200 px-1">
+            <span className="truncate text-[9.5px] font-bold uppercase leading-3 tracking-wide text-slate-500">Processing</span><strong className="mt-0.5 min-h-4 font-mono text-[13.5px] leading-4 text-slate-900">{publicOrderQueue?.ordersInProcessing ?? "—"}</strong>
+          </div>
+          <div className="flex min-w-0 flex-col items-center justify-center border-r border-gray-200 px-1">
+            <span className="truncate text-[9.5px] font-bold uppercase leading-3 tracking-wide text-slate-500">Est. wait (mins)</span><strong className="mt-0.5 min-h-4 font-mono text-[13.5px] leading-4 text-slate-900">{!publicOrderQueue ? "Updating" : !hasActiveOrders ? "--" : publicOrderQueue.averageReadyMinutes == null ? "--" : publicOrderQueue.averageReadyMinutes < 1 ? "<1" : publicOrderQueue.averageReadyMinutes}</strong>
+          </div>
+          <div className="flex min-w-0 flex-col items-center justify-center px-1">
+            <span className="truncate text-[9.5px] font-bold uppercase leading-3 tracking-wide text-slate-500">ORDER FLOW</span><strong className={`mt-0.5 min-h-4 truncate font-mono text-[13.5px] font-bold leading-4 ${trafficFlowClass}`}>{!publicOrderQueue ? "Updating" : hasActiveOrders ? publicOrderQueue.trafficFlowStatus : "--"}</strong>
           </div>
         </div>
+        <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
       </header>
 
       {/* Search & Filter Controls (Below Header, matching the thin footer style/height) */}
-      <div className={`${activeTab !== "shop" ? "hidden" : ""} px-4 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[38px]`}>
+      <div className={`${activeTab !== "shop" ? "hidden" : ""} px-3 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[83.5px]`}>
         <div className="relative flex-[5] flex items-center">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="SEARCH PRODUCTS..." 
-            className="w-full h-[26px] pl-8 pr-2 py-0 bg-white border border-gray-200 rounded shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all font-heading font-normal uppercase text-[10px]"
+          <input
+            type="text"
+            placeholder="SEARCH PRODUCTS..."
+            className="w-full h-[32px] pl-8 pr-2 py-0 bg-white border border-gray-200 rounded shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all font-heading font-normal uppercase text-[12px]"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
           />
         </div>
         <div className="relative flex-[3] flex items-center">
           <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <select 
-            className="w-full h-[26px] pl-8 pr-2 py-0 bg-white border border-gray-200 rounded shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black appearance-none cursor-pointer font-heading font-normal uppercase text-[10px]" 
+          <select
+            className="w-full h-[32px] pl-8 pr-2 py-0 bg-white border border-gray-200 rounded shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black appearance-none cursor-pointer font-heading font-normal uppercase text-[12px]"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
           >
@@ -389,9 +342,19 @@ export default function Shopfront() {
 
       {/* Main Content */}
       <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 px-3 sm:px-3.5 pt-[4.8px] pb-[4.8px] sm:pt-[5.6px] sm:pb-[5.6px] w-full`}>
-        
+
         {/* Product Grid */}
-        {products.length === 0 ? (
+        {catalogError && products.length === 0 ? (
+          <div role="alert" className="py-16 px-4 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto text-amber-500 mb-4" />
+            <h2 className="text-xl font-heading font-bold text-gray-900 mb-2">Could Not Load Products</h2>
+            <p className="text-gray-600 mb-4">{catalogError}</p>
+            <button type="button" onClick={() => void loadCatalog()} disabled={catalogLoading}
+              className="px-4 py-2 border border-gray-300 rounded text-sm font-bold disabled:opacity-50">
+              {catalogLoading ? "RETRYING…" : "RETRY"}
+            </button>
+          </div>
+        ) : products.length === 0 ? (
           <div className="py-20 text-center">
             <ShoppingBag className="w-16 h-16 mx-auto text-gray-200 mb-4" />
             <h2 className="text-xl font-heading font-bold text-gray-900 mb-2">No Products Available</h2>
@@ -407,7 +370,7 @@ export default function Shopfront() {
           <div className="grid grid-cols-3 gap-2">
             {filteredProducts.map(p => {
               const variants = p.variants && p.variants.length > 0 ? p.variants : [];
-              const isOutOfStock = variants.length > 0 
+              const isOutOfStock = variants.length > 0
                 ? variants.every((v: any) => (v.stock ?? 0) <= 0)
                 : (p.stock ?? 0) <= 0;
 
@@ -421,8 +384,8 @@ export default function Shopfront() {
               }
 
               return (
-                <div 
-                  key={p.id} 
+                <div
+                  key={p.id}
                   className="bg-white border border-gray-200/60 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all group flex flex-col cursor-pointer active:scale-[0.98]"
                   onClick={() => setSelectedProduct(p)}
                   role="button"
@@ -434,11 +397,12 @@ export default function Shopfront() {
                   }}
                 >
                   <div className="relative aspect-square overflow-hidden bg-gray-50 border-b border-gray-100">
-                    <img 
-                      src={p.imageUrl || "https://picsum.photos/seed/prime/600/600"} 
-                      alt={p.name} 
+                    <img
+                      src={p.imageUrl || "https://picsum.photos/seed/prime/600/600"}
+                      alt={p.name}
                       className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
                     />
+                    {p.tag && p.tag !== "NONE" && !isOutOfStock && <span className="absolute left-2 top-2 z-10 max-w-[calc(100%-1rem)] truncate border border-slate-500/40 bg-slate-900/85 px-2 py-1 text-[8px] font-mono font-bold uppercase tracking-wide text-white shadow-sm">{p.tag}</span>}
                     {isOutOfStock && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/10">
                         <span className="bg-black/80 backdrop-blur-sm text-white px-2 py-1 font-bold uppercase tracking-widest text-[9px] sm:text-xs rounded-lg">
@@ -447,23 +411,26 @@ export default function Shopfront() {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="p-2 sm:p-2.5 flex flex-col flex-1 justify-between gap-0.5 sm:gap-1">
                     {/* Category */}
                     {p.category && (
-                      <p className="text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-widest text-slate-400 truncate leading-none mb-0.5">
+                      <p className="text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 truncate leading-none mb-0.5">
                         {p.category}
                       </p>
                     )}
 
                     {/* Product Name */}
-                    <h3 className="font-heading font-bold text-gray-900 line-clamp-2 leading-[1.05] text-[11px] sm:text-[12.5px] tracking-tight">
+                    <h3 className="font-roboto-condensed-semibold text-gray-900 line-clamp-2 leading-[1.05] text-[12px] sm:text-[13.5px] tracking-tight">
                       {p.name}
                     </h3>
+                    <p className="font-mono text-[8px] sm:text-[9px] font-bold uppercase leading-none tracking-wide text-slate-500">
+                      {variants.length} {variants.length === 1 ? "variant" : "variants"}
+                    </p>
 
                     {/* Horizontally Aligned Lowest Price (Left) & Cart Icon (Right) */}
                     <div className="flex items-center justify-between pt-1 sm:pt-1.5 border-t border-gray-100 mt-auto gap-1">
-                      <div className="text-left font-mono font-bold text-xs sm:text-base text-gray-950 truncate">
+                      <div className="prime-product-card__price text-left truncate text-xs sm:text-base text-gray-950">
                         {formatPHP(lowestPrice)}
                       </div>
 
@@ -520,8 +487,15 @@ export default function Shopfront() {
         </div>
       )}
 
-      {activeTab === "cart" && (
-        <CartDrawer isOpen={true} onClose={() => { setIsCartOpen(false); setActiveTab("shop"); }} />
+      {(activeTab === "cart" || isCheckoutActive) && (
+        <CartDrawer
+          isOpen={activeTab === "cart"}
+          onClose={() => { setIsCheckoutActive(false); setIsCartOpen(false); setActiveTab("shop"); }}
+          onCheckoutOpenChange={(open) => {
+            setIsCheckoutActive(open);
+            if (open) window.scrollTo({ top: 0, behavior: "auto" });
+          }}
+        />
       )}
       {activeTab === "shop" && selectedProduct && <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
       {activeTab === "orders" && (
@@ -545,27 +519,7 @@ export default function Shopfront() {
         }}
       />}
 
-      {/* Media — temporarily locked during database/storage/security setup */}
-      {activeTab === "media" && (
-        <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
-          <section
-            className="w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-3 sm:p-3.5 flex items-center justify-center"
-            aria-label="Media availability announcement"
-          >
-            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-slate-50 p-3.5 text-center shadow-sm">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-amber-200 bg-amber-50">
-                <Film className="h-5 w-5 text-amber-600" />
-              </div>
-              <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">Media Vault</p>
-              <h1 className="mt-1 text-xl font-heading font-black uppercase tracking-tight text-slate-900">Available Soon</h1>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                Media is still under database and storage configuration and security setup.
-                It will be available soon.
-              </p>
-            </div>
-          </section>
-        </div>
-      )}
+      {activeTab === "media" && <VideoGalleryModal isOpen onClose={() => setActiveTab("shop")} />}
 
       {/* Fixed Non-Scrolling Bottom Navigation Bar (sitting right above system footer) */}
       <nav className="fixed bottom-[20px] left-0 right-0 max-w-[430px] mx-auto z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/90 shadow-lg px-0.5 py-1.5 flex items-center justify-between font-['Roboto_Condensed'] select-none">
@@ -585,7 +539,7 @@ export default function Shopfront() {
           }`}
         >
           <Store className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">SHOP</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">SHOP</span>
         </button>
 
         {/* 2. CART */}
@@ -605,7 +559,7 @@ export default function Shopfront() {
               </span>
             )}
           </div>
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">CART</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">CART</span>
         </button>
 
         {/* 3. ORDERS */}
@@ -619,7 +573,7 @@ export default function Shopfront() {
           className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-500 hover:text-gray-900 cursor-pointer"
         >
           <Receipt className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">ORDERS</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">ORDERS</span>
         </button>
 
         {/* 4. NOTIFICATIONS */}
@@ -631,7 +585,7 @@ export default function Shopfront() {
           className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
         >
           <Bell className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">NOTIFICATIONS</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">NOTIFICATIONS</span>
         </button>
 
         {/* 5. MEDIA — CLICKABLE, CONTENT TEMPORARILY LOCKED */}
@@ -648,7 +602,7 @@ export default function Shopfront() {
           }`}
         >
           <Film className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">MEDIA</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">MEDIA</span>
         </button>
 
         {/* 6. ACCOUNT */}
@@ -661,7 +615,7 @@ export default function Shopfront() {
           className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-500 hover:text-gray-900 cursor-pointer"
         >
           <User className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">ACCOUNT</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">ACCOUNT</span>
         </button>
 
         {/* 7. SUPPORT */}
@@ -673,7 +627,7 @@ export default function Shopfront() {
           className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
         >
           <Headphones className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-['Roboto_Condensed'] font-light">SUPPORT</span>
+          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">SUPPORT</span>
         </button>
       </nav>
     </div>
