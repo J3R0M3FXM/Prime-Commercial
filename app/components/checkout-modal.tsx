@@ -2936,7 +2936,7 @@ export default function CheckoutModal({
             <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-none flex flex-col items-center justify-center space-y-3">
               {(zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image) ? (
                 <div className="p-3 bg-white rounded-none shadow-xs border border-slate-200">
-                  <img
+                  <TelegramMediaImage
                     src={zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image}
                     alt={`${zoomedPaymentMethod.name} QR Code`}
                     className="w-48 h-48 object-contain"
