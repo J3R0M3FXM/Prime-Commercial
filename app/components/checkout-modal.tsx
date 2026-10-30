@@ -2381,7 +2381,7 @@ export default function CheckoutModal({
                                         <TelegramMediaImage
                                           src={method.logo}
                                           alt={method.name}
-                                          className={`absolute inset-0 z-[2] w-full h-full object-fill transition-transform duration-200 ${isOffline ? "filter blur-[1px] opacity-40 grayscale-[30%]" : ""}`}
+                                          className={`absolute inset-0 z-[2] w-full h-full object-fill rounded-md shadow-sm transition-transform duration-200 ${isOffline ? "filter blur-[1px] opacity-40 grayscale-[30%]" : ""}`}
                                           referrerPolicy="no-referrer"
                                         />
                                       ) : (
