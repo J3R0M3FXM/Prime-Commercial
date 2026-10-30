@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 
-export default function LiveHeaderClock({ caption = "SECURE CUSTOMER ACCESS" }: { caption?: string }) {
+export default function LiveHeaderClock({ caption = "SECURED CUSTOMER ACCESS" }: { caption?: string }) {
   const [mounted, setMounted] = useState(false);
   const [timeStr, setTimeStr] = useState("");
 

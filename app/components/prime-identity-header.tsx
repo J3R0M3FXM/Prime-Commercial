@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import LiveHeaderClock from "./live-header-clock";
 
 export default function PrimeIdentityHeader({
-  caption = "SECURE CUSTOMER ACCESS",
+  caption = "SECURED CUSTOMER ACCESS",
   children,
 }: {
   caption?: string;
