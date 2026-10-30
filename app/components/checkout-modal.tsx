@@ -2703,6 +2703,7 @@ export default function CheckoutModal({
                                 {/* Analysis-complete prompt */}
                                 {ocrAnalysis && !isAnalyzingReceipt && (
                                   <div className="prime-receipt-forensics__complete animate-in fade-in zoom-in-98 duration-200">
+                                    <div className="mb-2 border-b border-emerald-200/80 pb-2 font-heading text-[11px] font-black uppercase tracking-wider text-emerald-950">Analysis Completed</div>
                                     The receipt image file hash and normalized pixel-level fingerprint have been captured. Secure upload will store this metadata to ensure that this receipt will not be reused, edited, or tampered in any way in the future.
                                   </div>
                                 )}
