@@ -7,6 +7,7 @@ import { useCart } from './cart-context';
 import { ShoppingCart, X, Plus, Minus, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
 import CheckoutModal from './checkout-modal';
+import PrimePageHeading from './prime-page-heading';
 
 // Defensive Error Boundary to ensure Cart never crashes the host page
 interface ErrorBoundaryProps {
@@ -108,18 +109,10 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: 
         <div className="w-full max-w-[430px] bg-white h-auto max-h-[calc(100vh-120px)] shadow-sm flex flex-col relative border-x border-slate-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
-          <div className="flex items-center gap-1.5">
-            <ShoppingCart className="w-4 h-4 text-gray-900" />
-            <h2 className="text-base leading-5 font-heading font-bold uppercase tracking-wide">Your Cart</h2>
-            <span className="bg-black text-white text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full ml-1">
-              {cartCount || 0}
-            </span>
-          </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors cursor-pointer">
-            <X className="w-4 h-4 text-gray-600" />
-          </button>
-        </div>
+        <PrimePageHeading icon={<ShoppingCart />} title="CART" actions={<>
+          <span className="bg-black text-white text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full">{cartCount || 0}</span>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors cursor-pointer" aria-label="Close cart"><X className="w-4 h-4" /></button>
+        </>} />
 
         {/* Cart Items */}
         <div className="overflow-y-auto p-2.5 space-y-2 max-h-[calc(100vh-250px)]">

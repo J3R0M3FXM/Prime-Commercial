@@ -85,7 +85,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
             if (!item?.id) return item;
             const productId = item.productId || (typeof item.id === 'string' && item.id.includes('_') ? item.id.split('_')[0] : item.id);
             const variantId = item.variantId || (typeof item.id === 'string' && item.id.includes('_') ? item.id.split('_').slice(1).join('_') : 'default');
-            const product = products.find(row => String(row.id) === String(productId));
+            const product = products.find(row => row && typeof row === 'object' && String(row.id) === String(productId));
             if (!product || product.active === false || product.isActive === false) {
               if (item.catalogUnavailable === true) return item;
               changed = true;

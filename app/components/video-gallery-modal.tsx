@@ -2,6 +2,7 @@
 
 import { getServerlessVideos, resolveTelegramVideo } from "@/lib/telegram-serverless-client";
 import TelegramMediaImage from "@/app/components/telegram-media-image";
+import PrimePageHeading from "@/app/components/prime-page-heading";
 
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -200,27 +201,12 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
 
   return (
       <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
-      <div className="w-full max-w-[430px] min-h-[calc(100vh-120px)] bg-gray-50 flex flex-col overflow-hidden text-slate-900 shadow-sm relative border-x border-slate-200">
+      <div className="prime-page-shell w-full max-w-[430px] min-h-[calc(100vh-120px)] bg-gray-50 flex flex-col overflow-hidden text-slate-900 shadow-sm relative border-x border-slate-200">
         {/* 1. TOP NAVIGATION HEADER */}
-      <header className="sticky top-0 z-20 bg-white/95 border-b border-slate-200 backdrop-blur-md px-4 py-3 flex items-center justify-between gap-3 shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-center">
-            <Film className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-heading font-normal text-sm uppercase tracking-wider text-slate-900">
-                PRIME Media Vault
-              </span>
-              <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] font-mono font-black uppercase">
-                FREE HD
-              </span>
-            </div>
-            <p className="text-[10px] font-mono text-slate-500">
-              Product videos and customer guides
-            </p>
-          </div>
-        </div>
+      <PrimePageHeading icon={<Film />} title="MEDIA" actions={
+        <button onClick={onClose} className="p-2 text-slate-500" aria-label="Close media"><X className="h-5 w-5" /></button>
+      } />
+      <header className="hidden">
 
         {/* Search Input */}
         <div className="relative flex-1 max-w-md hidden md:block">

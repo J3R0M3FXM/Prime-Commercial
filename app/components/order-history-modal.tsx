@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import TelegramMediaImage from "./telegram-media-image";
+import PrimePageHeading from "./prime-page-heading";
 
 interface OrderHistoryModalProps {
   isOpen: boolean;
@@ -548,7 +549,7 @@ export default function OrderHistoryModal({
         aria-modal="true"
       >
         {/* ================= MODAL HEADER ================= */}
-        <div className="border-b border-gray-100 bg-white px-3.5 py-2.5 sticky top-0 z-30 flex items-center justify-between">
+        <div className="hidden">
           <div className="flex items-center gap-3">
             {selectedOrder && (
               <button
@@ -568,8 +569,9 @@ export default function OrderHistoryModal({
               </button>
             )}
             <div>
-              <div className="text-base leading-5 font-heading font-bold text-gray-900 tracking-wide uppercase">
-                {selectedOrder ? "ORDER DETAILS" : "MY PURCHASES"}
+              <div className="prime-page-heading__title flex items-center gap-2 text-base leading-5 font-heading font-bold text-gray-900 tracking-wide uppercase">
+                <Package className="h-5 w-5 shrink-0" />
+                {selectedOrder ? "ORDER DETAILS" : "PURCHASES"}
               </div>
             </div>
           </div>
@@ -593,6 +595,10 @@ export default function OrderHistoryModal({
             </button>
           </div>
         </div>
+        <PrimePageHeading icon={<Package />} title={selectedOrder ? "ORDER DETAILS" : "PURCHASES"} actions={<>
+          <button type="button" onClick={loadOrders} className="p-2 rounded-lg text-gray-400 hover:text-gray-700" title="Refresh Orders"><RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-black" : ""}`} /></button>
+          <button type="button" onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:text-gray-900" title="Close modal"><X className="w-5 h-5" /></button>
+        </>} />
 
         {/* ================= MODAL BODY ================= */}
         <div className="p-3 sm:p-3.5 overflow-y-auto flex-1 space-y-4">

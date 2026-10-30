@@ -1861,3 +1861,49 @@ body.admin-mode {
 .secretary-button-card { display: grid; gap: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; padding: 9px; }
 .secretary-message-preview__image { display: block; max-height: 150px; max-width: 100%; margin-bottom: 7px; object-fit: contain; }
 @media (max-width: 360px) { .secretary-configurator { padding: 7px; } .secretary-configurator__header { flex-direction: column; } .secretary-header-actions { width: 100%; flex-direction: row; } .secretary-header-actions button { flex: 1; } }
+
+/* Prime Central Command visual system */
+:root { --prime-blue:#0755b8; --prime-ink:#102a56; --prime-line:#d7e1ef; --prime-surface:#fff; --prime-muted:#60708a; }
+html, body { overflow-x:hidden; background:#eef2f7; }
+body { color:var(--prime-ink); }
+#mobile-portrait-viewport { width:100%; max-width:430px; min-height:100dvh; margin-inline:auto; background:#fff; overflow-x:hidden; padding-bottom:30px; }
+.prime-identity-header { min-height:58px; padding:9px 12px; background:linear-gradient(135deg,#0648a4,#0874d1); color:#fff; }
+.prime-identity-header__logo { filter:brightness(0) invert(1); }
+.prime-identity-header__right { color:#fff; }
+.prime-global-header, .command-fixed-header { max-width:430px; margin-inline:auto; background:#fff; }
+.prime-global-header .prime-identity-header__caption { color:#fff; font:600 10px/1 'Roboto Condensed',sans-serif; letter-spacing:.1em; }
+.prime-queue-monitor { background:#fff; border-bottom:1px solid var(--prime-line); }
+.prime-queue-monitor span { color:var(--prime-muted); font:600 9px/1 'Roboto Condensed',sans-serif; text-transform:uppercase; }
+.prime-queue-monitor strong { color:var(--prime-ink); font:600 14px/1 'Roboto Condensed',sans-serif; }
+.admin-shell, .serverless-admin-panel { max-width:430px; margin-inline:auto; background:#fff; overflow-x:hidden; }
+.admin-shell .admin-content, .serverless-admin-panel { padding:10px 10px 34px; }
+.admin-shell .admin-page-header, .serverless-panel-header { padding:12px; border:1px solid var(--prime-line); border-radius:12px; background:#fff; box-shadow:0 4px 14px #0f2d5b0d; }
+.admin-shell .admin-page-title, .serverless-panel-header h1 { color:var(--prime-ink); font:600 20px/1.05 'Roboto Condensed',sans-serif !important; }
+.admin-shell .admin-page-description { color:var(--prime-muted); font:400 12px/1.3 'MiSans',sans-serif; }
+.admin-shell .admin-section, .admin-shell .admin-feature-module, .serverless-admin-panel .serverless-record, .serverless-admin-panel .serverless-disclosure { margin-bottom:8px; border:1px solid var(--prime-line); border-radius:12px; background:#fff; box-shadow:0 3px 12px #0f2d5b0a; }
+.admin-shell .admin-section__header, .serverless-admin-panel .serverless-disclosure__trigger { min-height:42px; padding:8px 10px; }
+.admin-shell .admin-section__title, .serverless-admin-panel .serverless-disclosure__title { font:600 14px/1.1 'Roboto Condensed',sans-serif !important; }
+.admin-shell .admin-section__body, .serverless-admin-panel .serverless-disclosure__body { padding:8px 10px 10px; }
+.admin-shell .admin-stat-grid, .serverless-admin-panel .serverless-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.admin-shell .admin-primary-button, .admin-shell .admin-secondary-button, .serverless-admin-panel .serverless-action { min-height:32px; border-radius:7px; padding:0 10px; font:600 11px/1 'Roboto Condensed',sans-serif !important; }
+.admin-shell input,.admin-shell select,.admin-shell textarea,.serverless-admin-panel input,.serverless-admin-panel select,.serverless-admin-panel textarea { min-height:34px; border:1px solid #c7d3e2; border-radius:7px; background:#fff; padding:6px 8px; font:400 12px/1.2 'MiSans',sans-serif; }
+.system-wide-proprietary-footer { position:fixed; bottom:0; max-width:430px; margin-inline:auto; }
+.prime-system-footer__text { font:600 10px/1.1 'Roboto Condensed',sans-serif !important; letter-spacing:.04em; }
+.prime-page-heading { display:flex; flex:0 0 72px !important; min-height:72px !important; height:72px !important; max-height:72px !important; box-sizing:border-box; align-items:center; padding-top:8px !important; padding-bottom:8px !important; overflow:hidden; background:#fff; color:#0755b8; box-shadow:0 3px 10px rgba(7,85,184,.08); }
+.prime-page-heading h1, .prime-page-heading h2, .prime-page-heading [class*="title"] { color: #0755b8 !important; line-height: 1 !important; }
+.prime-page-heading p { line-height: 1.2 !important; }
+.prime-page-heading__icon { display:grid; width:20px; height:20px; place-items:center; border-radius:0; background:transparent; color:#0755b8; }
+.prime-page-heading > div > svg, .prime-page-heading > div > div > svg { width:20px; height:20px; color:#0755b8 !important; }
+.prime-page-heading button { color:#60708a; }
+.prime-page-heading__title { color:#0755b8 !important; line-height:1 !important; }
+.prime-page-heading__title { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+section > .prime-page-heading { width:calc(100% + 28px); margin-top:-14px; margin-right:-14px; margin-left:-14px; }
+.prime-page-heading + * { margin-top:0 !important; }
+.prime-page-shell { width:100%; max-width:430px; margin-inline:auto; overflow-x:hidden; }
+.prime-page-shell > .prime-page-heading { width:100%; margin:0; padding-inline:14px !important; }
+.prime-page-shell > .prime-page-heading + * { margin-top:0 !important; }
+.prime-page-shell > :not(.prime-page-heading) { box-sizing:border-box; }
+/* Current typography contract: Lato body/technical text and regular Roboto Condensed headings. */
+body, input, textarea, select, .font-mono { font-family:'Lato Condensed','Lato','Arial Narrow',sans-serif !important; }
+h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title { font-family:'Roboto Condensed',sans-serif !important; font-weight:400 !important; }
+@media (max-width:360px) { .admin-shell .admin-stat-grid,.serverless-admin-panel .serverless-fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
