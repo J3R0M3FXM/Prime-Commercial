@@ -1794,14 +1794,14 @@ export default function CheckoutModal({
               {/* Delivery Information */}
               <div className="p-2.5 rounded-none border border-slate-200 bg-slate-50 space-y-2.5 text-xs font-mono">
                 <div className="flex justify-between items-start">
-                  <span className="text-gray-500 uppercase text-[10px] font-heading font-semibold">Receiver</span>
+                  <span className="prime-checkout__review-label text-gray-500 uppercase text-[10px]">Receiver</span>
                   <span className="prime-checkout__review-value font-heading font-semibold text-[11px] text-gray-900 text-right">
                     {receiverName} ({receiverPhone})
                   </span>
                 </div>
 
                 <div className="flex justify-between items-start pt-1 border-t border-gray-200">
-                  <span className="text-gray-500 uppercase text-[10px] font-heading font-semibold flex items-center gap-1">
+                  <span className="prime-checkout__review-label text-gray-500 uppercase text-[10px] flex items-center gap-1">
                     <span>Address</span>
                   </span>
                   <span className="prime-checkout__review-value font-heading font-semibold text-[11px] text-gray-900 text-right max-w-xs break-words">
@@ -1811,7 +1811,7 @@ export default function CheckoutModal({
                 </div>
 
                 <div className="flex justify-between items-center pt-1 border-t border-gray-200">
-                  <span className="text-gray-500 uppercase text-[10px] font-heading font-semibold">Courier</span>
+                  <span className="prime-checkout__review-label text-gray-500 uppercase text-[10px]">Courier</span>
                   <span className="prime-checkout__review-value font-heading font-semibold text-[11px] text-gray-900">
                     {selectedCourier?.name} ({calculatedDistance} km)
                   </span>

@@ -71,6 +71,7 @@ body .prime-checkout input, body .prime-checkout__review-value, body .prime-chec
   letter-spacing: -0.01em;
 }
 body .prime-checkout__charge-label { font-family: 'Roboto Condensed', sans-serif !important; font-weight: 400 !important; letter-spacing: 0; }
+body .prime-checkout .prime-checkout__review-label { font-family: 'Roboto Condensed', sans-serif !important; font-weight: 600 !important; }
 .prime-checkout__pending-banner { display: grid; grid-template-columns: 82px minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
 .prime-checkout__pending-animation { position: relative; display: grid; width: 76px; height: 76px; place-items: center; border: 2px solid #cbd5e1; border-radius: 50%; background: #f8fafc; color: #334155; }
 .prime-checkout__cashier-icon { width: 46px; height: 46px; animation: prime-cashier-breathe 1.8s ease-in-out infinite; }
