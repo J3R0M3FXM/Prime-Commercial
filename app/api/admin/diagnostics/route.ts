@@ -80,18 +80,70 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 2. Geoapify API
+  // 2. TomTom API (Primary Location & Routing)
+  const tomtomKey = process.env.TOMTOM_API_KEY;
+  if (tomtomKey) {
+    const start = performance.now();
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(
+        `https://api.tomtom.com/search/2/reverseGeocode/14.5995,120.9842.json?key=${tomtomKey}&radius=100`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timeout);
+      const latency = Math.round(performance.now() - start);
+
+      if (res.ok) {
+        const data = await res.json();
+        const address = data.addresses?.[0]?.address?.freeformAddress || "Manila, Philippines";
+        results.push({
+          id: "tomtom-api",
+          name: "TomTom API",
+          category: "location",
+          status: "operational",
+          latencyMs: latency,
+          message: `Reverse Geocoding & Routing operational (${address.substring(0, 45)}...)`,
+          details: { sampleResolved: address },
+          lastChecked: timestamp,
+        });
+      } else {
+        results.push({
+          id: "tomtom-api",
+          name: "TomTom API",
+          category: "location",
+          status: "degraded",
+          latencyMs: latency,
+          message: `TomTom responded with HTTP ${res.status}`,
+          lastChecked: timestamp,
+        });
+      }
+    } catch (err: any) {
+      const latency = Math.round(performance.now() - start);
+      results.push({
+        id: "tomtom-api",
+        name: "TomTom API",
+        category: "location",
+        status: "error",
+        latencyMs: latency,
+        message: err.name === "AbortError" ? "Connection timed out (4s)" : err.message,
+        lastChecked: timestamp,
+      });
+    }
+  }
+
+  // 3. Geoapify API (Secondary / Fallback)
   const geoKey = process.env.GEOAPIFY_API_KEY;
-  if (!geoKey) {
+  if (!tomtomKey && !geoKey) {
     results.push({
-      id: "geoapify-api",
-      name: "Geoapify API",
+      id: "tomtom-api",
+      name: "TomTom API",
       category: "location",
       status: "error",
-      message: "GEOAPIFY_API_KEY is not configured in environment",
+      message: "TOMTOM_API_KEY is not configured in environment",
       lastChecked: timestamp,
     });
-  } else {
+  } else if (geoKey) {
     const start = performance.now();
     try {
       const controller = new AbortController();
@@ -108,7 +160,7 @@ export async function GET(req: NextRequest) {
         const address = data.features?.[0]?.properties?.formatted || "Manila, Philippines";
         results.push({
           id: "geoapify-api",
-          name: "Geoapify API",
+          name: "Geoapify API (Fallback)",
           category: "location",
           status: "operational",
           latencyMs: latency,
@@ -119,7 +171,7 @@ export async function GET(req: NextRequest) {
       } else {
         results.push({
           id: "geoapify-api",
-          name: "Geoapify API",
+          name: "Geoapify API (Fallback)",
           category: "location",
           status: "degraded",
           latencyMs: latency,
@@ -131,7 +183,7 @@ export async function GET(req: NextRequest) {
       const latency = Math.round(performance.now() - start);
       results.push({
         id: "geoapify-api",
-        name: "Geoapify API",
+        name: "Geoapify API (Fallback)",
         category: "location",
         status: "error",
         latencyMs: latency,

@@ -135,3 +135,19 @@ export async function processMaturedReferrals(): Promise<number> {
     return 0;
   }
 }
+
+export async function processMaturedOrderPoints(): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+  const supabase = getSupabaseAdmin()!;
+  try {
+    const { data, error } = await supabase.rpc('process_matured_order_points');
+    if (error) {
+      console.error('Error processing matured order points:', error);
+      return 0;
+    }
+    return Number(data?.processed || 0);
+  } catch (err) {
+    console.error('Error processing matured order points:', err);
+    return 0;
+  }
+}

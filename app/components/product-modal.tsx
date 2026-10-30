@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useCart } from './cart-context';
-import { X, Check, Minus, Plus, ShoppingCart, Info } from 'lucide-react';
+import { X, Check, Minus, Plus, ShoppingCart, Info, ChevronDown } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
 
 export default function ProductModal({ product, onClose }: { product: any, onClose: () => void }) {
@@ -20,7 +20,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
         tag: "NONE"
       }];
 
-  // Canonical variant shape: one image URL per variant.
+  // Canonical variant shape: one uploaded image reference per variant.
   const variants = rawVariants.map((variant: any) => ({
     ...variant,
     imageUrl: variant?.imageUrl || variant?.images?.[0]?.url || variant?.images?.[0] || fallbackImage,
@@ -29,6 +29,8 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
   // Do NOT pre-select an option by default — require customer choice first
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [localQuantity, setLocalQuantity] = useState(1);
+  const [variantMenuOpen, setVariantMenuOpen] = useState(false);
+  const [variantFeedbackTick, setVariantFeedbackTick] = useState(0);
 
   // Preserve the customer's selected variant when the live product row updates.
   // Realtime stock/configuration changes should refresh the option without resetting the UI.
@@ -44,6 +46,15 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
       return Math.min(Math.max(1, prev), Math.max(1, liveStock || 1));
     });
   }, [product]);
+
+  useEffect(() => {
+    if (!variantMenuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setVariantMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [variantMenuOpen]);
 
   if (!product) return null;
 
@@ -71,16 +82,13 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
   // Glossy chip rendering
   const renderGlossyChip = () => {
-    if (!selectedVariant) return null;
-    const stock = selectedVariant.stock ?? 0;
-    let tag = "NONE";
+    const stock = selectedVariant?.stock ?? product?.stock ?? 0;
+    let tag = selectedVariant?.tag || product?.tag || "NONE";
     
     if (stock <= 0) {
       tag = "UNAVAILABLE";
     } else if (stock <= lowStockThreshold) {
       tag = "LOW STOCKS";
-    } else if (selectedVariant.tag && selectedVariant.tag !== "NONE") {
-      tag = selectedVariant.tag;
     }
 
     if (tag === "NONE") return null;
@@ -93,7 +101,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
     else if (tag === "SALE") colorClasses = "bg-rose-500/85 border-rose-400/40 shadow-rose-500/20";
 
     return (
-      <span className={`absolute top-4 left-4 z-10 px-2.5 py-1 text-[9px] font-bold tracking-wider rounded-md backdrop-blur-md border text-white uppercase shadow-sm font-mono ${colorClasses}`}>
+      <span className={`absolute top-2 left-2 z-20 max-w-[calc(100%-1rem)] truncate px-2 py-1 text-[9px] font-bold tracking-wider rounded-md backdrop-blur-md border text-white uppercase shadow-sm font-mono ${colorClasses}`}>
         {tag}
       </span>
     );
@@ -106,6 +114,8 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
       id: cartItemId,
       productId: product.id,
       variantId: selectedVariant.id,
+      productName: product.name,
+      variantName: selectedVariant.id === "default" ? "" : selectedVariant.name,
       name: selectedVariant.id === "default" ? product.name : `${product.name} - ${selectedVariant.name}`,
       price: basePrice,
       imageUrl: selectedVariant.imageUrl || product.imageUrl,
@@ -144,7 +154,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
           </div>
 
           <div className="mt-4 flex justify-center">
-            <div className="relative w-full max-w-[360px] aspect-square overflow-hidden rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center">
+            <div key={variantFeedbackTick} className={`relative w-full max-w-[360px] ${variants.length > 1 ? "h-[min(34dvh,300px)]" : "aspect-square"} ${variantFeedbackTick > 0 ? "variant-selection-feedback" : ""} overflow-hidden rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center`}>
               {renderGlossyChip()}
               <img
                 src={selectedVariant?.imageUrl || fallbackImage}
@@ -158,77 +168,66 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
             </div>
           </div>
 
+          {selectedVariant && (
+            <div className="mx-auto mt-2 flex max-w-[360px] items-baseline justify-between gap-2 px-1">
+              <span className="font-mono text-[9px] font-bold uppercase tracking-wide text-slate-500">Price per item</span>
+              <span className="font-mono text-base font-bold text-slate-900">{formatPHP(basePrice)}</span>
+            </div>
+          )}
+
           {product.description && (
-            <p className="mt-3 mx-auto max-w-[380px] text-center text-xs text-gray-500 leading-relaxed">
+            <p className="mt-2 mx-auto max-w-[380px] text-center text-xs text-gray-500 leading-relaxed">
               {product.description}
             </p>
           )}
 
-          <div className="mt-4 text-center">
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 font-mono">
-              Select Variant
-            </label>
-            {variants.length > 1 && (
-              <span className="mt-1 block text-[9px] font-mono text-gray-400">
-                {variants.length} OPTIONS
-              </span>
-            )}
+          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+            <div className="relative min-w-0 font-mono text-[9px] font-bold uppercase tracking-wide text-slate-500">
+              <span className="mb-1 block">Variant</span>
+              <button type="button" aria-haspopup="dialog" aria-expanded={variantMenuOpen} onClick={() => setVariantMenuOpen(true)} className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 text-left text-[10px] font-semibold normal-case text-slate-800 shadow-sm">
+                <span className="min-w-0 truncate">{selectedVariant?.name || "Choose a variant"}</span>
+                {selectedVariant && <span className="shrink-0 font-mono">{formatPHP(Number(selectedVariant.price) || 0)}</span>}
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+              </button>
+            </div>
 
-            <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-              {variants.map((v: any) => {
-                const isSelected = selectedVariant?.id === v.id;
-                const variantPrice = Number(v.price) || 0;
-
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedVariant(v);
-                      setLocalQuantity(1);
-                    }}
-                    className={"rounded-lg border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-all cursor-pointer " + (isSelected
-                      ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                      : "border-gray-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50")}
-                  >
-                    <span>{v.name || "Variant"}</span>
-                    <span className={"ml-1.5 font-mono " + (isSelected ? "text-white/80" : "text-slate-400")}>
-                      {formatPHP(variantPrice)}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-wide text-slate-500">
+              <span className="mb-1 block text-center">Quantity</span>
+              <div className="flex h-10 items-center rounded-lg border border-slate-200 bg-white">
+                <button
+                  type="button"
+                  className="h-full px-2.5 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                  onClick={() => isInCart ? updateQuantity(cartItemId, cartItem.quantity - 1) : setLocalQuantity(Math.max(1, localQuantity - 1))}
+                  disabled={!selectedVariant || (isInCart ? cartItem.quantity <= 1 : localQuantity <= 1)}
+                  aria-label="Decrease quantity"
+                ><Minus className="h-3 w-3" /></button>
+                <span className="w-7 text-center text-sm font-bold text-slate-900">{selectedVariant ? currentQuantity : "—"}</span>
+                <button
+                  type="button"
+                  className="h-full px-2.5 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                  onClick={() => isInCart ? updateQuantity(cartItemId, cartItem.quantity + 1) : setLocalQuantity(Math.min(selectedVariant?.stock ?? 10, localQuantity + 1))}
+                  disabled={!selectedVariant || isOutOfStock || (isInCart ? cartItem.quantity >= (selectedVariant.stock ?? 10) : localQuantity >= (selectedVariant.stock ?? 10))}
+                  aria-label="Increase quantity"
+                ><Plus className="h-3 w-3" /></button>
+              </div>
             </div>
           </div>
 
           {selectedVariant && (
-            <>
-              <div className="mt-3 flex items-center justify-center py-2 border-y border-gray-100">
-                <div className="text-xs font-mono font-bold uppercase tracking-wider text-center">
-                  {isOutOfStock ? (
-                    <span className="text-red-500">Unavailable</span>
-                  ) : (
-                    <span className="text-gray-500">
-                      Stock: <span className="text-gray-900">{selectedVariant.stock}</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {hasBundle && !isOutOfStock && (
-                <div className="mt-3 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
-                  <p className="font-bold text-emerald-800 text-[10px] uppercase tracking-wide">
-                    Buy More, Save More
-                  </p>
-                  <p className="text-emerald-600 text-[11px] mt-0.5">
-                    Buy 2 or more to get <span className="font-bold">{product.bundleConfig.discount}% off</span>.
-                  </p>
-                </div>
-              )}
-            </>
+            <div className="mt-1 flex min-h-4 items-center justify-between gap-2 text-[9px] font-mono text-slate-500">
+              <span>{isOutOfStock ? <span className="font-bold text-red-600">Unavailable</span> : `Stock: ${selectedVariant.stock}`}</span>
+              {hasBundle && !isOutOfStock && <span className="truncate text-right text-emerald-700">Buy 2+ · {product.bundleConfig.discount}% off</span>}
+            </div>
           )}
 
-          <div className="mt-4">
+          {selectedVariant && (
+            <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 font-mono">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Total amount</span>
+              <span className="text-lg font-bold text-slate-900">{formatPHP(finalPrice * currentQuantity)}</span>
+            </div>
+          )}
+
+          <div className="mt-3">
             {!selectedVariant ? (
               <button disabled className="w-full bg-gray-100 text-gray-400 py-3.5 rounded-xl font-heading font-bold uppercase tracking-widest text-xs cursor-not-allowed text-center">
                 Please Select an Option First
@@ -238,67 +237,11 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
                 Unavailable
               </button>
             ) : isInCart ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
-                  <button
-                    className="p-3.5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors cursor-pointer"
-                    onClick={() => updateQuantity(cartItemId, cartItem.quantity - 1)}
-                    aria-label="Decrease quantity"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold">{cartItem.quantity}</span>
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest font-mono">In Cart</span>
-                  </div>
-                  <button
-                    className="p-3.5 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-30 cursor-pointer"
-                    onClick={() => updateQuantity(cartItemId, cartItem.quantity + 1)}
-                    disabled={cartItem.quantity >= (selectedVariant.stock ?? 10)}
-                    aria-label="Increase quantity"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+              <button type="button" disabled className="w-full rounded-xl border border-emerald-200 bg-emerald-50 py-3 text-xs font-heading font-bold uppercase tracking-wider text-emerald-800">
+                Added to Cart · {cartItem.quantity}
+              </button>
             ) : (
               <div className="space-y-3">
-                <div className="flex items-center justify-center gap-3">
-                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wide font-mono">Quantity</span>
-                  <div className="flex items-center border border-gray-200 rounded-lg bg-white">
-                    <button
-                      type="button"
-                      className="p-2 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-30 cursor-pointer"
-                      onClick={() => setLocalQuantity(Math.max(1, localQuantity - 1))}
-                      disabled={localQuantity <= 1}
-                      aria-label="Decrease quantity"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="w-10 text-center font-bold text-sm font-mono">{localQuantity}</span>
-                    <button
-                      type="button"
-                      className="p-2 text-gray-500 hover:text-black hover:bg-gray-50 transition-colors disabled:opacity-30 cursor-pointer"
-                      onClick={() => setLocalQuantity(Math.min(selectedVariant.stock ?? 10, localQuantity + 1))}
-                      disabled={localQuantity >= (selectedVariant.stock ?? 10)}
-                      aria-label="Increase quantity"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-xl font-mono font-bold text-gray-900">
-                    {formatPHP(finalPrice * localQuantity)}
-                  </span>
-                  {hasBundle && localQuantity > 1 && (
-                    <span className="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-wider">
-                      Bundle Savings Applied
-                    </span>
-                  )}
-                </div>
-
                 <button
                   onClick={handleAddToCart}
                   className="w-full px-3.5 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center"
@@ -310,6 +253,35 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
           </div>
         </div>
       </div>
+      {variantMenuOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-3 backdrop-blur-[2px]"
+          onClick={(event) => {
+            event.stopPropagation();
+            if (event.target === event.currentTarget) setVariantMenuOpen(false);
+          }}
+        >
+          <section role="dialog" aria-modal="true" aria-labelledby="variant-picker-title" className="flex max-h-[min(70dvh,520px)] w-full max-w-[430px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <header className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
+              <div>
+                <h3 id="variant-picker-title" className="font-heading text-base font-semibold text-slate-900">Select Variant</h3>
+                <p className="font-mono text-[11px] font-bold uppercase tracking-wide text-slate-500">{product.name}</p>
+              </div>
+              <button type="button" onClick={() => setVariantMenuOpen(false)} aria-label="Close variant selector" className="rounded-full p-2 text-slate-600 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+            </header>
+            <div role="listbox" aria-label="Choose product variant" className="min-h-0 overflow-y-auto overscroll-contain">
+              {variants.map((variant: any) => {
+                const stock = Math.max(0, Number(variant.stock) || 0);
+                const unavailable = stock <= 0;
+                const selected = String(selectedVariant?.id || "") === String(variant.id);
+                return <button key={variant.id} type="button" role="option" aria-selected={selected} disabled={unavailable} onClick={() => { setSelectedVariant(variant); setLocalQuantity(1); setVariantFeedbackTick((tick) => tick + 1); setVariantMenuOpen(false); }} className={`grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 border-b border-slate-100 px-3 py-3 text-left text-[11px] last:border-b-0 ${unavailable ? "cursor-not-allowed bg-slate-100 text-slate-400" : selected ? "bg-amber-50 text-slate-950" : "bg-white text-slate-800 hover:bg-slate-100"}`}>
+                  <span className="truncate font-semibold normal-case">{variant.name || "Variant"}</span><span className="whitespace-nowrap font-mono">{formatPHP(Number(variant.price) || 0)}</span><span className={`whitespace-nowrap font-mono ${unavailable ? "text-slate-400" : "text-slate-500"}`}>{unavailable ? "Out of stock" : `${stock} in stock`}</span>
+                </button>;
+              })}
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

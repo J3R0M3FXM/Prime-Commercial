@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getServerlessCatalog } from '@/lib/telegram-serverless-client';
 
 const CartContext = createContext<any>(null);
 
@@ -41,7 +41,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
       const safePrev = Array.isArray(prev) ? prev : [];
       const existing = safePrev.find(item => item && item.id === product.id);
       if (existing) {
-        return safePrev.map(item => item && item.id === product.id ? { ...item, quantity: (Number(item.quantity) || 1) + quantity } : item);
+        return safePrev.map(item => item && item.id === product.id ? { ...item, quantity: (Number(item.quantity) || 1) + quantity, catalogUnavailable: false, catalogUnavailableReason: '' } : item);
       }
       return [...safePrev, { ...product, quantity: Number(quantity) || 1, selected: true }];
     });
@@ -71,64 +71,55 @@ export default function CartProvider({ children }: { children: React.ReactNode }
     setCart([]);
   };
 
-  // Live inventory sync from Postgres. The database remains the source of truth;
-  // this subscription only keeps the cart UI current between checkout attempts.
+  // Refresh cart prices and stock from Telegram Serverless instead of Supabase Realtime.
   useEffect(() => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel('prime-products-stock')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'products' },
-        (payload) => {
-          const product = payload.new as any;
-          if (!product?.id) return;
-
-          const bundleConfig = product.bundle_config && typeof product.bundle_config === 'object'
-            ? product.bundle_config
-            : {};
-          const variants = Array.isArray(bundleConfig.variants) ? bundleConfig.variants : [];
-
-          setCart(prev => {
-            if (!Array.isArray(prev)) return [];
-            let changed = false;
-            const next = prev.map(item => {
-              if (!item?.id) return item;
-              const productId = item.productId || (
-                typeof item.id === 'string' && item.id.includes('_')
-                  ? item.id.split('_')[0]
-                  : item.id
-              );
-              if (productId !== product.id) return item;
-              const variantId = item.variantId || (
-                typeof item.id === 'string' && item.id.includes('_')
-                  ? item.id.split('_').slice(1).join('_')
-                  : 'default'
-              );
-              const liveVariant = variants.find((v: any) => String(v?.id) === String(variantId));
-              const liveStock = liveVariant ? Math.max(0, Number(liveVariant.stock) || 0) : Math.max(0, Number(product.stock) || 0);
-              const livePrice = liveVariant ? Number(liveVariant.price) || 0 : Number(product.price) || 0;
-              const liveImage = liveVariant?.imageUrl || product.image_url || item.imageUrl || '';
-              const currentQty = Math.max(0, Number(item.quantity) || 0);
-              const nextQty = Math.min(currentQty, liveStock);
-              if (item.stock !== liveStock || Number(item.price) !== livePrice || item.imageUrl !== liveImage || nextQty !== currentQty) {
-                changed = true;
-                return { ...item, stock: liveStock, price: livePrice, imageUrl: liveImage, quantity: nextQty };
-              }
-              return item;
-            }).filter(item => item && Number(item.quantity) > 0);
-            return changed ? next : prev;
-          });
-        }
-      )
-      .subscribe((status) => {
-        if (status !== 'SUBSCRIBED') console.warn('Product stock realtime status:', status);
-      });
-
+    let cancelled = false;
+    const refreshCartInventory = async () => {
+      try {
+        const products = await getServerlessCatalog();
+        if (cancelled) return;
+        setCart(previous => {
+          if (!Array.isArray(previous)) return [];
+          let changed = false;
+          const next = previous.map(item => {
+            if (!item?.id) return item;
+            const productId = item.productId || (typeof item.id === 'string' && item.id.includes('_') ? item.id.split('_')[0] : item.id);
+            const variantId = item.variantId || (typeof item.id === 'string' && item.id.includes('_') ? item.id.split('_').slice(1).join('_') : 'default');
+            const product = products.find(row => String(row.id) === String(productId));
+            if (!product || product.active === false || product.isActive === false) {
+              if (item.catalogUnavailable === true) return item;
+              changed = true;
+              return { ...item, catalogUnavailable: true, catalogUnavailableReason: 'This item is no longer in the catalog.' };
+            }
+            const variants = Array.isArray(product.variants) ? product.variants : [];
+            const variant = variants.find(row => String(row.id) === String(variantId));
+            if (variants.length > 0 && !variant) {
+              if (item.catalogUnavailable === true) return item;
+              changed = true;
+              return { ...item, catalogUnavailable: true, catalogUnavailableReason: 'This option is no longer available.' };
+            }
+            const stock = Math.max(0, Number(variant?.stock ?? product.stock) || 0);
+            const price = Math.max(0, Number(variant?.price ?? product.price) || 0);
+            const imageUrl = String(variant?.imageUrl || product.imageUrl || item.imageUrl || '');
+            const quantity = Math.min(Math.max(0, Number(item.quantity) || 1), stock);
+            const unavailable = stock < 1;
+            if (Number(item.stock) !== stock || Number(item.price) !== price || item.imageUrl !== imageUrl || Number(item.quantity) !== quantity || item.catalogUnavailable !== unavailable) {
+              changed = true;
+              return { ...item, stock, price, imageUrl, quantity: unavailable ? Number(item.quantity) || 1 : quantity, catalogUnavailable: unavailable, catalogUnavailableReason: unavailable ? 'Out of stock.' : '' };
+            }
+            return item;
+          }).filter(item => item && Number(item.quantity) > 0);
+          return changed || next.length !== previous.length ? next : previous;
+        });
+      } catch (error) {
+        console.warn('Telegram Serverless inventory refresh failed:', error);
+      }
+    };
+    void refreshCartInventory();
+    const timer = window.setInterval(refreshCartInventory, 30_000);
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -151,19 +142,29 @@ export default function CartProvider({ children }: { children: React.ReactNode }
             : 'default'
         );
         const serverProduct = serverProducts.find(p => p && p.id === productId);
-        if (!serverProduct) return item;
+        if (!serverProduct || serverProduct.active === false || serverProduct.isActive === false) {
+          if (item.catalogUnavailable === true) return item;
+          changed = true;
+          return { ...item, catalogUnavailable: true, catalogUnavailableReason: 'This item is no longer in the catalog.' };
+        }
 
         const serverVariants = Array.isArray(serverProduct.variants) ? serverProduct.variants : [];
         const serverVariant = serverVariants.find((v: any) => String(v?.id) === String(variantId));
+        if (serverVariants.length > 0 && !serverVariant) {
+          if (item.catalogUnavailable === true) return item;
+          changed = true;
+          return { ...item, catalogUnavailable: true, catalogUnavailableReason: 'This option is no longer available.' };
+        }
         const liveStock = serverVariant ? Math.max(0, Number(serverVariant.stock) || 0) : Math.max(0, Number(serverProduct.stock) || 0);
         const livePrice = serverVariant ? Number(serverVariant.price) || 0 : Number(serverProduct.price) || 0;
         const liveImage = serverVariant?.imageUrl || serverProduct.imageUrl || item.imageUrl || '';
         const newQty = Math.min(Math.max(0, Number(item.quantity) || 1), liveStock);
         const liveName = serverVariant ? serverProduct.name + ' - ' + serverVariant.name : serverProduct.name;
 
-        if (item.price !== livePrice || item.name !== liveName || item.quantity !== newQty || item.imageUrl !== liveImage || Number(item.stock) !== liveStock) {
+        const unavailable = liveStock < 1;
+        if (item.price !== livePrice || item.name !== liveName || item.quantity !== newQty || item.imageUrl !== liveImage || Number(item.stock) !== liveStock || item.catalogUnavailable !== unavailable) {
           changed = true;
-          return { ...item, price: livePrice, name: liveName, quantity: newQty, imageUrl: liveImage, stock: liveStock, productId, variantId };
+          return { ...item, price: livePrice, name: liveName, quantity: unavailable ? Number(item.quantity) || 1 : newQty, imageUrl: liveImage, stock: liveStock, productId, variantId, catalogUnavailable: unavailable, catalogUnavailableReason: unavailable ? 'Out of stock.' : '' };
         }
         return item;
       }).filter(item => item && item.quantity > 0);
@@ -178,14 +179,14 @@ export default function CartProvider({ children }: { children: React.ReactNode }
   const cartTotal = useMemo(() => {
     if (!Array.isArray(cart)) return 0;
     return cart
-      .filter(item => item && item.selected !== false)
+      .filter(item => item && item.selected !== false && item.catalogUnavailable !== true)
       .reduce((total, item) => total + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
   }, [cart]);
 
   const cartCount = useMemo(() => {
     if (!Array.isArray(cart)) return 0;
     return cart
-      .filter(Boolean)
+      .filter(item => item && item.catalogUnavailable !== true)
       .reduce((count, item) => count + (Number(item.quantity) || 0), 0);
   }, [cart]);
 

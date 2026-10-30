@@ -3,10 +3,11 @@ import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { cacheStore } from '@/lib/cache';
 import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 import { notifyOrderCreated, notifyPaymentUpdated } from '@/lib/telegram-notifications';
-import { getChargesFromDb } from '@/lib/db-adapter';
+import { getChargesFromDb, createOrderInDb, getOrdersFromDb, updateOrderInDb } from '@/lib/db-adapter';
 import { buildDeviceFingerprintId, getRequestClientIp, getServerFingerprintId, resolveTrustedFingerprint } from '@/lib/fingerprint';
 import { calculateChargesBreakdown } from '@/lib/charges';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from '@/lib/delivery-fee';
+import { calculateRouteTomTom, isTomTomConfigured } from '@/lib/tomtom';
 
 export const dynamic = 'force-dynamic';
 
@@ -188,8 +189,24 @@ async function calculateServerDelivery(
   const originLon = Number(warehouse.longitude);
   let distanceKm: number | null = null;
 
+  // 1. Try TomTom motorcycle route calculation with live traffic
+  if (isTomTomConfigured()) {
+    try {
+      const tomtomRoute = await calculateRouteTomTom(originLat, originLon, destinationLat, destinationLon, {
+        travelMode: 'motorcycle',
+        traffic: true,
+      });
+      if (tomtomRoute && Number.isFinite(tomtomRoute.distanceKm)) {
+        distanceKm = tomtomRoute.distanceKm;
+      }
+    } catch (error) {
+      console.warn('TomTom routing unavailable for order; checking fallback.', error);
+    }
+  }
+
+  // 2. Fallback to Geoapify if TomTom was not available
   const apiKey = process.env.GEOAPIFY_API_KEY;
-  if (apiKey) {
+  if (distanceKm === null && apiKey) {
     try {
       const routingUrl =
         'https://api.geoapify.com/v1/routing' +
@@ -241,7 +258,41 @@ export async function POST(request: Request) {
     }
 
     if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });
+      const body = await request.json();
+      const orderNumber = getOrderNumber();
+      const newOrder = await createOrderInDb({
+        orderNumber,
+        customerId: auth.customer?.id || 'cust-preview-001',
+        customerName: body?.customerName || body?.receiverName || auth.customer?.tg_name || 'Preview Customer',
+        customerPhone: body?.customerPhone || body?.receiverPhone || '0917-000-0000',
+        tgUserId: auth.customer?.tg_user_id || '100000001',
+        primeMemberId: auth.customer?.prime_member_id || 'PRIME-PREVIEW-01',
+        items: body?.items || [],
+        subtotal: toFiniteNumber(body?.subtotal, 0),
+        deliveryFee: toFiniteNumber(body?.deliveryFee, 0),
+        discountAmount: toFiniteNumber(body?.discountAmount, 0),
+        appliedPromoCode: body?.appliedPromoCode || '',
+        pointsDiscount: toFiniteNumber(body?.pointsDiscount, 0),
+        chargesBreakdown: body?.chargesBreakdown || [],
+        totalAmount: toFiniteNumber(body?.totalAmount, 0),
+        payableNow: toFiniteNumber(body?.payableNow, 0),
+        payableOnDelivery: toFiniteNumber(body?.payableOnDelivery, 0),
+        status: 'Pending',
+        paymentStatus: body?.paymentProofImage ? 'Pending Review' : 'Unpaid',
+        paymentMethodId: body?.paymentMethodId || '',
+        paymentMethodName: body?.paymentMethodName || 'GCash',
+        paymentProofImage: body?.paymentProofImage || '',
+        deliveryAddress: body?.deliveryAddress || {},
+        courierId: body?.courier?.id || body?.courierId || 'courier-grab',
+        courierName: body?.courier?.name || body?.courierName || 'Grab Express',
+      });
+
+      return NextResponse.json({
+        success: true,
+        orderId: newOrder.id,
+        orderNumber: newOrder.orderNumber,
+        order: newOrder,
+      });
     }
 
     const body = await request.json();
@@ -636,7 +687,14 @@ export async function GET(request: Request) {
     const orderNumber = searchParams.get('orderNumber');
 
     if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+      const orders = await getOrdersFromDb();
+      if (orderId || orderNumber) {
+        const target = orderId || orderNumber;
+        const found = orders.find(o => o.id === target || o.orderNumber === target);
+        if (!found) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        return NextResponse.json(found, { headers: { 'Cache-Control': 'no-store' } });
+      }
+      return NextResponse.json(orders, { headers: { 'Cache-Control': 'no-store' } });
     }
     const supabase = getSupabaseAdmin()!;
 
@@ -698,7 +756,15 @@ export async function PUT(request: Request) {
     }
 
     if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 400 });
+      await updateOrderInDb(orderId, {
+        paymentStatus: 'Pending Review',
+        paymentProofImage: paymentProofImage || '',
+        paymentMethodId: paymentMethodId || '',
+        paymentMethodName: paymentMethodName || '',
+        reviewStatus: 'Pending Manual Review',
+        requiresManualReview: true,
+      });
+      return NextResponse.json({ success: true });
     }
     const supabase = getSupabaseAdmin()!;
 
@@ -791,7 +857,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    void notifyPaymentUpdated({
+    const notificationSent = await notifyPaymentUpdated({
       chatId: auth.customer.tg_user_id,
       orderNumber: String(currentOrder.order_number || orderId),
       status: 'Pending',
@@ -799,6 +865,12 @@ export async function PUT(request: Request) {
       paymentStatus: 'Pending Review',
       event: 'payment',
     });
+    if (!notificationSent) {
+      console.error('Payment proof was saved, but Telegram payment notification delivery failed.', {
+        orderNumber: String(currentOrder.order_number || orderId),
+        customerId: auth.customer.id,
+      });
+    }
 
     cacheStore.invalidateOrders();
 

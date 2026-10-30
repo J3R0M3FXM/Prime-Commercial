@@ -1,6 +1,7 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
+import { useEffect } from "react";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -15,25 +16,35 @@ interface WarehouseMapProps {
   lat: number;
   lon: number;
   onLocationUpdate: (lat: number, lon: number) => void;
+  interactive?: boolean;
+  showMarker?: boolean;
+}
+
+function Recenter({ position }: { position: [number, number] }) {
+  const map = useMap();
+  useEffect(() => { map.setView(position, Math.max(map.getZoom(), 14), { animate: true }); }, [map, position[0], position[1]]);
+  return null;
 }
 
 function LocationMarker({
   position,
   onLocationUpdate,
+  interactive,
+  showMarker,
 }: {
   position: [number, number];
   onLocationUpdate: (lat: number, lon: number) => void;
+  interactive: boolean;
+  showMarker: boolean;
 }) {
   useMapEvents({
-    click(e) {
-      onLocationUpdate(e.latlng.lat, e.latlng.lng);
-    },
+    ...(interactive ? { click(e: any) { onLocationUpdate(e.latlng.lat, e.latlng.lng); } } : {}),
   });
 
-  return <Marker position={position} />;
+  return showMarker ? <Marker position={position} /> : null;
 }
 
-export default function WarehouseMap({ lat, lon, onLocationUpdate }: WarehouseMapProps) {
+export default function WarehouseMap({ lat, lon, onLocationUpdate, interactive = true, showMarker = true }: WarehouseMapProps) {
   const position: [number, number] = [lat, lon];
 
   return (
@@ -46,7 +57,8 @@ export default function WarehouseMap({ lat, lon, onLocationUpdate }: WarehouseMa
         attribution="&copy; OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <LocationMarker position={position} onLocationUpdate={onLocationUpdate} />
+      <Recenter position={position} />
+      <LocationMarker position={position} onLocationUpdate={onLocationUpdate} interactive={interactive} showMarker={showMarker} />
     </MapContainer>
   );
 }

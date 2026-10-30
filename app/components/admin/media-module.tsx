@@ -62,6 +62,17 @@ const CATEGORIES = [
   "Exclusive"
 ];
 
+function readImageFile(file: File): Promise<string> {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return Promise.reject(new Error("Choose a JPG, PNG, or WEBP image."));
+  if (file.size > 700_000) return Promise.reject(new Error("Choose an image no larger than 700 KB."));
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("The image file could not be read."));
+    reader.onerror = () => reject(new Error("The image file could not be read."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function MediaModule() {
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -961,7 +972,7 @@ export default function MediaModule() {
                 />
               </div>
 
-              {/* Tags & Thumbnail URL */}
+              {/* Tags & uploaded thumbnail image */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
@@ -978,15 +989,10 @@ export default function MediaModule() {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Custom Thumbnail Image URL (optional)
+                    Thumbnail image file (optional)
                   </label>
-                  <input
-                    type="text"
-                    value={uploadThumbnail}
-                    onChange={(e) => setUploadThumbnail(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
-                  />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { const image = e.currentTarget.files?.[0]; e.currentTarget.value = ""; if (image) void readImageFile(image).then(setUploadThumbnail).catch((err) => setError(err.message)); }} className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs" />
+                  {uploadThumbnail && <div className="mt-1 flex items-center gap-2"><img src={uploadThumbnail} alt="Uploaded thumbnail preview" className="h-12 w-20 object-cover border border-slate-200"/><button type="button" onClick={() => setUploadThumbnail("")} className="text-[10px] underline">Remove image</button></div>}
                 </div>
               </div>
 
@@ -1186,15 +1192,10 @@ export default function MediaModule() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Thumbnail Image URL (optional)
+                  Thumbnail image file (optional)
                 </label>
-                <input
-                  type="url"
-                  value={importThumbnail}
-                  onChange={(e) => setImportThumbnail(e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
-                />
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { const image = e.currentTarget.files?.[0]; e.currentTarget.value = ""; if (image) void readImageFile(image).then(setImportThumbnail).catch((err) => setError(err.message)); }} className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs" />
+                {importThumbnail && <div className="mt-1 flex items-center gap-2"><img src={importThumbnail} alt="Uploaded thumbnail preview" className="h-12 w-20 object-cover border border-slate-200"/><button type="button" onClick={() => setImportThumbnail("")} className="text-[10px] underline">Remove image</button></div>}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -1305,14 +1306,10 @@ export default function MediaModule() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Thumbnail Image URL
+                  Replace thumbnail image
                 </label>
-                <input
-                  type="text"
-                  value={editingVideo.thumbnailUrl || ""}
-                  onChange={(e) => setEditingVideo({ ...editingVideo, thumbnailUrl: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs font-mono focus:outline-hidden focus:border-slate-900"
-                />
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { const image = e.currentTarget.files?.[0]; e.currentTarget.value = ""; if (image && editingVideo) void readImageFile(image).then((thumbnailUrl) => setEditingVideo({ ...editingVideo, thumbnailUrl })).catch((err) => setError(err.message)); }} className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-none text-xs" />
+                {editingVideo.thumbnailUrl && <div className="mt-1 flex items-center gap-2"><img src={editingVideo.thumbnailUrl} alt="Current video thumbnail" className="h-12 w-20 object-cover border border-slate-200"/><button type="button" onClick={() => setEditingVideo({ ...editingVideo, thumbnailUrl: "" })} className="text-[10px] underline">Remove image</button></div>}
               </div>
 
               <div className="flex items-center gap-3 pt-1">

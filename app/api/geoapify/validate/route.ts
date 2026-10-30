@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { searchAddressesTomTom, isTomTomConfigured } from '@/lib/tomtom';
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +16,53 @@ export async function POST(request: Request) {
         message: 'Delivery address text is required.',
         missingFields: ['address']
       }, { status: 400 });
+    }
+
+    // 1. Try TomTom address validation first
+    if (isTomTomConfigured()) {
+      try {
+        const tomtomResults = await searchAddressesTomTom(cleanAddress, { limit: 1 });
+        if (tomtomResults.length > 0) {
+          const top = tomtomResults[0];
+          const matchType = top.result_type?.toLowerCase() || '';
+
+          let score: "high" | "medium" | "low" = "medium";
+          let status: "verified" | "warning" | "error" = "verified";
+          let message = "Address validated against TomTom Philippines spatial database.";
+
+          if (matchType.includes('point') || matchType.includes('building') || matchType.includes('street') || matchType.includes('poi')) {
+            score = "high";
+            status = "verified";
+            message = `High precision match: ${top.formatted || cleanAddress}`;
+          } else {
+            score = "medium";
+            status = "warning";
+            message = "Broad area match. Adding specific house number, building, or landmark is recommended.";
+          }
+
+          const hasUnit = (unitDetails || '').trim().length > 0;
+          const missingFields: string[] = [];
+          if (!hasUnit && !/\d/.test(cleanAddress)) {
+            missingFields.push('unit_building');
+          }
+
+          return NextResponse.json({
+            isValid: true,
+            score,
+            status,
+            message,
+            missingFields,
+            matchDetails: {
+              type: top.result_type,
+              confidence: top.confidence || 0.9,
+              resolvedAddress: top.formatted,
+            },
+            source: 'tomtom'
+          });
+        }
+      } catch (e) {
+        console.warn("TomTom address validation error:", e);
+      }
     }
 
     if (!apiKey) {

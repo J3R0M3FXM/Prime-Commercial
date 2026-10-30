@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
-import { calculateCustomerTier, processMaturedReferrals } from '@/lib/points-system';
+import { calculateCustomerTier, processMaturedOrderPoints, processMaturedReferrals } from '@/lib/points-system';
 import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     // Referral maturity is an atomic database operation. Running it here also
     // keeps accounts correct even when the scheduled cron is temporarily absent.
     await processMaturedReferrals();
+    await processMaturedOrderPoints();
 
     const userId = customer.id;
     const finalMemberId = customer.prime_member_id || '';
@@ -155,7 +156,7 @@ export async function GET(request: Request) {
       .from('orders')
       .select('referral_points_amount')
       .eq('referred_by_user_id', userId)
-      .eq('referral_points_status', 'pending_30m');
+      .eq('referral_points_status', 'pending_24h');
     if (pendingReferralError) throw pendingReferralError;
 
     const pendingReferralPoints = (pendingReferralRows || []).reduce(

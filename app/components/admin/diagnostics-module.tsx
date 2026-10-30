@@ -163,6 +163,8 @@ export default function DiagnosticsModule() {
         return <Radio className="w-5 h-5 text-sky-500" />;
       case "telegram-bot-api":
         return <Send className="w-5 h-5 text-sky-600" />;
+      case "tomtom-api":
+        return <MapPin className="w-5 h-5 text-emerald-600" />;
       case "geoapify-api":
         return <MapPin className="w-5 h-5 text-amber-600" />;
       case "iplocate-api":

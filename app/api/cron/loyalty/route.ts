@@ -21,11 +21,16 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getSupabaseAdmin()!;
-    const { data, error } = await supabase.rpc('process_matured_referrals');
-    if (error) throw error;
+    const [{ data: referralData, error: referralError }, { data: orderPointsData, error: orderPointsError }] = await Promise.all([
+      supabase.rpc('process_matured_referrals'),
+      supabase.rpc('process_matured_order_points'),
+    ]);
+    if (referralError) throw referralError;
+    if (orderPointsError) throw orderPointsError;
 
     return NextResponse.json(
-      { success: true, processed: Number(data?.processed || 0) },
+      { success: true, referralsProcessed: Number(referralData?.processed || 0),
+        orderPointsProcessed: Number(orderPointsData?.processed || 0) },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error: any) {

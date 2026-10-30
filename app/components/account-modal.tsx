@@ -8,7 +8,6 @@ import {
   Check, 
   Award, 
   Sparkles, 
-  ArrowRight, 
   Share2, 
   RefreshCw, 
   CreditCard, 
@@ -19,14 +18,13 @@ import {
   Calendar, 
   Phone, 
   ChevronRight, 
-  Send, 
   TrendingUp, 
   ShieldCheck, 
-  Camera, 
   Info,
   ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { callServerless } from '@/lib/telegram-serverless-client';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -43,124 +41,13 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
   // Copy helper state
   const [copiedCode, setCopiedCode] = useState(false);
 
-  // Conversion state
-  const [converting, setConverting] = useState(false);
-  const [convertType, setConvertType] = useState<'purchasing' | 'referral'>('purchasing');
-  const [convertAmount, setConvertAmount] = useState<number | ''>('');
-
-  // Transfer state
-  const [transferring, setTransferring] = useState(false);
-  const [transferRecipient, setTransferRecipient] = useState('');
-  const [transferAmount, setTransferAmount] = useState<number | ''>('');
-  const [transferMsg, setTransferMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Custom photo upload state
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-
   // Referrals view modal
-  const [showReferralsList, setShowReferralsList] = useState(false);
-
-  const getLiveTelegramInitData = () => {
-    if (typeof window === 'undefined') return '';
-    const webApp = (window as any).Telegram?.WebApp;
-    return typeof webApp?.initData === 'string' ? webApp.initData.trim() : '';
-  };
-
-  const bootstrapTelegramSession = async () => {
-    const initData = getLiveTelegramInitData();
-    if (!initData) throw new Error('Telegram authentication required. Please reopen PRIME from Telegram.');
-
-    const response = await fetch('/api/auth/telegram/validate', {
-      method: 'POST',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData }),
-    });
-
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.success) {
-      throw new Error(result.error || 'Unable to restore Telegram session.');
-    }
-
-    const sessionCheck = await fetch('/api/auth/telegram/validate', {
-      method: 'GET',
-      credentials: 'include',
-      cache: 'no-store',
-    });
-    const session = await sessionCheck.json().catch(() => ({}));
-    if (!sessionCheck.ok || !session.authenticated || !session.sessionReady) {
-      throw new Error('Telegram session could not be restored. Please reopen PRIME from Telegram.');
-    }
-  };
-
-  const authenticatedFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const initData = getLiveTelegramInitData();
-    const headers = new Headers(init?.headers || {});
-    if (initData) headers.set('X-Telegram-Init-Data', initData);
-
-    let response = await fetch(input, {
-      ...init,
-      headers,
-      credentials: 'include',
-      cache: 'no-store',
-    });
-
-    if (response.status === 401) {
-      await bootstrapTelegramSession();
-
-      const retryHeaders = new Headers(init?.headers || {});
-      const retryInitData = getLiveTelegramInitData();
-      if (retryInitData) retryHeaders.set('X-Telegram-Init-Data', retryInitData);
-
-      response = await fetch(input, {
-        ...init,
-        headers: retryHeaders,
-        credentials: 'include',
-        cache: 'no-store',
-      });
-    }
-
-    return response;
-  };
-
   const fetchAccount = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Determine customer id or tgUserId from storage/session
-      let customerId = '';
-      let primeMemberId = '';
-
-      if (typeof window !== 'undefined') {
-        const storedUser = localStorage.getItem('prime_user') || sessionStorage.getItem('prime_user');
-        if (storedUser) {
-          try {
-            const parsed = JSON.parse(storedUser);
-            customerId = parsed.id || parsed.tgUserId || '';
-            primeMemberId = parsed.primeMemberId || '';
-          } catch {}
-        }
-        if (!customerId) {
-          customerId = localStorage.getItem('tg_user_id') || sessionStorage.getItem('tg_user_id') || '';
-        }
-        if (!primeMemberId) {
-          primeMemberId = localStorage.getItem('prime_member_id') || sessionStorage.getItem('prime_member_id') || '';
-        }
-      }
-
-      const params = new URLSearchParams();
-      if (customerId) params.set('customerId', customerId);
-      if (primeMemberId) params.set('primeMemberId', primeMemberId);
-
-      const res = await authenticatedFetch(`/api/account?${params.toString()}`);
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to load account profile');
-      }
-
-      const resData = await res.json();
+      const resData = await callServerless<any>('getMyAccount');
       setData(resData);
     } catch (err: any) {
       setError(err.message || 'Error loading account details');
@@ -187,110 +74,6 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
     const shareText = `Join Prime Shop! Use my referral code ${data.customer.primeMemberId} when checking out to support my membership!`;
     const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(shareText)}`;
     window.open(tgUrl, '_blank');
-  };
-
-  const handleConvertPoints = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!convertAmount || Number(convertAmount) <= 0) return;
-    try {
-      setConverting(true);
-      const res = await authenticatedFetch('/api/account/points/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId: data?.customer?.id,
-          pointsType: convertType,
-          amount: Number(convertAmount)
-        })
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Conversion failed');
-
-      alert(`Successfully converted ${result.convertedAmount} points to ₱${result.convertedAmount} Store Credits!`);
-      setConvertAmount('');
-      fetchAccount();
-    } catch (err: any) {
-      alert(err.message || 'Conversion failed');
-    } finally {
-      setConverting(false);
-    }
-  };
-
-  const handleTransferCredits = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setTransferMsg(null);
-    if (!transferRecipient.trim() || !transferAmount || Number(transferAmount) <= 0) return;
-
-    try {
-      setTransferring(true);
-      const res = await authenticatedFetch('/api/account/points/transfer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          senderCustomerId: data?.customer?.id,
-          recipientMemberId: transferRecipient.trim().toUpperCase(),
-          amount: Number(transferAmount)
-        })
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Transfer failed');
-
-      setTransferMsg({
-        type: 'success',
-        text: `Transferred ₱${result.transferredAmount} to ${result.recipientName} (${result.recipientMemberId}) successfully!`
-      });
-      setTransferRecipient('');
-      setTransferAmount('');
-      fetchAccount();
-    } catch (err: any) {
-      setTransferMsg({ type: 'error', text: err.message || 'Transfer failed' });
-    } finally {
-      setTransferring(false);
-    }
-  };
-
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Check size limit (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Photo must be smaller than 2MB');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      if (!base64 || !data?.customer?.id) return;
-
-      try {
-        setUploadingPhoto(true);
-        const res = await authenticatedFetch('/api/account', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customerId: data.customer.id,
-            photoUrl: base64
-          })
-        });
-        if (!res.ok) throw new Error('Failed to update photo');
-        
-        setData((prev: any) => ({
-          ...prev,
-          customer: {
-            ...prev.customer,
-            photoUrl: base64,
-            hasCustomPhoto: true
-          }
-        }));
-      } catch (err: any) {
-        alert(err.message || 'Error updating photo');
-      } finally {
-        setUploadingPhoto(false);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   if (!isOpen) return null;
@@ -370,19 +153,6 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                           <User className="w-8 h-8 text-gray-400" />
                         )}
                       </div>
-                      <label 
-                        className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity"
-                        title="Upload Custom Photo"
-                      >
-                        <Camera className="w-5 h-5 text-white" />
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handlePhotoUpload}
-                          disabled={uploadingPhoto}
-                          className="hidden" 
-                        />
-                      </label>
                     </div>
 
                     <div>
@@ -393,17 +163,19 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs font-mono text-gray-500">PRIME ID:</span>
+                        <span className="text-xs font-mono text-gray-500">{c?.primeMemberId ? 'PRIME ID:' : 'Visitor Badge:'}</span>
                         <span className="text-xs font-mono font-bold text-gray-900 bg-white px-2 py-0.5 border border-gray-300">
-                          {c?.primeMemberId || 'N/A'}
+                          {c?.primeMemberId || c?.visitorBadgeNo || 'VISITOR'}
                         </span>
-                        <button
-                          onClick={handleCopyCode}
-                          className="text-gray-400 hover:text-gray-700 p-1"
-                          title="Copy PRIME Member ID"
-                        >
-                          {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
+                        {c?.primeMemberId && (
+                          <button
+                            onClick={handleCopyCode}
+                            className="text-gray-400 hover:text-gray-700 p-1"
+                            title="Copy PRIME Member ID"
+                          >
+                            {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -416,6 +188,16 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                     </div>
                   </div>
                 </div>
+
+              {!c?.primeMemberId && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 p-3 sm:p-4 text-xs font-mono text-amber-900 flex items-start gap-2.5">
+                  <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block font-bold text-amber-950 uppercase text-[11px] mb-0.5">Referral Eligibility & PRIME Member ID Notice</strong>
+                    To unlock your permanent <b>PRIME Member ID</b> (your permanent system identifier and referral code) and become eligible for referral bonuses, please complete your first successful order! Once delivered/completed, your account will automatically be migrated to Customers.
+                  </div>
+                </div>
+              )}
 
                 {/* Rolling 30-day Tier Progress */}
                 <div className="mt-5 pt-4 border-t border-gray-200">
@@ -538,164 +320,52 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
               {activeTab === 'points' && (
                 <div className="space-y-6">
                   {/* Point Balances Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
+                  <div className="grid grid-cols-3 items-stretch gap-2 font-mono">
                     {/* Store Credits */}
-                    <div className="p-4 bg-emerald-50 border border-emerald-200">
-                      <div className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <CreditCard className="w-3.5 h-3.5" />
-                        Store Credits (Good as Cash)
+                    <div className="flex min-h-[104px] min-w-0 flex-col rounded-lg border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-2.5 shadow-[0_2px_5px_rgba(15,23,42,0.08)]">
+                      <div className="flex min-h-[28px] items-start gap-1 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
+                        <CreditCard className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span className="break-words">Store Credits</span>
                       </div>
-                      <div className="text-2xl font-bold text-emerald-900 mt-1">
+                      <div className="mt-1 truncate text-[15px] font-bold leading-5 text-emerald-900">
                         ₱{Number(c?.storeCredits || 0).toLocaleString()}
                       </div>
-                      <div className="text-[11px] text-emerald-600 mt-1">
-                        Applied during checkout
+                      <div className="mt-auto pt-1 text-[9px] leading-tight text-emerald-600">
+                        Good as cash
                       </div>
                     </div>
 
                     {/* Purchasing Points */}
-                    <div className="p-4 bg-gray-50 border border-gray-200">
-                      <div className="text-[10px] text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                        <ShoppingBag className="w-3.5 h-3.5 text-gray-400" />
-                        Purchasing Points
+                    <div className="flex min-h-[104px] min-w-0 flex-col rounded-lg border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-[0_2px_5px_rgba(15,23,42,0.08)]">
+                      <div className="flex min-h-[28px] items-start gap-1 text-[9px] uppercase leading-tight tracking-wide text-slate-600">
+                        <ShoppingBag className="mt-0.5 h-3 w-3 shrink-0 text-slate-500" />
+                        <span className="break-words">Purchasing Points</span>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900 mt-1">
+                      <div className="mt-1 truncate text-[15px] font-bold leading-5 text-slate-900">
                         {c?.purchasingPoints || 0}
                       </div>
-                      <div className="text-[11px] text-gray-500 mt-1">
-                        Earn 5 pts per ₱100 item spend
+                      <div className="mt-auto pt-1 text-[9px] leading-tight text-slate-500">
+                        5 pts per ₱100 spend
                       </div>
                     </div>
 
                     {/* Referral Points */}
-                    <div className="p-4 bg-gray-50 border border-gray-200">
-                      <div className="text-[10px] text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5 text-gray-400" />
-                        Referral Points
+                    <div className="flex min-h-[104px] min-w-0 flex-col rounded-lg border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-[0_2px_5px_rgba(15,23,42,0.08)]">
+                      <div className="flex min-h-[28px] items-start gap-1 text-[9px] uppercase leading-tight tracking-wide text-slate-600">
+                        <Users className="mt-0.5 h-3 w-3 shrink-0 text-slate-500" />
+                        <span className="break-words">Referral Points</span>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900 mt-1">
+                      <div className="mt-1 truncate text-[15px] font-bold leading-5 text-slate-900">
                         {c?.referralPoints || 0}
                       </div>
-                      <div className="text-[11px] text-gray-500 mt-1">
+                      <div className="mt-auto pt-1 text-[9px] leading-tight text-slate-500">
                         {c?.pendingReferralPoints ? (
-                          <span className="text-amber-600 font-semibold">{c.pendingReferralPoints} pts maturing soon</span>
+                          <span className="text-amber-600 font-semibold">{c.pendingReferralPoints} pending</span>
                         ) : (
-                          '50 pts per completed referral'
+                          'Per referral'
                         )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Convert Points to Store Credits (1:1) */}
-                  <div className="border border-gray-200 p-4 bg-white">
-                    <h4 className="text-xs font-mono uppercase font-bold text-gray-900 mb-1 flex items-center gap-1.5">
-                      <ArrowRight className="w-4 h-4 text-emerald-600" />
-                      Convert Points to Store Credits (1:1 Ratio)
-                    </h4>
-                    <p className="text-[11px] font-mono text-gray-500 mb-3">
-                      1 Point equals ₱1 in Store Credits. Credits never expire and apply directly to your orders.
-                    </p>
-
-                    <form onSubmit={handleConvertPoints} className="space-y-3 font-mono text-xs">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-gray-500 uppercase text-[10px] mb-1">Convert From</label>
-                          <select
-                            value={convertType}
-                            onChange={(e: any) => setConvertType(e.target.value)}
-                            className="w-full p-2 border border-gray-300 bg-white text-xs outline-none focus:border-emerald-600"
-                          >
-                            <option value="purchasing">Purchasing Points (Avail: {c?.purchasingPoints || 0})</option>
-                            <option value="referral">Referral Points (Avail: {c?.referralPoints || 0})</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-gray-500 uppercase text-[10px] mb-1">Points Amount</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              min={1}
-                              max={convertType === 'purchasing' ? c?.purchasingPoints || 0 : c?.referralPoints || 0}
-                              value={convertAmount}
-                              onChange={(e) => setConvertAmount(e.target.value ? Number(e.target.value) : '')}
-                              placeholder="e.g. 50"
-                              className="w-full p-2 border border-gray-300 text-xs outline-none focus:border-emerald-600"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setConvertAmount(convertType === 'purchasing' ? c?.purchasingPoints || 0 : c?.referralPoints || 0)}
-                              className="px-2.5 py-2 bg-gray-100 border border-gray-300 text-[10px] hover:bg-gray-200"
-                            >
-                              MAX
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={converting || !convertAmount}
-                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
-                      >
-                        {converting ? 'Converting...' : 'Convert to Store Credits'}
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Peer to Peer Transfer */}
-                  <div className="border border-gray-200 p-4 bg-white">
-                    <h4 className="text-xs font-mono uppercase font-bold text-gray-900 mb-1 flex items-center gap-1.5">
-                      <Send className="w-4 h-4 text-slate-700" />
-                      Transfer Store Credits to Member
-                    </h4>
-                    <p className="text-[11px] font-mono text-gray-500 mb-3">
-                      Transfer your available Store Credits to another customer using their PRIME Member ID.
-                    </p>
-
-                    {transferMsg && (
-                      <div className={`p-2.5 mb-3 text-xs font-mono border ${
-                        transferMsg.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-700'
-                      }`}>
-                        {transferMsg.text}
-                      </div>
-                    )}
-
-                    <form onSubmit={handleTransferCredits} className="space-y-3 font-mono text-xs">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-gray-500 uppercase text-[10px] mb-1">Recipient PRIME Member ID</label>
-                          <input
-                            type="text"
-                            required
-                            value={transferRecipient}
-                            onChange={(e) => setTransferRecipient(e.target.value.toUpperCase())}
-                            placeholder="e.g. PRIME-ABCD12"
-                            className="w-full p-2 border border-gray-300 text-xs uppercase tracking-wider outline-none focus:border-emerald-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-gray-500 uppercase text-[10px] mb-1">Amount (₱)</label>
-                          <input
-                            type="number"
-                            required
-                            min={1}
-                            max={c?.storeCredits || 0}
-                            value={transferAmount}
-                            onChange={(e) => setTransferAmount(e.target.value ? Number(e.target.value) : '')}
-                            placeholder="e.g. 100"
-                            className="w-full p-2 border border-gray-300 text-xs outline-none focus:border-emerald-600"
-                          />
-                        </div>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={transferring || !transferRecipient || !transferAmount || Number(c?.storeCredits || 0) <= 0}
-                        className="w-full py-2 bg-slate-900 hover:bg-black text-white font-bold text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
-                      >
-                        {transferring ? 'Processing Transfer...' : 'Send Store Credits'}
-                      </button>
-                    </form>
                   </div>
 
                   {/* Transaction Timeline */}
@@ -703,7 +373,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                     <h4 className="text-xs font-mono uppercase text-gray-500 mb-2">Points & Credits Activity Timeline</h4>
                     {(!data?.pointTransactions || data.pointTransactions.length === 0) ? (
                       <div className="p-6 border border-dashed border-gray-200 text-center text-xs font-mono text-gray-400">
-                        No transactions recorded yet. Earn points with every completed order!
+                        No point or Store Credit activity recorded yet.
                       </div>
                     ) : (
                       <div className="border border-gray-200 divide-y divide-gray-100 font-mono text-xs max-h-56 overflow-y-auto">

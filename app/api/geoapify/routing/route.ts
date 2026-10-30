@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { calculateRouteTomTom, isTomTomConfigured } from '@/lib/tomtom';
 
 export async function GET(request: Request) {
   try {
@@ -9,9 +10,47 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Missing waypoints" }, { status: 400 });
     }
 
+    // 1. Try TomTom Route Calculation
+    if (isTomTomConfigured()) {
+      try {
+        const parts = waypoints.split('|');
+        if (parts.length >= 2) {
+          const [startLat, startLon] = parts[0].split(',').map(Number);
+          const [endLat, endLon] = parts[1].split(',').map(Number);
+
+          if (Number.isFinite(startLat) && Number.isFinite(startLon) && Number.isFinite(endLat) && Number.isFinite(endLon)) {
+            const tomtomRoute = await calculateRouteTomTom(startLat, startLon, endLat, endLon, {
+              travelMode: 'motorcycle',
+              traffic: true
+            });
+
+            if (tomtomRoute) {
+              return NextResponse.json({
+                distanceKm: tomtomRoute.distanceKm,
+                durationMinutes: tomtomRoute.durationMinutes,
+                trafficDelaySeconds: tomtomRoute.trafficDelaySeconds,
+                source: tomtomRoute.source,
+                features: [
+                  {
+                    properties: {
+                      distance: tomtomRoute.distanceKm * 1000,
+                      time: tomtomRoute.durationMinutes * 60,
+                      traffic_delay: tomtomRoute.trafficDelaySeconds,
+                    }
+                  }
+                ]
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("TomTom routing calculation failed, trying fallback:", e);
+      }
+    }
+
     const apiKey = process.env.GEOAPIFY_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "Missing Geoapify API Key" }, { status: 500 });
+      return NextResponse.json({ error: "No routing API key configured (TOMTOM_API_KEY or GEOAPIFY_API_KEY)" }, { status: 500 });
     }
 
     const res = await fetch(`https://api.geoapify.com/v1/routing?waypoints=${waypoints}&mode=drive&apiKey=${apiKey}`);

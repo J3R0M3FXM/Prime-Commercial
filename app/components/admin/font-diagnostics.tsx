@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  Type, 
-  RefreshCw, 
-  CheckCircle2, 
-  AlertTriangle, 
-  XCircle, 
-  ShieldCheck, 
-  Search, 
-  Sliders, 
+import {
+  Type,
+  RefreshCw,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  ShieldCheck,
+  Search,
+  Sliders,
   ExternalLink,
   Copy,
   Check
@@ -26,13 +26,8 @@ export interface FontViolation {
 }
 
 export const ALLOWED_FONTS = [
+  "MiSans",
   "Roboto Condensed",
-  "Lato Condensed",
-  "Lato",
-  "Arial Narrow",
-  "Open Sauce Sans",
-  "Open Sauce One",
-  "SF Pro Condensed",
 ];
 
 export function isFontAllowed(computedFontFamily: string): boolean {
@@ -354,8 +349,8 @@ export default function FontDiagnostics() {
               DOM Text Elements Verified Compliant
             </h4>
             <p className="text-xs text-emerald-700 font-sans leading-relaxed">
-              All {totalScanned} text-bearing DOM elements on the storefront strictly resolve to the allowed font family stack: 
-              <strong> 'Roboto Condensed'</strong>, <strong>'Lato Condensed'</strong>, <strong>'Lato'</strong>, or <strong>'SF Pro Condensed'</strong>. No unapproved font families were discovered in the computed styles.
+              All {totalScanned} text-bearing DOM elements on the storefront resolve to the approved app typography:
+              <strong> MiSans</strong> for body text and <strong>Roboto Condensed Semibold</strong> for labels and headings. No unapproved font families were discovered in the computed styles.
             </p>
           </div>
         </div>

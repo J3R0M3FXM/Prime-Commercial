@@ -4,9 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { 
   X, 
-  ArrowLeft, 
   ArrowRight, 
-  Check, 
   MapPin, 
   Truck, 
   User, 
@@ -19,7 +17,8 @@ import {
   ChevronRight, 
   Building, 
   Receipt, 
-  Clock, 
+  Banknote,
+  Store,
   Sparkles,
   ShoppingBag,
   Copy,
@@ -40,9 +39,18 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
-import { getClientFingerprint, getOrCreateSessionToken, getClientLocation } from "./fingerprint-collector";
+import { getClientFingerprint, getOrCreateSessionToken, getFreshClientLocation } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import { authenticatedFetch } from "./telegram-auth-client";
+import TelegramMediaImage from "./telegram-media-image";
+import {
+  callServerless,
+  clearPendingServerlessCheckoutKey,
+  getOrCreateServerlessCheckoutKey,
+  hasTelegramServerlessBridge,
+  resolveTelegramMedia,
+  uploadPaymentReceiptDataUrl,
+} from "@/lib/telegram-serverless-client";
 
 // Dynamic map import to ensure zero SSR conflicts
 const AddressPickerMap = dynamic(() => import("./address-picker-map"), {
@@ -71,10 +79,41 @@ export function formatPhoneNumber(val: string): string {
   return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
 }
 
+function formatPaymentDeadline(value: string | number): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "—";
+  const day = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric",
+  }).format(date);
+  const time = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit", hour12: true,
+  }).format(date);
+  return `${day} ${time}`;
+}
+
 // Convert courier name to Title Case nicely (e.g. LALAMOVE -> Lalamove)
 export function formatCourierName(name: string): string {
   if (!name) return "";
   return name.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function CourierTileLogo({ reference, name, selected }: { reference: string; name: string; selected: boolean }) {
+  const [src, setSrc] = useState("");
+  const [failed, setFailed] = useState(!reference);
+
+  useEffect(() => {
+    let active = true;
+    setSrc("");
+    setFailed(!reference);
+    if (!reference) return () => { active = false; };
+    resolveTelegramMedia(reference)
+      .then((url) => { if (active) setSrc(url); })
+      .catch(() => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, [reference]);
+
+  if (failed || !src) return <Truck className={`relative z-[2] h-8 w-8 ${selected ? "text-slate-500" : "text-slate-300"}`} aria-hidden="true" />;
+  return <img src={src} alt={name} className="absolute inset-0 z-[2] h-full w-full object-contain" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 }
 
 export default function CheckoutModal({
@@ -103,13 +142,46 @@ export default function CheckoutModal({
   const proofInputRef = useRef<HTMLInputElement>(null);
   const [isPreviewProofOpen, setIsPreviewProofOpen] = useState(false);
 
-  // Receipt OCR Analysis State (GPT-5.3 Multimodal Vision OCR)
+  // Receipt forensics state; no OCR or payment decision is performed here.
   const [isAnalyzingReceipt, setIsAnalyzingReceipt] = useState(false);
   const [ocrAnalysis, setOcrAnalysis] = useState<any>(null);
   const [ocrError, setOcrError] = useState<string>("");
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen || !overlayRef.current) return;
+    const checkoutRoot = overlayRef.current;
+    const pageHeader = document.querySelector("body > div header") || document.querySelector("header");
+    const navigation = document.querySelector("nav.fixed");
+    const visualViewport = window.visualViewport;
+
+    const updateBounds = () => {
+      const headerBottom = pageHeader?.getBoundingClientRect().bottom ?? 0;
+      const navigationTop = navigation?.getBoundingClientRect().top;
+      const baseBottom = typeof navigationTop === "number"
+        ? Math.max(0, window.innerHeight - navigationTop + 8)
+        : 108;
+      const keyboardInset = visualViewport
+        ? Math.max(0, window.innerHeight - (visualViewport.offsetTop + visualViewport.height))
+        : 0;
+      checkoutRoot.style.setProperty("--prime-checkout-top", `${Math.max(0, headerBottom)}px`);
+      checkoutRoot.style.setProperty("--prime-checkout-bottom", `${Math.max(baseBottom, keyboardInset)}px`);
+    };
+
+    updateBounds();
+    window.addEventListener("resize", updateBounds);
+    visualViewport?.addEventListener("resize", updateBounds);
+    visualViewport?.addEventListener("scroll", updateBounds);
+    return () => {
+      window.removeEventListener("resize", updateBounds);
+      visualViewport?.removeEventListener("resize", updateBounds);
+      visualViewport?.removeEventListener("scroll", updateBounds);
+      checkoutRoot.style.removeProperty("--prime-checkout-top");
+      checkoutRoot.style.removeProperty("--prime-checkout-bottom");
+    };
+  }, [isOpen]);
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -135,9 +207,10 @@ export default function CheckoutModal({
     username: "",
     primeMemberId: "",
     contactNumber: "",
-    tier: "SILVER",
+    tier: "",
   });
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [isLoadingTier, setIsLoadingTier] = useState(false);
 
   // Step 1: Receiver Details
   const [receiverName, setReceiverName] = useState("");
@@ -154,9 +227,11 @@ export default function CheckoutModal({
     lat: 14.5995,
     lon: 120.9842,
   });
+  const [pinDropArmed, setPinDropArmed] = useState(false);
   const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [addressError, setAddressError] = useState("");
+  const [locationNotice, setLocationNotice] = useState("");
   const [addressValidation, setAddressValidation] = useState<AddressValidationResult | null>(null);
   const [isValidatingAddress, setIsValidatingAddress] = useState<boolean>(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -206,6 +281,8 @@ export default function CheckoutModal({
   const [availableCouriers, setAvailableCouriers] = useState<any[]>([]);
   const [selectedCourierId, setSelectedCourierId] = useState<string>("");
   const [calculatedDistance, setCalculatedDistance] = useState<number>(0);
+  const [estimatedTravelMinutes, setEstimatedTravelMinutes] = useState<number | null>(null);
+  const [trafficEstimateType, setTrafficEstimateType] = useState<string>("unavailable");
   const [isLoadingCouriers, setIsLoadingCouriers] = useState<boolean>(false);
   const [courierFetchError, setCourierFetchError] = useState<string>("");
   const [deliveryPaymentMethod, setDeliveryPaymentMethod] = useState<"upon_checkout" | "upon_delivery" | "">("");
@@ -213,6 +290,7 @@ export default function CheckoutModal({
   // Step 4: Admin Charges State
   const [activeCharges, setActiveCharges] = useState<any[]>([]);
   const [isLoadingCharges, setIsLoadingCharges] = useState<boolean>(false);
+  const [chargesLoadError, setChargesLoadError] = useState("");
   const [customerNotes, setCustomerNotes] = useState<string>("");
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string>("");
@@ -286,7 +364,21 @@ export default function CheckoutModal({
         username: resolvedUsername,
         primeMemberId: storedMemberId,
         contactNumber: resolvedPhone,
+        tier: "",
       });
+
+      // This read-only endpoint returns only the verified member's tier; account
+      // summary endpoints also reconcile ledgers and are not used for this value.
+      if (hasTelegramServerlessBridge()) {
+        setIsLoadingTier(true);
+        void callServerless<{ tier?: string }>("getMyTier", {}, 10_000)
+          .then((result) => {
+            const tier = String(result?.tier || "").trim();
+            setTgCustomer((prev) => ({ ...prev, tier: tier.toUpperCase() }));
+          })
+          .catch(() => setTgCustomer((prev) => ({ ...prev, tier: "" })))
+          .finally(() => setIsLoadingTier(false));
+      }
 
       // Synchronize directly with Firestore customer record to guarantee primeMemberId hydration
       if (resolvedId) {
@@ -352,30 +444,30 @@ export default function CheckoutModal({
     }
   }, [isOpen]);
 
-  // Fetch admin configured charges with fresh no-cache fetch
+  // Fetch the same active charge configuration used by the Serverless order writer.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || currentStep !== 4) return;
     const fetchCharges = async () => {
       try {
         setIsLoadingCharges(true);
-        const res = await authenticatedFetch(`/api/charges?_t=${Date.now()}`, {
-          cache: "no-store",
-          headers: { "Pragma": "no-cache" }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setActiveCharges(data);
-          }
-        }
+        setChargesLoadError("");
+        const data = hasTelegramServerlessBridge()
+          ? await callServerless<any[]>("getPublicCharges", {})
+          : await authenticatedFetch(`/api/charges?_t=${Date.now()}`, { cache: "no-store", headers: { "Pragma": "no-cache" } }).then(async (response) => {
+              if (!response.ok) throw new Error("The current charge list was unavailable.");
+              return response.json();
+            });
+        if (!Array.isArray(data)) throw new Error("The current charge list was unavailable.");
+        setActiveCharges(data);
       } catch (e) {
         console.warn("Could not fetch active charges", e);
+        setChargesLoadError("Could not load the current configured charges. Retry checkout before submitting to avoid an inaccurate total.");
       } finally {
         setIsLoadingCharges(false);
       }
     };
     fetchCharges();
-  }, [isOpen]);
+  }, [isOpen, currentStep]);
 
   // Fetch active payment methods when step becomes 5 (order placed) or when modal opens
   useEffect(() => {
@@ -383,19 +475,14 @@ export default function CheckoutModal({
     const fetchPaymentMethods = async () => {
       try {
         setIsLoadingPaymentMethods(true);
-        const res = await authenticatedFetch(`/api/payment-methods?_t=${Date.now()}`, {
-          cache: "no-store",
-          headers: { "Pragma": "no-cache" }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            // Keep all payment methods (active and offline for customer visibility)
-            setPaymentMethods(data);
-          }
-        }
+        const data = await callServerless<any[]>("getPublicPaymentMethods", {});
+        const receiptTypes = new Set(["qr_code", "manual_transfer", "crypto", "secured_payment_link"]);
+        setPaymentMethods((Array.isArray(data) ? data : []).filter((method) =>
+          receiptTypes.has(String(method?.paymentType || method?.type || "").toLowerCase()) && method?.isActive !== false
+        ));
       } catch (e) {
         console.warn("Could not fetch payment methods:", e);
+        setPaymentMethods([]);
       } finally {
         setIsLoadingPaymentMethods(false);
       }
@@ -409,11 +496,13 @@ export default function CheckoutModal({
   useEffect(() => {
     if (!isOpen) {
       setCurrentStep(1);
+      setPinDropArmed(false);
       setReceiverName("");
       setReceiverPhone("");
       setDeviceGps(null);
       setDeviceGpsAddress("");
       setDeviceGpsAddressLoading(false);
+      setLocationNotice("");
       setSelectedPaymentMethod(null);
       setSelectedCourierId("");
       setDeliveryPaymentMethod("");
@@ -526,18 +615,15 @@ export default function CheckoutModal({
 
     if (localResult.isValid && targetAddr && targetAddr.trim().length >= 5) {
       try {
-        const res = await authenticatedFetch("/api/geoapify/validate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            address: targetAddr,
-            unitDetails: unit,
-            lat: currentCoords.lat,
-            lon: currentCoords.lon,
-          }),
-        });
-        if (res.ok) {
-          const apiData = await res.json();
+        const apiData = await callServerless<any>("geoapifyAddress", {
+          action: "validate",
+          address: targetAddr,
+          text: targetAddr,
+          unitDetails: unit,
+          lat: currentCoords.lat,
+          lon: currentCoords.lon,
+        }, 20_000);
+        if (apiData) {
           setAddressValidation((prev) => ({
             ...prev,
             ...apiData,
@@ -583,11 +669,13 @@ export default function CheckoutModal({
     setIsSearchingAddress(true);
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const res = await authenticatedFetch(`/api/geoapify/autocomplete?text=${encodeURIComponent(query)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setAddressSuggestions(data.results || []);
-        }
+        const data = await callServerless<{ results?: any[] }>("geoapifyAddress", {
+          action: "autocomplete",
+          text: query,
+          lat: coords.lat,
+          lon: coords.lon,
+        }, 20_000);
+        setAddressSuggestions(Array.isArray(data?.results) ? data.results : []);
       } catch (err) {
         console.error("Autocomplete fetch error:", err);
       } finally {
@@ -602,6 +690,8 @@ export default function CheckoutModal({
     setSelectedAddress(formatted);
     setAddressSearch(formatted);
     setAddressSuggestions([]);
+    setAddressError("");
+    setLocationNotice("");
     
     if (item.lat && item.lon) {
       const newCoords = { lat: item.lat, lon: item.lon };
@@ -614,9 +704,10 @@ export default function CheckoutModal({
   // Reverse Geocoding Helper
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
-      const res = await authenticatedFetch(`/api/geoapify/reverse?lat=${lat}&lon=${lon}`);
-      if (res.ok) {
-        const data = await res.json();
+      const data = await callServerless<{ results?: any[] }>("geoapifyAddress", {
+        action: "reverse", lat, lon,
+      }, 20_000);
+      if (data) {
         if (data.results && data.results.length > 0) {
           const formatted = data.results[0].formatted || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
           setSelectedAddress(formatted);
@@ -633,6 +724,8 @@ export default function CheckoutModal({
   const handleLocationChange = (lat: number, lon: number) => {
     setCoords({ lat, lon });
     setHasSelectedAddress(true);
+    setAddressError("");
+    setLocationNotice("");
     reverseGeocode(lat, lon);
     fetchCouriersForLocation(lat, lon);
   };
@@ -640,9 +733,10 @@ export default function CheckoutModal({
   const reverseGeocodeDeviceGps = async (lat: number, lon: number) => {
     try {
       setDeviceGpsAddressLoading(true);
-      const res = await authenticatedFetch(`/api/geoapify/reverse?lat=${lat}&lon=${lon}`, { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await callServerless<{ results?: any[] }>("geoapifyAddress", {
+        action: "reverse", type: "building", lat, lon,
+      }, 20_000);
+      if (data) {
         const formatted = String(data?.results?.[0]?.formatted || "").trim();
         if (formatted) setDeviceGpsAddress(formatted);
       }
@@ -658,9 +752,11 @@ export default function CheckoutModal({
   const handleUseMyLocation = async () => {
     setIsLocating(true);
     setAddressError("");
+    setLocationNotice("");
+    setDeviceGps(null);
 
     try {
-      const location = await getClientLocation(60000, true);
+      const location = await getFreshClientLocation(12000, true);
       const lat = Number(location?.lat);
       const lon = Number(location?.lon);
 
@@ -670,58 +766,46 @@ export default function CheckoutModal({
         !Number.isFinite(lon) ||
         (lat === 0 && lon === 0)
       ) {
-        throw new Error("Unable to retrieve your precise location. Please allow location access and try again.");
+        throw new Error("Phone location is unavailable. Search for your address or move the map pin; GPS is not required to continue.");
       }
+
+      const reportedAccuracy = Number(location.accuracy);
+      const hasOrderGradeAccuracy = Number.isFinite(reportedAccuracy) && reportedAccuracy > 0 && reportedAccuracy <= 20;
 
       const capturedAt = new Date().toISOString();
       let reverseGeocodedAddress = "";
 
-      try {
-        setDeviceGpsAddressLoading(true);
-        const res = await authenticatedFetch(
-          `/api/geoapify/reverse?lat=${lat}&lon=${lon}`,
-          { cache: "no-store" },
-        );
-        if (res.ok) {
-          const data = await res.json();
-          reverseGeocodedAddress = String(data?.results?.[0]?.formatted || "").trim();
-        }
-      } catch (error) {
-        console.warn("Use My Location reverse geocode failed:", error);
-      } finally {
-        setDeviceGpsAddressLoading(false);
-      }
-
-      const snapshot = {
+      setDeviceGps(hasOrderGradeAccuracy ? {
         lat,
         lon,
-        accuracy: Number.isFinite(Number(location.accuracy))
-          ? Number(location.accuracy)
-          : undefined,
+        accuracy: reportedAccuracy,
         source: "Use My Location snapshot",
         capturedAt,
         reverseGeocodedAddress,
-      };
-
-      setDeviceGps(snapshot);
+      } : null);
+      setLocationNotice("Location updated. Confirm the pin and address.");
       setDeviceGpsAddress(reverseGeocodedAddress);
       setCoords({ lat, lon });
       setHasSelectedAddress(true);
 
-      if (reverseGeocodedAddress) {
-        setSelectedAddress(reverseGeocodedAddress);
-        setAddressSearch(reverseGeocodedAddress);
-      } else {
-        await reverseGeocode(lat, lon);
-      }
+      setDeviceGpsAddressLoading(true);
+      void callServerless<{ results?: any[] }>("geoapifyAddress", {
+        action: "reverse", type: "building", lat, lon,
+      }, 12_000).then((data) => {
+        const formatted = String(data?.results?.[0]?.formatted || "").trim();
+        if (formatted) {
+          setDeviceGpsAddress(formatted);
+          setSelectedAddress(formatted);
+          setAddressSearch(formatted);
+        }
+      }).catch(() => {
+        void reverseGeocode(lat, lon);
+      }).finally(() => setDeviceGpsAddressLoading(false));
 
       fetchCouriersForLocation(lat, lon);
     } catch (error: any) {
       console.warn("Use My Location failed:", error);
-      setAddressError(
-        error?.message ||
-        "Unable to retrieve your location. Please allow location access or type your address.",
-      );
+      setAddressError(error?.message || "Phone location is unavailable. Search for your address or move the map pin; GPS is not required to continue.");
     } finally {
       setIsLocating(false);
     }
@@ -733,19 +817,13 @@ export default function CheckoutModal({
       setIsLoadingCouriers(true);
       setCourierFetchError("");
 
-      const res = await authenticatedFetch("/api/checkout/delivery-fee", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destinationLat: lat, destinationLon: lon }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to calculate courier rates");
-      }
-
-      const data = await res.json();
+      const data = await callServerless<any>("getDeliveryQuote", {
+        destinationLat: lat,
+        destinationLon: lon,
+      }, 20_000);
       setCalculatedDistance(data.distanceKm || 0);
+      setEstimatedTravelMinutes(Number.isFinite(Number(data.routeTimeMinutes)) ? Number(data.routeTimeMinutes) : null);
+      setTrafficEstimateType(String(data.trafficModel || "unavailable"));
 
       const couriersList = Array.isArray(data.couriers) && data.couriers.length > 0
         ? data.couriers
@@ -856,58 +934,62 @@ export default function CheckoutModal({
     return payableNow;
   }, [completedOrder, payableNow]);
 
-  // High-Precision GPT-5.3 Multimodal Vision OCR Scanner
+  // Hash the selected file and a normalized pixel sample. This records
+  // comparison evidence only; it does not authenticate a receipt or approve payment.
   const analyzeReceiptImage = async (base64Image: string) => {
     if (!base64Image) return;
+    const analysisStartedAt = Date.now();
+    const waitForMinimumScanDuration = async () => {
+      const remaining = Math.max(0, 15_000 - (Date.now() - analysisStartedAt));
+      if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+    };
     try {
       setIsAnalyzingReceipt(true);
       setOcrError("");
-      const res = await authenticatedFetch("/api/ocr/analyze-receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: base64Image,
-          expectedAmount: currentPayableNow,
-          paymentMethodName: selectedPaymentMethod?.name || "",
-          orderNumber: completedOrder?.orderNumber || completedOrder?.id || "",
-          receiverName: receiverName || "",
-        }),
-      });
+      setOcrAnalysis(null);
+      const [, encoded = ""] = base64Image.split(",", 2);
+      if (!encoded || !globalThis.crypto?.subtle) throw new Error("Automated image analysis is unavailable. Please try selecting the receipt again.");
+      const binary = atob(encoded);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+      const rawDigest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+      const rawImageSha256 = Array.from(new Uint8Array(rawDigest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
-      const data = await res.json();
-      if (res.ok && data.success && data.analysis) {
-        setOcrAnalysis(data.analysis);
-      } else {
-        // Non-blocking fallback ensuring seamless flow
-        setOcrAnalysis({
-          referenceNumber: `REF-${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-          amountPaid: currentPayableNow,
-          detectedCurrency: "PHP",
-          paymentProvider: selectedPaymentMethod?.name || "E-Wallet",
-          transactionDate: new Date().toLocaleString("en-PH"),
-          confidenceScore: 92,
-          matchStatus: "MATCHED",
-          rawSummary: "Receipt scanned and queued for administrative manual review.",
-          model: "GPT-5.3 (Multimodal Vision OCR)",
-          analyzedAt: new Date().toISOString(),
-          requiresManualReview: true,
-        });
-      }
-    } catch (e: any) {
-      console.warn("Receipt OCR analysis exception:", e);
-      setOcrAnalysis({
-        referenceNumber: `REF-${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-        amountPaid: currentPayableNow,
-        detectedCurrency: "PHP",
-        paymentProvider: selectedPaymentMethod?.name || "E-Wallet",
-        transactionDate: new Date().toLocaleString("en-PH"),
-        confidenceScore: 88,
-        matchStatus: "PENDING_MANUAL_REVIEW",
-        rawSummary: "Receipt image uploaded and prepared for manual verification.",
-        model: "GPT-5.3 (Multimodal Vision OCR)",
-        analyzedAt: new Date().toISOString(),
-        requiresManualReview: true,
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error("The selected receipt image could not be analyzed."));
+        element.src = base64Image;
       });
+      const scale = Math.min(1, 256 / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("The selected receipt image could not be analyzed.");
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const pixelBytes = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      const pixelDigest = await globalThis.crypto.subtle.digest("SHA-256", pixelBytes);
+      const pixelFingerprintSha256 = Array.from(new Uint8Array(pixelDigest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      const analysis = {
+        model: "PRIME Image Forensics v1",
+        rawImageSha256,
+        scanImageSha256: rawImageSha256,
+        pixelFingerprintSha256,
+        imageWidth: image.naturalWidth,
+        imageHeight: image.naturalHeight,
+        imageByteLength: bytes.length,
+        analyzedAt: new Date().toISOString(),
+        matchStatus: "ANALYSIS_COMPLETED",
+        forensicsResult: "Image hashes and a normalized pixel sample are ready. Exact reuse and replacement comparisons are checked during secure upload; staff must still verify the payment manually.",
+        requiresManualReview: true,
+      };
+      await waitForMinimumScanDuration();
+      setOcrAnalysis(analysis);
+    } catch (e: any) {
+      await waitForMinimumScanDuration();
+      console.warn("Receipt image analysis failed:", e);
+      setOcrError(e?.message || "Receipt image analysis failed. Please re-scan the image.");
     } finally {
       setIsAnalyzingReceipt(false);
     }
@@ -924,39 +1006,35 @@ export default function CheckoutModal({
     setPromoError("");
     try {
       const fpData = await getClientFingerprint();
-      const fingerprintSnapshot = {
-        ...fpData,
-        deviceGps: deviceGps ? {
-          lat: deviceGps.lat,
-          lon: deviceGps.lon,
-          accuracy: deviceGps.accuracy,
-          source: deviceGps.source || "Precise GPS",
-          capturedAt: new Date().toISOString(),
-          reverseGeocodedAddress: deviceGpsAddress || null,
-        } : null,
-      };
       const totalItemCount = selectedItems.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
-      const res = await authenticatedFetch("/api/promos/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: cleanCode,
-          itemsSubtotal,
-          itemQuantity: totalItemCount,
-          totalItems: totalItemCount,
-          deliveryFee: courierDeliveryFee,
-          customerId: tgCustomer.id,
-          primeMemberId: tgCustomer.primeMemberId,
-          customerTier: tgCustomer.tier || 'SILVER',
-          paymentMethod: deliveryPaymentMethod === 'upon_delivery' ? 'upon_delivery' : 'upon_checkout',
-          courierId: selectedCourier?.id || selectedCourierId,
-          deviceId: fpData.deviceId,
-          hardwareId: fpData.hardwareId,
-          sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id)
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.valid) {
+      const promoRequest = {
+        code: cleanCode,
+        itemsSubtotal,
+        itemQuantity: totalItemCount,
+        totalItems: totalItemCount,
+        deliveryFee: courierDeliveryFee,
+        customerId: tgCustomer.id,
+        primeMemberId: tgCustomer.primeMemberId,
+        customerTier: tgCustomer.tier || 'SILVER',
+        paymentMethod: deliveryPaymentMethod === 'upon_delivery' ? 'upon_delivery' : 'upon_checkout',
+        courierId: selectedCourier?.id || selectedCourierId,
+        deviceId: fpData.deviceId,
+        hardwareId: fpData.hardwareId,
+        sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id)
+      };
+      let data: any;
+      if (hasTelegramServerlessBridge()) {
+        data = await callServerless<any>("validatePromo", promoRequest, 20_000);
+      } else {
+        const res = await authenticatedFetch("/api/promos/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(promoRequest),
+        });
+        data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "We couldn't check this code. Please try again.");
+      }
+      if (!data?.valid) {
         setPromoError(data.error || "Invalid promo code.");
         return;
       }
@@ -979,7 +1057,7 @@ export default function CheckoutModal({
       });
       setPromoCodeInput("");
     } catch (err: any) {
-      setPromoError(err.message || "Failed to validate promo code.");
+      setPromoError("We couldn't check this code right now. Please try again.");
     } finally {
       setIsCheckingPromo(false);
     }
@@ -1083,6 +1161,10 @@ export default function CheckoutModal({
 
   // Submit Order to API
   const handleSubmitOrder = async () => {
+    if (chargesLoadError || isLoadingCharges) {
+      setSubmitError("Wait for the current configured charges to load before submitting your order.");
+      return;
+    }
     const normalizedReceiverName = String(receiverName || "").trim();
     const normalizedReceiverPhone = String(receiverPhone || "").trim();
     if (!normalizedReceiverName || !normalizedReceiverPhone) {
@@ -1102,9 +1184,34 @@ export default function CheckoutModal({
       return;
     }
 
+    let activeOperationKey = "";
     try {
       setIsSubmittingOrder(true);
       setSubmitError("");
+
+      // Match the total shown to the customer to the canonical charge, promo,
+      // courier, and credit calculation used by createOrder.
+      const freshCharges = hasTelegramServerlessBridge()
+        ? await callServerless<any[]>("getPublicCharges", {})
+        : await authenticatedFetch(`/api/charges?_t=${Date.now()}`, { cache: "no-store", headers: { "Pragma": "no-cache" } }).then(async (response) => {
+            if (!response.ok) throw new Error("The current charge list was unavailable.");
+            return response.json();
+          });
+      if (!Array.isArray(freshCharges)) throw new Error("The current charge list was unavailable.");
+      setActiveCharges(freshCharges);
+      setChargesLoadError("");
+      const freshChargeBreakdown = calculateChargesBreakdown(freshCharges, itemsSubtotal);
+      const reviewEffectiveDeliveryFee = appliedPromo?.isFreeShipping ? 0
+        : Math.max(0, courierDeliveryFee - Number(appliedPromo?.shippingSubsidy || 0));
+      const reviewPayableBeforeCredits = Math.max(0, itemsSubtotal - promoDiscountAmount) + freshChargeBreakdown.totalChargesAmount +
+        (deliveryPaymentMethod === "upon_checkout" ? reviewEffectiveDeliveryFee : 0);
+      const reviewCredits = Math.min(useStoreCredits ? availableStoreCredits : 0, reviewPayableBeforeCredits);
+      const reviewPayableNow = Math.max(0, reviewPayableBeforeCredits - reviewCredits);
+      const reviewPayableOnDelivery = deliveryPaymentMethod === "upon_delivery" ? reviewEffectiveDeliveryFee : 0;
+      const reviewTotal = reviewPayableNow + reviewPayableOnDelivery;
+      if (Math.abs(reviewTotal - overallOrderValue) > 0.01) {
+        throw new Error("The current total changed while checkout was open. Review the updated charges and submit again.");
+      }
 
       const fpData = await getClientFingerprint();
 
@@ -1174,6 +1281,9 @@ export default function CheckoutModal({
         totalAmount: overallOrderValue,
         payableNow,
         payableOnDelivery,
+        expectedTotalAmount: reviewTotal,
+        expectedPayableNow: reviewPayableNow,
+        expectedPayableOnDelivery: reviewPayableOnDelivery,
         promoCode: appliedPromo ? appliedPromo.code : null,
         promoDiscount: promoDiscountAmount,
         promoTitle: appliedPromo?.title || null,
@@ -1194,18 +1304,31 @@ export default function CheckoutModal({
         },
       };
 
-      const res = await authenticatedFetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderData),
-      });
+      let orderResult: any;
+      if (hasTelegramServerlessBridge()) {
+        const operationKey = getOrCreateServerlessCheckoutKey(String(tgCustomer.id));
+        activeOperationKey = operationKey;
+        orderResult = await callServerless<any>("createOrder", {
+          ...orderData,
+          operationKey,
+        }, 60_000);
+        if (!orderResult || orderResult.success === false) {
+          throw new Error(orderResult?.error || "We couldn't submit your order. Please try again.");
+        }
+        clearPendingServerlessCheckoutKey(String(tgCustomer.id), operationKey);
+      } else {
+        const res = await authenticatedFetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(orderData),
+        });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to submit order.");
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to submit order.");
+        }
+        orderResult = await res.json();
       }
-
-      const orderResult = await res.json();
       setCompletedOrder(orderResult);
 
       // Save to localStorage for instant customer Order History accessibility
@@ -1223,6 +1346,9 @@ export default function CheckoutModal({
 
     } catch (err: any) {
       console.error("Order submission failed:", err);
+      if (activeOperationKey && String(err?.message || "").includes("payable amount changed while checkout was open")) {
+        clearPendingServerlessCheckoutKey(String(tgCustomer.id), activeOperationKey);
+      }
       setSubmitError(err.message || "Order submission failed. Please try again.");
     } finally {
       setIsSubmittingOrder(false);
@@ -1234,34 +1360,29 @@ export default function CheckoutModal({
   return (
     <div ref={overlayRef} className="prime-checkout w-full bg-gray-50 flex justify-center py-0">
       <div 
-        className="bg-white w-full max-w-[760px] shadow-sm border-x border-gray-200 overflow-hidden flex flex-col"
+        className="prime-checkout__dialog bg-white w-full shadow-sm overflow-hidden flex flex-col"
         role="dialog"
-        aria-modal="true"
+        aria-modal="false"
       >
         {/* Header with Step Tracker */}
-        <div className="border-b border-gray-100 bg-white px-3.5 py-2.5 sticky top-0 z-30 flex items-center justify-between">
+        <div className="prime-checkout__header border-b border-gray-100 bg-white px-2.5 sticky top-0 z-30 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {currentStep > 1 && currentStep < 5 && (
-              <button
-                onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
-                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors cursor-pointer"
-                title="Go back"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-            )}
-            <div>
-              {currentStep < 5 && (
-                <div className="text-xs text-gray-500 font-mono">
-                  {Math.min(currentStep, 4)}/4
-                </div>
-              )}
-              <h2 className="text-lg font-heading font-bold text-gray-900 tracking-wide uppercase mt-0.5">
-                {currentStep === 1 && "Identity & Receiver Info"}
-                {currentStep === 2 && "Delivery Address & Pin"}
-                {currentStep === 3 && "Courier & Delivery Option"}
-                {currentStep === 4 && "Order Breakdown & Confirm"}
-                {currentStep === 5 && "Order Submitted - Awaiting Payment"}
+            <div className="min-w-0 flex-1">
+              <h2 className="prime-checkout__title text-base font-heading font-bold text-gray-900 uppercase">
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  {currentStep === 1 && <User className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                  {currentStep === 2 && <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                  {currentStep === 3 && <Truck className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                  {currentStep === 4 && <Receipt className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                  {currentStep === 5 && <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                  <span className="truncate">
+                    {currentStep === 1 && "Customer & Receiver Details"}
+                    {currentStep === 2 && "Delivery Details"}
+                    {currentStep === 3 && "Delivery & Handling"}
+                    {currentStep === 4 && "Review"}
+                    {currentStep === 5 && "Order Submitted"}
+                  </span>
+                </span>
               </h2>
             </div>
           </div>
@@ -1275,18 +1396,8 @@ export default function CheckoutModal({
           </button>
         </div>
 
-        {/* Progress bar */}
-        {currentStep < 5 && (
-          <div className="w-full bg-gray-100 h-1">
-            <div
-              className="bg-black h-1 transition-all duration-300 ease-out"
-              style={{ width: `${(currentStep / 4) * 100}%` }}
-            />
-          </div>
-        )}
-
         {/* Modal Scrollable Content */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-2.5">
+        <div ref={scrollContainerRef} className="prime-checkout__scroll flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-2.5">
 
           {/* ================= STEP 1: IDENTITY & RECEIVER ================= */}
           {currentStep === 1 && (
@@ -1339,20 +1450,20 @@ export default function CheckoutModal({
                       type="text"
                       readOnly
                       value={tgCustomer.primeMemberId || (isLoadingProfile ? "Loading..." : "No ID")}
-                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs font-mono font-bold text-amber-800 cursor-default focus:outline-none"
+                      className="prime-checkout__field-value w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs font-mono font-bold text-amber-800 cursor-default focus:outline-none"
                     />
                   </div>
 
-                  {/* Linked Phone Number (Right) */}
+                  {/* Membership Tier (Right) */}
                   <div className="space-y-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
-                      Linked Phone No.
+                      Membership Tier
                     </label>
                     <input
                       type="text"
                       readOnly
-                      value={tgCustomer.contactNumber ? formatPhoneNumber(tgCustomer.contactNumber) : "No Phone No. Linked"}
-                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs font-mono text-gray-700 cursor-default focus:outline-none"
+                      value={tgCustomer.tier ? `${tgCustomer.tier.charAt(0)}${tgCustomer.tier.slice(1).toLowerCase()}` : (isLoadingTier ? "Loading..." : "Unavailable")}
+                      className="prime-checkout__field-value w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs font-mono text-gray-700 cursor-default focus:outline-none"
                     />
                   </div>
                 </div>
@@ -1418,19 +1529,16 @@ export default function CheckoutModal({
           {/* ================= STEP 2: ADDRESS & MAP ================= */}
           {currentStep === 2 && (
             <div className="space-y-2.5">
-              <div className="border-b border-gray-100 pb-2">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 font-heading">
-                  Delivery Destination & Location
-                </h3>
-                <p className="text-xs text-gray-500 font-mono">
-                  Search address or pinpoint your exact gate/drop-off point on the map
-                </p>
-              </div>
-
               {addressError && (
                 <div className="text-xs font-mono text-red-600 flex items-center gap-1.5 py-1">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>{addressError}</span>
+                </div>
+              )}
+              {locationNotice && (
+                <div className="prime-checkout__location-notice flex items-center gap-1.5 border border-sky-200 bg-sky-50 px-2 py-1.5 text-xs leading-tight text-sky-900">
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{locationNotice}</span>
                 </div>
               )}
 
@@ -1482,6 +1590,38 @@ export default function CheckoutModal({
                 )}
               </div>
 
+              {/* Keep unit and landmark details beside address search, before the map. */}
+              <div className="space-y-1 pt-0.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
+                  Unit, Floor, Building or Landmark
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                    <Building className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={unitDetails}
+                    onChange={(e) => setUnitDetails(e.target.value)}
+                    placeholder="e.g. Unit 402, Tower B, near the main gate"
+                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 font-heading">
+                  Rider Instructions (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={customerNotes}
+                  onChange={(e) => setCustomerNotes(e.target.value)}
+                  placeholder="Gate codes, landmarks, or delivery preferences..."
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-none text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+                />
+              </div>
+
               {/* Rectangular Map Container with Zoom, Drag, Use My Location, & Drop Pin */}
               <div className="space-y-1 relative z-0">
                 <AddressPickerMap
@@ -1490,6 +1630,8 @@ export default function CheckoutModal({
                   onLocationChange={handleLocationChange}
                   onUseMyLocation={handleUseMyLocation}
                   isLocating={isLocating}
+                  pinDropArmed={pinDropArmed}
+                  onPinDropArmedChange={setPinDropArmed}
                 />
               </div>
 
@@ -1501,31 +1643,12 @@ export default function CheckoutModal({
                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block font-heading">
                       Selected Delivery Location
                     </span>
-                    <p className="text-xs font-mono text-gray-900 break-words mt-0.5 font-medium">
+                    <p className="text-xs font-mono text-gray-900 break-words mt-0.5">
                       {selectedAddress}
                     </p>
                   </div>
                 </div>
               )}
-
-              {/* Additional Information: Unit No, Floor No, Apartment No, Company Name */}
-              <div className="space-y-1 pt-0.5">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
-                  Unit No., Floor No., Apartment, Company Name, Landmarks
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <Building className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    value={unitDetails}
-                    onChange={(e) => setUnitDetails(e.target.value)}
-                    placeholder="e.g. Unit 402, 4th Floor, Tower B / Near 7-Eleven gate"
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black transition-all"
-                  />
-                </div>
-              </div>
 
               {/* Real-Time Address Validation Status Banner Removed */}
             </div>
@@ -1534,13 +1657,16 @@ export default function CheckoutModal({
           {/* ================= STEP 3: COURIER & DELIVERY PAYMENT ================= */}
           {currentStep === 3 && (
             <div className="space-y-3">
-              <div className="border-b border-gray-100 pb-2">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 font-heading">
-                  Choose Courier & Delivery Fee Option <span className="text-red-500">*</span>
-                </h3>
-                <p className="text-xs text-gray-500 font-mono">
-                  Real-time calculated rates based on {calculatedDistance > 0 ? `${calculatedDistance} km` : "driving route"}
-                </p>
+              <div className="grid grid-cols-2 gap-2 border-b border-gray-100 pb-2">
+                <div className="min-w-0 border border-slate-200 bg-slate-50 px-2.5 py-2 text-center">
+                  <span className="block text-[9px] uppercase tracking-wide text-slate-500 font-heading">Estimated distance</span>
+                  <span className="block text-sm font-mono font-bold text-slate-900">{calculatedDistance > 0 ? `${calculatedDistance} km` : "Calculating"}</span>
+                </div>
+                <div className="min-w-0 border border-slate-200 bg-slate-50 px-2.5 py-2 text-center">
+                  <span className="block text-[9px] uppercase tracking-wide text-slate-500 font-heading">Estimated travel time</span>
+                  <span className="block text-sm font-mono font-bold text-slate-900">{estimatedTravelMinutes !== null ? `~${estimatedTravelMinutes} min` : "Unavailable"}</span>
+                </div>
+                <p className="col-span-2 text-center text-[9px] leading-tight text-slate-500 font-mono">PRIME constantly pools road traffic data every 30 minutes. The indicated travel time is still an estimate and may change depending on actual traffic conditions.</p>
               </div>
 
               {courierFetchError && (
@@ -1559,14 +1685,14 @@ export default function CheckoutModal({
                 {isLoadingCouriers ? (
                   <div className="p-8 text-center bg-gray-50 rounded-none border border-gray-200 flex flex-col items-center justify-center gap-2 text-xs font-mono text-gray-500">
                     <Loader2 className="w-6 h-6 animate-spin text-black" />
-                    <span>Calculating real-time rates with Geoapify routing...</span>
+                    <span>Checking delivery rates and travel time...</span>
                   </div>
                 ) : availableCouriers.length === 0 ? (
                   <div className="p-6 text-center bg-amber-50 rounded-none border border-amber-200 text-xs font-mono text-amber-800">
                     No couriers currently available for this route. Please re-adjust address or contact support.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                     {availableCouriers.map((courier) => {
                       const isSelected = selectedCourierId === courier.id;
                       return (
@@ -1574,29 +1700,14 @@ export default function CheckoutModal({
                           <button
                             type="button"
                             onClick={() => setSelectedCourierId(courier.id)}
-                            className={`group w-full aspect-video rounded-2xl border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_18px_rgba(15,23,42,0.05),0_2px_6px_rgba(15,23,42,0.08)] ${
+                            aria-pressed={isSelected}
+                            className={`group w-full aspect-[2/1] rounded-lg border-0 transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white shadow-sm hover:shadow-md ${
                               isSelected
-                                ? "border-slate-900 shadow-sm ring-1 ring-slate-900"
-                                : "border-gray-200 bg-white hover:border-gray-300"
+                                ? "bg-slate-50 shadow-md ring-2 ring-slate-900"
+                                : "bg-white"
                             }`}
                           >
-                            {courier.logo ? (
-                              <img
-                                src={courier.logo}
-                                alt={courier.name}
-                                className="absolute inset-0 z-[2] w-full h-full object-fill transition-transform duration-200"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <Truck className={`relative z-[2] w-8 h-8 ${isSelected ? 'text-gray-600' : 'text-gray-300 opacity-40'}`} />
-                            )}
-                            <div className="absolute inset-0 z-[3] pointer-events-none bg-gradient-to-br from-white/75 via-white/20 to-transparent opacity-90" />
-                            <div className="absolute inset-x-3 top-1.5 z-[4] h-1/3 rounded-t-xl pointer-events-none bg-gradient-to-b from-white/70 to-transparent" />
-                            {isSelected && (
-                              <div className="absolute top-1.5 right-1.5 z-20 w-5 h-5 bg-white text-slate-950 border border-slate-200 flex items-center justify-center">
-                                <Check className="w-3 h-3" />
-                              </div>
-                            )}
+                            <CourierTileLogo reference={String(courier.logo || "")} name={courier.name} selected={isSelected} />
                           </button>
                           <div className="w-full text-center leading-tight">
                             <span className="block truncate text-[9px] sm:text-[10px] font-heading font-black uppercase tracking-wide text-slate-900">
@@ -1618,14 +1729,14 @@ export default function CheckoutModal({
                 <div className="space-y-3 pt-2">
                   <div className="border-b border-slate-100 pb-3 mb-4 text-center">
                     <p className="text-xs text-slate-700 font-mono leading-relaxed max-w-lg mx-auto">
-                      You have chosen <span className="font-bold text-slate-900">{selectedCourier?.name}</span> to handle your delivery from PRIME Network Distribution &amp; Fulfillment Center with a corresponding charge of <span className="font-bold text-slate-900 font-mono">{formatPHP(courierDeliveryFee)}</span>. How would you like to pay for the charge?
+                      You have chosen <span className="font-bold text-slate-900">{selectedCourier?.name}</span> to handle your delivery from PRIME Fulfillment Hub with a corresponding charge of <span className="font-bold text-slate-900 font-mono">{formatPHP(courierDeliveryFee)}</span>. How would you like to pay for the charge?
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3 w-full">
                     <button
                       type="button"
                       onClick={() => setDeliveryPaymentMethod("upon_checkout")}
-                      className={`px-3.5 py-2.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center border ${
+                      className={`px-3.5 py-2.5 rounded-none shadow-sm hover:shadow-md text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer text-center border ${
                         deliveryPaymentMethod === "upon_checkout"
                           ? "bg-slate-900 border-slate-900 text-white hover:bg-black"
                           : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
@@ -1636,7 +1747,7 @@ export default function CheckoutModal({
                     <button
                       type="button"
                       onClick={() => setDeliveryPaymentMethod("upon_delivery")}
-                      className={`px-3.5 py-2.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs text-center border ${
+                      className={`px-3.5 py-2.5 rounded-none shadow-sm hover:shadow-md text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer text-center border ${
                         deliveryPaymentMethod === "upon_delivery"
                           ? "bg-slate-900 border-slate-900 text-white hover:bg-black"
                           : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
@@ -1653,12 +1764,17 @@ export default function CheckoutModal({
           {/* ================= STEP 4: ORDER BREAKDOWN & CONFIRM ================= */}
           {currentStep === 4 && (
             <div className="space-y-3">
-              <div className="border-b border-gray-100 pb-2">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 font-heading">
-                  Review Order & Finalize
-                </h3>
-                <p className="text-xs text-gray-500 font-mono">
-                  Delivery information, items, charges, and final adjustments
+              <div className="prime-checkout__review-warning border-2 border-amber-400 bg-amber-50 px-2.5 py-2 text-amber-950">
+                <span className="prime-checkout__review-warning-icon" aria-hidden="true">
+                  <svg viewBox="0 0 48 48" role="presentation">
+                    <circle cx="24" cy="24" r="21" fill="#facc15" stroke="#fbbf24" strokeWidth="2" />
+                    <path d="M24 12c-5 0-8 4-8 9v6l-3 4v2h22v-2l-3-4v-6c0-5-3-9-8-9Zm-3 24h6a3 3 0 0 1-6 0Z" fill="#713f12" />
+                    <path d="M10 18c-2 2-2 7 0 9m28-9c2 2 2 7 0 9" fill="none" stroke="#713f12" strokeWidth="2.5" strokeLinecap="round" />
+                    <path d="M24 8V6" stroke="#713f12" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <p className="text-xs text-left text-amber-950 font-mono" style={{ fontSize: "calc(1em - 0.5pt)" }}>
+                  Double-check all order details before submitting. Orders are confirmed only after payment is completed and proof of payment is uploaded and validated within one hour of order submission.
                 </p>
               </div>
 
@@ -1673,7 +1789,7 @@ export default function CheckoutModal({
               <div className="p-2.5 rounded-none border border-slate-200 bg-slate-50 space-y-2.5 text-xs font-mono">
                 <div className="flex justify-between items-start">
                   <span className="text-gray-500 uppercase text-[10px]">Receiver</span>
-                  <span className="font-bold text-gray-900 text-right">
+                  <span className="prime-checkout__review-value font-bold text-gray-900 text-right">
                     {receiverName} ({receiverPhone})
                   </span>
                 </div>
@@ -1682,7 +1798,7 @@ export default function CheckoutModal({
                   <span className="text-gray-500 uppercase text-[10px] flex items-center gap-1">
                     <span>Address</span>
                   </span>
-                  <span className="font-medium text-gray-900 text-right max-w-xs break-words">
+                  <span className="prime-checkout__review-value text-gray-900 text-right max-w-xs break-words">
                     {selectedAddress}
                     <span className="block text-gray-500 text-[11px]">Unit/Landmark: {unitDetails.trim() || "Non"}</span>
                   </span>
@@ -1690,7 +1806,7 @@ export default function CheckoutModal({
 
                 <div className="flex justify-between items-center pt-1 border-t border-gray-200">
                   <span className="text-gray-500 uppercase text-[10px]">Courier</span>
-                  <span className="font-bold text-gray-900">
+                  <span className="prime-checkout__review-value font-bold text-gray-900">
                     {selectedCourier?.name} ({calculatedDistance} km)
                   </span>
                 </div>
@@ -1715,22 +1831,27 @@ export default function CheckoutModal({
                             className="w-10 h-10 object-cover rounded bg-white border border-gray-200 shrink-0"
                           />
                           <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className="font-heading font-medium uppercase text-gray-900 truncate">
-                                {item.name}
+                            <div className="min-w-0">
+                              <p className="prime-checkout__review-value text-gray-900 truncate">
+                                {item.productName || (item.variantName ? item.name : item.name.includes(" - ") ? item.name.slice(0, item.name.lastIndexOf(" - ")) : item.name)}
                               </p>
+                              {(item.variantName || (!item.productName && !item.variantName && item.name.includes(" - ") ? item.name.slice(item.name.lastIndexOf(" - ") + 3) : "")) && (
+                                <p className="prime-checkout__review-value text-[11px] font-mono text-gray-500 truncate">{item.variantName || item.name.slice(item.name.lastIndexOf(" - ") + 3)}</p>
+                              )}
+                              <div className="flex items-center gap-1.5">
                               {isFreeItem && (
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
                                   FREE
                                 </span>
                               )}
+                              </div>
                             </div>
-                            <p className="text-[11px] font-mono text-gray-500">
+                            <p className="prime-checkout__review-value text-[11px] font-mono text-gray-500">
                               {item.quantity} × {isFreeItem ? <span className="text-emerald-600 font-bold">FREE</span> : formatPHP(item.price || 0)}
                             </p>
                           </div>
                         </div>
-                        <span className={`font-mono font-semibold shrink-0 ${isFreeItem ? "text-emerald-600 font-bold" : "text-gray-900"}`}>
+                        <span className={`prime-checkout__review-value font-mono shrink-0 ${isFreeItem ? "text-emerald-600" : "text-gray-900"}`}>
                           {isFreeItem ? "FREE" : formatPHP((item.price || 0) * (item.quantity || 1))}
                         </span>
                       </div>
@@ -1742,38 +1863,40 @@ export default function CheckoutModal({
 
 
               {/* Comprehensive Charges Breakdown */}
-              <div className="border border-gray-200 rounded-none p-2.5 bg-white space-y-1.5">
-                <h4 className="text-xs font-bold tracking-wider text-gray-900 font-heading border-b border-gray-100 pb-2">
+              <div className="prime-checkout__charges border border-gray-200 rounded-none p-2.5 bg-white space-y-1.5">
+                <h4 className="text-xs font-bold tracking-wider text-gray-900 font-heading uppercase border-b border-gray-100 pb-2">
                   Breakdown of charges
                 </h4>
+                {chargesLoadError && <p className="border border-red-200 bg-red-50 p-2 text-xs text-red-700">{chargesLoadError}</p>}
+                {isLoadingCharges && <p className="text-xs text-slate-500">Refreshing configured charges…</p>}
 
                 {/* Subtotal */}
                 <div className="flex justify-between items-center text-xs font-mono">
-                  <span className="text-gray-600 font-medium">Items Subtotal:</span>
-                  <span className="font-semibold text-gray-900">{formatPHP(itemsSubtotal)}</span>
+                  <span className="prime-checkout__charge-label">Items Subtotal:</span>
+                  <span className="prime-checkout__charge-value font-semibold text-gray-900">{formatPHP(itemsSubtotal)}</span>
                 </div>
 
                 {/* Active Admin Charges */}
                 {computedCharges.map((charge) => (
                   <div key={charge.id} className="flex justify-between items-center text-xs font-mono">
-                    <span className="text-gray-600 flex items-center gap-1">
+                    <span className="prime-checkout__charge-label flex items-center gap-1">
                       {charge.name}:
                       {charge.type === "percentage" && (
                         <span className="text-[10px] text-gray-400">({charge.rate || (charge as any).amount}%)</span>
                       )}
                     </span>
-                    <span className="font-semibold text-gray-900">{formatPHP(charge.computedAmount)}</span>
+                    <span className="prime-checkout__charge-value font-semibold text-gray-900">{formatPHP(charge.computedAmount)}</span>
                   </div>
                 ))}
 
                 {/* Courier Delivery Fee */}
                 <div className="flex justify-between items-start text-xs font-mono pt-1 border-t border-gray-100">
                   <div>
-                    <span className="text-gray-700 font-medium block">
+                    <span className="prime-checkout__charge-label block">
                       Delivery Fee ({selectedCourier?.name ? formatCourierName(selectedCourier.name) : "Courier"}):
                     </span>
                     {deliveryPaymentMethod === "upon_delivery" && (
-                      <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 inline-block mt-0.5">
+                      <span className="prime-checkout__charge-label text-[10px] bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 inline-block mt-0.5">
                         To be paid upon delivery
                       </span>
                     )}
@@ -1782,16 +1905,16 @@ export default function CheckoutModal({
                     {appliedPromo?.isFreeShipping ? (
                       <div>
                         <span className="line-through text-gray-400 text-[11px] mr-1.5 font-mono">{formatPHP(courierDeliveryFee)}</span>
-                        <span className="font-bold text-emerald-600 font-mono">FREE</span>
+                        <span className="prime-checkout__charge-value font-bold text-emerald-600 font-mono">FREE</span>
                       </div>
                     ) : appliedPromo?.shippingSubsidy && appliedPromo.shippingSubsidy > 0 ? (
                       <div>
                         <span className="line-through text-gray-400 text-[11px] mr-1.5 font-mono">{formatPHP(courierDeliveryFee)}</span>
-                        <span className="font-semibold text-gray-900 font-mono">{formatPHP(effectiveCourierDeliveryFee)}</span>
+                        <span className="prime-checkout__charge-value font-semibold text-gray-900 font-mono">{formatPHP(effectiveCourierDeliveryFee)}</span>
                         <span className="text-[10px] text-emerald-600 block font-mono">(-{formatPHP(appliedPromo.shippingSubsidy)} subsidy)</span>
                       </div>
                     ) : (
-                      <span className="font-semibold text-gray-900 font-mono">
+                      <span className="prime-checkout__charge-value font-semibold text-gray-900 font-mono">
                         {formatPHP(courierDeliveryFee)}
                       </span>
                     )}
@@ -2012,10 +2135,6 @@ export default function CheckoutModal({
 
               {/* Final Total & Applied Benefits */}
               <div className="border border-slate-200 rounded-none p-2.5 bg-slate-50 space-y-2">
-                <h4 className="text-xs font-bold tracking-wider text-gray-900 font-heading border-b border-slate-200 pb-2">
-                  Final Total
-                </h4>
-
                 {/* Promo Code Discount */}
                 {appliedPromo && promoDiscountAmount > 0 && (
                   <div className="flex justify-between items-center text-xs font-mono text-emerald-700 pt-1 border-t border-gray-100">
@@ -2023,7 +2142,7 @@ export default function CheckoutModal({
                       <Tag className="w-3 h-3 text-emerald-600" />
                       Promo Discount ({appliedPromo.code}):
                     </span>
-                    <span className="font-bold font-mono">-{formatPHP(promoDiscountAmount)}</span>
+                    <span className="prime-checkout__review-value font-mono">-{formatPHP(promoDiscountAmount)}</span>
                   </div>
                 )}
 
@@ -2034,7 +2153,7 @@ export default function CheckoutModal({
                       <Coins className="w-3 h-3 text-amber-600" />
                       Cashback Points to Earn ({appliedPromo.code}):
                     </span>
-                    <span className="font-bold font-mono text-amber-900">+{(appliedPromo as any).cashbackPoints.toLocaleString()} PTS</span>
+                    <span className="prime-checkout__review-value font-mono text-amber-900">+{(appliedPromo as any).cashbackPoints.toLocaleString()} PTS</span>
                   </div>
                 )}
 
@@ -2054,7 +2173,7 @@ export default function CheckoutModal({
                     <span className="font-heading font-bold uppercase tracking-wide text-gray-900 text-sm">
                       Total Payable Now:
                     </span>
-                    <span className="font-heading font-bold text-2xl text-black font-mono">
+                    <span className="prime-checkout__review-value text-2xl text-black font-mono">
                       {formatPHP(payableNow)}
                     </span>
                   </div>
@@ -2070,36 +2189,27 @@ export default function CheckoutModal({
                 </div>
               </div>
 
-              {/* Optional Notes */}
-              <div className="space-y-1">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 font-heading">
-                  Order / Rider Instructions (Optional)
-                </label>
-                <textarea
-                  rows={2}
-                  value={customerNotes}
-                  onChange={(e) => setCustomerNotes(e.target.value)}
-                  placeholder="Special instructions for packing, gate codes, landmarks, or contact preferences..."
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-none text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
-                />
-              </div>
             </div>
           )}
 
           {/* ================= STEP 5: ORDER CONFIRMATION ================= */}
           {currentStep === 5 && completedOrder && (
             <div className="py-2.5 px-1 space-y-3">
-              {/* Success Banner */}
-              <div className="text-center space-y-2.5">
-                <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto border-2 border-amber-200">
-                  <Clock className="w-7 h-7" />
+              {/* Pending payment banner */}
+              <div className="prime-checkout__pending-banner">
+                <div className="prime-checkout__pending-animation" aria-hidden="true">
+                  <Store className="prime-checkout__cashier-icon" />
+                  <Banknote className="prime-checkout__cash-note" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-heading font-bold text-gray-900 uppercase tracking-wide">
-                    Order Submitted - Pending Review
+                <div className="min-w-0">
+                  <h3 className="text-xl font-heading font-bold text-gray-900 uppercase tracking-wide leading-tight">
+                    Order Is Awaiting Payment
                   </h3>
-                  <p className="text-xs text-gray-500 font-mono mt-1">
-                    Your order #{completedOrder.id || completedOrder.orderNumber} is registered as <strong className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">PENDING</strong> and awaits payment verification.
+                  <p className="mt-1 text-sm text-gray-600 font-mono leading-snug">
+                    Your order ({completedOrder.orderNumber || completedOrder.id}) has been successfully submitted and is waiting for your payment.
+                  </p>
+                  <p className="mt-1.5 text-sm text-gray-600 font-mono leading-snug">
+                    Stocks will be reserved for you for one hour and will be automatically released back to inventory if no payment is made.
                   </p>
                 </div>
               </div>
@@ -2108,7 +2218,7 @@ export default function CheckoutModal({
               <div className="bg-gray-50 border border-gray-200 rounded-none p-2.5 font-mono text-xs space-y-2.5 w-full">
                 <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                   <span className="text-gray-400 uppercase text-[9px] font-bold">Order Identifier</span>
-                  <span className="font-bold text-gray-900">{completedOrder.id || completedOrder.orderNumber}</span>
+                  <span className="font-bold text-gray-900">{completedOrder.orderNumber || completedOrder.id}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                   <span className="text-gray-400 uppercase text-[9px] font-bold">Receiver Name</span>
@@ -2172,16 +2282,12 @@ export default function CheckoutModal({
               )}
 
               {completedOrder.paymentDeadlineAt && (
-                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-none text-center">
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-900">
+                <div className="prime-checkout__deadline p-3 bg-red-50 border-2 border-red-400 rounded-lg text-center">
+                  <p className="text-sm font-mono font-bold uppercase tracking-wider text-red-900">
                     Payment Proof Deadline
                   </p>
-                  <p className="text-xs font-mono text-amber-700 mt-0.5">
-                    Submit your payment receipt by {new Intl.DateTimeFormat("en-PH", {
-                      timeZone: "Asia/Manila",
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(new Date(completedOrder.paymentDeadlineAt))}
+                  <p className="mt-1 text-sm font-mono leading-snug text-red-800">
+                    Settle the total payable amount and upload the receipt on or before {formatPaymentDeadline(completedOrder.paymentDeadlineAt)} to avoid cancellation.
                   </p>
                 </div>
               )}
@@ -2205,11 +2311,8 @@ export default function CheckoutModal({
                 <div className="border-t border-gray-200 pt-3 space-y-2.5">
                   <div className="text-center">
                     <h4 className="text-sm font-heading font-bold uppercase tracking-wider text-gray-900">
-                      Settle Your Payment
+                      Available Payment Method
                     </h4>
-                    <p className="text-xs text-gray-500 font-mono mt-1">
-                      Select a payment method from the configured options below:
-                    </p>
                   </div>
 
                 {isLoadingPaymentMethods ? (
@@ -2265,17 +2368,17 @@ export default function CheckoutModal({
                                           setIsPaymentQrModalOpen(true);
                                         }
                                       }}
-                                      className={`group w-full aspect-video rounded-2xl border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_18px_rgba(15,23,42,0.05),0_2px_6px_rgba(15,23,42,0.08)] select-none ${
+                                      className={`group w-full aspect-[2/1] rounded-none border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white shadow-sm hover:shadow-md select-none ${
                                         isOffline
                                           ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90"
                                           : isSelected
-                                          ? "border-slate-900 shadow-sm ring-1 ring-slate-900 cursor-pointer"
+                                          ? "border-slate-900 shadow-md ring-1 ring-slate-900 cursor-pointer"
                                           : "border-gray-200 bg-white hover:border-gray-300 cursor-pointer"
                                       }`}
                                       title={isOffline ? `${method.name} is currently offline` : method.name}
                                     >
                                       {method.logo ? (
-                                        <img
+                                        <TelegramMediaImage
                                           src={method.logo}
                                           alt={method.name}
                                           className={`absolute inset-0 z-[2] w-full h-full object-fill transition-transform duration-200 ${isOffline ? "filter blur-[1px] opacity-40 grayscale-[30%]" : ""}`}
@@ -2285,12 +2388,6 @@ export default function CheckoutModal({
                                         <CreditCard className={`relative z-[2] w-5 h-5 text-gray-400 ${isOffline ? "filter blur-[1px] opacity-40" : ""}`} />
                                       )}
 
-                                      {!isOffline && (
-                                        <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-br from-white/75 via-white/15 to-transparent opacity-90" />
-                                      )}
-                                      {!isOffline && (
-                                        <div className="absolute inset-x-3 top-1.5 z-[6] h-1/3 rounded-t-xl pointer-events-none bg-gradient-to-b from-white/70 to-transparent" />
-                                      )}
 
                                       {/* Offline Overlay */}
                                       {isOffline && (
@@ -2556,7 +2653,7 @@ export default function CheckoutModal({
                                     className="flex-1 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-heading font-bold uppercase tracking-wider text-xs rounded-lg transition-all cursor-pointer shadow-2xs flex justify-center items-center gap-1.5 active:scale-95"
                                   >
                                     <Receipt className="w-3.5 h-3.5" />
-                                    <span>Preview Receipt</span>
+                                    <span>PREVIEW</span>
                                   </button>
                                   <button
                                     type="button"
@@ -2567,28 +2664,32 @@ export default function CheckoutModal({
                                     }}
                                     disabled={isAnalyzingReceipt}
                                     className="flex-1 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-heading font-bold uppercase tracking-wider text-xs rounded-lg transition-all cursor-pointer shadow-2xs flex justify-center items-center gap-1.5 active:scale-95 disabled:opacity-50"
-                                    title="Re-scan receipt with GPT-5.3 OCR"
+                                    title="Re-scan receipt hashes and normalized pixel sample"
                                   >
                                     <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzingReceipt ? "animate-spin text-slate-900" : ""}`} />
-                                    <span>Re-scan OCR</span>
+                                    <span>RE-SCAN</span>
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => proofInputRef.current?.click()}
+                                    disabled={isAnalyzingReceipt || isSubmittingProof}
                                     className="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-heading font-bold uppercase tracking-wider text-xs rounded-lg transition-all cursor-pointer shadow-2xs flex justify-center items-center active:scale-95"
                                   >
-                                    <span>Replace</span>
+                                    <span>REPLACE</span>
                                   </button>
                                 </div>
 
-                                {/* Live GPT-5.3 OCR Scanning State */}
+                                {/* Live receipt forensics state */}
                                 {isAnalyzingReceipt && (
                                   <div className="p-3.5 bg-slate-900 text-white rounded-none border border-slate-800 space-y-2 animate-in fade-in duration-200">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
-                                        <Cpu className="w-4 h-4 text-emerald-400 animate-pulse" />
+                                        <div className="prime-receipt-scan" aria-hidden="true">
+                                          <Receipt className="prime-receipt-scan__icon" />
+                                          <span className="prime-receipt-scan__line" />
+                                        </div>
                                         <span className="text-[11px] font-heading font-bold uppercase tracking-wider text-slate-200">
-                                          GPT-5.3 Vision OCR Scanning
+                                          Automated Forensics Analysis
                                         </span>
                                       </div>
                                       <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800 animate-pulse">
@@ -2599,162 +2700,60 @@ export default function CheckoutModal({
                                       <div className="bg-emerald-400 h-full w-2/3 animate-[pulse_1s_ease-in-out_infinite]" />
                                     </div>
                                     <p className="text-[10px] font-mono text-slate-400">
-                                      Extracting Reference ID, transaction amount, timestamp, and provider details...
+                                      Automated Image Forensics Analysis is in progress. Do not minimize or close this page. Please wait patiently as this could take up to 30 seconds.
                                     </p>
                                   </div>
                                 )}
 
-                                {/* GPT-5.3 OCR Analysis Result Display */}
+                                {/* Analysis-complete prompt */}
                                 {ocrAnalysis && !isAnalyzingReceipt && (
-                                  <div className="p-3.5 rounded-none border border-slate-200 bg-slate-50/80 space-y-2.5 animate-in fade-in zoom-in-98 duration-200 text-left">
-                                    <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                                      <div className="flex items-center gap-1.5">
-                                        <FileCheck className="w-4 h-4 text-emerald-600" />
-                                        <span className="text-[11px] font-heading font-black uppercase tracking-wider text-slate-900">
-                                          GPT-5.3 OCR Analysis
-                                        </span>
-                                      </div>
-                                      <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">
-                                        {ocrAnalysis.confidenceScore || 94}% Confidence
-                                      </span>
+                                  <div className="p-3.5 rounded-none border border-emerald-200 bg-emerald-50/80 space-y-2 animate-in fade-in zoom-in-98 duration-200 text-left">
+                                    <div className="flex items-center gap-1.5 border-b border-emerald-200/80 pb-2">
+                                      <FileCheck className="w-4 h-4 text-emerald-700" />
+                                      <span className="text-[11px] font-heading font-black uppercase tracking-wider text-emerald-950">Analysis Completed</span>
                                     </div>
-
-                                    {/* Key Details Grid */}
-                                    <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                                      <div className="bg-white p-2 rounded-lg border border-slate-200/70 space-y-0.5">
-                                        <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-heading font-bold">
-                                          Reference / Trace No.
-                                        </span>
-                                        <div className="flex items-center justify-between gap-1">
-                                          <span className="font-bold text-slate-900 truncate text-[11px] select-all">
-                                            {ocrAnalysis.referenceNumber || "Extracted"}
-                                          </span>
-                                          {ocrAnalysis.referenceNumber && (
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                navigator.clipboard.writeText(ocrAnalysis.referenceNumber);
-                                                setCopiedField("ocrRef");
-                                                setTimeout(() => setCopiedField(null), 1500);
-                                              }}
-                                              className="text-[9px] text-slate-500 hover:text-slate-900 p-0.5 shrink-0"
-                                              title="Copy Reference"
-                                            >
-                                              {copiedField === "ocrRef" ? (
-                                                <span className="text-emerald-600 font-bold">✓</span>
-                                              ) : (
-                                                <Copy className="w-3 h-3" />
-                                              )}
-                                            </button>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      <div className="bg-white p-2 rounded-lg border border-slate-200/70 space-y-0.5">
-                                        <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-heading font-bold">
-                                          Detected Amount
-                                        </span>
-                                        <span className="font-bold text-slate-900 block text-[11px]">
-                                          {formatPHP(ocrAnalysis.amountPaid || currentPayableNow)}
-                                        </span>
-                                      </div>
-
-                                      <div className="bg-white p-2 rounded-lg border border-slate-200/70 space-y-0.5">
-                                        <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-heading font-bold">
-                                          Payment Provider
-                                        </span>
-                                        <span className="text-slate-700 block truncate text-[11px]">
-                                          {ocrAnalysis.paymentProvider || selectedPaymentMethod?.name || "E-Wallet"}
-                                        </span>
-                                      </div>
-
-                                      <div className="bg-white p-2 rounded-lg border border-slate-200/70 space-y-0.5">
-                                        <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-heading font-bold">
-                                          OCR Match Status
-                                        </span>
-                                        <div className="flex items-center gap-1">
-                                          {ocrAnalysis.matchStatus === "MATCHED" ? (
-                                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                                              <Check className="w-2.5 h-2.5" /> MATCHED
-                                            </span>
-                                          ) : ocrAnalysis.matchStatus === "DISCREPANCY" ? (
-                                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1">
-                                              <AlertTriangle className="w-2.5 h-2.5" /> DISCREPANCY
-                                            </span>
-                                          ) : (
-                                            <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-300">
-                                              VERIFYING
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Manual Review Clarification Banner */}
-                                    <div className="p-2.5 bg-amber-50/90 border border-amber-200 rounded-lg text-[10px] font-mono text-amber-900 leading-relaxed space-y-1">
-                                      <div className="flex items-center gap-1 font-heading font-black text-amber-950 uppercase tracking-wide">
-                                        <ShieldCheck className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                                        <span>Mandatory Manual Review</span>
-                                      </div>
-                                      <p>
-                                        Regardless of scan results, all payment receipts and orders are submitted for manual staff verification prior to dispatch.
-                                      </p>
-                                    </div>
+                                    <p className="text-xs font-mono text-emerald-950">The receipt file hash and normalized pixel sample are recorded. Secure upload will compare for exact image reuse and replacement against prior evidence.</p>
+                                    <p className="text-[10px] font-mono text-amber-900">This analysis cannot prove a receipt is authentic or detect every edit. Staff will verify the payment manually; the scan never marks an order Paid.</p>
+                                    {ocrError && <p className="text-xs text-red-700">{ocrError}</p>}
                                   </div>
                                 )}
+                                {ocrError && !ocrAnalysis && !isAnalyzingReceipt && <p className="p-2 text-xs text-red-700 bg-red-50 border border-red-200">{ocrError}</p>}
                                 
                                 <button
                                   type="button"
-                                  disabled={isSubmittingProof || isAnalyzingReceipt}
+                                  disabled={isSubmittingProof || isAnalyzingReceipt || !ocrAnalysis || !selectedPaymentMethod?.id}
                                   onClick={async () => {
                                     try {
                                       setIsSubmittingProof(true);
-                                      let finalProofUrl = uploadedProofImage;
-                                      
-                                      // Upload to Supabase Storage Bucket if configured
-                                      try {
-                                        const storageRes = await authenticatedFetch("/api/storage/upload", {
-                                          method: "POST",
+                                      if (hasTelegramServerlessBridge()) {
+                                        await uploadPaymentReceiptDataUrl(
+                                          uploadedProofImage,
+                                          String(completedOrder.id || ""),
+                                          String(selectedPaymentMethod.id),
+                                          false,
+                                          ocrAnalysis,
+                                        );
+                                      } else {
+                                        const response = await authenticatedFetch("/api/orders", {
+                                          method: "PUT",
                                           headers: { "Content-Type": "application/json" },
                                           body: JSON.stringify({
-                                            image: uploadedProofImage,
-                                            bucket: "receipt-proofs",
-                                            filename: `order-${completedOrder?.orderNumber || completedOrder?.id || Date.now()}.png`,
+                                            orderId: completedOrder.id || completedOrder.orderNumber,
+                                            paymentMethodId: selectedPaymentMethod.id,
+                                            paymentMethodName: selectedPaymentMethod.name,
+                                            paymentProofImage: uploadedProofImage,
+                                            ocrAnalysis,
                                           }),
                                         });
-                                        const storageData = await storageRes.json();
-                                        if (storageRes.ok && storageData.url) {
-                                          finalProofUrl = storageData.url;
+                                        if (!response.ok) {
+                                          const result = await response.json().catch(() => ({}));
+                                          throw new Error(result.error || "Failed to submit payment proof.");
                                         }
-                                      } catch (storageErr) {
-                                        console.warn("Storage upload fallback to payload:", storageErr);
                                       }
-
-                                      const res = await authenticatedFetch("/api/orders", {
-                                        method: "PUT",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({
-                                          orderId: completedOrder.id || completedOrder.orderNumber,
-                                          paymentMethodId: selectedPaymentMethod.id,
-                                          paymentMethodName: selectedPaymentMethod.name,
-                                          paymentProofImage: finalProofUrl,
-                                          ocrAnalysis: ocrAnalysis || {
-                                            model: "GPT-5.3 (Multimodal Vision OCR)",
-                                            status: "submitted_for_manual_review",
-                                            analyzedAt: new Date().toISOString(),
-                                            requiresManualReview: true,
-                                          }
-                                        })
-                                      });
-                                      if (res.ok) {
-                                        setProofSubmitSuccess(true);
-                                      } else {
-                                        const errData = await res.json().catch(() => ({}));
-                                        alert(errData.error || "Failed to submit payment proof");
-                                      }
+                                      setProofSubmitSuccess(true);
                                     } catch (e) {
                                       console.error(e);
-                                      alert("Submission failed. Please try again.");
+                                      alert(e instanceof Error ? e.message : "Submission failed. Please try again.");
                                     } finally {
                                       setIsSubmittingProof(false);
                                     }
@@ -2764,10 +2763,10 @@ export default function CheckoutModal({
                                   {isSubmittingProof ? (
                                     <>
                                       <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                                      <span>Submitting for Manual Review...</span>
+                                      <span>Uploading for Forensics &amp; Manual Review...</span>
                                     </>
                                   ) : (
-                                    <span>Submit for Manual Review</span>
+                                      <span>Submit Receipt</span>
                                   )}
                                 </button>
                               </div>
@@ -2790,12 +2789,12 @@ export default function CheckoutModal({
 
         {/* Modal Bottom Action Bar */}
         {currentStep < 5 && (
-          <div className="border-t border-gray-100 bg-white px-3.5 py-2.5 flex items-center justify-between gap-3">
+          <div className="prime-checkout__actions border-t border-gray-100 bg-white px-3.5 py-2.5 flex items-center justify-between gap-3">
             {currentStep > 1 ? (
               <button
                 type="button"
                 onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
-                className="px-4 py-3 border border-gray-200 hover:bg-gray-50 text-gray-700 font-mono text-xs uppercase tracking-wider rounded-none transition-colors cursor-pointer"
+                className="bg-slate-900 hover:bg-black text-white font-heading font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer shadow-sm"
               >
                 Back
               </button>
@@ -2809,7 +2808,7 @@ export default function CheckoutModal({
                 onClick={handleNextFromStep1}
                 className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs"
               >
-                <span>Continue to Address</span>
+                <span>Continue</span>
               </button>
             )}
 
@@ -2819,7 +2818,7 @@ export default function CheckoutModal({
                 onClick={handleNextFromStep2}
                 className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs"
               >
-                <span>Select Courier</span>
+                <span>Continue</span>
               </button>
             )}
 
@@ -2830,12 +2829,12 @@ export default function CheckoutModal({
                 disabled={!selectedCourier || !deliveryPaymentMethod}
                 className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span>Review Order</span>
+                <span>Continue</span>
               </button>
             )}
 
             {currentStep === 4 && (
-              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+              <div className="prime-checkout__confirm flex flex-col sm:flex-row items-end sm:items-center gap-2">
                 {submitError && (
                   <span className="text-xs font-mono text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg max-w-xs truncate">
                     {submitError}
@@ -2844,13 +2843,13 @@ export default function CheckoutModal({
                 <button
                   type="button"
                   onClick={handleSubmitOrder}
-                  disabled={isSubmittingOrder}
-                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isSubmittingOrder || isLoadingCharges || Boolean(chargesLoadError)}
+                  className="prime-checkout__submit px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmittingOrder ? (
                     <span>Submitting...</span>
                   ) : (
-                    <span>Confirm & Place Order</span>
+                    <span>Submit Order</span>
                   )}
                 </button>
               </div>

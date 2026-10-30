@@ -109,6 +109,7 @@ export async function POST(request: NextRequest) {
     const serverIp = getRequestClientIp(request);
 
     let existingData: any = null;
+    let hasSuccessfulOrder = false;
     if (getSupabaseAdmin()) {
       const supabase = getSupabaseAdmin()!;
       const { data } = await supabase
@@ -117,9 +118,19 @@ export async function POST(request: NextRequest) {
         .eq('tg_user_id', tgUserId)
         .maybeSingle();
       existingData = data;
+
+      if (existingData?.id) {
+        const { count } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('customer_id', existingData.id)
+          .in('status', ['completed', 'delivered']);
+        hasSuccessfulOrder = Boolean(count && count > 0);
+      }
     }
 
-    const primeMemberId = existingData?.prime_member_id || generateMemberId();
+    const visitorBadgeNo = existingData?.visitor_badge_no || `VIS-${tgUserId}`;
+    const primeMemberId = existingData?.prime_member_id || (hasSuccessfulOrder ? generateMemberId() : null);
     const role = isAdmin ? 'admin' : (existingData?.role || 'customer');
     const fullName =
       `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() ||
@@ -129,13 +140,16 @@ export async function POST(request: NextRequest) {
     if (getSupabaseAdmin()) {
       const supabase = getSupabaseAdmin()!;
       const now = new Date().toISOString();
-      const customerPayload = {
+      const customerPayload: any = {
         tg_user_id: tgUserId,
         tg_name: fullName,
         tg_username: tgUser.username || '',
-        prime_member_id: primeMemberId,
+        visitor_badge_no: visitorBadgeNo,
         updated_at: now,
       };
+      if (primeMemberId) {
+        customerPayload.prime_member_id = primeMemberId;
+      }
       const { error } = await supabase
         .from('customers')
         .upsert(customerPayload, { onConflict: 'tg_user_id' });

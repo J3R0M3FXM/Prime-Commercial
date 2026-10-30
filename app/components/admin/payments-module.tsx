@@ -511,7 +511,7 @@ export default function PaymentsModule() {
                         <img
                           src={method.logo}
                           alt={method.name}
-                          className="w-11 h-11 object-contain p-1 rounded-none bg-white border border-slate-100 shrink-0"
+                          className="w-11 h-11 object-contain p-1 rounded-none bg-slate-950 border border-slate-800 shrink-0"
                         />
                       ) : (
                         <div className="w-11 h-11 bg-slate-100 text-slate-700 flex items-center justify-center rounded-none shrink-0 border border-slate-200">

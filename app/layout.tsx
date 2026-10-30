@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import "@fontsource/lato/400.css";
-import "@fontsource/lato/700.css";
+import "@fontsource/roboto-condensed/600.css";
 import "@fontsource/roboto-condensed/400.css";
 import "./globals.css";
 import CartProvider from "./components/cart-context";
@@ -36,12 +35,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link 
-          href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,400&family=Roboto+Condensed:wght@400;700&display=swap" 
-          rel="stylesheet" 
-        />
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
       </head>
       <body suppressHydrationWarning className="font-sans bg-slate-950 text-gray-900 antialiased min-h-screen flex justify-center selection:bg-slate-900 selection:text-white">
