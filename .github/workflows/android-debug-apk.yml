@@ -28,7 +28,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Set up Java
@@ -46,7 +46,7 @@ jobs:
 
       - name: Show web build failure
         if: failure()
-        run: tail -200 android-web-build.log
+        run: test ! -f android-web-build.log || tail -200 android-web-build.log
 
       - name: Sync Capacitor Android project
         run: npx cap sync android
@@ -58,7 +58,7 @@ jobs:
 
       - name: Show Android build failure
         if: failure()
-        run: tail -240 android-gradle-build.log
+        run: test ! -f android-gradle-build.log || tail -240 android-gradle-build.log
 
       - name: Upload build logs on failure
         if: failure()
