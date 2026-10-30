@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false
+      VITE_CONFIG_NATIVE_IGNORE_WARNING: 'true'
     permissions:
       contents: read
 
@@ -40,12 +41,11 @@ jobs:
         run: npm ci
 
       - name: Build web assets
-        shell: bash
-        run: set -o pipefail; npm run build:android:web 2>&1 | tee android-web-build.log
+        run: npm run build:android:web
 
       - name: Show web build failure
         if: failure()
-        run: test ! -f android-web-build.log || tail -200 android-web-build.log
+        run: echo 'The web build failed before Android compilation.'
 
       - name: Sync Capacitor Android project
         run: npx cap sync android
