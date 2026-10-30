@@ -14,6 +14,8 @@ import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, 
 import { formatPHP } from "@/lib/currency";
 import { authenticatedFetch } from "./components/telegram-auth-client";
 import { callServerless, getServerlessCatalog, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 
 type PublicOrderQueue = {
   ordersInQueue: number;
@@ -252,6 +254,17 @@ export default function Shopfront() {
         <AlertCircle className="w-16 h-16 text-red-500 mb-6" />
         <h1 className="text-2xl font-heading font-bold text-gray-900 mb-2 uppercase tracking-wide">Access Denied</h1>
         <p className="text-gray-600 mb-6 max-w-sm">This shopfront is exclusively secured for use within the Telegram environment.</p>
+        <button
+          type="button"
+          onClick={() => {
+            const url = "https://t.me/primenetworkphbot?startapp=shop";
+            if (Capacitor.isNativePlatform()) void Browser.open({ url });
+            else window.open(url, "_blank", "noopener,noreferrer");
+          }}
+          className="w-full max-w-sm rounded-lg bg-slate-900 px-4 py-3 text-xs font-heading font-bold uppercase tracking-wider text-white shadow-sm"
+        >
+          OPEN PRIME IN TELEGRAM
+        </button>
       </div>
     );
   }
