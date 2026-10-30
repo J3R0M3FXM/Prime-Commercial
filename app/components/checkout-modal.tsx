@@ -331,6 +331,12 @@ export default function CheckoutModal({
   } | null>(null);
   const [isCheckingReferral, setIsCheckingReferral] = useState<boolean>(false);
   const [referralError, setReferralError] = useState<string>("");
+  const checkoutError = promoError || referralError || submitError;
+  const dismissCheckoutError = () => {
+    setPromoError("");
+    setReferralError("");
+    setSubmitError("");
+  };
   const [referralSuccess, setReferralSuccess] = useState<string>("");
 
   // Hydrate Telegram info on open
@@ -1773,7 +1779,7 @@ export default function CheckoutModal({
                     <path d="M24 8V6" stroke="#713f12" strokeWidth="2.5" strokeLinecap="round" />
                   </svg>
                 </span>
-                <p className="text-xs text-left text-amber-950 font-mono" style={{ fontSize: "calc(1em - 0.5pt)" }}>
+                <p className="text-[11px] text-left text-amber-950 font-mono leading-tight">
                   Double-check all order details before submitting. Orders are confirmed only after payment is completed and proof of payment is uploaded and validated within one hour of order submission.
                 </p>
               </div>
@@ -1788,25 +1794,25 @@ export default function CheckoutModal({
               {/* Delivery Information */}
               <div className="p-2.5 rounded-none border border-slate-200 bg-slate-50 space-y-2.5 text-xs font-mono">
                 <div className="flex justify-between items-start">
-                  <span className="text-gray-500 uppercase text-[10px]">Receiver</span>
-                  <span className="prime-checkout__review-value font-bold text-gray-900 text-right">
+                  <span className="text-gray-500 uppercase text-[10px] font-heading font-semibold">Receiver</span>
+                  <span className="prime-checkout__review-value font-heading font-semibold text-[11px] text-gray-900 text-right">
                     {receiverName} ({receiverPhone})
                   </span>
                 </div>
 
                 <div className="flex justify-between items-start pt-1 border-t border-gray-200">
-                  <span className="text-gray-500 uppercase text-[10px] flex items-center gap-1">
+                  <span className="text-gray-500 uppercase text-[10px] font-heading font-semibold flex items-center gap-1">
                     <span>Address</span>
                   </span>
-                  <span className="prime-checkout__review-value text-gray-900 text-right max-w-xs break-words">
+                  <span className="prime-checkout__review-value font-heading font-semibold text-[11px] text-gray-900 text-right max-w-xs break-words">
                     {selectedAddress}
-                    <span className="block text-gray-500 text-[11px]">Unit/Landmark: {unitDetails.trim() || "Non"}</span>
+                    <span className="block text-gray-500 text-[10px] font-heading font-semibold">Unit/Landmark: {unitDetails.trim() || "Non"}</span>
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center pt-1 border-t border-gray-200">
-                  <span className="text-gray-500 uppercase text-[10px]">Courier</span>
-                  <span className="prime-checkout__review-value font-bold text-gray-900">
+                  <span className="text-gray-500 uppercase text-[10px] font-heading font-semibold">Courier</span>
+                  <span className="prime-checkout__review-value font-heading font-semibold text-[11px] text-gray-900">
                     {selectedCourier?.name} ({calculatedDistance} km)
                   </span>
                 </div>
@@ -2999,6 +3005,19 @@ export default function CheckoutModal({
                 Done
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {checkoutError && (
+        <div className="fixed inset-0 z-[4000] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-label="Checkout error">
+          <div className="prime-checkout__error-popover aspect-square w-full max-w-[280px] rounded-2xl border-2 border-red-300 bg-white p-6 shadow-2xl flex flex-col items-center justify-center text-center gap-3">
+            <div className="rounded-full bg-red-100 p-3 text-red-600 animate-bounce" aria-hidden="true">
+              <AlertTriangle className="h-10 w-10" />
+            </div>
+            <h3 className="font-heading text-sm font-semibold uppercase tracking-wider text-red-800">Please check this</h3>
+            <p className="max-w-[220px] text-[11px] font-mono leading-relaxed text-slate-700">{checkoutError}</p>
+            <button type="button" onClick={dismissCheckoutError} className="mt-1 rounded-lg bg-slate-900 px-5 py-2 text-[11px] font-heading font-semibold uppercase tracking-wider text-white shadow-sm">Okay</button>
           </div>
         </div>
       )}
