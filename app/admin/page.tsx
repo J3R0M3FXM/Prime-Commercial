@@ -2280,7 +2280,13 @@ export default function AdminPage() {
   return (
     <div className="admin-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased w-full" data-serverless-admin={serverlessAdminMode ? "true" : undefined}>
       <header className="command-fixed-header" aria-label="Prime Command Center header">
-        <PrimeIdentityHeader caption="SECURED ADMIN ACCESS" />
+        <PrimeIdentityHeader accessLabel="CORE ADMIN ACCESS" />
+        <div aria-label="Live order status" className="command-header-queue grid h-[38.5px] grid-cols-4 border-t border-gray-100 bg-slate-50">
+          <div className="flex min-w-0 flex-col items-center justify-center border-r border-gray-200 px-1"><span>ON QUEUE</span><strong>—</strong></div>
+          <div className="flex min-w-0 flex-col items-center justify-center border-r border-gray-200 px-1"><span>PROCESSING</span><strong>—</strong></div>
+          <div className="flex min-w-0 flex-col items-center justify-center border-r border-gray-200 px-1"><span>EST. WAIT (MINS)</span><strong>Updating</strong></div>
+          <div className="flex min-w-0 flex-col items-center justify-center px-1"><span>ORDER FLOW</span><strong>Updating</strong></div>
+        </div>
         {!serverlessAdminMode && <div className="command-fixed-header__status">
           <span className="command-live-status"><span className="admin-live-dot" />{serverlessAdminMode ? "SECURE" : isSilentSyncing ? "SYNCING" : "LIVE"}</span>
           <div className="command-header-actions">

@@ -810,6 +810,10 @@ export default function OrderHistoryModal({
                   <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl bg-gray-50/50 p-2 max-h-60 overflow-y-auto">
                     {Array.isArray(selectedOrder.items) && selectedOrder.items.map((item: any, idx: number) => {
                       const isFree = Boolean(item.isFree || Number(item.price) === 0);
+                      const storedName = String(item.name || "Product");
+                      const variantSeparator = storedName.lastIndexOf(" - ");
+                      const displayProductName = String(item.productName || (variantSeparator >= 0 ? storedName.slice(0, variantSeparator) : storedName));
+                      const displayVariantName = String(item.selectedVariant?.name || item.variantName || (variantSeparator >= 0 ? storedName.slice(variantSeparator + 3) : ""));
                       return (
                         <div key={idx} className="order-history__item p-2 flex items-center justify-between gap-3 text-xs">
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -822,7 +826,7 @@ export default function OrderHistoryModal({
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <p className="order-history__item-name truncate text-gray-900">
-                                  {item.name}
+                                  {displayProductName}
                                 </p>
                                 {isFree && (
                                   <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
@@ -832,9 +836,7 @@ export default function OrderHistoryModal({
                               </div>
                               <p className="order-history__item-meta text-[11px] text-gray-500">
                                 {item.quantity || 1} × {isFree ? "FREE" : formatPHP(item.price || 0)}
-                                {(item.selectedVariant?.name || item.variantName) && (
-                                  <span className="text-gray-400"> • {item.selectedVariant?.name || item.variantName}</span>
-                                )}
+                                {displayVariantName && <span className="block text-gray-500">{displayVariantName}</span>}
                               </p>
                             </div>
                           </div>
@@ -849,7 +851,7 @@ export default function OrderHistoryModal({
 
                 {/* Financial Breakdown & Charges */}
                 <div className="order-history__payment-breakdown border border-gray-200 rounded-xl p-3 bg-white space-y-1 text-xs">
-                  <h4 className="font-heading font-bold uppercase tracking-wider text-gray-900 border-b border-gray-100 pb-1">
+                  <h4 className="order-detail-heading font-heading font-bold uppercase tracking-wider text-gray-900 border-b border-gray-100 pb-1">
                     Payment Breakdown
                   </h4>
                   {(selectedOrder.appliedCharges?.length ?? 0) === 0 && (
@@ -860,8 +862,8 @@ export default function OrderHistoryModal({
 
                   {/* Subtotal */}
                   <div className="flex justify-between items-center text-gray-600">
-                    <span>Items Subtotal:</span>
-                    <span className="order-history__charge-amount text-gray-900">
+                    <span className="order-detail-label">Items Subtotal:</span>
+                    <span className="order-detail-value order-history__charge-amount text-gray-900">
                       {formatPHP(selectedOrder.subTotal || selectedOrder.subtotal || selectedOrder.itemsSubtotal || selectedOrder.items?.reduce((s: number, i: any) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0) || 0)}
                     </span>
                   </div>
@@ -871,8 +873,8 @@ export default function OrderHistoryModal({
                     const isChFree = Boolean(ch.isFree || Number(ch.computedAmount || ch.amount) === 0);
                     return (
                       <div key={i} className="flex justify-between items-center text-gray-600">
-                        <span>{ch.name}:</span>
-                        <span className={`order-history__charge-amount ${isChFree ? "text-emerald-600 font-bold" : "text-gray-900"}`}>
+                        <span className="order-detail-label">{ch.name}:</span>
+                        <span className={`order-detail-value order-history__charge-amount ${isChFree ? "text-emerald-600 font-bold" : "text-gray-900"}`}>
                           {isChFree ? "WAIVED / FREE" : formatPHP(ch.computedAmount || ch.amount || 0)}
                         </span>
                       </div>
@@ -882,8 +884,8 @@ export default function OrderHistoryModal({
                   {/* Store Credits Applied */}
                   {Number(selectedOrder.storeCreditsUsed || 0) > 0 && (
                     <div className="flex justify-between items-center text-gray-600">
-                      <span>Store Credits Applied:</span>
-                      <span className="order-history__charge-amount text-emerald-700">
+                      <span className="order-detail-label">Store Credits Applied:</span>
+                      <span className="order-detail-value order-history__charge-amount text-emerald-700">
                         -{formatPHP(Number(selectedOrder.storeCreditsUsed))}
                       </span>
                     </div>
@@ -892,21 +894,21 @@ export default function OrderHistoryModal({
                   {/* Delivery Fee */}
                   <div className="flex justify-between items-center text-gray-600">
                     <div>
-                      <span>Delivery Fee ({selectedOrder.courier?.name || selectedOrder.courierName || "Courier"}):</span>
+                      <span className="order-detail-label">Delivery Fee ({selectedOrder.courier?.name || selectedOrder.courierName || "Courier"}):</span>
                       {selectedOrder.deliveryFeePaymentMethod === "upon_delivery" ? (
-                        <span className="block text-[10px] text-amber-700 font-bold uppercase tracking-wider">
+                        <span className="order-detail-label block text-[10px] text-amber-700 font-bold uppercase tracking-wider">
                           PAY UPON DELIVERY (COD)
                         </span>
                       ) : (
-                        <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider">
+                        <span className="order-detail-label block text-[10px] text-emerald-700 font-bold uppercase tracking-wider">
                           PAY UPON CHECKOUT
                         </span>
                       )}
                     </div>
                     {Boolean(selectedOrder.isDeliveryFeeFree || Number(selectedOrder.deliveryFee) === 0) ? (
-                      <span className="order-history__charge-amount text-emerald-600">WAIVED / FREE</span>
+                      <span className="order-detail-value order-history__charge-amount text-emerald-600">WAIVED / FREE</span>
                     ) : (
-                      <span className="order-history__charge-amount text-gray-900">
+                      <span className="order-detail-value order-history__charge-amount text-gray-900">
                         {formatPHP(selectedOrder.deliveryFee || selectedOrder.courier?.fee || 0)}
                       </span>
                     )}
@@ -914,8 +916,8 @@ export default function OrderHistoryModal({
 
                   {/* Grand Total */}
                   <div className="pt-2 border-t border-gray-200 flex justify-between items-center text-sm font-heading font-bold text-gray-900">
-                    <span>Total Amount:</span>
-                    <span className="text-base text-slate-950 font-bold font-mono">
+                    <span className="order-detail-label">Total Amount:</span>
+                    <span className="order-detail-value text-base text-slate-950 font-bold">
                       {formatPHP(
                         selectedOrder.deliveryFeePaymentMethod === "upon_delivery"
                           ? (selectedOrder.payableNow !== undefined 
@@ -932,14 +934,14 @@ export default function OrderHistoryModal({
                   {selectedOrder.deliveryFeePaymentMethod === "upon_delivery" && (
                     <div className="mt-2.5 pt-2 border-t border-dashed border-gray-200 space-y-1.5 text-[11px]">
                       <div className="flex justify-between items-center text-slate-600">
-                        <span>Amount Paid Now (Checkout):</span>
-                        <span className="font-bold text-slate-900 font-ibm-condensed">
+                        <span className="order-detail-label">Amount Paid Now (Checkout):</span>
+                        <span className="order-detail-value text-slate-900">
                           {formatPHP(selectedOrder.payableNow ?? (Number(selectedOrder.totalAmount) - Number(selectedOrder.deliveryFee)))}
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-amber-800 bg-amber-50 p-1.5 rounded border border-amber-200">
-                        <span className="font-bold">Pay to Courier upon delivery:</span>
-                        <span className="font-black font-ibm-condensed">
+                        <span className="order-detail-label font-bold">Pay to Courier upon delivery:</span>
+                        <span className="order-detail-value">
                           {formatPHP(selectedOrder.payableOnDelivery ?? selectedOrder.deliveryFee ?? 0)}
                         </span>
                       </div>
@@ -949,20 +951,20 @@ export default function OrderHistoryModal({
 
                 {/* Recipient & Delivery Details */}
                 <div className="border border-gray-200 rounded-xl p-4 bg-white space-y-2.5 font-mono text-xs">
-                  <h4 className="font-heading font-bold uppercase tracking-wider text-gray-900 border-b border-gray-100 pb-2">
+                  <h4 className="order-detail-heading font-heading font-bold uppercase tracking-wider text-gray-900 border-b border-gray-100 pb-2">
                     Recipient &amp; Delivery Info
                   </h4>
 
                   <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                     <div>
-                      <span className="text-[10px] uppercase text-gray-400 block font-bold">Receiver Name</span>
-                      <span className="font-ibm-condensed font-medium text-slate-800 uppercase">
+                      <span className="order-detail-label text-[10px] uppercase text-gray-400 block font-bold">Receiver Name</span>
+                      <span className="order-detail-value text-slate-800">
                         {selectedOrder.receiverName || "N/A"}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] uppercase text-gray-400 block font-bold">Receiver Phone</span>
-                      <span className="font-ibm-condensed font-medium text-slate-800">
+                      <span className="order-detail-label text-[10px] uppercase text-gray-400 block font-bold">Receiver Phone</span>
+                      <span className="order-detail-value text-slate-800">
                         {selectedOrder.receiverPhone || "N/A"}
                       </span>
                     </div>
@@ -970,10 +972,10 @@ export default function OrderHistoryModal({
 
                   <div className="space-y-2.5">
                     <div>
-                      <span className="text-[10px] uppercase text-gray-400 block font-bold">Delivery Address</span>
-                      <span className="text-slate-800 leading-relaxed block font-ibm-condensed font-medium">
+                      <span className="order-detail-label text-[10px] uppercase text-gray-400 block font-bold">Delivery Address</span>
+                      <span className="order-detail-value text-slate-800 leading-relaxed block">
                         {selectedOrder.deliveryAddress?.formatted || selectedOrder.deliveryAddress?.address || selectedOrder.address || "N/A"}
-                        <span className="block text-gray-500 text-[11px] mt-0.5 font-ibm-condensed font-medium">
+                        <span className="order-detail-value block text-gray-500 text-[11px] mt-0.5">
                           Unit / Landmark: {selectedOrder.deliveryAddress?.unitDetails || "Non"}
                         </span>
                       </span>
@@ -1096,7 +1098,7 @@ export default function OrderHistoryModal({
                             <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 font-heading mb-1.5">
                               Select Payment Method
                             </label>
-                            <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                            <div className="prime-payment-grid grid grid-cols-3 gap-x-2 gap-y-3">
                               {paymentMethods.map((method: any) => {
                                 const isOffline = method.isActive === false;
                                 const isSelected = !isOffline && selectedPaymentMethod?.id === method.id;
@@ -1113,14 +1115,14 @@ export default function OrderHistoryModal({
                                       setProofError("");
                                       setProofImage("");
                                     }}
-                                    className={`group w-full aspect-video border transition-colors flex items-center justify-center p-0 relative overflow-hidden bg-slate-950 select-none rounded-md shadow-[0_1px_3px_rgba(15,23,42,0.2)] ${isOffline ? "border-red-200/70 cursor-not-allowed opacity-90" : isSelected ? "border-slate-300 cursor-pointer" : "border-slate-500 hover:border-slate-300 cursor-pointer"}`}
+                                    className={`group w-full aspect-[1.7/1] border transition-all flex items-center justify-center p-1 relative overflow-hidden bg-white select-none rounded-md shadow-sm hover:shadow-md ${isOffline ? "border-red-200/70 cursor-not-allowed opacity-90" : isSelected ? "border-slate-800 ring-1 ring-slate-800 cursor-pointer" : "border-slate-200 hover:border-slate-400 cursor-pointer"}`}
                                     title={isOffline ? `${method.name} is currently offline` : method.name}
                                   >
                                     {method.logo ? (
                                       <TelegramMediaImage
                                         src={method.logo}
                                         alt={method.name}
-                                        className={`absolute inset-0 z-[2] w-full h-full object-fill ${isOffline ? "opacity-40 grayscale-[30%]" : ""}`}
+                                        className={`absolute inset-0 z-[2] w-full h-full object-contain p-1.5 ${isOffline ? "opacity-40 grayscale-[30%]" : ""}`}
                                         referrerPolicy="no-referrer"
                                       />
                                     ) : (

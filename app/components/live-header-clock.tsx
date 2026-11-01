@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 
-export default function LiveHeaderClock() {
+export default function LiveHeaderClock({ accessLabel = "ENCRYPTED CUSTOMER ACCESS" }: { accessLabel?: string }) {
   const [mounted, setMounted] = useState(false);
   const [timeStr, setTimeStr] = useState("");
 
@@ -27,6 +27,8 @@ export default function LiveHeaderClock() {
     return (
       <div className="prime-live-clock" id="live-clock-placeholder">
         <div className="prime-live-clock__time prime-live-clock__placeholder" />
+        <span className="prime-live-clock__rule" />
+        <span className="prime-live-clock__access">{accessLabel}</span>
       </div>
     );
   }
@@ -34,8 +36,10 @@ export default function LiveHeaderClock() {
   return (
     <div className="prime-live-clock" id="live-clock-container">
       <div className="prime-live-clock__time">
-        {timeStr}
+        <span className="prime-live-clock__time-text">{timeStr}</span>
       </div>
+      <span className="prime-live-clock__rule" aria-hidden="true" />
+      <span className="prime-live-clock__access">{accessLabel}</span>
     </div>
   );
 }

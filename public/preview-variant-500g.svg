@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+  <rect width="600" height="600" rx="42" fill="#f3eadc"/>
+  <rect x="125" y="70" width="350" height="460" rx="24" fill="#6d432c"/>
+  <path d="M155 155h290v235H155z" fill="#fffaf2"/>
+  <text x="300" y="245" text-anchor="middle" font-family="Arial,sans-serif" font-size="44" font-weight="700" fill="#6d432c">PRIME</text>
+  <text x="300" y="292" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" fill="#b67935">500G</text>
+  <circle cx="300" cy="342" r="34" fill="#12805c"/>
+</svg>

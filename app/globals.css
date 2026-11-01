@@ -1888,7 +1888,7 @@ body { color:var(--prime-ink); }
 .admin-shell .admin-primary-button, .admin-shell .admin-secondary-button, .serverless-admin-panel .serverless-action { min-height:32px; border-radius:7px; padding:0 10px; font:600 11px/1 'Roboto Condensed',sans-serif !important; }
 .admin-shell input,.admin-shell select,.admin-shell textarea,.serverless-admin-panel input,.serverless-admin-panel select,.serverless-admin-panel textarea { min-height:34px; border:1px solid #c7d3e2; border-radius:7px; background:#fff; padding:6px 8px; font:400 12px/1.2 'MiSans',sans-serif; }
 .system-wide-proprietary-footer { position:fixed; bottom:0; max-width:430px; margin-inline:auto; }
-.prime-system-footer__text { font:600 10px/1.1 'Roboto Condensed',sans-serif !important; letter-spacing:.04em; }
+.prime-system-footer__text { width:100%; font:600 11.5px/1.1 'Roboto Condensed',sans-serif !important; letter-spacing:.04em; }
 .prime-page-heading { display:flex; flex:0 0 72px !important; min-height:72px !important; height:72px !important; max-height:72px !important; box-sizing:border-box; align-items:center; padding-top:8px !important; padding-bottom:8px !important; overflow:hidden; background:#fff; color:#0755b8; box-shadow:0 3px 10px rgba(7,85,184,.08); }
 .prime-page-heading h1, .prime-page-heading h2, .prime-page-heading [class*="title"] { color: #0755b8 !important; line-height: 1 !important; }
 .prime-page-heading p { line-height: 1.2 !important; }
@@ -1907,3 +1907,144 @@ section > .prime-page-heading { width:calc(100% + 28px); margin-top:-14px; margi
 body, input, textarea, select, .font-mono { font-family:'Lato Condensed','Lato','Arial Narrow',sans-serif !important; }
 h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title { font-family:'Roboto Condensed',sans-serif !important; font-weight:400 !important; }
 @media (max-width:360px) { .admin-shell .admin-stat-grid,.serverless-admin-panel .serverless-fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* One root-shell contract owns phone sizing, typography, and Shopfront scrolling. */
+#mobile-portrait-viewport {
+  box-sizing: border-box !important;
+  width: min(100%, 430px) !important;
+  max-width: 430px !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  margin-inline: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  background: #fff !important;
+}
+#mobile-portrait-viewport,
+#mobile-portrait-viewport * {
+  box-sizing: border-box;
+  font-family: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif !important;
+  letter-spacing: normal;
+}
+#mobile-portrait-viewport { font-size: 14px !important; line-height: 1.3; }
+#mobile-portrait-viewport :is(h1, h2, h3, h4, h5, h6, .font-heading, .prime-page-heading__title, .admin-page-title, .admin-section__title, .serverless-panel-header h1, .serverless-disclosure__title) {
+  font-family: 'Roboto Condensed', sans-serif !important;
+  font-weight: 400 !important;
+}
+#mobile-portrait-viewport h1 { font-size: 20px !important; line-height: 1.08 !important; }
+#mobile-portrait-viewport h2 { font-size: 17px !important; line-height: 1.1 !important; }
+#mobile-portrait-viewport h3 { font-size: 15px !important; line-height: 1.15 !important; }
+#mobile-portrait-viewport :is(h4, h5, h6) { font-size: 13px !important; line-height: 1.2 !important; }
+#mobile-portrait-viewport :is([class*="text-[8px]"], [class*="text-[8.5px]"], [class*="text-[9px]"], [class*="text-[9.5px]"]) { font-size: 10px !important; line-height: 1.2 !important; }
+#mobile-portrait-viewport :is([class*="text-[10px]"], [class*="text-[10.5px]"], [class*="text-[11px]"], [class*="text-[11.5px]"]) { font-size: 12px !important; line-height: 1.25 !important; }
+#mobile-portrait-viewport :is([class*="text-[12px]"], [class*="text-[12.5px]"], [class*="text-[13px]"], [class*="text-[13.5px]"], [class*="text-[14px]"], [class*="text-[14.5px]"], [class*="text-xs"], [class*="text-sm"]) { font-size: 14px !important; line-height: 1.25 !important; }
+#mobile-portrait-viewport :is([class*="text-base"]) { font-size: 14px !important; line-height: 1.25 !important; }
+#mobile-portrait-viewport :is([class*="text-lg"], [class*="text-[15px]"], [class*="text-[16px]"], [class*="text-[17px]"]) { font-size: 16px !important; line-height: 1.15 !important; }
+#mobile-portrait-viewport :is([class*="text-xl"], [class*="text-[18px]"], [class*="text-[19px]"], [class*="text-[20px]"]) { font-size: 18px !important; line-height: 1.12 !important; }
+#mobile-portrait-viewport :is(input, select, textarea) { font-size: 13px !important; line-height: 1.25 !important; }
+#mobile-portrait-viewport :is(button, [role="button"]) { min-width: 0; }
+#mobile-portrait-viewport .prime-page-heading {
+  position: relative !important;
+  top: auto !important;
+  width: 100% !important;
+  height: 72px !important;
+  min-height: 72px !important;
+  max-height: 72px !important;
+  flex: 0 0 72px !important;
+  padding: 8px 12px !important;
+}
+#mobile-portrait-viewport .prime-page-heading :is(h1, h2, .prime-page-heading__title) { font-size: 16px !important; line-height: 1 !important; }
+#mobile-portrait-viewport .prime-page-heading p { font-size: 12px !important; line-height: 1.2 !important; }
+#mobile-portrait-viewport .prime-shopfront-shell {
+  display: flex;
+  width: 100%;
+  max-width: 430px;
+  height: auto !important;
+  min-height: 100dvh;
+  flex: 0 0 auto;
+  flex-direction: column;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+#mobile-portrait-viewport .prime-shopfront-global-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 45 !important;
+  flex: 0 0 auto;
+}
+#mobile-portrait-viewport .prime-shopfront-global-header .prime-identity-header {
+  box-sizing: border-box !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  flex: 0 0 58px !important;
+}
+#mobile-portrait-viewport .prime-shopfront-search {
+  position: sticky !important;
+  top: 100px !important;
+  z-index: 30 !important;
+  flex: 0 0 auto;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-shell,
+#mobile-portrait-viewport .prime-shopfront-shell .prime-cart,
+#mobile-portrait-viewport .prime-shopfront-shell .prime-order-history,
+#mobile-portrait-viewport .prime-shopfront-shell #account-modal-overlay {
+  width: 100% !important;
+  max-width: 430px !important;
+  margin-inline: auto !important;
+  overflow-x: hidden !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-shell {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow-y: visible !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-shell [class*="overflow-y-auto"] {
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-shell > .prime-page-heading { margin: 0 !important; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-cart > div:not(.prime-checkout) {
+  width: 100% !important;
+  max-width: 430px !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-cart > div:not(.prime-checkout) [class*="overflow-y-auto"] {
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-order-history > [role="dialog"],
+#mobile-portrait-viewport .prime-shopfront-shell #account-modal-overlay > div {
+  width: 100% !important;
+  max-width: 430px !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+#mobile-portrait-viewport :is([role="dialog"], [aria-modal="true"]) {
+  width: min(100%, 430px) !important;
+  max-width: 430px !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-order-history [class*="overflow-y-auto"],
+#mobile-portrait-viewport .prime-shopfront-shell #account-modal-overlay [class*="overflow-y-auto"] {
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-cart__product-name { font-size: 13px !important; line-height: 1.15 !important; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-cart__variant { font-size: 11px !important; line-height: 1.2 !important; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-cart__value { font-size: 12px !important; font-variant-numeric: tabular-nums; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-product-card__price { font-size: 13px !important; line-height: 1.1 !important; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-account__stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-account__stat { min-width: 0; padding: 8px !important; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-payment-grid,
+#mobile-portrait-viewport .prime-shopfront-shell .prime-courier-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
+#mobile-portrait-viewport .prime-shopfront-shell .order-detail-label,
+#mobile-portrait-viewport .prime-shopfront-shell .order-history__payment-breakdown > div > :first-child { font-family: 'Roboto Condensed', sans-serif !important; font-weight: 400 !important; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-order-history [class*="overflow-x-auto"] { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px !important; overflow-x: hidden !important; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-order-history [class*="overflow-x-auto"] button { min-width: 0; padding-inline: 4px !important; white-space: normal !important; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-order-history [class*="overflow-x-auto"] .ml-auto { grid-column: 1 / -1; justify-self: end; }

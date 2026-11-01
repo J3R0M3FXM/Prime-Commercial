@@ -128,7 +128,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer pointer-events-auto"
       onClick={onClose}
     >
       <div
@@ -145,16 +145,16 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
         <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-5 pb-4 overscroll-contain">
           <div className="text-left pr-10">
-            <p className="text-[9px] font-mono font-bold tracking-widest text-gray-400 uppercase leading-none">
+            <p className="text-[10px] font-mono font-bold tracking-wide text-slate-600 uppercase leading-tight">
               {product.category || "General"}
             </p>
-            <h2 className="mt-1 text-lg sm:text-xl font-heading font-bold text-gray-900 leading-[1.15] tracking-tight">
+            <h2 className="mt-1 text-lg font-heading font-bold text-gray-900 leading-tight tracking-tight">
               {product.name}
             </h2>
           </div>
 
           <div className="mt-4 flex justify-center">
-            <div key={variantFeedbackTick} className={`relative w-full max-w-[360px] ${variants.length > 1 ? "h-[min(34dvh,300px)]" : "aspect-square"} ${variantFeedbackTick > 0 ? "variant-selection-feedback" : ""} overflow-hidden rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center`}>
+            <div key={variantFeedbackTick} className={`relative aspect-square w-full max-w-[300px] ${variantFeedbackTick > 0 ? "variant-selection-feedback" : ""} overflow-hidden rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center`}>
               {renderGlossyChip()}
               <img
                 src={selectedVariant?.imageUrl || fallbackImage}
@@ -170,28 +170,28 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
           {selectedVariant && (
             <div className="mx-auto mt-2 flex max-w-[360px] items-baseline justify-between gap-2 px-1">
-              <span className="font-mono text-[9px] font-bold uppercase tracking-wide text-slate-500">Price per item</span>
-              <span className="font-mono text-base font-bold text-slate-900">{formatPHP(basePrice)}</span>
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-slate-600">Price per item</span>
+              <span className="font-mono text-base font-bold leading-none text-slate-900">{formatPHP(basePrice)}</span>
             </div>
           )}
 
           {product.description && (
-            <p className="mt-2 mx-auto max-w-[380px] text-center text-xs text-gray-500 leading-relaxed">
+            <p className="mt-2 mx-auto max-w-[380px] text-center text-xs text-gray-600 leading-relaxed">
               {product.description}
             </p>
           )}
 
           <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
-            <div className="relative min-w-0 font-mono text-[9px] font-bold uppercase tracking-wide text-slate-500">
+            <div className="relative min-w-0 font-mono text-[10px] font-bold uppercase tracking-wide text-slate-600">
               <span className="mb-1 block">Variant</span>
-              <button type="button" aria-haspopup="dialog" aria-expanded={variantMenuOpen} onClick={() => setVariantMenuOpen(true)} className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 text-left text-[10px] font-semibold normal-case text-slate-800 shadow-sm">
+              <button type="button" aria-haspopup="dialog" aria-expanded={variantMenuOpen} onClick={() => setVariantMenuOpen(true)} className="flex h-10 w-full touch-manipulation items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 text-left text-xs font-semibold normal-case text-slate-800 shadow-sm">
                 <span className="min-w-0 truncate">{selectedVariant?.name || "Choose a variant"}</span>
                 {selectedVariant && <span className="shrink-0 font-mono">{formatPHP(Number(selectedVariant.price) || 0)}</span>}
                 <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500" />
               </button>
             </div>
 
-            <div className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-wide text-slate-500">
+            <div className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wide text-slate-600">
               <span className="mb-1 block text-center">Quantity</span>
               <div className="flex h-10 items-center rounded-lg border border-slate-200 bg-white">
                 <button
@@ -214,7 +214,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
           </div>
 
           {selectedVariant && (
-            <div className="mt-1 flex min-h-4 items-center justify-between gap-2 text-[9px] font-mono text-slate-500">
+            <div className="mt-1 flex min-h-4 items-center justify-between gap-2 text-[10px] font-mono text-slate-600">
               <span>{isOutOfStock ? <span className="font-bold text-red-600">Unavailable</span> : `Stock: ${selectedVariant.stock}`}</span>
               {hasBundle && !isOutOfStock && <span className="truncate text-right text-emerald-700">Buy 2+ · {product.bundleConfig.discount}% off</span>}
             </div>
@@ -222,8 +222,8 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
 
           {selectedVariant && (
             <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 font-mono">
-              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Total amount</span>
-              <span className="text-lg font-bold text-slate-900">{formatPHP(finalPrice * currentQuantity)}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Total amount</span>
+              <span className="text-lg font-bold leading-none text-slate-900">{formatPHP(finalPrice * currentQuantity)}</span>
             </div>
           )}
 
@@ -255,7 +255,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
       </div>
       {variantMenuOpen && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-3 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/55 p-3 backdrop-blur-[2px] pointer-events-auto"
           onClick={(event) => {
             event.stopPropagation();
             if (event.target === event.currentTarget) setVariantMenuOpen(false);
@@ -265,16 +265,16 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
             <header className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
               <div>
                 <h3 id="variant-picker-title" className="font-heading text-base font-semibold text-slate-900">Select Variant</h3>
-                <p className="font-mono text-[11px] font-bold uppercase tracking-wide text-slate-500">{product.name}</p>
+                <p className="truncate font-mono text-[10px] font-bold uppercase tracking-wide text-slate-600">{product.name}</p>
               </div>
               <button type="button" onClick={() => setVariantMenuOpen(false)} aria-label="Close variant selector" className="rounded-full p-2 text-slate-600 hover:bg-slate-100"><X className="h-4 w-4" /></button>
             </header>
-            <div role="listbox" aria-label="Choose product variant" className="min-h-0 overflow-y-auto overscroll-contain">
+            <div role="listbox" aria-label="Choose product variant" className="min-h-0 overflow-y-auto overscroll-contain touch-pan-y">
               {variants.map((variant: any) => {
                 const stock = Math.max(0, Number(variant.stock) || 0);
                 const unavailable = stock <= 0;
                 const selected = String(selectedVariant?.id || "") === String(variant.id);
-                return <button key={variant.id} type="button" role="option" aria-selected={selected} disabled={unavailable} onClick={() => { setSelectedVariant(variant); setLocalQuantity(1); setVariantFeedbackTick((tick) => tick + 1); setVariantMenuOpen(false); }} className={`grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 border-b border-slate-100 px-3 py-3 text-left text-[11px] last:border-b-0 ${unavailable ? "cursor-not-allowed bg-slate-100 text-slate-400" : selected ? "bg-amber-50 text-slate-950" : "bg-white text-slate-800 hover:bg-slate-100"}`}>
+                return <button key={variant.id} type="button" role="option" aria-selected={selected} disabled={unavailable} onClick={() => { setSelectedVariant(variant); setLocalQuantity(1); setVariantFeedbackTick((tick) => tick + 1); setVariantMenuOpen(false); }} className={`grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 border-b border-slate-100 px-3 py-3 text-left text-xs last:border-b-0 ${unavailable ? "cursor-not-allowed bg-slate-100 text-slate-400" : selected ? "bg-amber-50 text-slate-950" : "bg-white text-slate-800 hover:bg-slate-100"}`}>
                   <span className="truncate font-semibold normal-case">{variant.name || "Variant"}</span><span className="whitespace-nowrap font-mono">{formatPHP(Number(variant.price) || 0)}</span><span className={`whitespace-nowrap font-mono ${unavailable ? "text-slate-400" : "text-slate-500"}`}>{unavailable ? "Out of stock" : `${stock} in stock`}</span>
                 </button>;
               })}

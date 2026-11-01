@@ -4,7 +4,7 @@ import { getServerlessCatalog, callServerless } from "@/lib/telegram-serverless-
 
 import React, { useEffect, useState, useMemo, Component, ErrorInfo, ReactNode } from 'react';
 import { useCart } from './cart-context';
-import { ShoppingCart, X, Plus, Minus, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
 import CheckoutModal from './checkout-modal';
 import PrimePageHeading from './prime-page-heading';
@@ -130,52 +130,45 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: 
           ) : (
             safeCart.map((item: any) => {
               if (!item || !item.id) return null;
+              const storedName = String(item.name || "Product");
+              const variantSeparator = storedName.lastIndexOf(" - ");
+              const displayProductName = String(item.productName || (variantSeparator >= 0 ? storedName.slice(0, variantSeparator) : storedName));
+              const displayVariantName = String(item.variantName || item.selectedVariant?.name || (variantSeparator >= 0 ? storedName.slice(variantSeparator + 3) : ""));
               return (
-                <div key={item.id} className="flex gap-2 p-1.5 bg-gray-50 rounded-lg border border-gray-100 items-center">
-                  <input 
-                    type="checkbox" 
-                    checked={item.selected !== false && item.catalogUnavailable !== true}
-                    disabled={item.catalogUnavailable === true}
-                    onChange={(e) => toggleSelection && toggleSelection(item.id, e.target.checked)}
-                    className="w-3.5 h-3.5 cursor-pointer accent-black shrink-0"
-                  />
-                  <img 
-                    src={item.imageUrl || "https://picsum.photos/seed/prime/100"} 
-                    alt={item.name || "Item"} 
-                    className="w-10 h-10 object-cover rounded-md bg-white border border-gray-200 shrink-0"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "https://picsum.photos/seed/prime/100";
-                    }}
-                  />
-                  <div className="flex-1 min-w-0 flex flex-col justify-between">
-                    <div className="flex justify-between items-start gap-1">
-                      <div className="min-w-0">
-                        <h3 className="prime-cart__product-name uppercase text-gray-900 line-clamp-1 text-[11px]">{item.name || "Product"}</h3>
-                        <p className="prime-cart__value text-[11px] text-gray-800 font-mono mt-0.5">{formatPHP(item.price || 0)}</p>
-                        {item.catalogUnavailable === true && (
-                          <p className="mt-1 text-[10px] font-semibold text-red-600">{item.catalogUnavailableReason || 'No longer available. Remove this item to continue.'}</p>
-                        )}
-                      </div>
-                      <button 
-                        onClick={() => removeFromCart && removeFromCart(item.id)}
-                        className="p-1 text-gray-400 hover:text-red-500 transition-colors cursor-pointer shrink-0"
-                        title="Remove item"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex items-center border border-gray-200 rounded bg-white">
+                <div key={item.id} className="flex items-start gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
+                  <div className="flex h-14 shrink-0 items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={item.selected !== false && item.catalogUnavailable !== true}
+                      disabled={item.catalogUnavailable === true}
+                      onChange={(e) => toggleSelection && toggleSelection(item.id, e.target.checked)}
+                      className="h-4 w-4 cursor-pointer accent-slate-900 shrink-0"
+                    />
+                    <img
+                      src={item.imageUrl || "https://picsum.photos/seed/prime/100"}
+                      alt={item.name || "Item"}
+                      className="h-14 w-14 aspect-square object-cover rounded-lg bg-white border border-gray-200 shrink-0"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = "https://picsum.photos/seed/prime/100"; }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <h3 className="prime-cart__product-name line-clamp-2 text-[12px] leading-tight text-gray-900">{displayProductName}</h3>
+                    {displayVariantName && <p className="prime-cart__variant mt-0.5 line-clamp-1 text-[10px] leading-tight text-slate-600">{displayVariantName}</p>}
+                    <p className="prime-cart__value mt-1 text-[11px] text-gray-800 font-mono">{formatPHP(item.price || 0)}</p>
+                    {item.catalogUnavailable === true && <p className="mt-1 text-[10px] font-semibold text-red-700">{item.catalogUnavailableReason || 'No longer available. Remove this item to continue.'}</p>}
+                  </div>
+                  <div className="flex h-14 w-[68px] shrink-0 flex-col gap-0.5">
+                    <button type="button" onClick={() => removeFromCart && removeFromCart(item.id)} className="h-[27px] w-full rounded-md border border-red-100 bg-white px-1 text-[9px] font-semibold uppercase tracking-wide text-red-700 shadow-sm transition hover:bg-red-50" title="Remove item">Remove</button>
+                    <div className="grid h-[27px] w-full grid-cols-3 items-center overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
                         <button 
-                          className="px-1.5 py-0.5 text-gray-500 hover:text-black hover:bg-gray-50 cursor-pointer"
+                          className="flex h-full items-center justify-center text-gray-500 hover:text-black hover:bg-gray-50 cursor-pointer"
                           onClick={() => updateQuantity && updateQuantity(item.id, (item.quantity || 1) - 1)}
                         >
                           <Minus className="w-2.5 h-2.5" />
                         </button>
-                        <span className="prime-cart__value text-[11px] font-mono w-5 text-center">{item.quantity || 1}</span>
+                        <span className="prime-cart__value text-[10px] font-mono text-center">{item.quantity || 1}</span>
                         <button 
-                          className="px-1.5 py-0.5 text-gray-500 hover:text-black hover:bg-gray-50 cursor-pointer"
+                          className="flex h-full items-center justify-center text-gray-500 hover:text-black hover:bg-gray-50 cursor-pointer"
                           onClick={() => updateQuantity && updateQuantity(item.id, (item.quantity || 1) + 1)}
                         >
                           <Plus className="w-2.5 h-2.5" />
@@ -183,7 +176,6 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: 
                       </div>
                     </div>
                   </div>
-                </div>
               );
             })
           )}

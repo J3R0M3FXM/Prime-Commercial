@@ -94,8 +94,8 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
   const activeTierTheme = tierColors[activeTier] || tierColors.Silver;
 
   return (
-    <div id="account-modal-overlay" className="w-full bg-gray-50 flex justify-center py-[4.8px]">
-      <div className="w-full max-w-[760px] min-h-[calc(100vh-120px)] bg-white shadow-sm border-x border-slate-200 flex flex-col overflow-hidden">
+    <div id="account-modal-overlay" className="prime-account w-full bg-gray-50 flex justify-center py-[4.8px]">
+      <div className="w-full max-w-[430px] min-h-[calc(100vh-120px)] bg-white shadow-sm border-x border-slate-200 flex flex-col overflow-hidden">
         {/* Modal Header */}
         <div className="prime-page-heading px-3.5 py-2.5 border-b border-gray-200 flex items-center justify-between bg-white sticky top-0 z-10">
           <div className="flex items-center gap-2">
@@ -124,7 +124,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-3.5 space-y-6">
+        <div className="flex-1 overflow-y-auto p-2.5 space-y-3">
           {loading && !data ? (
             <div className="py-16 text-center text-gray-500 font-mono text-sm">
               <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
@@ -137,12 +137,12 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
           ) : (
             <>
               {/* Profile Card & Tier Banner */}
-              <div className="bg-gray-50 border border-gray-200 p-4 sm:p-5 relative overflow-hidden">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 relative overflow-hidden">
+                <div className="flex items-center justify-between gap-2">
                   {/* Photo and Identity */}
-                  <div className="flex items-center gap-4">
+                  <div className="flex min-w-0 items-center gap-2.5">
                     <div className="relative group">
-                      <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm flex items-center justify-center">
                         {c?.photoUrl ? (
                           <img 
                             src={c.photoUrl} 
@@ -155,16 +155,16 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                       </div>
                     </div>
 
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-base font-semibold text-gray-900">{c?.tgName || 'Valued Member'}</h3>
+                        <h3 className="truncate text-sm font-semibold text-gray-900">{c?.tgName || 'Valued Member'}</h3>
                         {c?.tgUsername && (
                           <span className="text-xs text-gray-500 font-mono">@{c.tgUsername}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs font-mono text-gray-500">{c?.primeMemberId ? 'PRIME ID:' : 'Visitor Badge:'}</span>
-                        <span className="text-xs font-mono font-bold text-gray-900 bg-white px-2 py-0.5 border border-gray-300">
+                        <span className="max-w-[130px] truncate text-xs font-mono font-bold text-gray-900 bg-white px-2 py-0.5 border border-gray-300">
                           {c?.primeMemberId || c?.visitorBadgeNo || 'VISITOR'}
                         </span>
                         {c?.primeMemberId && (
@@ -181,7 +181,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                   </div>
 
                   {/* Tier Badge */}
-                  <div className="flex sm:flex-col items-start sm:items-end justify-between border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-200">
+                  <div className="flex shrink-0 flex-col items-end justify-center border-l border-gray-200 pl-2">
                     <div className="text-[10px] font-mono uppercase text-gray-500">Membership Tier</div>
                     <div className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider rounded-md ${activeTierTheme.pill} mt-0.5`}>
                       ★ {activeTier}
@@ -200,7 +200,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
               )}
 
                 {/* Rolling 30-day Tier Progress */}
-                <div className="mt-5 pt-4 border-t border-gray-200">
+                <div className="mt-3 pt-2 border-t border-gray-200">
                   <div className="flex items-center justify-between text-xs font-mono mb-1.5">
                     <span className="text-gray-600">
                       30-Day Item Spend: <strong className="text-gray-900">₱{Number(tier?.currentSpending || 0).toLocaleString()}</strong>
@@ -240,7 +240,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                   <button
                     key={t.key}
                     onClick={() => setActiveTab(t.key as any)}
-                    className={`flex-1 py-2.5 text-center font-medium transition-colors border-b-2 ${
+                    className={`prime-account__tab flex-1 py-2.5 text-center font-medium transition-colors border-b-2 ${
                       activeTab === t.key
                         ? 'border-emerald-600 text-emerald-700 font-bold'
                         : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -253,27 +253,27 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
 
               {/* TAB 1: OVERVIEW */}
               {activeTab === 'overview' && (
-                <div className="space-y-5">
+                <div className="space-y-3">
                   {/* Financial & Order Stats */}
                   <div>
                     <h4 className="text-xs font-mono uppercase text-gray-500 mb-2.5">Lifetime Account Activity</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 font-mono">
-                      <div className="p-3 bg-gray-50 border border-gray-200">
+                    <div className="prime-account__stat-grid grid grid-cols-2 gap-1.5 font-mono">
+                      <div className="prime-account__stat">
                         <div className="text-[10px] text-gray-500 uppercase">Total Orders</div>
                         <div className="text-base font-bold text-gray-900 mt-0.5">{c?.lifetimeOrderCount || 0}</div>
                         <div className="text-[10px] text-emerald-600 mt-0.5">{c?.lifetimeSuccessfulOrders || 0} Delivered</div>
                       </div>
-                      <div className="p-3 bg-gray-50 border border-gray-200">
+                      <div className="prime-account__stat">
                         <div className="text-[10px] text-gray-500 uppercase">Item Spend</div>
                         <div className="text-base font-bold text-gray-900 mt-0.5">₱{Number(c?.lifetimeItemSpending || 0).toLocaleString()}</div>
                         <div className="text-[10px] text-gray-400 mt-0.5">Points Base</div>
                       </div>
-                      <div className="p-3 bg-gray-50 border border-gray-200">
+                      <div className="prime-account__stat">
                         <div className="text-[10px] text-gray-500 uppercase">Total Spend</div>
                         <div className="text-base font-bold text-gray-900 mt-0.5">₱{Number(c?.lifetimeTotalSpending || 0).toLocaleString()}</div>
                         <div className="text-[10px] text-gray-400 mt-0.5">All Orders</div>
                       </div>
-                      <div className="p-3 bg-gray-50 border border-gray-200">
+                      <div className="prime-account__stat">
                         <div className="text-[10px] text-gray-500 uppercase">Discounts Saved</div>
                         <div className="text-base font-bold text-emerald-700 mt-0.5">₱{Number(c?.lifetimeDiscounts || 0).toLocaleString()}</div>
                         <div className="text-[10px] text-emerald-600 mt-0.5">Promos & Credits</div>
@@ -282,7 +282,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                   </div>
 
                   {/* Account Metadata Details */}
-                  <div className="border border-gray-200 p-4 font-mono text-xs space-y-2">
+                  <div className="border border-gray-200 rounded-lg p-3 font-mono text-xs space-y-2">
                     <h4 className="text-[11px] uppercase font-bold text-gray-700 border-b border-gray-100 pb-1.5 mb-2">
                       Account Registration & History
                     </h4>
@@ -318,7 +318,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
 
               {/* TAB 2: POINTS & STORE CREDITS */}
               {activeTab === 'points' && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Point Balances Cards */}
                   <div className="grid grid-cols-3 items-stretch gap-2 font-mono">
                     {/* Store Credits */}
@@ -398,9 +398,9 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
 
               {/* TAB 3: REFERRALS */}
               {activeTab === 'referrals' && (
-                <div className="space-y-5">
+                <div className="space-y-3">
                   {/* Share Card */}
-                  <div className="border border-gray-200 p-4 bg-gray-50 font-mono text-xs space-y-3">
+                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 font-mono text-xs space-y-2">
                     <div>
                       <h4 className="text-sm font-bold text-gray-900 uppercase">Your Permanent Referral Code</h4>
                       <p className="text-gray-500 text-[11px] mt-0.5">
@@ -469,7 +469,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
 
               {/* TAB 4: RECENT ORDERS */}
               {activeTab === 'orders' && (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-mono uppercase text-gray-500">Recent 5 Orders</h4>
                     <span className="text-[11px] font-mono text-gray-400">Click to view order details</span>

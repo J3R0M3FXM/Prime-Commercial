@@ -25,6 +25,20 @@ type PublicOrderQueue = {
   trafficFlowStatus: string;
 };
 
+const VISUAL_PREVIEW_PRODUCT = {
+  id: "visual-preview-product",
+  name: "PRIME Signature Blend",
+  category: "Coffee",
+  description: "Visual-preview product used only to inspect the product page and option selector.",
+  imageUrl: "/preview-variant-250g.svg",
+  stock: 12,
+  price: 185,
+  variants: [
+    { id: "small", name: "250g", price: 185, stock: 12, imageUrl: "/preview-variant-250g.svg", tag: "NEW" },
+    { id: "large", name: "500g", price: 320, stock: 8, imageUrl: "/preview-variant-500g.svg", tag: "NONE" },
+  ],
+};
+
 export default function Shopfront() {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
@@ -49,6 +63,11 @@ export default function Shopfront() {
 
   const { cart, cartCount, addToCart, updateQuantity } = useCart();
 
+  useEffect(() => {
+    if (!authorized) return;
+    document.getElementById("mobile-portrait-viewport")?.scrollTo({ top: 0, behavior: "auto" });
+  }, [activeTab, authorized]);
+
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true);
     try {
@@ -59,6 +78,12 @@ export default function Shopfront() {
         ? latest.find(product => String(product.id) === String(selected.id)) || null
         : null);
     } catch (error) {
+      if (import.meta.env.VITE_UI_PREVIEW === "1") {
+        setProducts([VISUAL_PREVIEW_PRODUCT]);
+        setSelectedProduct((current: any) => current || VISUAL_PREVIEW_PRODUCT);
+        setCatalogError("");
+        return;
+      }
       setCatalogError(error instanceof Error ? error.message : "Could not load the product catalog.");
     } finally {
       setCatalogLoading(false);
@@ -112,6 +137,8 @@ export default function Shopfront() {
       if (previewMode) {
         setAuthorized(true);
         setChecking(false);
+        setProducts([VISUAL_PREVIEW_PRODUCT]);
+        setSelectedProduct(VISUAL_PREVIEW_PRODUCT);
         void loadCatalog().catch(() => undefined);
         return;
       }
@@ -278,7 +305,7 @@ export default function Shopfront() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col relative pb-20">
+    <div className="prime-shopfront-shell min-h-screen bg-gray-50 flex flex-col relative pb-20">
       {isAdmin && (
         <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-[11px] font-mono shrink-0">
           <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
@@ -297,7 +324,7 @@ export default function Shopfront() {
       )}
 
       {/* Sticky Header */}
-      <header className="sticky top-0 z-45 bg-white border-b border-gray-100 shadow-[0_3px_5px_rgba(15,23,42,0.2)]">
+      <header className="prime-shopfront-global-header sticky top-0 z-45 bg-white border-b border-gray-100 shadow-[0_3px_5px_rgba(15,23,42,0.2)]">
         <PrimeIdentityHeader>
           {isAdmin && (
             <button
@@ -325,7 +352,7 @@ export default function Shopfront() {
       </header>
 
       {/* Search & Filter Controls (Below Header, matching the thin footer style/height) */}
-      <div className={`${activeTab !== "shop" ? "hidden" : ""} px-3 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[83.5px]`}>
+      <div className={`prime-shopfront-search ${activeTab !== "shop" ? "hidden" : ""} px-3 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[83.5px]`}>
         <div className="relative flex-[5] flex items-center">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
@@ -423,16 +450,16 @@ export default function Shopfront() {
                   <div className="p-2 sm:p-2.5 flex flex-col flex-1 justify-between gap-0.5 sm:gap-1">
                     {/* Category */}
                     {p.category && (
-                      <p className="text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 truncate leading-none mb-0.5">
+                      <p className="prime-product-card__category text-[10px] sm:text-[11px] font-mono font-bold uppercase tracking-widest text-slate-600 truncate leading-none mb-0.5">
                         {p.category}
                       </p>
                     )}
 
                     {/* Product Name */}
-                    <h3 className="font-roboto-condensed-semibold text-gray-900 line-clamp-2 leading-[1.05] text-[12px] sm:text-[13.5px] tracking-tight">
+                    <h3 className="font-roboto-condensed-semibold text-gray-900 line-clamp-2 leading-[1.05] text-[13px] sm:text-[14.5px] tracking-tight">
                       {p.name}
                     </h3>
-                    <p className="font-mono text-[8px] sm:text-[9px] font-bold uppercase leading-none tracking-wide text-slate-500">
+                    <p className="prime-product-card__availability font-mono text-[8.5px] sm:text-[9.5px] font-bold uppercase leading-none tracking-wide text-slate-700">
                       {variants.length} {variants.length === 1 ? "variant" : "variants"}
                     </p>
 
@@ -449,11 +476,11 @@ export default function Shopfront() {
                           setSelectedProduct(p);
                         }}
                         disabled={isOutOfStock}
-                        className="p-1 sm:p-1.5 bg-slate-900 hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-md transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
+                        className="p-1 sm:p-1.5 bg-transparent hover:bg-slate-100 disabled:bg-transparent disabled:text-gray-400 text-slate-800 rounded-md transition-colors cursor-pointer flex items-center justify-center shrink-0"
                         title={isOutOfStock ? "Sold Out" : "Select Options / Add to Cart"}
                         aria-label="Select Options"
                       >
-                        <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5" strokeWidth={2.75} />
                       </button>
                     </div>
                   </div>
