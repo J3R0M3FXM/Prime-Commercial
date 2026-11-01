@@ -361,14 +361,17 @@ type ServerlessProduct = {
 };
 
 /** Read the public catalog and turn Telegram media references into browser URLs. */
-export async function getServerlessCatalog(): Promise<ServerlessProduct[]> {
+export async function getServerlessCatalog(options: { resolveMedia?: boolean } = {}): Promise<ServerlessProduct[]> {
   const rows = await callServerless<ServerlessProduct[]>('getCatalog', {}, 20_000);
   if (!Array.isArray(rows)) throw new Error('The product catalog response was invalid.');
+  const resolveMedia = options.resolveMedia !== false;
 
   return await Promise.all(rows.map(async (product) => {
     const variants = await Promise.all((Array.isArray(product.variants) ? product.variants : []).map(async (variant) => ({
       ...variant,
-      imageUrl: await resolveTelegramMedia(String(variant.imageUrl || variant.image_url || '')),
+      imageUrl: resolveMedia
+        ? await resolveTelegramMedia(String(variant.imageUrl || variant.image_url || ''))
+        : String(variant.imageUrl || variant.image_url || ''),
     })));
     const bundleConfig = product.bundleConfig && typeof product.bundleConfig === 'object'
       ? { ...product.bundleConfig, variants }
@@ -376,8 +379,10 @@ export async function getServerlessCatalog(): Promise<ServerlessProduct[]> {
 
     return {
       ...product,
-      imageUrl: await resolveTelegramMedia(String(product.imageUrl || '')),
-      gallery: await Promise.all((Array.isArray(product.gallery) ? product.gallery : []).map((image) => resolveTelegramMedia(String(image || '')))),
+      imageUrl: resolveMedia ? await resolveTelegramMedia(String(product.imageUrl || '')) : String(product.imageUrl || ''),
+      gallery: resolveMedia
+        ? await Promise.all((Array.isArray(product.gallery) ? product.gallery : []).map((image) => resolveTelegramMedia(String(image || ''))))
+        : (Array.isArray(product.gallery) ? product.gallery : []),
       variants,
       bundleConfig,
       active: product.active !== false,

@@ -76,7 +76,10 @@ export default function CartProvider({ children }: { children: React.ReactNode }
     let cancelled = false;
     const refreshCartInventory = async () => {
       try {
-        const products = await getServerlessCatalog();
+        // Cart reconciliation only needs product/variant IDs, price, and stock.
+        // Resolving every catalog image here makes one failed media fetch abort
+        // the entire inventory sync and can leave stale cart records behind.
+        const products = await getServerlessCatalog({ resolveMedia: false });
         if (cancelled) return;
         setCart(previous => {
           if (!Array.isArray(previous)) return [];
@@ -100,7 +103,10 @@ export default function CartProvider({ children }: { children: React.ReactNode }
             }
             const stock = Math.max(0, Number(variant?.stock ?? product.stock) || 0);
             const price = Math.max(0, Number(variant?.price ?? product.price) || 0);
-            const imageUrl = String(variant?.imageUrl || product.imageUrl || item.imageUrl || '');
+            const imageReference = String(variant?.imageUrl || product.imageUrl || '');
+            const imageUrl = imageReference.startsWith('tgmedia:') || !imageReference
+              ? String(item.imageUrl || '')
+              : imageReference;
             const quantity = Math.min(Math.max(0, Number(item.quantity) || 1), stock);
             const unavailable = stock < 1;
             if (Number(item.stock) !== stock || Number(item.price) !== price || item.imageUrl !== imageUrl || Number(item.quantity) !== quantity || item.catalogUnavailable !== unavailable) {
@@ -141,7 +147,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
             ? item.id.split('_').slice(1).join('_')
             : 'default'
         );
-        const serverProduct = serverProducts.find(p => p && p.id === productId);
+        const serverProduct = serverProducts.find(p => p && String(p.id) === String(productId));
         if (!serverProduct || serverProduct.active === false || serverProduct.isActive === false) {
           if (item.catalogUnavailable === true) return item;
           changed = true;
@@ -157,7 +163,10 @@ export default function CartProvider({ children }: { children: React.ReactNode }
         }
         const liveStock = serverVariant ? Math.max(0, Number(serverVariant.stock) || 0) : Math.max(0, Number(serverProduct.stock) || 0);
         const livePrice = serverVariant ? Number(serverVariant.price) || 0 : Number(serverProduct.price) || 0;
-        const liveImage = serverVariant?.imageUrl || serverProduct.imageUrl || item.imageUrl || '';
+        const imageReference = String(serverVariant?.imageUrl || serverProduct.imageUrl || '');
+        const liveImage = imageReference.startsWith('tgmedia:') || !imageReference
+          ? String(item.imageUrl || '')
+          : imageReference;
         const newQty = Math.min(Math.max(0, Number(item.quantity) || 1), liveStock);
         const liveName = serverVariant ? serverProduct.name + ' - ' + serverVariant.name : serverProduct.name;
 

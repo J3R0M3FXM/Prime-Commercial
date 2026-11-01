@@ -86,7 +86,7 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: 
       // Read current cart data and applicable charges from Telegram Serverless.
       setLoadingCharges(true);
       Promise.all([
-        getServerlessCatalog(),
+        getServerlessCatalog({ resolveMedia: false }),
         callServerless<any[]>('getPublicCharges'),
       ]).then(([products, charges]) => {
         if (Array.isArray(products) && typeof syncWithServerData === 'function') syncWithServerData(products);

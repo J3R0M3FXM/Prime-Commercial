@@ -1828,21 +1828,29 @@ export default function CheckoutModal({
                 <div className="divide-y divide-gray-100 border border-gray-200 rounded-none bg-gray-50/50 p-2 max-h-48 overflow-y-auto">
                   {selectedItems.map((item) => {
                     const isFreeItem = Boolean(item.isFree || Number(item.price) === 0);
+                    const itemName = String(item?.name || item?.productName || "Product");
+                    const itemNameSeparator = itemName.lastIndexOf(" - ");
+                    const displayProductName = String(item.productName || (item.variantName
+                      ? itemName
+                      : itemNameSeparator >= 0 ? itemName.slice(0, itemNameSeparator) : itemName));
+                    const displayVariantName = String(item.variantName || (
+                      !item.productName && itemNameSeparator >= 0 ? itemName.slice(itemNameSeparator + 3) : ""
+                    ));
                     return (
                       <div key={item.id} className="p-2 flex items-center justify-between gap-3 text-xs">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <img
                             src={item.imageUrl || "https://picsum.photos/seed/prime/100"}
-                            alt={item.name}
+                            alt={displayProductName}
                             className="w-10 h-10 object-cover rounded bg-white border border-gray-200 shrink-0"
                           />
                           <div className="min-w-0">
                             <div className="min-w-0">
                               <p className="prime-checkout__review-value text-gray-900 truncate">
-                                {item.productName || (item.variantName ? item.name : item.name.includes(" - ") ? item.name.slice(0, item.name.lastIndexOf(" - ")) : item.name)}
+                                {displayProductName}
                               </p>
-                              {(item.variantName || (!item.productName && !item.variantName && item.name.includes(" - ") ? item.name.slice(item.name.lastIndexOf(" - ") + 3) : "")) && (
-                                <p className="prime-checkout__review-value text-[11px] font-mono text-gray-500 truncate">{item.variantName || item.name.slice(item.name.lastIndexOf(" - ") + 3)}</p>
+                              {displayVariantName && (
+                                <p className="prime-checkout__review-value text-[11px] font-mono text-gray-500 truncate">{displayVariantName}</p>
                               )}
                               <div className="flex items-center gap-1.5">
                               {isFreeItem && (
