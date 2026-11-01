@@ -269,12 +269,17 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
               </div>
               <button type="button" onClick={() => setVariantMenuOpen(false)} aria-label="Close variant selector" className="rounded-full p-2 text-slate-600 hover:bg-slate-100"><X className="h-4 w-4" /></button>
             </header>
+            <div aria-hidden="true" className="grid grid-cols-[minmax(0,1fr)_4.5rem_5.5rem] items-center gap-1 border-b border-slate-200 bg-slate-50 px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-wide text-slate-500">
+              <span className="text-right">Variant</span>
+              <span className="text-right">Price</span>
+              <span className="text-right">Stock</span>
+            </div>
             <div role="listbox" aria-label="Choose product variant" className="min-h-0 overflow-y-auto overscroll-contain touch-pan-y">
               {variants.map((variant: any) => {
                 const stock = Math.max(0, Number(variant.stock) || 0);
                 const unavailable = stock <= 0;
                 const selected = String(selectedVariant?.id || "") === String(variant.id);
-                return <button key={variant.id} type="button" role="option" aria-selected={selected} disabled={unavailable} onClick={() => { setSelectedVariant(variant); setLocalQuantity(1); setVariantFeedbackTick((tick) => tick + 1); setVariantMenuOpen(false); }} className={`grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 border-b border-slate-100 px-3 py-3 text-left text-xs last:border-b-0 ${unavailable ? "cursor-not-allowed bg-slate-100 text-slate-400" : selected ? "bg-amber-50 text-slate-950" : "bg-white text-slate-800 hover:bg-slate-100"}`}>
+                return <button key={variant.id} type="button" role="option" aria-selected={selected} disabled={unavailable} onClick={() => { setSelectedVariant(variant); setLocalQuantity(1); setVariantFeedbackTick((tick) => tick + 1); setVariantMenuOpen(false); }} className={`grid w-full grid-cols-[minmax(0,1fr)_4.5rem_5.5rem] items-center gap-1 border-b border-slate-100 px-3 py-3 text-right text-xs last:border-b-0 ${unavailable ? "cursor-not-allowed bg-slate-100 text-slate-400" : selected ? "bg-amber-50 text-slate-950" : "bg-white text-slate-800 hover:bg-slate-100"}`}>
                   <span className="truncate font-semibold normal-case">{variant.name || "Variant"}</span><span className="whitespace-nowrap font-mono">{formatPHP(Number(variant.price) || 0)}</span><span className={`whitespace-nowrap font-mono ${unavailable ? "text-slate-400" : "text-slate-500"}`}>{unavailable ? "Out of stock" : `${stock} in stock`}</span>
                 </button>;
               })}

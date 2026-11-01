@@ -2015,10 +2015,25 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   padding-bottom: calc(80px + env(safe-area-inset-bottom));
 }
 #mobile-portrait-viewport .prime-shopfront-global-header {
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 45 !important;
+  position: relative !important;
+  top: auto !important;
+  z-index: auto !important;
   flex: 0 0 auto;
+}
+#mobile-portrait-viewport .prime-shopfront-fixed-top {
+  position: fixed !important;
+  top: 0 !important;
+  left: 50% !important;
+  z-index: 60 !important;
+  width: min(100vw, 430px) !important;
+  max-width: 430px !important;
+  transform: translateX(-50%) !important;
+  background: #fff;
+}
+#mobile-portrait-viewport .prime-shopfront-fixed-top-spacer {
+  display: block !important;
+  width: 100%;
+  flex: 0 0 auto !important;
 }
 #mobile-portrait-viewport .prime-shopfront-global-header .prime-identity-header {
   box-sizing: border-box !important;
@@ -2027,9 +2042,9 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   flex: 0 0 35px !important;
 }
 #mobile-portrait-viewport .prime-shopfront-search {
-  position: sticky !important;
-  top: 100px !important;
-  z-index: 30 !important;
+  position: relative !important;
+  top: auto !important;
+  z-index: auto !important;
   flex: 0 0 auto;
 }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-page-shell,
@@ -2092,3 +2107,15 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 #mobile-portrait-viewport .prime-shopfront-shell .prime-order-history [class*="overflow-x-auto"] { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px !important; overflow-x: hidden !important; }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-order-history [class*="overflow-x-auto"] button { min-width: 0; padding-inline: 4px !important; white-space: normal !important; }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-order-history [class*="overflow-x-auto"] .ml-auto { grid-column: 1 / -1; justify-self: end; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-product-card__category,
+#mobile-portrait-viewport .prime-shopfront-shell .prime-product-card__availability {
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  color: #64748b !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-shopfront-search {
+  padding-top: 0 !important;
+}
+#system-wide-proprietary-footer .prime-system-footer__text {
+  font-size: 9.5px !important;
+}

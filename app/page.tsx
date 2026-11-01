@@ -312,6 +312,7 @@ export default function Shopfront() {
 
   return (
     <div className="prime-shopfront-shell min-h-screen bg-gray-50 flex flex-col relative pb-20">
+      <div className="prime-shopfront-fixed-top">
       {isAdmin && (
         <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-[11px] font-mono shrink-0">
           <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
@@ -329,8 +330,8 @@ export default function Shopfront() {
         </div>
       )}
 
-      {/* Sticky Header */}
-      <header className="prime-shopfront-global-header sticky top-0 z-45 bg-white border-b border-gray-100 shadow-[0_3px_5px_rgba(15,23,42,0.2)]">
+      {/* Fixed global header and queue monitor */}
+      <header className="prime-shopfront-global-header bg-white border-b border-gray-100 shadow-[0_3px_5px_rgba(15,23,42,0.2)]">
         <PrimeIdentityHeader>
           {isAdmin && (
             <button
@@ -358,7 +359,7 @@ export default function Shopfront() {
       </header>
 
       {/* Search & Filter Controls (Below Header, matching the thin footer style/height) */}
-      <div className={`prime-shopfront-search ${activeTab !== "shop" ? "hidden" : ""} px-3 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none z-30 sticky top-[83.5px]`}>
+      <div className={`prime-shopfront-search ${activeTab !== "shop" ? "hidden" : ""} px-3 py-1.5 bg-gray-50 border-b border-gray-200/80 flex flex-row gap-2 max-w-[430px] mx-auto w-full items-center select-none`}>
         <div className="relative flex-[5] flex items-center">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
@@ -380,6 +381,8 @@ export default function Shopfront() {
           </select>
         </div>
       </div>
+      </div>
+      <div aria-hidden="true" className="prime-shopfront-fixed-top-spacer" style={{ height: `${(activeTab === "shop" ? 115.5 : 76.5) + (isAdmin ? 32 : 0)}px` }} />
 
       {/* Main Content */}
       <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 px-3 sm:px-3.5 pt-[4.8px] pb-[4.8px] sm:pt-[5.6px] sm:pb-[5.6px] w-full`}>
