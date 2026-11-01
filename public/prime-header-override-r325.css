@@ -27,11 +27,11 @@ header.prime-shopfront-global-header .prime-live-clock {
   width: max-content !important;
   max-width: 100% !important;
   min-width: 0 !important;
-  height: 29px !important;
+  height: 26px !important;
   flex-direction: column !important;
   align-items: flex-end !important;
   justify-content: center !important;
-  gap: 3px !important;
+  gap: 0 !important;
   overflow: hidden !important;
   text-align: right !important;
 }
@@ -56,7 +56,7 @@ header.prime-shopfront-global-header .prime-live-clock__time-text {
   width: max-content !important;
   max-width: 100% !important;
   overflow: visible !important;
-  padding-bottom: 3px !important;
+  padding-bottom: 1px !important;
   border-bottom: 0 !important;
   color: #102a56 !important;
   font-family: 'Roboto Slab Variable', 'Roboto Slab', serif !important;
@@ -82,15 +82,15 @@ header.prime-shopfront-global-header .prime-live-clock__access {
   overflow: hidden !important;
   color: #047857 !important;
   font-family: 'Roboto Condensed', sans-serif !important;
-  font-size: 9px !important;
+  font-size: 8px !important;
   font-weight: 600 !important;
   line-height: 1 !important;
-  letter-spacing: .12em !important;
+  letter-spacing: .06em !important;
   text-align: right !important;
   text-overflow: clip !important;
   white-space: nowrap !important;
   border-top: 0 !important;
-  padding-top: 3px !important;
+  padding-top: 1px !important;
   padding-left: 0 !important;
   animation: prime-encrypted-access-pulse-r325 1.8s ease-in-out infinite;
 }
@@ -102,7 +102,20 @@ header.command-fixed-header .prime-identity-header {
 }
 header.command-fixed-header .prime-identity-header__logo { height: 29px !important; }
 header.command-fixed-header .prime-live-clock {
-  height: 29px !important;
+  height: 26px !important;
+  gap: 0 !important;
+}
+header.command-fixed-header .prime-live-clock__time { padding: 0 !important; }
+header.command-fixed-header .prime-live-clock__time-text { padding-bottom: 1px !important; }
+header.command-fixed-header .prime-live-clock__access {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  font-size: 8px !important;
+  line-height: 1 !important;
+  letter-spacing: .06em !important;
+  padding-top: 1px !important;
+  text-align: right !important;
+  white-space: nowrap !important;
 }
 header.command-fixed-header .command-header-queue span {
   color: #64748b;
@@ -112,6 +125,25 @@ header.command-fixed-header .command-header-queue span {
 header.command-fixed-header .command-header-queue strong {
   color: #0f172a;
   font: 600 13.5px/1 'Roboto Condensed', sans-serif;
+}
+
+#system-wide-proprietary-footer {
+  box-sizing: border-box !important;
+  left: 50% !important;
+  right: auto !important;
+  width: min(100vw, 430px) !important;
+  max-width: 430px !important;
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+  transform: translateX(-50%) !important;
+}
+#system-wide-proprietary-footer .prime-system-footer__text {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  margin: 0 !important;
+  font-size: clamp(10px, 3vw, 13px) !important;
+  line-height: 1.1 !important;
+  letter-spacing: 0 !important;
 }
 
 @keyframes prime-encrypted-access-pulse-r325 { 50% { opacity: .55; } }
