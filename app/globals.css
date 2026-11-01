@@ -1956,6 +1956,18 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   flex: 0 0 72px !important;
   padding: 8px 12px !important;
 }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-heading {
+  height: 27px !important;
+  min-height: 27px !important;
+  max-height: 27px !important;
+  flex: 0 0 27px !important;
+  padding: 0 12px !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-heading h2 {
+  margin: 0 !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+}
 #mobile-portrait-viewport .prime-page-heading :is(h1, h2, .prime-page-heading__title) { font-size: 16px !important; line-height: 1 !important; }
 #mobile-portrait-viewport .prime-page-heading p { font-size: 12px !important; line-height: 1.2 !important; }
 #mobile-portrait-viewport .prime-shopfront-shell {
