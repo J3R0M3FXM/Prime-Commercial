@@ -1957,10 +1957,10 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   padding: 8px 12px !important;
 }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-page-heading {
-  height: 27px !important;
-  min-height: 27px !important;
-  max-height: 27px !important;
-  flex: 0 0 27px !important;
+  height: 38.5px !important;
+  min-height: 38.5px !important;
+  max-height: 38.5px !important;
+  flex: 0 0 38.5px !important;
   padding: 0 12px !important;
 }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-page-heading h2 {
