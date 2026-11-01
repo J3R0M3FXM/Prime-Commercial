@@ -39,6 +39,12 @@ const VISUAL_PREVIEW_PRODUCT = {
   ],
 };
 
+function isVisualPreviewMode() {
+  return import.meta.env.VITE_UI_PREVIEW === "1"
+    && typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("visual-preview") === "1";
+}
+
 export default function Shopfront() {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
@@ -78,7 +84,7 @@ export default function Shopfront() {
         ? latest.find(product => String(product.id) === String(selected.id)) || null
         : null);
     } catch (error) {
-      if (import.meta.env.VITE_UI_PREVIEW === "1") {
+      if (isVisualPreviewMode()) {
         setProducts([VISUAL_PREVIEW_PRODUCT]);
         setSelectedProduct((current: any) => current || VISUAL_PREVIEW_PRODUCT);
         setCatalogError("");
@@ -133,7 +139,7 @@ export default function Shopfront() {
 
   useEffect(() => {
     async function checkAuth() {
-      const previewMode = import.meta.env.VITE_UI_PREVIEW === "1";
+      const previewMode = isVisualPreviewMode();
       if (previewMode) {
         setAuthorized(true);
         setChecking(false);
