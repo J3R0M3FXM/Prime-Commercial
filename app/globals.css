@@ -2119,3 +2119,15 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 #system-wide-proprietary-footer .prime-system-footer__text {
   font-size: 9.5px !important;
 }
+#mobile-portrait-viewport :is(button, a[href], [role="button"], [role="option"], [role="tab"], [role="menuitem"], [role="switch"], summary, select, [class~="cursor-pointer"]):not(:disabled) {
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 110ms ease-out;
+}
+#mobile-portrait-viewport :is(button, a[href], [role="button"], [role="option"], [role="tab"], [role="menuitem"], [role="switch"], summary, select, [class~="cursor-pointer"]):not(:disabled):not([aria-disabled="true"]):active {
+  filter: brightness(0.9);
+}
+@media (prefers-reduced-motion: reduce) {
+  #mobile-portrait-viewport :is(button, a[href], [role="button"], [role="option"], [role="tab"], [role="menuitem"], [role="switch"], summary, select, [class~="cursor-pointer"]):not(:disabled) {
+    transition: none;
+  }
+}
