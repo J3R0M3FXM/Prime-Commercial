@@ -1968,6 +1968,38 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   font-size: 16px !important;
   line-height: 1 !important;
 }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-heading,
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-heading :is(h1, h2, .prime-page-heading__title, .prime-page-heading__icon, svg),
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-heading__icon svg {
+  color: #000 !important;
+}
+#mobile-portrait-viewport .prime-shopfront-info-page {
+  width: 100% !important;
+  max-width: 430px !important;
+  min-height: calc(100dvh - 120px) !important;
+  margin: 0 auto !important;
+  padding: 0 12px 12px !important;
+  border: 0 !important;
+  background: #fff !important;
+}
+#mobile-portrait-viewport .prime-shopfront-info-card {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+}
+#mobile-portrait-viewport .prime-shopfront-info-card > p:first-child {
+  margin: 0;
+  color: #111827 !important;
+  font: 600 14px/1.2 'Roboto Condensed', sans-serif !important;
+}
+#mobile-portrait-viewport .prime-shopfront-info-card__description {
+  margin: 5px 0 0;
+  color: #475569 !important;
+  font: 400 13px/1.35 'Lato Condensed', 'Lato', sans-serif !important;
+}
 #mobile-portrait-viewport .prime-page-heading :is(h1, h2, .prime-page-heading__title) { font-size: 16px !important; line-height: 1 !important; }
 #mobile-portrait-viewport .prime-page-heading p { font-size: 12px !important; line-height: 1.2 !important; }
 #mobile-portrait-viewport .prime-shopfront-shell {

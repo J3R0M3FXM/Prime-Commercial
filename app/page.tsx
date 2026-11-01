@@ -498,23 +498,23 @@ export default function Shopfront() {
       </main>
 
       {activeTab === "notifications" && (
-        <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
-          <section className="prime-page-shell w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-3 sm:p-3.5">
+        <div className="w-full bg-white flex justify-center">
+          <section className="prime-page-shell prime-shopfront-info-page w-full max-w-[430px] mx-auto bg-white min-h-[calc(100vh-120px)]">
           <PrimePageHeading icon={<Bell />} title="NOTIFICATIONS" />
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <div className="prime-shopfront-info-card">
             <p className="text-sm font-semibold text-slate-800">Telegram order notifications are enabled.</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">You will receive updates when an order is received, its status changes, payment information is updated, or tracking information is added.</p>
+            <p className="prime-shopfront-info-card__description">You will receive updates when an order is received, its status changes, payment information is updated, or tracking information is added.</p>
           </div>
           </section>
         </div>
       )}
       {activeTab === "support" && (
-        <div className="w-full bg-gray-50 flex justify-center py-[4.8px]">
-          <section className="prime-page-shell w-full max-w-[760px] mx-auto bg-white border-x border-slate-200 min-h-[calc(100vh-120px)] p-3 sm:p-3.5">
+        <div className="w-full bg-white flex justify-center">
+          <section className="prime-page-shell prime-shopfront-info-page w-full max-w-[430px] mx-auto bg-white min-h-[calc(100vh-120px)]">
           <PrimePageHeading icon={<Headphones />} title="SUPPORT" />
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <div className="prime-shopfront-info-card">
             <p className="text-sm font-semibold text-slate-800">Need help with an order?</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">Open MY ORDERS to review your purchase details and current order status. Telegram notifications will keep you informed as your order progresses.</p>
+            <p className="prime-shopfront-info-card__description">Open MY ORDERS to review your purchase details and current order status. Telegram notifications will keep you informed as your order progresses.</p>
           </div>
           </section>
         </div>
