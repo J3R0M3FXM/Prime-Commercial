@@ -1978,9 +1978,9 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 }
 #mobile-portrait-viewport .prime-shopfront-global-header .prime-identity-header {
   box-sizing: border-box !important;
-  height: 58px !important;
-  min-height: 58px !important;
-  flex: 0 0 58px !important;
+  height: 35px !important;
+  min-height: 35px !important;
+  flex: 0 0 35px !important;
 }
 #mobile-portrait-viewport .prime-shopfront-search {
   position: sticky !important;
