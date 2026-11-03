@@ -1,4 +1,4 @@
-name: PRIME order notification dispatch
+name: PRIME order notification maintenance
 
 on:
   repository_dispatch:
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Run the bounded Serverless notification dispatcher
+      - name: Reconcile due orders and send queued notifications
         env:
           TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_TOKEN }}
-        run: npm exec --yes --package=@tgcloud/cli -- tgcloud run endpoints/dispatchOrderNotifications '{}'
+        run: npm exec --yes --package=@tgcloud/cli -- tgcloud run endpoints/maintainOrderNotifications '{}'
