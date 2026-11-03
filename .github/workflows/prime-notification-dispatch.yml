@@ -21,6 +21,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Refresh runtime modules from live TGCloud
+        env:
+          TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_TOKEN }}
+        run: npm exec --yes --package=@tgcloud/cli -- tgcloud pull --force
       - name: Reconcile due orders and send queued notifications
         env:
           TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_TOKEN }}
