@@ -25,6 +25,7 @@ import {
   Download,
   QrCode,
   ExternalLink,
+  Check,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -41,13 +42,15 @@ import { formatPHP } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
 import { getClientFingerprint, getOrCreateSessionToken, getFreshClientLocation } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
-import { authenticatedFetch } from "./telegram-auth-client";
 import TelegramMediaImage from "./telegram-media-image";
+import SecuredPaymentLink from "./secured-payment-link";
 import {
   callServerless,
   clearPendingServerlessCheckoutKey,
   getOrCreateServerlessCheckoutKey,
   hasTelegramServerlessBridge,
+  createPaymentSession,
+  uploadPaymentProofDataUrl,
   resolveTelegramMedia,
   uploadPaymentReceiptDataUrl,
 } from "@/lib/telegram-serverless-client";
@@ -97,7 +100,13 @@ export function formatCourierName(name: string): string {
   return name.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-function CourierTileLogo({ reference, name, selected }: { reference: string; name: string; selected: boolean }) {
+export function selectorTileClass(selected: boolean, disabled = false) {
+  return `group w-full aspect-[2/1] rounded-lg border-0 transition-all flex items-center justify-center p-0 relative overflow-hidden shadow-sm hover:shadow-md select-none ${disabled ? "bg-slate-100 cursor-not-allowed opacity-60" : selected ? "bg-slate-50 shadow-md ring-2 ring-slate-900" : "bg-white"}`;
+}
+
+export const selectorLabelClass = "block truncate w-full text-center leading-tight text-[9px] sm:text-[10px] font-heading font-black uppercase tracking-wide";
+
+export function CheckoutTileLogo({ reference, name, selected, payment = false }: { reference: string; name: string; selected: boolean; payment?: boolean }) {
   const [src, setSrc] = useState("");
   const [failed, setFailed] = useState(!reference);
 
@@ -112,7 +121,8 @@ function CourierTileLogo({ reference, name, selected }: { reference: string; nam
     return () => { active = false; };
   }, [reference]);
 
-  if (failed || !src) return <Truck className={`relative z-[2] h-8 w-8 ${selected ? "text-slate-500" : "text-slate-300"}`} aria-hidden="true" />;
+  const Icon = payment ? CreditCard : Truck;
+  if (failed || !src) return <Icon className={`relative z-[2] h-8 w-8 ${selected ? "text-slate-500" : "text-slate-300"}`} aria-hidden="true" />;
   return <img src={src} alt={name} className="absolute inset-0 z-[2] h-full w-full object-contain" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 }
 
@@ -122,12 +132,14 @@ export default function CheckoutModal({
   selectedItems = [],
   onOrderSuccess,
 }: CheckoutModalProps) {
-  // Step state: 1 = Contact & Receiver, 2 = Address & Map, 3 = Courier & Delivery Fee, 4 = Review & Place Order, 5 = Confirmation
+  // Step state: 1 = Contact, 2 = Address, 3 = Courier, 4 = Review, 5 = Payment, 6 = Confirmation
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Payment States
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
+  const [paymentMethodsLoadError, setPaymentMethodsLoadError] = useState(false);
+  const [paymentMethodsReloadKey, setPaymentMethodsReloadKey] = useState(0);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<any>(null);
   const [uploadedProofImage, setUploadedProofImage] = useState<string>("");
   const [isSubmittingProof, setIsSubmittingProof] = useState(false);
@@ -135,11 +147,15 @@ export default function CheckoutModal({
   const [copiedText, setCopiedText] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [currentPaymentPage, setCurrentPaymentPage] = useState(0);
+  const [paymentPageDirection, setPaymentPageDirection] = useState<1 | -1>(1);
   const [isPaymentQrModalOpen, setIsPaymentQrModalOpen] = useState(false);
   const [zoomedPaymentMethod, setZoomedPaymentMethod] = useState<any>(null);
   const [isStartingMayaCheckout, setIsStartingMayaCheckout] = useState(false);
   const [mayaCheckoutError, setMayaCheckoutError] = useState("");
+  const [gatewayMethodPending, setGatewayMethodPending] = useState<any>(null);
+  const [isGatewayPromptOpen, setIsGatewayPromptOpen] = useState(false);
   const proofInputRef = useRef<HTMLInputElement>(null);
+  const preSubmitProofInputRef = useRef<HTMLInputElement>(null);
   const [isPreviewProofOpen, setIsPreviewProofOpen] = useState(false);
 
   // Receipt forensics state; no OCR or payment decision is performed here.
@@ -255,6 +271,7 @@ export default function CheckoutModal({
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.targetTouches[0].clientX;
+    touchEndX.current = null;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -262,14 +279,20 @@ export default function CheckoutModal({
   };
 
   const handleTouchEnd = (totalPages: number) => {
-    if (touchStartX.current === null || touchEndX.current === null) return;
+    if (touchStartX.current === null || touchEndX.current === null) {
+      touchStartX.current = null;
+      touchEndX.current = null;
+      return;
+    }
     const diff = touchStartX.current - touchEndX.current;
     const threshold = 50; // swipe threshold in pixels
     if (diff > threshold) {
       // Swiped left -> next page
+      setPaymentPageDirection(1);
       setCurrentPaymentPage((prev) => Math.min(prev + 1, totalPages - 1));
     } else if (diff < -threshold) {
       // Swiped right -> prev page
+      setPaymentPageDirection(-1);
       setCurrentPaymentPage((prev) => Math.max(0, prev - 1));
     }
     // reset
@@ -310,6 +333,7 @@ export default function CheckoutModal({
     isFreeShipping: boolean;
     shippingSubsidy?: number;
     cashbackPoints?: number;
+    freeProductName?: string;
   } | null>(null);
   const [isCheckingPromo, setIsCheckingPromo] = useState<boolean>(false);
   const [promoError, setPromoError] = useState<string>("");
@@ -386,11 +410,14 @@ export default function CheckoutModal({
           .finally(() => setIsLoadingTier(false));
       }
 
-      // Synchronize directly with Firestore customer record to guarantee primeMemberId hydration
+      // Production checkout account data comes from TGCloud only. Do not read
+      // credits through the retired account route.
       if (resolvedId) {
         setIsLoadingProfile(true);
-        authenticatedFetch(`/api/account?customerId=${encodeURIComponent(resolvedId)}`, { credentials: 'include', cache: 'no-store' })
-          .then(res => res.json())
+        const accountRequest = hasTelegramServerlessBridge()
+          ? callServerless<any>('getMyAccount', {}, 20_000)
+          : Promise.reject(new Error('TGCloud checkout is unavailable.'));
+        accountRequest
           .then(data => {
             const customer = data?.customer;
             if (customer) {
@@ -457,12 +484,8 @@ export default function CheckoutModal({
       try {
         setIsLoadingCharges(true);
         setChargesLoadError("");
-        const data = hasTelegramServerlessBridge()
-          ? await callServerless<any[]>("getPublicCharges", {})
-          : await authenticatedFetch(`/api/charges?_t=${Date.now()}`, { cache: "no-store", headers: { "Pragma": "no-cache" } }).then(async (response) => {
-              if (!response.ok) throw new Error("The current charge list was unavailable.");
-              return response.json();
-            });
+        if (!hasTelegramServerlessBridge()) throw new Error("TGCloud checkout is unavailable.");
+        const data = await callServerless<any[]>("getPublicCharges", {});
         if (!Array.isArray(data)) throw new Error("The current charge list was unavailable.");
         setActiveCharges(data);
       } catch (e) {
@@ -475,26 +498,34 @@ export default function CheckoutModal({
     fetchCharges();
   }, [isOpen, currentStep]);
 
-  // Fetch active payment methods when step becomes 5 (order placed) or when modal opens
+  // Load payment instructions when the customer reaches the payment step.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || currentStep !== 5) return;
+    let active = true;
     const fetchPaymentMethods = async () => {
       try {
         setIsLoadingPaymentMethods(true);
-        const data = await callServerless<any[]>("getPublicPaymentMethods", {});
-        const receiptTypes = new Set(["qr_code", "manual_transfer", "crypto", "secured_payment_link"]);
-        setPaymentMethods((Array.isArray(data) ? data : []).filter((method) =>
+        setPaymentMethodsLoadError(false);
+        const data = await callServerless<any[]>("getPublicPaymentMethods", {}, 30_000);
+        if (!Array.isArray(data)) throw new Error("Payment methods response was invalid.");
+        const receiptTypes = new Set(["qr_code", "manual_transfer", "crypto", "secured_payment_link", "api", "webhook"]);
+        if (!active) return;
+        setPaymentMethods(data.filter((method) =>
           receiptTypes.has(String(method?.paymentType || method?.type || "").toLowerCase()) && method?.isActive !== false
         ));
       } catch (e) {
         console.warn("Could not fetch payment methods:", e);
-        setPaymentMethods([]);
+        if (active) {
+          setPaymentMethods([]);
+          setPaymentMethodsLoadError(true);
+        }
       } finally {
-        setIsLoadingPaymentMethods(false);
+        if (active) setIsLoadingPaymentMethods(false);
       }
     };
     fetchPaymentMethods();
-  }, [isOpen]);
+    return () => { active = false; };
+  }, [isOpen, currentStep, paymentMethodsReloadKey]);
 
   // Reset checkout session state when closed. This is important because the
   // modal stays mounted inside CartDrawer; leaving currentStep at 4 while clearing
@@ -528,9 +559,9 @@ export default function CheckoutModal({
   // Precise GPS is parked. App startup, checkout open, and order submission
   // never request location. Only "Use My Location" below can do so.
 
-  // Live sync for order updates & courier tracking button when on Step 5 (Targeted Single Order Query)
+  // Live sync for order updates & courier tracking button when on Step 6 (Targeted Single Order Query)
   useEffect(() => {
-    if (currentStep !== 5 || !completedOrder) return;
+    if (currentStep !== 6 || !completedOrder) return;
     const orderId = completedOrder.id || completedOrder.orderNumber;
     if (!orderId) return;
 
@@ -546,13 +577,12 @@ export default function CheckoutModal({
       }
 
       try {
-        const res = await authenticatedFetch(`/api/orders?orderId=${encodeURIComponent(orderId)}`);
-        if (res.ok) {
-          const orderData = await res.json();
-          if (orderData && (orderData.id || orderData.orderNumber)) {
-            setCompletedOrder((prev: any) => ({ ...prev, ...orderData }));
-          }
-        }
+        if (!hasTelegramServerlessBridge()) return;
+        const orders = await callServerless<any[]>("getMyOrders", {}, 20_000);
+        const orderData = Array.isArray(orders)
+          ? orders.find((item) => String(item?.id || item?.orderNumber || "") === String(orderId))
+          : null;
+        if (orderData) setCompletedOrder((prev: any) => ({ ...prev, ...orderData }));
       } catch (err) {
         // silent background sync error
       }
@@ -580,19 +610,7 @@ export default function CheckoutModal({
     try {
       setIsStartingMayaCheckout(true);
       setMayaCheckoutError("");
-      const res = await authenticatedFetch("/api/maya/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId,
-          paymentMethodId: selectedPaymentMethod.id,
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success || !data.redirectUrl) {
-        throw new Error(data.error || "Unable to start Maya Checkout. Check the active Maya environment and configured public API key.");
-      }
+        throw new Error("Maya payment links must be opened from the configured secure payment method. This retired payment route is disabled.");
 
       setCompletedOrder((prev: any) => ({
         ...prev,
@@ -877,14 +895,14 @@ export default function CheckoutModal({
   // Recalculate promo discount if cart items subtotal changes
   const promoDiscountAmount = useMemo(() => {
     if (!appliedPromo) return 0;
-    if (appliedPromo.isFreeShipping) return 0; // Handled via effectiveCourierDeliveryFee
+    if (appliedPromo.discountType === "free_shipping" || appliedPromo.discountType === "shipping_discount") return 0; // Shipping subsidy is applied to delivery only.
     if (appliedPromo.discountType === "percentage" && appliedPromo.discountValue) {
       const pct = Number(appliedPromo.discountValue) || 0;
       let calc = (itemsSubtotal * pct) / 100;
       if (appliedPromo.maxDiscountAmount) {
         calc = Math.min(calc, appliedPromo.maxDiscountAmount);
       }
-      return Math.min(itemsSubtotal, Math.round(calc));
+      return Math.min(itemsSubtotal, Math.round(calc * 100) / 100);
     }
     return Math.min(itemsSubtotal, appliedPromo.discountAmount || 0);
   }, [appliedPromo, itemsSubtotal]);
@@ -1028,18 +1046,8 @@ export default function CheckoutModal({
         hardwareId: fpData.hardwareId,
         sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id)
       };
-      let data: any;
-      if (hasTelegramServerlessBridge()) {
-        data = await callServerless<any>("validatePromo", promoRequest, 20_000);
-      } else {
-        const res = await authenticatedFetch("/api/promos/validate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(promoRequest),
-        });
-        data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "We couldn't check this code. Please try again.");
-      }
+      if (!hasTelegramServerlessBridge()) throw new Error("TGCloud checkout is unavailable.");
+      const data: any = await callServerless<any>("validatePromo", promoRequest, 20_000);
       if (!data?.valid) {
         setPromoError(data.error || "Invalid promo code.");
         return;
@@ -1059,7 +1067,8 @@ export default function CheckoutModal({
         maxDiscountAmount: data.maxDiscountAmount,
         isFreeShipping: Boolean(data.isFreeShipping),
         shippingSubsidy: Number(data.shippingSubsidy) || 0,
-        cashbackPoints: Number(data.cashbackPoints) || 0
+        cashbackPoints: Number(data.cashbackPoints) || 0,
+        freeProductName: String(data.freeProductName || "")
       });
       setPromoCodeInput("");
     } catch (err: any) {
@@ -1085,17 +1094,8 @@ export default function CheckoutModal({
     setReferralError("");
     setReferralSuccess("");
     try {
-      const res = await authenticatedFetch("/api/referral/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          referralCode: cleanCode,
-          customerId: tgCustomer.id,
-          customerMemberId: tgCustomer.primeMemberId
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.valid) {
+      const data = await callServerless<any>("validateReferral", { referralCode: cleanCode });
+      if (!data?.valid) {
         setReferralError(data.error || "Invalid referral code.");
         return;
       }
@@ -1178,6 +1178,10 @@ export default function CheckoutModal({
       return;
     }
     const normalizedDeliveryPaymentMethod = String(deliveryPaymentMethod || "").trim().toLowerCase();
+    if (hasTelegramServerlessBridge() && (!selectedPaymentMethod?.id || !uploadedProofImage)) {
+      setSubmitError("Choose a payment method and upload your payment proof before submitting the order.");
+      return;
+    }
 
     // Do not send an order request with a missing delivery-payment channel.
     // Step 4 should never be able to fall through to the API in an invalid state.
@@ -1197,12 +1201,8 @@ export default function CheckoutModal({
 
       // Match the total shown to the customer to the canonical charge, promo,
       // courier, and credit calculation used by createOrder.
-      const freshCharges = hasTelegramServerlessBridge()
-        ? await callServerless<any[]>("getPublicCharges", {})
-        : await authenticatedFetch(`/api/charges?_t=${Date.now()}`, { cache: "no-store", headers: { "Pragma": "no-cache" } }).then(async (response) => {
-            if (!response.ok) throw new Error("The current charge list was unavailable.");
-            return response.json();
-          });
+      if (!hasTelegramServerlessBridge()) throw new Error("TGCloud checkout is unavailable.");
+      const freshCharges = await callServerless<any[]>("getPublicCharges", {});
       if (!Array.isArray(freshCharges)) throw new Error("The current charge list was unavailable.");
       setActiveCharges(freshCharges);
       setChargesLoadError("");
@@ -1314,8 +1314,12 @@ export default function CheckoutModal({
       if (hasTelegramServerlessBridge()) {
         const operationKey = getOrCreateServerlessCheckoutKey(String(tgCustomer.id));
         activeOperationKey = operationKey;
+        const paymentSession = await createPaymentSession(orderData, String(selectedPaymentMethod.id), operationKey);
+        if (!paymentSession?.success || !paymentSession.paymentSessionId) throw new Error("We couldn't start the payment session. Please try again.");
+        await uploadPaymentProofDataUrl(uploadedProofImage, paymentSession.paymentSessionId, "image/jpeg", ocrAnalysis);
         orderResult = await callServerless<any>("createOrder", {
           ...orderData,
+          paymentSessionId: paymentSession.paymentSessionId,
           operationKey,
         }, 60_000);
         if (!orderResult || orderResult.success === false) {
@@ -1323,17 +1327,7 @@ export default function CheckoutModal({
         }
         clearPendingServerlessCheckoutKey(String(tgCustomer.id), operationKey);
       } else {
-        const res = await authenticatedFetch("/api/orders", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(orderData),
-        });
-
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to submit order.");
-        }
-        orderResult = await res.json();
+        throw new Error("TGCloud checkout is unavailable.");
       }
       setCompletedOrder(orderResult);
 
@@ -1347,7 +1341,7 @@ export default function CheckoutModal({
         console.warn("Failed to persist order to local storage", e);
       }
 
-      setCurrentStep(5);
+      setCurrentStep(6);
       onOrderSuccess(orderResult);
 
     } catch (err: any) {
@@ -1380,13 +1374,15 @@ export default function CheckoutModal({
                   {currentStep === 2 && <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />}
                   {currentStep === 3 && <Truck className="h-4 w-4 shrink-0" aria-hidden="true" />}
                   {currentStep === 4 && <Receipt className="h-4 w-4 shrink-0" aria-hidden="true" />}
-                  {currentStep === 5 && <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                  {currentStep === 5 && <CreditCard className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                  {currentStep === 6 && <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />}
                   <span className="truncate">
                     {currentStep === 1 && "Customer & Receiver Details"}
                     {currentStep === 2 && "Delivery Details"}
                     {currentStep === 3 && "Delivery & Handling"}
                     {currentStep === 4 && "Review"}
-                    {currentStep === 5 && "Order Submitted"}
+                    {currentStep === 5 && "Payment"}
+                    {currentStep === 6 && "Order Submitted"}
                   </span>
                 </span>
               </h2>
@@ -1698,7 +1694,7 @@ export default function CheckoutModal({
                     No couriers currently available for this route. Please re-adjust address or contact support.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                  <div className="prime-courier-grid grid grid-cols-3 gap-1.5 sm:gap-2">
                     {availableCouriers.map((courier) => {
                       const isSelected = selectedCourierId === courier.id;
                       return (
@@ -1707,16 +1703,12 @@ export default function CheckoutModal({
                             type="button"
                             onClick={() => setSelectedCourierId(courier.id)}
                             aria-pressed={isSelected}
-                            className={`group w-full aspect-[2/1] rounded-lg border-0 transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white shadow-sm hover:shadow-md ${
-                              isSelected
-                                ? "bg-slate-50 shadow-md ring-2 ring-slate-900"
-                                : "bg-white"
-                            }`}
+                            className={selectorTileClass(isSelected)}
                           >
-                            <CourierTileLogo reference={String(courier.logo || "")} name={courier.name} selected={isSelected} />
+                            <CheckoutTileLogo reference={String(courier.logo || "")} name={courier.name} selected={isSelected} />
                           </button>
                           <div className="w-full text-center leading-tight">
-                            <span className="block truncate text-[9px] sm:text-[10px] font-heading font-black uppercase tracking-wide text-slate-900">
+                            <span className={`${selectorLabelClass} text-slate-900`}>
                               {formatCourierName(courier.name)}
                             </span>
                             <span className="block text-xs sm:text-[13px] font-mono font-bold text-slate-950 tracking-tight">
@@ -1769,21 +1761,7 @@ export default function CheckoutModal({
 
           {/* ================= STEP 4: ORDER BREAKDOWN & CONFIRM ================= */}
           {currentStep === 4 && (
-            <div className="space-y-3">
-              <div className="prime-checkout__review-warning border-2 border-amber-400 bg-amber-50 px-2.5 py-2 text-amber-950">
-                <span className="prime-checkout__review-warning-icon" aria-hidden="true">
-                  <svg viewBox="0 0 48 48" role="presentation">
-                    <circle cx="24" cy="24" r="21" fill="#facc15" stroke="#fbbf24" strokeWidth="2" />
-                    <path d="M24 12c-5 0-8 4-8 9v6l-3 4v2h22v-2l-3-4v-6c0-5-3-9-8-9Zm-3 24h6a3 3 0 0 1-6 0Z" fill="#713f12" />
-                    <path d="M10 18c-2 2-2 7 0 9m28-9c2 2 2 7 0 9" fill="none" stroke="#713f12" strokeWidth="2.5" strokeLinecap="round" />
-                    <path d="M24 8V6" stroke="#713f12" strokeWidth="2.5" strokeLinecap="round" />
-                  </svg>
-                </span>
-                <p className="text-[11px] text-left text-amber-950 font-mono leading-tight">
-                  Double-check all order details before submitting. Orders are confirmed only after payment is completed and proof of payment is uploaded and validated within one hour of order submission.
-                </p>
-              </div>
-
+            <div className="space-y-3 prime-checkout__review-page">
               {submitError && (
                 <div className="text-xs font-mono text-red-600 flex items-center gap-1.5 py-1">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -1960,8 +1938,14 @@ export default function CheckoutModal({
                       <div className="min-w-0 flex-1 pr-1">
                         <span className="font-bold text-emerald-950 uppercase block truncate">{appliedPromo.code}</span>
                         <span className="text-[10px] text-emerald-700 font-semibold block truncate">
-                          {appliedPromo.isFreeShipping
+                          {appliedPromo.discountType === "free_product"
+                            ? `Free product: ${appliedPromo.freeProductName || "selected item"}`
+                            : appliedPromo.discountType === "coins_cashback"
+                            ? `${appliedPromo.discountValue}% points back`
+                            : appliedPromo.isFreeShipping
                             ? "Free Shipping"
+                            : appliedPromo.discountType === "shipping_discount"
+                            ? `₱${appliedPromo.shippingSubsidy?.toLocaleString() || "0"} shipping off`
                             : appliedPromo.discountType === "percentage"
                             ? `${appliedPromo.discountValue}% OFF`
                             : `₱${appliedPromo.discountAmount.toLocaleString()} OFF`}
@@ -2160,6 +2144,12 @@ export default function CheckoutModal({
                   </div>
                 )}
 
+                {appliedPromo?.discountType === "free_product" && (
+                  <div className="flex justify-between items-center text-xs font-mono text-emerald-700 pt-1 border-t border-gray-100">
+                    <span>Free product: {appliedPromo.freeProductName || "selected item"}</span><span>₱0</span>
+                  </div>
+                )}
+
                 {/* Points Cashback Voucher Reward */}
                 {appliedPromo && (appliedPromo as any).cashbackPoints > 0 && (
                   <div className="flex justify-between items-center text-xs font-mono text-amber-800 pt-1 border-t border-gray-100 bg-amber-50/50 p-1.5 rounded">
@@ -2206,8 +2196,75 @@ export default function CheckoutModal({
             </div>
           )}
 
-          {/* ================= STEP 5: ORDER CONFIRMATION ================= */}
-          {currentStep === 5 && completedOrder && (
+          {/* ================= STEP 5: PAYMENT & PROOF BEFORE SUBMISSION ================= */}
+          {currentStep === 5 && (
+            <section className="prime-checkout__payment-section space-y-3 border-t border-slate-200 pt-3">
+              <div className="border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-950">
+                Pay the amount below, then attach your receipt or payment screenshot. The order is created only after the proof is attached.
+              </div>
+              <div className="flex items-center justify-between border-2 border-blue-300 bg-blue-50 px-3 py-3">
+                <span className="font-heading font-bold uppercase text-blue-950">Total Payable Now</span>
+                <span className="font-mono text-xl font-bold text-blue-950">{formatPHP(payableNow)}</span>
+              </div>
+
+              {isLoadingPaymentMethods ? (
+                <div className="p-8 text-center bg-gray-50 border border-gray-200 text-xs font-mono text-gray-500">
+                  <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin text-black" />Loading payment options...
+                </div>
+              ) : paymentMethodsLoadError ? (
+                <div className="space-y-2 border border-amber-200 bg-amber-50 p-4 text-center text-xs font-mono text-amber-900">
+                  <p>Payment options could not load. Please retry before submitting your order.</p>
+                  <button type="button" onClick={() => setPaymentMethodsReloadKey((key) => key + 1)} className="rounded border border-amber-400 bg-white px-3 py-2 font-heading font-semibold text-amber-950">Retry Payment Options</button>
+                </div>
+              ) : paymentMethods.length === 0 ? (
+                <div className="border border-gray-200 bg-gray-50 p-4 text-center text-xs font-mono text-gray-600">No active payment methods are currently configured. Please contact shop support.</div>
+              ) : (
+                <>
+                  <div className="prime-payment-grid grid grid-cols-3 gap-2">
+                    {paymentMethods.map((method) => {
+                      const type = String(method.paymentType || method.type || "").toLowerCase();
+                      const selected = selectedPaymentMethod?.id === method.id;
+                      return <div key={method.id} className="flex min-w-0 flex-col items-center gap-1">
+                        <button type="button" onClick={() => { setSelectedPaymentMethod(method); setUploadedProofImage(""); setOcrAnalysis(null); setSubmitError(""); }} aria-pressed={selected} className={selectorTileClass(selected)}>
+                          <CheckoutTileLogo reference={String(method.logo || "")} name={method.name} selected={selected} payment />
+                          <span className="sr-only">{method.name}</span>
+                          {type === "qr_code" && <QrCode className="absolute bottom-1 right-1 h-3 w-3 text-slate-500" aria-hidden="true" />}
+                        </button>
+                        <span className={selectorLabelClass}>{method.name}</span>
+                      </div>;
+                    })}
+                  </div>
+
+                  {selectedPaymentMethod && (
+                    <div className="space-y-2 border border-slate-200 bg-slate-50 p-3 text-xs">
+                      <p className="font-heading font-bold uppercase text-slate-900">{selectedPaymentMethod.name}</p>
+                      {(selectedPaymentMethod.accountName || selectedPaymentMethod.accountNumber) && <div className="font-mono text-slate-700">{selectedPaymentMethod.accountName && <div>{selectedPaymentMethod.accountName}</div>}{selectedPaymentMethod.accountNumber && <div className="font-bold select-all">{selectedPaymentMethod.accountNumber}</div>}</div>}
+                      {selectedPaymentMethod.instructions && <p className="font-mono text-slate-600">{selectedPaymentMethod.instructions}</p>}
+                      {selectedPaymentMethod.paymentLinkUrl && <SecuredPaymentLink url={selectedPaymentMethod.paymentLinkUrl} />}
+                    </div>
+                  )}
+
+                  <input ref={preSubmitProofInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 10 * 1024 * 1024) { setSubmitError("Payment proof must be 10 MB or smaller."); return; }
+                    const reader = new FileReader();
+                    reader.onloadend = () => { const value = String(reader.result || ""); setUploadedProofImage(value); setOcrAnalysis(null); setSubmitError(""); void analyzeReceiptImage(value); };
+                    reader.readAsDataURL(file);
+                  }} />
+                  <button type="button" onClick={() => preSubmitProofInputRef.current?.click()} disabled={!selectedPaymentMethod?.id || isAnalyzingReceipt} className="w-full bg-slate-900 px-3 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-white disabled:cursor-not-allowed disabled:opacity-50">
+                    {!selectedPaymentMethod?.id ? "Select Payment Method First" : uploadedProofImage ? "Replace Payment Proof" : "Attach Payment Proof"}
+                  </button>
+                  {isAnalyzingReceipt && <p className="text-center text-[11px] font-mono text-slate-600">Analyzing proof image…</p>}
+                  {uploadedProofImage && !isAnalyzingReceipt && <p className="border border-emerald-200 bg-emerald-50 p-2 text-center text-[11px] font-mono text-emerald-800">Payment proof attached. You can now submit the order for staff review.</p>}
+                  {ocrError && <p className="border border-red-200 bg-red-50 p-2 text-[11px] font-mono text-red-700">{ocrError}</p>}
+                </>
+              )}
+            </section>
+          )}
+
+          {/* ================= STEP 6: ORDER CONFIRMATION ================= */}
+          {currentStep === 6 && completedOrder && (
             <div className="py-2.5 px-1 space-y-3">
               {/* Pending payment banner */}
               <div className="prime-checkout__pending-banner">
@@ -2244,10 +2301,10 @@ export default function CheckoutModal({
                     <span className="font-bold">-{formatPHP(completedOrder.promoDiscount)}</span>
                   </div>
                 )}
-                {completedOrder.storeCreditsUsed > 0 && (
+                {Number(completedOrder?.storeCreditsUsed || creditsDeducted) > 0 && (
                   <div className="flex justify-between items-center border-b border-gray-200 pb-2 text-emerald-700">
                     <span className="text-gray-400 uppercase text-[9px] font-bold">Store Credits Used</span>
-                    <span className="font-bold">-{formatPHP(completedOrder.storeCreditsUsed)}</span>
+                    <span className="font-bold">-{formatPHP(completedOrder?.storeCreditsUsed ?? creditsDeducted)}</span>
                   </div>
                 )}
                 <div className="border-b border-gray-200 pb-2 space-y-1">
@@ -2298,34 +2355,41 @@ export default function CheckoutModal({
               {completedOrder.paymentDeadlineAt && (
                 <div className="prime-checkout__deadline p-3 bg-red-50 border-2 border-red-400 rounded-lg text-center">
                   <p className="text-sm font-mono font-bold uppercase tracking-wider text-red-900">
-                    Payment Proof Deadline
+                    Payment Session Expiry
                   </p>
                   <p className="mt-1 text-sm font-mono leading-snug text-red-800">
-                    Settle the total payable amount and upload the receipt on or before {formatPaymentDeadline(completedOrder.paymentDeadlineAt)} to avoid cancellation.
+                    Your payment proof was submitted with the order. Staff will review it before payment approval; if the session expires before submission, start checkout again.
                   </p>
                 </div>
               )}
 
-              {/* Settle Payment Section */}
-              {Number(completedOrder.payableNow || 0) === 0 && Number(completedOrder.storeCreditsUsed || 0) > 0 ? (
+              {/* Proof is already stored before this confirmation is reachable. */}
+              {true ? (
                 <div className="border-t border-gray-200 pt-3">
                   <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-none text-center space-y-1.5 w-full">
                     <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
                       <CheckCircle2 className="w-6 h-6" />
                     </div>
                     <h4 className="text-sm font-heading font-bold uppercase tracking-wider text-emerald-950">
-                      Fully Settled via Store Credits
+                      Payment Proof Submitted
                     </h4>
                     <p className="text-xs font-mono text-emerald-800 leading-relaxed">
-                      Your order total was completely covered by your PRIME Store Credits. No bank or e-wallet transfer is required. Your order is queued for fulfillment!
+                      Your payment proof is attached to this order for staff review. Payment is not marked paid until the provider is manually verified.
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="border-t border-gray-200 pt-3 space-y-2.5">
+                <div className="prime-checkout__payment-section border-t border-gray-200 pt-3 space-y-2.5">
+                <div className="prime-checkout__payment-reminder border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-950">
+                  Please ensure to obtain a copy of the payment receipt. This is required prior to order submission.
+                </div>
+                <div className="prime-checkout__payment-total flex items-center justify-between border-2 border-blue-300 bg-blue-50 px-3 py-3">
+                  <span className="font-heading font-bold uppercase text-blue-950">Total Payable Now</span>
+                  <span className="font-mono text-xl font-bold text-blue-950">{formatPHP(currentPayableNow)}</span>
+                </div>
                   <div className="text-center">
                     <h4 className="text-sm font-heading font-bold uppercase tracking-wider text-gray-900">
-                      Available Payment Method
+                      CHOOSE YOUR PREFERRED PAYMENT METHOD.
                     </h4>
                   </div>
 
@@ -2334,15 +2398,22 @@ export default function CheckoutModal({
                     <Loader2 className="w-5 h-5 animate-spin text-black" />
                     <span>Loading payment options...</span>
                   </div>
+                ) : paymentMethodsLoadError ? (
+                  <div className="p-4 text-center bg-amber-50 border border-amber-200 text-xs font-mono text-amber-900 space-y-2">
+                    <p>Payment options could not load. Your order was submitted; please retry here or open Orders to view payment instructions.</p>
+                    <button type="button" onClick={() => setPaymentMethodsReloadKey((key) => key + 1)} className="inline-flex items-center justify-center gap-1.5 rounded border border-amber-400 bg-white px-3 py-2 font-heading font-semibold text-amber-950 active:translate-y-px">
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Retry Payment Options
+                    </button>
+                  </div>
                 ) : paymentMethods.length === 0 ? (
                   <div className="p-6 text-center bg-gray-50 rounded-none border border-gray-200 text-xs font-mono text-gray-600">
                     No active payment methods are currently configured by the administrator. Please contact shop support to settle payment manually.
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    {/* Method Tiles Selection (4 columns per row, max 2 rows per page, swipe left/right + dot indicators) */}
+                    {/* Three columns and up to three rows per page. */}
                     {(() => {
-                      const itemsPerPage = 8;
+                      const itemsPerPage = 9;
                       const totalPages = Math.ceil(paymentMethods.length / itemsPerPage);
                       
                       // Safety: if the current page is out of bounds, clip it
@@ -2353,12 +2424,12 @@ export default function CheckoutModal({
                         <div className="space-y-3">
                           {/* Outer Container with Swipe Events */}
                           <div 
-                            className="relative overflow-hidden w-full select-none cursor-grab active:cursor-grabbing"
+                            className="relative overflow-hidden w-full p-0.5 select-none cursor-grab active:cursor-grabbing"
                             onTouchStart={handleTouchStart}
                             onTouchMove={handleTouchMove}
                             onTouchEnd={() => handleTouchEnd(totalPages)}
                           >
-                            <div className="grid grid-cols-4 gap-x-1.5 gap-y-2 sm:gap-x-2 sm:gap-y-2">
+                            <div key={pageIndex} className={`prime-payment-grid prime-payment-grid--page prime-payment-grid--${paymentPageDirection === 1 ? "next" : "previous"} grid grid-cols-3 gap-1.5 sm:gap-2`}>
                               {slicedMethods.map((method) => {
                                 const isOffline = method.isActive === false;
                                 const isSelected = !isOffline && selectedPaymentMethod?.id === method.id;
@@ -2367,40 +2438,31 @@ export default function CheckoutModal({
                                 const qrImg = method.qrCodeImage || method.qrCode || method.qrImage || method.qr_code_image || "";
 
                                 return (
-                                  <div key={method.id} className="flex flex-col items-center gap-1.5">
+                                  <div key={method.id} className="flex flex-col items-center gap-1">
                                     <button
                                       type="button"
                                       disabled={isOffline}
                                       onClick={() => {
                                         if (isOffline) return;
+                                        const gateway = pType === "api" || pType === "webhook" || pType === "secured_payment_link";
+                                        if (gateway) {
+                                          setGatewayMethodPending(method);
+                                          setIsGatewayPromptOpen(true);
+                                          return;
+                                        }
                                         setSelectedPaymentMethod(method);
                                         setProofSubmitSuccess(false);
                                         setUploadedProofImage("");
-                                        // If it is a QR payment method, pop up the QR Code immediately
                                         if (isQr && qrImg) {
                                           setZoomedPaymentMethod(method);
                                           setIsPaymentQrModalOpen(true);
                                         }
                                       }}
-                                      className={`group w-full aspect-[2/1] rounded-none border transition-all flex items-center justify-center p-0 relative overflow-hidden bg-white shadow-sm hover:shadow-md select-none ${
-                                        isOffline
-                                          ? "border-red-200/70 bg-slate-100 cursor-not-allowed opacity-90"
-                                          : isSelected
-                                          ? "border-slate-900 shadow-md ring-1 ring-slate-900 cursor-pointer"
-                                          : "border-gray-200 bg-white hover:border-gray-300 cursor-pointer"
-                                      }`}
+                                      aria-pressed={isSelected}
+                                      className={selectorTileClass(isSelected, isOffline)}
                                       title={isOffline ? `${method.name} is currently offline` : method.name}
                                     >
-                                      {method.logo ? (
-                                        <TelegramMediaImage
-                                          src={method.logo}
-                                          alt={method.name}
-                                          className={`absolute inset-0 z-[2] w-full h-full object-fill rounded-md shadow-sm transition-transform duration-200 ${isOffline ? "filter blur-[1px] opacity-40 grayscale-[30%]" : ""}`}
-                                          referrerPolicy="no-referrer"
-                                        />
-                                      ) : (
-                                        <CreditCard className={`relative z-[2] w-5 h-5 text-gray-400 ${isOffline ? "filter blur-[1px] opacity-40" : ""}`} />
-                                      )}
+                                      <CheckoutTileLogo reference={String(method.logo || "")} name={method.name} selected={isSelected} payment />
 
 
                                       {/* Offline Overlay */}
@@ -2412,8 +2474,8 @@ export default function CheckoutModal({
                                         </div>
                                       )}
                                     </button>
-                                    <span className={`payment-method-label truncate w-full text-center leading-tight ${
-                                      isOffline ? "text-gray-400" : "text-gray-900"
+                                    <span className={`${selectorLabelClass} ${
+                                      isOffline ? "text-gray-400" : "text-slate-900"
                                     }`}>
                                       {method.name}
                                     </span>
@@ -2430,7 +2492,11 @@ export default function CheckoutModal({
                                 <button
                                   key={idx}
                                   type="button"
-                                  onClick={() => setCurrentPaymentPage(idx)}
+                                  onClick={() => {
+                                    if (idx === pageIndex) return;
+                                    setPaymentPageDirection(idx > pageIndex ? 1 : -1);
+                                    setCurrentPaymentPage(idx);
+                                  }}
                                   className={`w-1.5 h-1.5 rounded-full transition-all cursor-pointer ${
                                     idx === pageIndex ? "bg-black w-3" : "bg-gray-300 hover:bg-gray-400"
                                   }`}
@@ -2451,6 +2517,7 @@ export default function CheckoutModal({
                       const isManual = pType === "manual_transfer" || pType === "manual" || pType === "bank_transfer" || pType === "transfer";
                       const isCrypto = pType === "crypto";
                       const isApi = pType === "api" || pType === "webhook";
+                      const isSecuredLink = pType === "secured_payment_link";
                       const qrImg = selectedPaymentMethod.qrCodeImage || selectedPaymentMethod.qrCode || selectedPaymentMethod.qrImage || selectedPaymentMethod.qr_code_image || "";
 
                       return (
@@ -2565,6 +2632,13 @@ export default function CheckoutModal({
                                 )}
                               </div>
                             </div>
+                          )}
+
+                          {isSecuredLink && (
+                            <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                              <p className="text-xs text-slate-700">Open the provider’s HTTPS payment page in your browser. After paying, return here and upload your receipt for staff review.</p>
+                              <SecuredPaymentLink url={selectedPaymentMethod.paymentLinkUrl} />
+                            </section>
                           )}
 
                           {/* Maya Hosted Checkout */}
@@ -2731,23 +2805,7 @@ export default function CheckoutModal({
                                           false,
                                           ocrAnalysis,
                                         );
-                                      } else {
-                                        const response = await authenticatedFetch("/api/orders", {
-                                          method: "PUT",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({
-                                            orderId: completedOrder.id || completedOrder.orderNumber,
-                                            paymentMethodId: selectedPaymentMethod.id,
-                                            paymentMethodName: selectedPaymentMethod.name,
-                                            paymentProofImage: uploadedProofImage,
-                                            ocrAnalysis,
-                                          }),
-                                        });
-                                        if (!response.ok) {
-                                          const result = await response.json().catch(() => ({}));
-                                          throw new Error(result.error || "Failed to submit payment proof.");
-                                        }
-                                      }
+                                      } else throw new Error("TGCloud payment proof upload is unavailable.");
                                       setProofSubmitSuccess(true);
                                     } catch (e) {
                                       console.error(e);
@@ -2775,6 +2833,22 @@ export default function CheckoutModal({
                         </div>
                       );
                     })()}
+
+                    {hasTelegramServerlessBridge() && (
+                      <div className="border border-blue-200 bg-blue-50 p-3 space-y-2">
+                        <p className="text-xs font-heading font-bold text-blue-950">Payment proof required before submission</p>
+                        <p className="text-[11px] text-blue-900">First select a payment method above and follow the displayed instructions. After paying, attach your screenshot or receipt here. Stock is reserved only after proof-backed submission.</p>
+                        <input ref={preSubmitProofInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => {
+                          const file = event.target.files?.[0]; if (!file) return;
+                          if (file.size > 10 * 1024 * 1024) { setSubmitError("Payment proof must be 10 MB or smaller."); return; }
+                          const reader = new FileReader(); reader.onloadend = () => { const value = String(reader.result || ''); setUploadedProofImage(value); setSubmitError(''); void analyzeReceiptImage(value); }; reader.readAsDataURL(file);
+                        }} />
+                        <button type="button" onClick={() => preSubmitProofInputRef.current?.click()} disabled={!selectedPaymentMethod?.id} className="w-full px-3 py-2 bg-slate-900 text-white text-xs font-heading font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed">
+                          {!selectedPaymentMethod?.id ? "Select Payment Method First" : uploadedProofImage ? "Replace Payment Proof" : "Attach Payment Proof"}
+                        </button>
+                        {uploadedProofImage && <p className="text-[10px] text-emerald-800">Proof attached and ready for secure submission.</p>}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2786,7 +2860,7 @@ export default function CheckoutModal({
         </div>
 
         {/* Modal Bottom Action Bar */}
-        {currentStep < 5 && (
+        {currentStep < 6 && (
           <div className="prime-checkout__actions border-t border-gray-100 bg-white px-3.5 py-2.5 flex items-center justify-between gap-3">
             {currentStep > 1 ? (
               <button
@@ -2832,6 +2906,16 @@ export default function CheckoutModal({
             )}
 
             {currentStep === 4 && (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(5)}
+                className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              >
+                <span>Continue</span>
+              </button>
+            )}
+
+            {currentStep === 5 && (
               <div className="prime-checkout__confirm flex flex-col sm:flex-row items-end sm:items-center gap-2">
                 {submitError && (
                   <span className="text-xs font-mono text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg max-w-xs truncate">
@@ -2841,7 +2925,12 @@ export default function CheckoutModal({
                 <button
                   type="button"
                   onClick={handleSubmitOrder}
-                  disabled={isSubmittingOrder || isLoadingCharges || Boolean(chargesLoadError)}
+                  disabled={
+                    isSubmittingOrder ||
+                    isLoadingCharges ||
+                    Boolean(chargesLoadError) ||
+                    Boolean(hasTelegramServerlessBridge() && (!selectedPaymentMethod?.id || !uploadedProofImage))
+                  }
                   className="prime-checkout__submit px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmittingOrder ? (
@@ -2856,6 +2945,19 @@ export default function CheckoutModal({
         )}
 
       </div>
+
+      {isGatewayPromptOpen && gatewayMethodPending && (
+        <div className="fixed inset-0 z-[2600] flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-[390px] space-y-3 rounded-xl bg-white p-4 shadow-xl">
+            <h3 className="font-heading text-sm font-bold uppercase text-slate-900">Secure Payment Gateway</h3>
+            <p className="font-mono text-xs leading-relaxed text-slate-700">You will be redirected to a secure page to process your payment with our processor and acquirer (Maya Business). Would you like to proceed?</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => { setIsGatewayPromptOpen(false); setGatewayMethodPending(null); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-heading text-xs font-bold uppercase text-slate-700">No</button>
+              <button type="button" onClick={() => { setSelectedPaymentMethod(gatewayMethodPending); setProofSubmitSuccess(false); setUploadedProofImage(""); setIsGatewayPromptOpen(false); setGatewayMethodPending(null); }} className="rounded-lg bg-slate-900 px-3 py-2 font-heading text-xs font-bold uppercase text-white">Yes</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upload Proof Preview Modal */}
       {isPreviewProofOpen && uploadedProofImage && (
@@ -2971,9 +3073,8 @@ export default function CheckoutModal({
                   onClick={() => {
                     const url = zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image;
                     const filename = `PRIME_QR_${zoomedPaymentMethod.name.replace(/\\s+/g, "_")}.png`;
-                    const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
                     const link = document.createElement("a");
-                    link.href = proxyUrl;
+                    link.href = url;
                     link.download = filename;
                     document.body.appendChild(link);
                     link.click();

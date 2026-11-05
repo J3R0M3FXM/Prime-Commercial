@@ -1,0 +1,8 @@
+{
+  "name": "prime-media-preview",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-11-04",
+  "r2_buckets": [
+    { "binding": "MEDIA_BUCKET", "bucket_name": "prime-media-preview" }
+  ]
+}

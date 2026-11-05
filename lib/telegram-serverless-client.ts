@@ -14,6 +14,32 @@ declare global {
 }
 
 const mediaUrlCache = new Map<string, Promise<string>>();
+const isVisualPreview = import.meta.env.VITE_UI_PREVIEW === '1';
+
+function visualPreviewResponse(name: string, input: Record<string, unknown>): unknown {
+  const action = String(input.action || '');
+  const products = [
+    { id: 'preview-product-1', name: 'Ergonomic Wireless Mouse', category: 'Electronics', price: 2499, stock: 18, lowStockThreshold: 5, isActive: true, variants: [{ id: 'preview-v1', name: 'Matte Black', price: 2499, stock: 12, tag: 'BEST SELLER' }, { id: 'preview-v2', name: 'Arctic White', price: 2699, stock: 6, tag: 'NEW' }] },
+    { id: 'preview-product-2', name: 'Mechanical Keyboard', category: 'Electronics', price: 5999, stock: 8, lowStockThreshold: 3, isActive: true, variants: [] },
+  ];
+  if (name === 'manageProducts' || name === 'getCatalog') return action === 'list' || !action ? products : { success: true, product: products[0] };
+  if (name === 'managePaymentMethods') return action === 'list' ? [{ id: 'preview-gcash', name: 'GCash', isActive: true, type: 'ewallet', instructions: 'Preview payment method' }] : { success: true };
+  if (name === 'getPublicPaymentMethods') return [{ id: 'preview-gcash', name: 'GCash', paymentType: 'qr_code', isActive: true, qrCodeImage: '', accountName: 'Preview Account', accountNumber: '0000 0000' }];
+  if (name === 'manageCouriers') return action === 'list' ? [{ id: 'preview-courier', name: 'Express Delivery', isActive: true, baseFee: 60, perKmFee: 12 }] : { success: true };
+  if (name === 'manageWarehouses') return action === 'list' ? [{ id: 'preview-warehouse', name: 'Prime Main Warehouse', address: 'Preview location', latitude: 14.5995, longitude: 120.9842, isActive: true }] : { success: true };
+  if (name === 'manageCustomers') return action === 'list' ? [{ id: 'preview-customer', tgName: 'Preview Customer', tgUsername: 'prime_preview', primeMemberId: 'PM-00001', totalOrders: 3, lifetimeSpent: 9200 }] : { id: 'preview-customer', tgName: 'Preview Customer', orders: [] };
+  if (name === 'manageNotifications') return action === 'list' ? { notifications: [{ id: 'preview-notification', orderNumber: 'PRV-1001', eventKey: 'order.created', status: 'sent', createdAt: new Date().toISOString() }] } : { success: true, deletedCount: 0 };
+  if (name === 'manageVideos') return action === 'list' ? [] : action === 'getStorageTarget' ? {} : { success: true };
+  if (name === 'managePromos') return action === 'list' ? [{ id: 'preview-voucher-1', code: 'PRIME-GIFT-2026', title: 'Member Gift', description: 'A thank-you for your order.', voucherType: 'shop_voucher', discountType: 'free_product', discountValue: 0, freeProductId: 'preview-product-1', freeVariantId: 'preview-v1', minSpend: 1000, customerEligibility: 'specific_customer', eligibleCustomerId: 'preview-admin', activeDaysOfWeek: [0,1,2,3,4,5,6], allowedPaymentMethods: ['all'], allowedCourierIds: ['all'], usageLimitPerCustomer: 1, totalUsageLimit: 1, isActive: true }] : { success: true };
+  if (name === 'manageCharges') return action === 'list' ? [] : { success: true };
+  if (name === 'manageOrders') return action === 'list' ? [] : { success: true };
+  if (name === 'getPublicOrderQueue') return { ordersInQueue: 3, ordersInProcessing: 2, averageReadyMinutes: 12, trafficFlowStatus: 'MODERATE' };
+  if (name === 'manageOcrSettings') return action === 'status' ? { googleVisionConfigured: false, ocrSpaceConfigured: false, provider: 'ocr_space' } : { success: true };
+  if (name === 'manageIplocateSettings' || name === 'manageTomtomSettings') return action === 'status' ? { configured: false } : { success: true };
+  if (name === 'manageAutomation') return action === 'list' ? [] : { success: true };
+  if (name === 'geoapifyAddress') return { results: [] };
+  return { success: true };
+}
 
 async function collectSessionFingerprint(): Promise<Record<string, unknown> | undefined> {
   if (typeof window === 'undefined') return undefined;
@@ -50,6 +76,7 @@ export function callServerless<T>(
   input: Record<string, unknown> = {},
   timeoutMs = 12_000,
 ): Promise<T> {
+  if (isVisualPreview) return Promise.resolve(visualPreviewResponse(name, input) as T);
   if (typeof window === 'undefined') return Promise.reject(new Error('Telegram Mini App is not available.'));
   const bridge = window.Telegram?.WebApp?.Serverless;
   if (!bridge?.call) return Promise.reject(new Error('Open PRIME from Telegram to use this feature.'));
@@ -83,6 +110,24 @@ export function callServerless<T>(
 /** Resume an uncertain checkout using its key; the Serverless endpoint loads its saved request snapshot. */
 export async function resumeServerlessCheckout<T = Record<string, unknown>>(operationKey: string): Promise<T> {
   return await callServerless<T>('createOrder', { operationKey, resume: true }, 60_000);
+}
+
+export async function createPaymentSession(request: Record<string, unknown>, paymentMethodId: string, operationKey: string) {
+  return await callServerless<{ success: boolean; paymentSessionId: string; expiresAt: string }>('createPaymentSession', {
+    request, paymentMethodId, operationKey,
+  }, 60_000);
+}
+
+export async function uploadPaymentProofDataUrl(dataUrl: string, paymentSessionId: string, contentType = 'image/jpeg', ocrAnalysis?: Record<string, unknown> | null) {
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ''));
+  if (!match) throw new Error('The payment proof image is invalid.');
+  const bytes = Uint8Array.from(atob(match[2]), (character) => character.charCodeAt(0));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const encoded = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return await callServerless<{ success: boolean; paymentSessionId: string; status: string }>('uploadPaymentProof', {
+    paymentSessionId, contentType: match[1] || contentType, data: encoded, ...(ocrAnalysis ? { ocrAnalysis } : {}),
+  }, 60_000);
 }
 
 const CHECKOUT_ATTEMPT_STORAGE_PREFIX = 'prime_serverless_checkout_attempt_v1:';
@@ -344,6 +389,7 @@ export type TelegramServerlessSession = {
 };
 
 export async function getTelegramServerlessSession(options: { heartbeat?: boolean } = {}): Promise<TelegramServerlessSession> {
+  if (isVisualPreview) return { authenticated: true, sessionReady: true, isAdmin: true, tgUserId: '999000001', tgName: 'Preview Admin', tgUsername: 'prime_preview', primeMemberId: 'PM-PREVIEW', user: { id: 'preview-admin', name: 'Preview Admin', role: 'admin' } };
   const fingerprint = await collectSessionFingerprint();
   return await callServerless<TelegramServerlessSession>('getTelegramSession', {
     ...(fingerprint ? { fingerprint } : {}),
@@ -444,7 +490,7 @@ async function prepareJpegUpload(
 ): Promise<{ id: string; data: string; contentType: string }> {
   if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error('Choose a JPG, PNG, or WEBP image.');
   const loaded = await loadImage(file);
-  let blob: Blob;
+  let blob: Blob | null = null;
   try {
     const source = loaded.image as CanvasImageSource & { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number };
     const width = Number(source.width || source.naturalWidth || 0);
@@ -453,20 +499,26 @@ async function prepareJpegUpload(
     // Keep logo JSON payloads small enough for the Telegram Serverless bridge.
     const maxDimension = Math.max(256, Number(options.maxDimension) || 1024);
     const maxBytes = Math.max(32_000, Number(options.maxBytes) || 600_000);
-    const scale = Math.min(1, maxDimension / Math.max(width, height));
+    let scale = Math.min(1, maxDimension / Math.max(width, height));
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(width * scale));
-    canvas.height = Math.max(1, Math.round(height * scale));
     const context = canvas.getContext('2d');
     if (!context) throw new Error('This image could not be prepared. Please choose it again.');
-    if (!options.preserveTransparency) { context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height); }
-    context.drawImage(loaded.image, 0, 0, canvas.width, canvas.height);
-    blob = options.preserveTransparency
-      ? await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('This image could not be prepared.')), 'image/png'))
-      : await canvasJpeg(canvas, 0.82);
-    for (const quality of [0.72, 0.62, 0.52, 0.42, 0.32, 0.24, 0.18]) {
-      if (options.preserveTransparency || blob.size <= maxBytes) break;
-      blob = await canvasJpeg(canvas, quality);
+    for (;;) {
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      if (!options.preserveTransparency) { context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height); }
+      context.drawImage(loaded.image, 0, 0, canvas.width, canvas.height);
+      blob = options.preserveTransparency
+        ? await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('This image could not be prepared.')), 'image/png'))
+        : await canvasJpeg(canvas, 0.82);
+      if (!options.preserveTransparency) {
+        for (const quality of [0.72, 0.62, 0.52]) {
+          if (blob.size <= maxBytes) break;
+          blob = await canvasJpeg(canvas, quality);
+        }
+      }
+      if (blob.size <= maxBytes || Math.max(canvas.width, canvas.height) <= 256) break;
+      scale *= 0.8;
     }
   } finally { loaded.release(); }
   if (!blob || blob.size > Math.max(32_000, Number(options.maxBytes) || 600_000)) throw new Error('This image is too large to upload. Choose a smaller image.');
@@ -486,11 +538,14 @@ async function prepareQrUpload(file: File): Promise<{ id: string; data: string; 
 export type PublicImageBucket = 'product-images' | 'courier-logos' | 'payment-method-logos' | 'payment-qr-codes' | 'media-gallery';
 
 export async function uploadStaffImage(file: File, bucket: PublicImageBucket): Promise<string> {
+  if ((bucket === 'courier-logos' || bucket === 'payment-method-logos') && file.size > 3 * 1024 * 1024) {
+    throw new Error('Logo files must be 3 MB or smaller.');
+  }
   const upload = bucket === 'payment-qr-codes'
     ? await prepareQrUpload(file)
-    : { ...(await prepareJpegUpload(file, bucket === 'courier-logos' || bucket === 'payment-method-logos'
-      ? { maxDimension: 768, maxBytes: 200_000 }
-      : {})), contentType: 'image/jpeg' };
+    : await prepareJpegUpload(file, bucket === 'courier-logos' || bucket === 'payment-method-logos'
+      ? { maxDimension: 1024, maxBytes: 550_000, preserveTransparency: true }
+      : {});
   const result = await callServerless<{ success: boolean; reference: string }>('manageMediaAssets', {
     action: 'uploadPublicImage', id: upload.id, bucket, contentType: upload.contentType, data: upload.data,
   }, 60_000);
@@ -499,9 +554,10 @@ export async function uploadStaffImage(file: File, bucket: PublicImageBucket): P
 }
 
 export async function uploadProductImage(file: File): Promise<string> {
+  if (file.size > 3 * 1024 * 1024) throw new Error('Product image files must be 3 MB or smaller.');
   const upload = await prepareJpegUpload(file);
-  const result = await callServerless<{ success: boolean; reference: string }>('uploadProductImage', {
-    id: upload.id,
+  const result = await callServerless<{ success: boolean; reference: string }>('manageMediaAssets', {
+    action: 'uploadProductImage', id: upload.id,
     contentType: upload.contentType,
     data: upload.data,
   }, 60_000);
@@ -510,8 +566,11 @@ export async function uploadProductImage(file: File): Promise<string> {
 }
 
 export async function uploadPaymentImage(file: File, bucket: 'payment-method-logos' | 'payment-qr-codes'): Promise<string> {
+  if (bucket === 'payment-method-logos' && file.size > 3 * 1024 * 1024) {
+    throw new Error('Logo files must be 3 MB or smaller.');
+  }
   const upload = await prepareJpegUpload(file, bucket === 'payment-method-logos'
-    ? { maxDimension: 768, maxBytes: 200_000, preserveTransparency: true }
+    ? { maxDimension: 1024, maxBytes: 550_000, preserveTransparency: true }
     : {});
   const result = await callServerless<{ success: boolean; reference: string }>('uploadPaymentImage', {
     id: upload.id, bucket, contentType: upload.contentType, data: upload.data,

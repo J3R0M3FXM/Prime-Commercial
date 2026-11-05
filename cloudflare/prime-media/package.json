@@ -1,0 +1,7 @@
+{
+  "name": "prime-media-r2-worker",
+  "private": true,
+  "type": "module",
+  "scripts": { "check": "node --check src/index.mjs" },
+  "dependencies": { "aws4fetch": "^1.0.20" }
+}

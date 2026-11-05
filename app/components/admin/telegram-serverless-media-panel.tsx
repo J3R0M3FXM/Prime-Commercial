@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ArrowLeft, CheckCircle2, Film, ImagePlus, Loader2, Plus, RefreshCw, Save, ShieldCheck, Trash2, Upload, X } from "lucide-react";
 import { callServerless, getTelegramServerlessSession, uploadServerlessGalleryVideo, uploadStaffImage, type ServerlessGalleryVideo } from "@/lib/telegram-serverless-client";
 import TelegramMediaImage from "@/app/components/telegram-media-image";
+import { deleteR2Video, listR2Videos, r2MediaEnabled, updateR2Video, uploadR2Video } from "@/lib/r2-media-client";
 
 const CATEGORIES = ["Product Demos", "Unboxing", "Customer Reviews", "Tutorials", "Behind The Scenes", "Exclusive"];
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
@@ -68,6 +69,7 @@ export default function TelegramServerlessMediaPanel({ onBack }: { onBack: () =>
   const [editingId, setEditingId] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [uploadStorage, setUploadStorage] = useState<'telegram' | 'r2'>('telegram');
 
   const loadMedia = useCallback(async () => {
     setLoading(true); setError("");
@@ -76,8 +78,13 @@ export default function TelegramServerlessMediaPanel({ onBack }: { onBack: () =>
         callServerless<ManagedVideo[]>("manageVideos", { action: "list" }, 30_000),
         callServerless<{ chatId?: string }>("manageVideos", { action: "getStorageTarget" }, 15_000),
       ]);
+      let r2Rows: ManagedVideo[] = [];
+      if (r2MediaEnabled()) {
+        try { r2Rows = await listR2Videos(true); }
+        catch (err: any) { setError(`Cloudflare videos could not load: ${err?.message || 'connection failed'}. Telegram videos remain available.`); }
+      }
       if (!Array.isArray(rows)) throw new Error("The Serverless media list response was invalid.");
-      setVideos(rows); setStorageChatId(String(target?.chatId || "")); setStorageSaved(String(target?.chatId || ""));
+      setVideos([...r2Rows, ...rows]); setStorageChatId(String(target?.chatId || "")); setStorageSaved(String(target?.chatId || ""));
     } catch (err: any) { setError(err?.message || "Could not load Serverless media."); }
     finally { setLoading(false); }
   }, []);
@@ -119,20 +126,25 @@ export default function TelegramServerlessMediaPanel({ onBack }: { onBack: () =>
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
       if (editingId) {
-        const result = await callServerless<{ success?: boolean }>("manageVideos", {
-          action: "update", id: editingId, ...form, rating: Number(form.rating), tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
-        }, 30_000);
-        if (!result?.success) throw new Error("The video changes were not confirmed.");
+        const changes = { ...form, rating: Number(form.rating), tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean) };
+        if (videos.find((video) => video.id === editingId)?.storageType === 'r2') await updateR2Video(editingId, changes);
+        else {
+          const result = await callServerless<{ success?: boolean }>("manageVideos", { action: "update", id: editingId, ...changes }, 30_000);
+          if (!result?.success) throw new Error("The video changes were not confirmed.");
+        }
         setNotice("Video details updated.");
       } else {
         if (!file) throw new Error("Choose an MP4 video file.");
-        if (file.size > MAX_VIDEO_BYTES) throw new Error("This file exceeds the 20 MiB limit.");
-        await uploadServerlessGalleryVideo(
-          file,
-          { ...form, rating: Number(form.rating), tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean) },
-          (completed, total) => setNotice(`Uploading video · part ${completed}/${total} · 512 KiB each`),
-        );
-        setNotice("Video uploaded to Telegram and added to the gallery.");
+        const metadata = { ...form, rating: Number(form.rating), tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean) };
+        if (uploadStorage === 'r2') {
+          const uploaded = await uploadR2Video(file, metadata, (completed, total) => setNotice(`Uploading to Cloudflare · part ${completed}/${total}`));
+          if (form.isPublished) await updateR2Video(uploaded.id, { isPublished: true });
+          setNotice("Video saved in private Cloudflare storage and added to the gallery.");
+        } else {
+          if (file.size > MAX_VIDEO_BYTES) throw new Error("This file exceeds the 20 MiB Telegram limit.");
+          await uploadServerlessGalleryVideo(file, metadata, (completed, total) => setNotice(`Uploading to Telegram · part ${completed}/${total}`));
+          setNotice("Video uploaded to Telegram and added to the gallery.");
+        }
       }
       resetForm(); await loadMedia();
     } catch (err: any) { setError(err?.message || "Could not save this video."); }
@@ -142,7 +154,8 @@ export default function TelegramServerlessMediaPanel({ onBack }: { onBack: () =>
   const togglePublished = async (video: ManagedVideo) => {
     setBusy(true); setError(""); setNotice("");
     try {
-      await callServerless("manageVideos", { action: "update", id: video.id, isPublished: video.isPublished === false }, 30_000);
+      if (video.storageType === 'r2') await updateR2Video(video.id, { isPublished: video.isPublished === false });
+      else await callServerless("manageVideos", { action: "update", id: video.id, isPublished: video.isPublished === false }, 30_000);
       setNotice(video.isPublished === false ? "Video published." : "Video unpublished from the customer gallery.");
       await loadMedia();
     } catch (err: any) { setError(err?.message || "Could not change publication status."); }
@@ -152,7 +165,8 @@ export default function TelegramServerlessMediaPanel({ onBack }: { onBack: () =>
   const toggleFeatured = async (video: ManagedVideo) => {
     setBusy(true); setError(""); setNotice("");
     try {
-      await callServerless("manageVideos", { action: "update", id: video.id, featured: !video.featured }, 30_000);
+      if (video.storageType === 'r2') await updateR2Video(video.id, { featured: !video.featured });
+      else await callServerless("manageVideos", { action: "update", id: video.id, featured: !video.featured }, 30_000);
       setNotice(video.featured ? "Featured placement removed." : "Video set as featured.");
       await loadMedia();
     } catch (err: any) { setError(err?.message || "Could not update featured placement."); }
@@ -160,11 +174,12 @@ export default function TelegramServerlessMediaPanel({ onBack }: { onBack: () =>
   };
 
   const deleteVideo = async (video: ManagedVideo) => {
-    if (!window.confirm(`Remove “${video.title}” from the gallery? The Telegram storage-channel message is retained.`)) return;
+    if (!window.confirm(video.storageType === 'r2' ? `Permanently delete “${video.title}” from Cloudflare storage and the gallery?` : `Remove “${video.title}” from the gallery? The Telegram storage-channel message is retained.`)) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      await callServerless("manageVideos", { action: "delete", id: video.id }, 30_000);
-      setNotice("Video removed from the customer gallery. The source message remains in Telegram storage.");
+      if (video.storageType === 'r2') await deleteR2Video(video.id);
+      else await callServerless("manageVideos", { action: "delete", id: video.id }, 30_000);
+      setNotice(video.storageType === 'r2' ? "Cloudflare video deleted." : "Video removed from the customer gallery. The source message remains in Telegram storage.");
       await loadMedia();
     } catch (err: any) { setError(err?.message || "Could not remove the video."); }
     finally { setBusy(false); }
@@ -174,7 +189,7 @@ export default function TelegramServerlessMediaPanel({ onBack }: { onBack: () =>
     <header className="serverless-panel-header">
       <button type="button" onClick={onBack} className="serverless-action" aria-label="Back to Admin modules"><ArrowLeft className="h-4 w-4"/></button>
       <div className="serverless-panel-header__copy"><h1>Media Gallery</h1><p><ShieldCheck className="mr-1 inline h-3 w-3 text-emerald-700"/>Verified Telegram staff · {videos.length} video{videos.length === 1 ? "" : "s"}</p></div>
-      <button type="button" disabled={!authorized || busy} onClick={() => { setForm(emptyForm); setEditingId(""); setFile(null); setThumbnailCandidates([]); setFormOpen(true); }} className="serverless-action serverless-action--primary"><Plus className="h-4 w-4"/>Upload</button>
+      <button type="button" disabled={!authorized || busy} onClick={() => { setForm(emptyForm); setEditingId(""); setFile(null); setThumbnailCandidates([]); setUploadStorage(r2MediaEnabled() ? 'r2' : 'telegram'); setFormOpen(true); }} className="serverless-action serverless-action--primary"><Plus className="h-4 w-4"/>Upload</button>
       <button type="button" disabled={!authorized || loading || busy} onClick={() => void loadMedia()} className="serverless-action" aria-label="Refresh videos"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}/></button>
     </header>
 
@@ -191,7 +206,8 @@ export default function TelegramServerlessMediaPanel({ onBack }: { onBack: () =>
 
       {formOpen && <form onSubmit={saveVideo} className="my-2 space-y-3 border border-emerald-200 bg-white p-3 shadow-sm">
         <div className="flex items-center justify-between"><h2 className="font-heading text-base font-normal uppercase tracking-wide text-slate-900">{editingId ? "Edit video details" : "Upload a video"}</h2><button type="button" className="serverless-action" onClick={resetForm} aria-label="Close form"><X className="h-4 w-4"/></button></div>
-        {!editingId && <label className="serverless-field">MP4 video · maximum 20 MiB<input required type="file" accept="video/mp4,.mp4" onChange={async (event) => { const selected = event.currentTarget.files?.[0] || null; setFile(selected); setThumbnailCandidates([]); if (!selected) return; setError(""); setNotice("Generating three thumbnail choices…"); try { setThumbnailCandidates(await makeThumbnailCandidates(selected)); setNotice("Choose a thumbnail frame, or upload your own image below."); } catch (err: any) { setError(err?.message || "Could not generate thumbnail choices."); } }}/>{file && <small>{file.name} · {formatSize(file.size)}</small>}</label>}
+        {!editingId && r2MediaEnabled() && <label className="serverless-field">Storage<select value={uploadStorage} onChange={(event) => { setUploadStorage(event.target.value as 'telegram' | 'r2'); setFile(null); setThumbnailCandidates([]); }}><option value="r2">Cloudflare R2 · up to 150 MiB</option><option value="telegram">Telegram channel · up to 20 MiB</option></select></label>}
+        {!editingId && <label className="serverless-field">MP4 video · maximum {uploadStorage === 'r2' ? '150' : '20'} MiB<input required type="file" accept="video/mp4,.mp4" onChange={async (event) => { const selected = event.currentTarget.files?.[0] || null; setFile(selected); setThumbnailCandidates([]); if (!selected) return; setError(""); setNotice("Generating three thumbnail choices…"); try { setThumbnailCandidates(await makeThumbnailCandidates(selected)); setNotice("Choose a thumbnail frame, or upload your own image below."); } catch (err: any) { setError(err?.message || "Could not generate thumbnail choices."); } }}/>{file && <small>{file.name} · {formatSize(file.size)}</small>}</label>}
         <div className="serverless-fields">
           <label className="serverless-field">Title<input required maxLength={180} value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}/></label>
           <label className="serverless-field">Category<select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}>{CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></label>
@@ -202,9 +218,9 @@ export default function TelegramServerlessMediaPanel({ onBack }: { onBack: () =>
         </div>
         <label className="serverless-field">Description<textarea rows={3} maxLength={4000} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}/></label>
         <div className="flex flex-wrap gap-4 text-xs text-slate-700"><label className="flex items-center gap-2"><input type="checkbox" checked={form.isPublished} onChange={(event) => setForm((current) => ({ ...current, isPublished: event.target.checked }))}/>Publish in customer gallery</label><label className="flex items-center gap-2"><input type="checkbox" checked={form.featured} onChange={(event) => setForm((current) => ({ ...current, featured: event.target.checked }))}/>Feature video</label></div>
-        {file && <p className="text-[10px] leading-relaxed text-slate-500">The file is sent to Telegram for storage. Upload time depends on your connection; keep this screen open until it finishes.</p>}
-        <div className="flex justify-end gap-2"><button type="button" disabled={busy} onClick={resetForm} className="serverless-action">Cancel</button><button type="submit" disabled={busy || (!editingId && !storageSaved)} className="serverless-action serverless-action--primary">{busy ? <Loader2 className="h-4 w-4 animate-spin"/> : editingId ? <Save className="h-4 w-4"/> : <Upload className="h-4 w-4"/>}{busy ? "Uploading…" : editingId ? "Save details" : "Upload and save"}</button></div>
-        {!editingId && !storageSaved && <p className="text-[10px] text-amber-800">Save the storage channel above before uploading.</p>}
+        {file && <p className="text-[10px] leading-relaxed text-slate-500">The file is sent to {uploadStorage === 'r2' ? 'private Cloudflare storage in resumable parts' : 'the Telegram storage channel'}. Keep this screen open until it finishes.</p>}
+        <div className="flex justify-end gap-2"><button type="button" disabled={busy} onClick={resetForm} className="serverless-action">Cancel</button><button type="submit" disabled={busy || (!editingId && uploadStorage === 'telegram' && !storageSaved)} className="serverless-action serverless-action--primary">{busy ? <Loader2 className="h-4 w-4 animate-spin"/> : editingId ? <Save className="h-4 w-4"/> : <Upload className="h-4 w-4"/>}{busy ? "Uploading…" : editingId ? "Save details" : "Upload and save"}</button></div>
+        {!editingId && uploadStorage === 'telegram' && !storageSaved && <p className="text-[10px] text-amber-800">Save the storage channel above before uploading.</p>}
       </form>}
 
       <section className="mt-3 space-y-2" aria-label="Videos">

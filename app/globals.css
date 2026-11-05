@@ -315,6 +315,15 @@ body .prime-order-history .font-misans-regular { font-family: 'MiSans', sans-ser
 .command-system-card__copy strong { display: block; color: #243044; font: 400 12px/1.15 'Roboto Condensed', sans-serif; overflow-wrap: anywhere; }
 .admin-command-home { padding: 10px; }
 .admin-command-home .command-system-grid { margin-top: 8px; }
+.admin-module-launcher__heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding: 4px 2px 8px; }
+.admin-module-launcher__heading h1 { margin: 2px 0 0; color: #172033; font: 600 22px/1.05 'Roboto Condensed', sans-serif; }
+.admin-module-launcher__heading p { margin: 4px 0 0; color: #647084; font: 400 11px/1.25 'Roboto Condensed', sans-serif; }
+.admin-module-launcher__count { flex: 0 0 auto; border: 1px solid #b9d9cd; border-radius: 999px; padding: 4px 7px; color: #12805c; background: #f0faf6; font: 600 9px/1 'Roboto Condensed', sans-serif; letter-spacing: .08em; }
+.command-admin-module { min-height: 92px; cursor: pointer; transition: border-color .15s ease, background-color .15s ease, transform .15s ease, box-shadow .15s ease; }
+.command-admin-module:hover:not(:disabled), .command-admin-module:focus-visible { border-color: #12805c; background: #f5fbf8; box-shadow: 0 4px 12px rgb(15 23 42 / 8%); outline: none; }
+.command-admin-module:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
+.command-admin-module--ready { border-color: #d2dbe5; }
+.command-admin-module--parked { cursor: not-allowed; }
 
 .serverless-orders-panel { padding: 0; }
 .serverless-orders-panel .serverless-record__summary { flex-wrap: wrap; }

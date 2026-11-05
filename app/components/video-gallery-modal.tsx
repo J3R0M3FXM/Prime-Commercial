@@ -1,6 +1,7 @@
 "use client";
 
 import { getServerlessVideos, resolveTelegramVideo } from "@/lib/telegram-serverless-client";
+import { grantR2Playback, listR2Videos, r2MediaEnabled } from "@/lib/r2-media-client";
 import TelegramMediaImage from "@/app/components/telegram-media-image";
 import PrimePageHeading from "@/app/components/prime-page-heading";
 
@@ -42,6 +43,7 @@ export interface GalleryVideo {
   publishedAt?: string;
   featured?: boolean;
   createdAt?: string;
+  storageType?: string;
 }
 
 interface VideoGalleryModalProps {
@@ -81,7 +83,9 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
     try {
       setLoading(true);
       setGalleryError(null);
-      setVideos(await getServerlessVideos());
+      const [telegram, r2] = await Promise.allSettled([getServerlessVideos(), r2MediaEnabled() ? listR2Videos() : Promise.resolve([])]);
+      if (telegram.status === 'rejected' && r2.status === 'rejected') throw telegram.reason;
+      setVideos([...(r2.status === 'fulfilled' ? r2.value : []), ...(telegram.status === 'fulfilled' ? telegram.value : [])]);
     } catch (err) {
       setGalleryError(err instanceof Error ? err.message : "The video gallery could not be loaded.");
     } finally {
@@ -104,7 +108,9 @@ export default function VideoGalleryModal({ isOpen, onClose }: VideoGalleryModal
       setIsPlaying(false);
       let cancelled = false;
       const source = activeVideo.directUrl || (activeVideo.mediaId ? "" : activeVideo.telegramFileId || "");
-      (source && !source.startsWith("tgmedia:")
+      (activeVideo.storageType === 'r2'
+        ? grantR2Playback(activeVideo.id)
+        : source && !source.startsWith("tgmedia:")
         ? Promise.resolve(source)
         : resolveTelegramVideo(source.startsWith("tgmedia:") ? source : activeVideo.mediaId || activeVideo.id)
       ).then((url) => {

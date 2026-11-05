@@ -145,12 +145,9 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
   const [testChatId, setTestChatId] = useState("");
   const [monoMode, setMonoMode] = useState(false);
 
-  async function requestAutomation(action: string, payload: Record<string, unknown> = {}, legacyRequest?: RequestInit, legacyUrl = "/api/admin/automation") {
-    if (serverless) return await callServerless<any>("manageAutomation", { action, ...payload }, 20_000);
-    const response = await fetch(legacyUrl, { cache: "no-store", ...legacyRequest });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data?.error || "Secretary request failed.");
-    return data;
+  async function requestAutomation(action: string, payload: Record<string, unknown> = {}, _legacyRequest?: RequestInit, _legacyUrl?: string) {
+    if (!serverless) throw new Error("Telegram Serverless Secretary access is required.");
+    return await callServerless<any>("manageAutomation", { action, ...payload }, 20_000);
   }
 
   useEffect(() => {
@@ -307,7 +304,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
 
     setBusy(true);
     try {
-      await requestAutomation("delete", { id: selected.id }, { method: "DELETE" }, "/api/admin/automation?id=" + encodeURIComponent(selected.id));
+      await requestAutomation("delete", { id: selected.id });
 
       setFlows((current) => current.filter((flow) => flow.id !== selected.id));
       setSelected(null);

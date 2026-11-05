@@ -38,3 +38,8 @@ yarn-error.log*
 /migration-backups/
 *.pcmbak
 *.pcmmapping
+
+# Cloudflare media build/dependency output
+cloudflare/**/node_modules/
+cloudflare/**/__pycache__/
+cloudflare/**/dist/

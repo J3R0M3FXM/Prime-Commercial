@@ -71,7 +71,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
     setCart([]);
   };
 
-  // Refresh cart prices and stock from Telegram Serverless instead of Supabase Realtime.
+  // Refresh cart prices and stock from Telegram Serverless.
   useEffect(() => {
     let cancelled = false;
     const refreshCartInventory = async () => {
