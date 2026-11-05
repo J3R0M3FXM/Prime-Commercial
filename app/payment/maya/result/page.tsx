@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, AlertCircle, RefreshCw, ArrowLeft } from "lucide-react";
-import { authenticatedFetch } from "@/app/components/telegram-auth-client";
+import { callServerless } from "@/lib/telegram-serverless-client";
 
 type ResultState = "success" | "failure" | "cancel" | "pending";
 
@@ -34,13 +34,9 @@ export default function MayaResultPage() {
 
     const load = async () => {
       try {
-        const response = await authenticatedFetch(
-          "/api/orders?orderNumber=" + encodeURIComponent(params.order) + "&_t=" + Date.now(),
-          { cache: "no-store" }
-        );
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) throw new Error(data?.error || "Unable to retrieve the PRIME order.");
+        const rows = await callServerless<any[]>("getMyOrders", {}, 20_000);
+        const data = (Array.isArray(rows) ? rows : []).find((row) => String(row?.orderNumber || row?.order_number || "") === String(params.order)) || null;
+        if (!data) throw new Error("Unable to retrieve the PRIME order.");
 
         if (!cancelled) {
           setOrder(data?.id || data?.orderNumber ? data : null);

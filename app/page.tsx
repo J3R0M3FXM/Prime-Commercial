@@ -13,7 +13,6 @@ import SplashScreen from "./components/splash-screen";
 import VideoGalleryModal from "./components/video-gallery-modal";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Bell, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
-import { authenticatedFetch } from "./components/telegram-auth-client";
 import { callServerless, getServerlessCatalog, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
@@ -123,7 +122,7 @@ export default function Shopfront() {
     return () => window.clearInterval(interval);
   }, [authorized, loadPublicOrderQueue]);
 
-  // Refresh the Serverless catalog periodically in place of the former Supabase Realtime subscription.
+  // Refresh the Serverless catalog periodically.
   useEffect(() => {
     if (!authorized) return;
     let cancelled = false;

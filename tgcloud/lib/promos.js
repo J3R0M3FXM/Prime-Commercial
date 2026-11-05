@@ -15,6 +15,8 @@ export function deserializePromo(row) {
     description: hasMeta ? String(meta.realDescription || '') : rawDescription,
     voucherType: hasMeta ? meta.voucherType ?? 'shop_voucher' : 'shop_voucher',
     discountType: row.discountType,
+    freeProductId: hasMeta ? String(meta.freeProductId || '') : '',
+    freeVariantId: hasMeta ? String(meta.freeVariantId || 'default') : 'default',
     discountValue: Number(row.discountValue) || 0,
     maxDiscountAmount: row.maxDiscountAmount == null ? undefined : Number(row.maxDiscountAmount),
     cappedShippingDiscount: hasMeta && meta.cappedShippingDiscount != null ? Number(meta.cappedShippingDiscount) : undefined,
@@ -22,6 +24,7 @@ export function deserializePromo(row) {
     minSpend: Number(row.minSpend) || 0,
     minItemQuantity: hasMeta && meta.minItemQuantity != null ? Number(meta.minItemQuantity) : undefined,
     customerEligibility: hasMeta ? meta.customerEligibility ?? 'all' : 'all',
+    eligibleCustomerId: hasMeta ? String(meta.eligibleCustomerId || '') : '',
     minPreviousOrders: hasMeta && meta.minPreviousOrders != null ? Number(meta.minPreviousOrders) : undefined,
     eligibleTiers: hasMeta && Array.isArray(meta.eligibleTiers) ? meta.eligibleTiers : [],
     allowedPaymentMethods: hasMeta && Array.isArray(meta.allowedPaymentMethods) ? meta.allowedPaymentMethods : ['all'],
@@ -56,6 +59,7 @@ export function serializePromoDescription(promo, existingDescription = '') {
     realDescription: String(promo.description || ''),
     voucherType: promo.voucherType || 'shop_voucher',
     customerEligibility: promo.customerEligibility || 'all',
+    eligibleCustomerId: String(promo.eligibleCustomerId || '').trim(),
     minItemQuantity: promo.minItemQuantity !== undefined ? promo.minItemQuantity : null,
     minPreviousOrders: promo.minPreviousOrders !== undefined ? promo.minPreviousOrders : null,
     eligibleTiers: Array.isArray(promo.eligibleTiers) ? promo.eligibleTiers : [],
@@ -67,6 +71,8 @@ export function serializePromoDescription(promo, existingDescription = '') {
     flashHourEnd: promo.flashHourEnd !== undefined ? promo.flashHourEnd : null,
     cappedShippingDiscount: promo.cappedShippingDiscount !== undefined ? promo.cappedShippingDiscount : null,
     cashbackPercentage: promo.cashbackPercentage !== undefined ? promo.cashbackPercentage : null,
+    freeProductId: promo.freeProductId || '',
+    freeVariantId: promo.freeVariantId || 'default',
   });
 }
 
@@ -100,6 +106,15 @@ export function calculatePromoDiscount(promo, itemsSubtotal, deliveryFee = 0) {
     return { discount: 0, isFreeShipping: false, shippingSubsidy: 0, cashbackPoints: points };
   }
   return { discount: 0, isFreeShipping: false, shippingSubsidy: 0, cashbackPoints: 0 };
+}
+
+export function addFreeProductToCart(cart, canonicalItems, giftLine) {
+  canonicalItems.push({ ...giftLine, id: 'gift_' + giftLine.id,
+    name: 'Free gift · ' + giftLine.name, price: 0, isFree: true });
+  const existing = cart.reservations.find((line) =>
+    line.productId === giftLine.productId && line.variantId === giftLine.variantId);
+  if (existing) existing.quantity += 1;
+  else cart.reservations.push({ productId: giftLine.productId, variantId: giftLine.variantId, quantity: 1 });
 }
 export function generatePromoCode(prefix = 'PRIME') {
   const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';

@@ -6,7 +6,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   X, 
   ArrowLeft, 
-  Clock, 
   CheckCircle2, 
   Truck, 
   Package, 
@@ -20,7 +19,6 @@ import {
   Loader2, 
   Receipt, 
   AlertCircle, 
-  ChevronRight, 
   MapPin, 
   Phone, 
   User, 
@@ -30,6 +28,7 @@ import {
 } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import TelegramMediaImage from "./telegram-media-image";
+import SecuredPaymentLink from "./secured-payment-link";
 import PrimePageHeading from "./prime-page-heading";
 
 interface OrderHistoryModalProps {
@@ -48,6 +47,7 @@ function normalizeOrder(raw: any) {
     createdAt: raw.createdAt || raw.created_at || raw.updatedAt || raw.updated_at || null,
     updatedAt: raw.updatedAt || raw.updated_at || null,
     status: raw.status || raw.order_status || "Pending",
+    controlState: raw.controlState || raw.control_state || "normal",
     customerName: raw.customerName || raw.customer_name || "",
     receiverName: raw.receiverName || raw.receiver_name || raw.customerName || raw.customer_name || "",
     receiverPhone: raw.receiverPhone || raw.receiver_phone || raw.customerPhone || raw.customer_phone || "",
@@ -57,6 +57,9 @@ function normalizeOrder(raw: any) {
     trackingUrl: raw.trackingUrl || raw.tracking_url || "",
     deliveryFee: raw.deliveryFee ?? raw.delivery_fee ?? 0,
     deliveryFeePaymentMethod: raw.deliveryFeePaymentMethod || raw.delivery_fee_payment_method || "",
+    discountAmount: Number(raw.discountAmount ?? raw.discount_amount ?? raw.promoDiscount ?? raw.promo_discount ?? 0) || 0,
+    promoDiscount: Number(raw.promoDiscount ?? raw.promo_discount ?? raw.discountAmount ?? raw.discount_amount ?? 0) || 0,
+    pointsDiscount: Number(raw.pointsDiscount ?? raw.points_discount ?? 0) || 0,
     payableNow: raw.payableNow ?? raw.payable_now,
     payableOnDelivery: raw.payableOnDelivery ?? raw.payable_on_delivery,
     totalAmount: raw.totalAmount ?? raw.total_amount ?? 0,
@@ -147,11 +150,33 @@ function formatPaymentDeadline(order: any): string {
   }).format(new Date(deadlineMs));
 }
 
+function orderStatusTone(status: any): string {
+  const value = String(status || "pending").toLowerCase();
+  if (["completed", "complete", "delivered", "fulfilled"].includes(value)) return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (["expired", "cancelled", "canceled", "rejected", "cancellation requested"].includes(value)) return "border-slate-200 bg-slate-100 text-slate-600";
+  if (["pending"].includes(value)) return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-sky-200 bg-sky-50 text-sky-800";
+}
+
+function paymentStatusTone(status: any): string {
+  const value = String(status || "").toLowerCase();
+  if (value === "paid" || value === "completed") return "text-emerald-700";
+  if (value === "unpaid" || value === "failed") return "text-amber-800";
+  return "text-slate-500";
+}
+
+function orderItemTitle(item: any): string {
+  const storedName = String(item?.productName || item?.name || "Product");
+  const separator = storedName.lastIndexOf(" - ");
+  return item?.productName || (separator >= 0 ? storedName.slice(0, separator) : storedName);
+}
+
 export default function OrderHistoryModal({
   isOpen,
   onClose,
   initialSelectedOrderId = null
 }: OrderHistoryModalProps) {
+  const isVisualPreview = import.meta.env.VITE_UI_PREVIEW === "1";
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -173,11 +198,15 @@ export default function OrderHistoryModal({
   const [receiptViewerUrl, setReceiptViewerUrl] = useState<string | null>(null);
   const [confirmingReceiptOrderId, setConfirmingReceiptOrderId] = useState<string | null>(null);
   const [receiptConfirmationError, setReceiptConfirmationError] = useState<string>("");
+  const [orderActionBusy, setOrderActionBusy] = useState(false);
+  const [orderActionError, setOrderActionError] = useState('');
+  const [customerEditOpen, setCustomerEditOpen] = useState(false);
+  const [customerEdit, setCustomerEdit] = useState({ receiverName: '', receiverPhone: '', unitDetails: '', deliveryNotes: '' });
 
 
 
   const selectedOrder = useMemo(() => {
-    return orders.find(o => (o.id === selectedOrderId || o.orderNumber === selectedOrderId) && !["completed", "complete", "delivered", "fulfilled"].includes(String(o.status || "").toLowerCase())) || null;
+    return orders.find(o => String(o.id) === String(selectedOrderId) || String(o.orderNumber) === String(selectedOrderId)) || null;
   }, [orders, selectedOrderId]);
 
   // Sync initialSelectedOrderId when passed
@@ -192,6 +221,51 @@ export default function OrderHistoryModal({
     setIsLoading(true);
     setErrorMsg("");
     try {
+      if (isVisualPreview) {
+        const now = Date.now();
+        setOrders([
+          {
+            id: "preview-order-1", orderNumber: "PR-261102-1042", status: "Pending", paymentStatus: "Unpaid",
+            createdAt: new Date(now - 18 * 60_000).toISOString(), paymentDeadlineAt: new Date(now + 42 * 60_000).toISOString(),
+            customerName: "Preview Member", receiverName: "Alex Morgan", receiverPhone: "+63 917 000 1042",
+            deliveryAddress: { formatted: "Makati City, Metro Manila", unitDetails: "Unit 8B, Example Tower", receiverName: "Alex Morgan", receiverPhone: "+63 917 000 1042" },
+            items: [
+              { id: "preview-item-1", name: "Prime Coffee Beans - 250g", productName: "Prime Coffee Beans", variantName: "250g", quantity: 2, price: 390, imageUrl: "/preview-variant-250g.svg" },
+              { id: "preview-item-2", name: "Ceramic Dripper - White", productName: "Ceramic Dripper", variantName: "White", quantity: 1, price: 520, imageUrl: "/preview-variant-500g.svg" },
+            ],
+            subTotal: 1300, deliveryFee: 120, totalAmount: 1420, payableNow: 1420, payableOnDelivery: 0,
+            deliveryFeePaymentMethod: "checkout", appliedCharges: [], paymentMethodName: "GCash",
+          },
+          {
+            id: "preview-order-2", orderNumber: "PR-261101-0981", status: "Dispatched", paymentStatus: "Paid",
+            createdAt: new Date(now - 27 * 60 * 60_000).toISOString(), dispatchedAt: new Date(now - 20 * 60_000).toISOString(),
+            customerName: "Preview Member", receiverName: "Alex Morgan", receiverPhone: "+63 917 000 1042",
+            deliveryAddress: { formatted: "Quezon City, Metro Manila", unitDetails: "Gate 2, Sample Village" },
+            items: [
+              { id: "preview-item-3", name: "Prime Coffee Beans - 500g", productName: "Prime Coffee Beans", variantName: "500g", quantity: 1, price: 720, imageUrl: "/preview-variant-500g.svg" },
+              { id: "preview-item-4", name: "Travel Tumbler - 350ml", productName: "Travel Tumbler", variantName: "350ml", quantity: 1, price: 480, imageUrl: "/preview-variant-250g.svg" },
+            ],
+            subTotal: 1200, deliveryFee: 150, totalAmount: 1350, payableNow: 1200, payableOnDelivery: 150,
+            deliveryFeePaymentMethod: "upon_delivery", appliedCharges: [], paymentMethodName: "Store Credits",
+            courierName: "Prime Courier", trackingNumber: "PREVIEW-TRACK-2051", trackingUrl: "https://example.com/",
+          },
+          {
+            id: "preview-order-3", orderNumber: "PR-261028-0714", status: "Completed", paymentStatus: "Paid",
+            createdAt: new Date(now - 5 * 24 * 60 * 60_000).toISOString(), deliveredAt: new Date(now - 4 * 24 * 60 * 60_000).toISOString(),
+            items: [{ id: "preview-item-5", name: "Prime Coffee Beans - 250g", productName: "Prime Coffee Beans", variantName: "250g", quantity: 1, price: 390, imageUrl: "/preview-variant-250g.svg" }],
+            subTotal: 390, deliveryFee: 0, isDeliveryFeeFree: true, totalAmount: 390, payableNow: 390, payableOnDelivery: 0,
+            deliveryFeePaymentMethod: "checkout", appliedCharges: [], paymentMethodName: "GCash",
+          },
+          {
+            id: "preview-order-4", orderNumber: "PR-261020-0529", status: "Expired", paymentStatus: "Unpaid",
+            createdAt: new Date(now - 13 * 24 * 60 * 60_000).toISOString(), expiredAt: new Date(now - 12 * 24 * 60 * 60_000).toISOString(),
+            items: [{ id: "preview-item-6", name: "Travel Tumbler - 350ml", productName: "Travel Tumbler", variantName: "350ml", quantity: 1, price: 480, imageUrl: "/preview-variant-500g.svg" }],
+            subTotal: 480, deliveryFee: 120, totalAmount: 600, payableNow: 600, payableOnDelivery: 0,
+            deliveryFeePaymentMethod: "checkout", appliedCharges: [],
+          },
+        ]);
+        return;
+      }
       // The endpoint scopes results to the verified Telegram user; browser IDs are not trusted for ownership.
       const serverOrders = await callServerless<any[]>('getMyOrders', {}, 20_000);
       if (Array.isArray(serverOrders)) {
@@ -217,6 +291,7 @@ export default function OrderHistoryModal({
   };
 
   const confirmOrderReceived = async (orderId: string) => {
+    if (isVisualPreview) return;
     setConfirmingReceiptOrderId(orderId);
     setReceiptConfirmationError("");
     try {
@@ -229,9 +304,47 @@ export default function OrderHistoryModal({
     }
   };
 
+  const cancelCustomerOrder = async () => {
+    if (!selectedOrder || !window.confirm('Cancel this order before it reaches Ready? If payment was submitted, staff must review the refund.')) return;
+    setOrderActionBusy(true);
+    setOrderActionError('');
+    try {
+      const status = isVisualPreview
+        ? String(selectedOrder.status).toLowerCase() === 'pending' && String(selectedOrder.paymentStatus).toLowerCase() === 'unpaid' && !selectedOrder.paymentProofImage ? 'Cancelled' : 'Cancellation Requested'
+        : (await callServerless<any>('manageMyOrder', { action: 'cancel', orderId: selectedOrder.id }, 30_000)).status;
+      if (!status) throw new Error('The server did not confirm cancellation.');
+      setOrders(rows => rows.map(order => order.id === selectedOrder.id ? { ...order, status } : order));
+      if (!isVisualPreview) await loadOrders();
+    } catch (error: any) { setOrderActionError(error?.message || 'Cancellation could not be saved.'); }
+    finally { setOrderActionBusy(false); }
+  };
+
+  const saveCustomerEdit = async () => {
+    if (!selectedOrder) return;
+    setOrderActionBusy(true);
+    setOrderActionError('');
+    try {
+      const payload = { action: 'edit', orderId: selectedOrder.id, expectedVersion: Number(selectedOrder.staffEditVersion || 0), ...customerEdit };
+      const result = isVisualPreview ? { success: true, staffEditVersion: payload.expectedVersion + 1,
+        deliveryAddress: { ...(selectedOrder.deliveryAddress || {}), ...customerEdit } }
+        : await callServerless<any>('manageMyOrder', payload, 30_000);
+      if (!result?.success) throw new Error('The server did not confirm this edit.');
+      setOrders(rows => rows.map(order => order.id === selectedOrder.id ? { ...order,
+        receiverName: customerEdit.receiverName, receiverPhone: customerEdit.receiverPhone,
+        deliveryAddress: result.deliveryAddress, staffEditVersion: result.staffEditVersion } : order));
+      setCustomerEditOpen(false);
+      if (!isVisualPreview) await loadOrders();
+    } catch (error: any) { setOrderActionError(error?.message || 'Order changes could not be saved.'); }
+    finally { setOrderActionBusy(false); }
+  };
+
   // Load payment methods for proof submission
   const loadPaymentMethods = async () => {
     try {
+      if (isVisualPreview) {
+        setPaymentMethods([]);
+        return;
+      }
       const data = await callServerless<any[]>('getPublicPaymentMethods');
       const receiptTypes = new Set(['qr_code', 'manual_transfer', 'crypto', 'secured_payment_link']);
       const list = (Array.isArray(data) ? data : []).filter((method: any) =>
@@ -334,6 +447,10 @@ export default function OrderHistoryModal({
 
   // Submit payment proof for the selected order
   const handleSubmitProof = async () => {
+    if (isVisualPreview) {
+      setProofError("Visual preview only. No payment receipt was submitted.");
+      return;
+    }
     if (!selectedOrder) return;
     if (!canUploadPaymentProof(selectedOrder)) {
       setProofError("This order has expired or is no longer accepting payment proof.");
@@ -396,6 +513,10 @@ export default function OrderHistoryModal({
   };
 
   const handleSubmitAdjustmentProof = async () => {
+    if (isVisualPreview) {
+      setProofError("Visual preview only. No payment receipt was submitted.");
+      return;
+    }
     if (!selectedOrder || !proofImage || !selectedPaymentMethod) return;
     if (Number(selectedOrder.adjustmentDue || 0) <= 0 || String(selectedOrder.adjustmentStatus || '').toLowerCase() !== 'awaiting_payment') {
       setProofError('This order is not awaiting an additional payment. Refresh your orders.');
@@ -441,6 +562,10 @@ export default function OrderHistoryModal({
   };
 
   const submitDirectReceipt = async (order: any) => {
+    if (isVisualPreview) {
+      setProofError("Visual preview only. No payment receipt was submitted.");
+      return;
+    }
     if (!order) return;
 
     if (!canUploadPaymentProof(order)) {
@@ -519,18 +644,24 @@ export default function OrderHistoryModal({
     return [...orders]
       .sort((a, b) => (timestampMs(b.createdAt || b.updatedAt) || 0) - (timestampMs(a.createdAt || a.updatedAt) || 0))
       .filter(order => {
-      const status = (order.status || "Pending").toUpperCase();
-      if (["COMPLETED", "COMPLETE", "DELIVERED", "FULFILLED"].includes(status)) return false;
-      const matchesFilter = 
-        statusFilter === "ALL" ||
-        (statusFilter === "PENDING" && status === "PENDING") ||
-        (statusFilter === "PROCESSING" && status === "PROCESSING");
+      const status = String(order.status || "Pending").toLowerCase();
+      const paymentStatus = String(order.paymentStatus || "").toLowerCase();
+      const actionNeeded = (status === "pending" && paymentStatus === "unpaid" && canUploadPaymentProof(order)) ||
+        (Number(order.adjustmentDue || 0) > 0 && String(order.adjustmentStatus || "").toLowerCase() === "awaiting_payment");
+      const isClosed = ["expired", "cancelled", "canceled", "rejected", "cancellation requested"].includes(status);
+      const isCompleted = ["completed", "complete", "delivered", "fulfilled"].includes(status);
+      const isInProgress = ["pending", "processing", "ready", "dispatched"].includes(status) && !actionNeeded;
+      const matchesFilter = statusFilter === "ALL" ||
+        (statusFilter === "ACTION" && actionNeeded) ||
+        (statusFilter === "PROGRESS" && isInProgress) ||
+        (statusFilter === "COMPLETED" && isCompleted) ||
+        (statusFilter === "CLOSED" && isClosed);
 
       const query = searchTerm.trim().toLowerCase();
-      const orderNum = (order.orderNumber || order.id || "").toLowerCase();
-      const receiver = (order.receiverName || "").toLowerCase();
-      const itemsMatch = Array.isArray(order.items) && order.items.some((it: any) => 
-        (it.name || "").toLowerCase().includes(query)
+      const orderNum = String(order.orderNumber || order.id || "").toLowerCase();
+      const receiver = String(order.receiverName || "").toLowerCase();
+      const itemsMatch = Array.isArray(order.items) && order.items.some((it: any) =>
+        `${it.productName || it.name || ""} ${it.variantName || it.selectedVariant?.name || ""}`.toLowerCase().includes(query)
       );
 
       const matchesSearch = !query || orderNum.includes(query) || receiver.includes(query) || itemsMatch;
@@ -596,8 +727,9 @@ export default function OrderHistoryModal({
           </div>
         </div>
         <PrimePageHeading icon={<Package />} title={selectedOrder ? "ORDER DETAILS" : "PURCHASES"} actions={<>
-          <button type="button" onClick={loadOrders} className="p-2 rounded-lg text-gray-400 hover:text-gray-700" title="Refresh Orders"><RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-black" : ""}`} /></button>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:text-gray-900" title="Close modal"><X className="w-5 h-5" /></button>
+          {selectedOrder && <button type="button" onClick={() => { setSelectedOrderId(null); setReceiptViewerUrl(null); setProofSuccess(false); setProofImage(""); setProofError(""); setDirectReceiptOrderId(null); }} aria-label="Back to purchases" className="flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /></button>}
+          <button type="button" onClick={loadOrders} aria-label="Refresh orders" className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-black" : ""}`} /></button>
+          <button type="button" onClick={onClose} aria-label="Close purchases" className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><X className="w-5 h-5" /></button>
         </>} />
 
         {/* ================= MODAL BODY ================= */}
@@ -628,25 +760,29 @@ export default function OrderHistoryModal({
                 </div>
 
                 {/* Filter Pills */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-mono">
-                  {(["ALL", "PENDING", "PROCESSING", "EXPIRED"] as const).map(tab => (
+                <div className="grid grid-cols-3 gap-1.5 text-xs font-mono">
+                  {([
+                    ["ALL", "All"], ["ACTION", "Action needed"], ["PROGRESS", "In progress"],
+                    ["COMPLETED", "Completed"], ["CLOSED", "Closed"],
+                  ] as const).map(([tab, label]) => (
                     <button
                       key={tab}
                       type="button"
                       onClick={() => setStatusFilter(tab)}
-                      className={`px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider text-[10px] whitespace-nowrap transition-colors cursor-pointer ${
+                      aria-pressed={statusFilter === tab}
+                      className={`min-h-9 rounded-md border px-2 py-1.5 font-bold uppercase tracking-wide text-[9px] leading-tight transition-colors cursor-pointer ${
                         statusFilter === tab
-                          ? "bg-slate-900 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          ? "border-slate-900 bg-slate-900 text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                       }`}
                     >
-                      {tab}
+                      {label}
                     </button>
                   ))}
-                  <span className="ml-auto text-[11px] text-gray-400 font-mono">
-                    {filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"}
-                  </span>
                 </div>
+                <p aria-live="polite" className="text-right text-[10px] font-mono text-slate-500">
+                  {filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"}
+                </p>
               </div>
 
               {/* Orders List Container */}
@@ -680,36 +816,55 @@ export default function OrderHistoryModal({
                     </h3>
                     <p className="text-xs font-mono text-gray-500 max-w-xs mx-auto mt-1">
                       {searchTerm || statusFilter !== "ALL"
-                        ? "No orders match your active search or filters."
-                        : orders.length > 0 ? "No active orders to display." : "You haven't placed any orders yet. Add items to your cart to checkout."}
+                        ? "No orders match your active search or filter."
+                        : "Your purchases will appear here after checkout."}
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-2.5">
                   {filteredOrders.map((order) => {
-                    const status = order.status || "Pending";
+                    const status = String(order.controlState || '').toLowerCase() === 'held' ? 'On Hold' : String(order.status || "Pending");
                     const orderNumber = String(order.orderNumber || order.id || "").replace(/^#/, "");
                     const orderKey = order.id || order.orderNumber;
-                    const isActive = !["completed", "delivered", "expired", "cancelled"].includes(String(status).toLowerCase());
-                    const statusIcon = isActive ? <Clock className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />;
+                    const itemCount = Array.isArray(order.items) ? order.items.reduce((sum: number, item: any) => sum + Math.max(1, Number(item.quantity) || 1), 0) : 0;
+                    const amount = Number(order.totalAmount ?? order.payableNow ?? 0) || 0;
+                    const isCod = String(order.deliveryFeePaymentMethod || "").toLowerCase() === "upon_delivery";
+                    const dueNow = Number(order.payableNow ?? (amount - Number(order.payableOnDelivery || 0))) || 0;
+                    const dueToCourier = Number(order.payableOnDelivery ?? (isCod ? order.deliveryFee : 0)) || 0;
 
                     return (
                       <button
                         key={orderKey}
                         type="button"
                         onClick={() => setSelectedOrderId(orderKey)}
-                        className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3.5 text-left shadow-xs transition-all hover:border-slate-900 active:scale-[0.99]"
+                        className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left shadow-xs transition-colors hover:border-slate-400 active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700"
                       >
-                        <span className="min-w-0">
-                          <span className="block truncate font-misans-bold text-[17px] leading-tight text-slate-950">{orderNumber}</span>
-                          <span className="mt-1 block font-misans-regular text-xs text-gray-500">
-                            {formatOrderDate(order.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        <span className="flex min-w-0 items-start justify-between gap-2">
+                          <span className="min-w-0">
+                            <span className="block truncate font-mono text-[13px] font-bold leading-tight text-slate-950">#{orderNumber}</span>
+                            <span className="mt-1 block font-mono text-[10px] text-slate-500">
+                              {formatOrderDate(order.createdAt, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          </span>
+                          <span className={`inline-flex shrink-0 items-center rounded border px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wide ${orderStatusTone(status)}`}>{status}</span>
+                        </span>
+                        <span className="mt-2 block truncate text-[11px] leading-snug text-slate-700">
+                          {Array.isArray(order.items) && order.items.length > 0
+                            ? <>{orderItemTitle(order.items[0])}{order.items[0]?.variantName && <span className="text-slate-500"> · {order.items[0].variantName}</span>}{order.items.length > 1 && <span className="text-slate-500"> + {order.items.length - 1} more item{order.items.length > 2 ? "s" : ""}</span>}</>
+                            : "Order items"}
+                          <span className="ml-1 text-slate-500">· {itemCount} {itemCount === 1 ? "item" : "items"}</span>
+                        </span>
+                        <span className="mt-2 flex items-end justify-between gap-2 border-t border-slate-100 pt-2">
+                          <span className={`min-w-0 truncate font-mono text-[10px] font-semibold ${paymentStatusTone(order.paymentStatus)}`}>
+                            {order.paymentStatus || "Payment status unavailable"}{order.paymentMethodName ? ` · ${order.paymentMethodName}` : ""}
+                          </span>
+                          <span className="shrink-0 text-right">
+                            <span className="block font-heading text-[9px] font-normal uppercase tracking-wide text-slate-500">Order total</span>
+                            <span className="block font-mono text-[14px] font-bold tabular-nums text-slate-950">{formatPHP(amount)}</span>
                           </span>
                         </span>
-                        <span className={`flex shrink-0 items-center gap-1.5 font-misans-bold text-[13px] uppercase ${isActive ? "text-blue-700" : "text-slate-600"} ${isActive ? "order-history__active-status" : ""}`}>
-                          {statusIcon}<span>{status}</span>
-                        </span>
+                        {isCod && <span className="mt-1 block text-right font-mono text-[9px] text-slate-500">{formatPHP(dueNow)} now · {formatPHP(dueToCourier)} to courier</span>}
                       </button>
                     );
                   })}
@@ -721,18 +876,20 @@ export default function OrderHistoryModal({
             selectedOrder && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-150">
                 {/* Status and Summary Hero Box */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="flex items-start justify-between gap-2 border-b border-slate-200/80 pb-3">
+                <div className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="truncate font-misans-bold text-[19px] leading-tight text-slate-900">
-                          {String(selectedOrder.orderNumber || selectedOrder.id || "").replace(/^#/, "")}
+                      <span className="block font-heading text-[9px] font-normal uppercase tracking-wider text-slate-500">Order number</span>
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        <h3 className="truncate font-mono text-[16px] font-bold leading-tight text-slate-950">
+                          #{String(selectedOrder.orderNumber || selectedOrder.id || "").replace(/^#/, "")}
                         </h3>
                         <button
                           type="button"
                           onClick={() => copyToClipboard(selectedOrder.orderNumber || selectedOrder.id, "orderId")}
                           className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
-                          title="Copy Order ID"
+                          aria-label="Copy order number"
+                          title="Copy order number"
                         >
                           {copiedKey === "orderId" ? (
                             <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -741,19 +898,24 @@ export default function OrderHistoryModal({
                           )}
                         </button>
                       </div>
-                      <p className="mt-1 font-misans-regular text-xs text-slate-500">
-                        {formatOrderDate(selectedOrder.createdAt)}
-                      </p>
+                      <p className="mt-1 font-mono text-[10px] text-slate-500">Placed {formatOrderDate(selectedOrder.createdAt)}</p>
                     </div>
                     {(() => {
-                      const status = String(selectedOrder.status || "Pending");
-                      const isActive = !["completed", "delivered", "expired", "cancelled"].includes(status.toLowerCase());
-                      return <span className={`flex shrink-0 items-center gap-1.5 font-misans-bold text-[19px] leading-tight uppercase ${isActive ? "text-blue-700 order-history__active-status" : "text-slate-700"}`}>
-                        {isActive ? <Clock className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}{status}
-                      </span>;
+                      const status = String(selectedOrder.controlState || '').toLowerCase() === 'held' ? 'On Hold' : String(selectedOrder.status || "Pending");
+                      return <span className={`mt-3 inline-flex shrink-0 items-center rounded border px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wide ${orderStatusTone(status)}`}>{status}</span>;
                     })()}
                   </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[10px]">
+                    <span className={`font-mono font-bold uppercase ${paymentStatusTone(selectedOrder.paymentStatus)}`}>{selectedOrder.paymentStatus || "Payment status unavailable"}</span>
+                    {selectedOrder.paymentMethodName && <span className="text-slate-500">via {selectedOrder.paymentMethodName}</span>}
+                  </div>
                 </div>
+
+                <div className="flex gap-2">
+                  <button type="button" disabled={orderActionBusy || String(selectedOrder.status || '').toLowerCase() !== 'pending' || String(selectedOrder.paymentStatus || '').toLowerCase() === 'paid'} onClick={() => { setOrderActionError(''); setCustomerEdit({ receiverName: String(selectedOrder.deliveryAddress?.receiverName || selectedOrder.receiverName || ''), receiverPhone: String(selectedOrder.deliveryAddress?.receiverPhone || selectedOrder.receiverPhone || ''), unitDetails: String(selectedOrder.deliveryAddress?.unitDetails || ''), deliveryNotes: String(selectedOrder.deliveryAddress?.deliveryNotes || '') }); setCustomerEditOpen(true); }} className="min-h-10 flex-1 rounded-lg border border-slate-300 bg-white px-2 font-roboto-condensed-semibold text-xs text-slate-800 disabled:opacity-45">Edit Order</button>
+                  <button type="button" disabled={orderActionBusy || !['pending', 'approved', 'processing'].includes(String(selectedOrder.status || '').toLowerCase())} onClick={() => void cancelCustomerOrder()} className="min-h-10 flex-1 rounded-lg border border-rose-300 bg-rose-50 px-2 font-roboto-condensed-semibold text-xs text-rose-800 disabled:opacity-45">Cancel Order</button>
+                </div>
+                {orderActionError && <p role="alert" className="rounded border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700">{orderActionError}</p>}
 
                 {String(selectedOrder.status || '').toLowerCase() === 'dispatched' && (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-2">
@@ -763,11 +925,11 @@ export default function OrderHistoryModal({
                     {receiptConfirmationError && <p className="text-xs text-red-700">{receiptConfirmationError}</p>}
                     <button
                       type="button"
-                      disabled={confirmingReceiptOrderId === selectedOrder.id}
+                      disabled={isVisualPreview || confirmingReceiptOrderId === selectedOrder.id}
                       onClick={() => confirmOrderReceived(selectedOrder.id)}
                       className="w-full rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-mono font-bold text-white disabled:opacity-60"
                     >
-                      {confirmingReceiptOrderId === selectedOrder.id ? 'CONFIRMING…' : 'I RECEIVED MY ORDER'}
+                      {isVisualPreview ? 'PREVIEW ONLY' : confirmingReceiptOrderId === selectedOrder.id ? 'CONFIRMING…' : 'I RECEIVED MY ORDER'}
                     </button>
                   </div>
                 )}
@@ -868,6 +1030,19 @@ export default function OrderHistoryModal({
                     </span>
                   </div>
 
+                  {Number(selectedOrder.promoDiscount ?? selectedOrder.discountAmount ?? 0) > 0 && (
+                    <div className="flex justify-between items-center text-gray-600">
+                      <span className="order-detail-label">Promotion discount:</span>
+                      <span className="order-detail-value order-history__charge-amount text-emerald-700">−{formatPHP(Number(selectedOrder.promoDiscount ?? selectedOrder.discountAmount))}</span>
+                    </div>
+                  )}
+                  {Number(selectedOrder.pointsDiscount || 0) > 0 && (
+                    <div className="flex justify-between items-center text-gray-600">
+                      <span className="order-detail-label">Points discount:</span>
+                      <span className="order-detail-value order-history__charge-amount text-emerald-700">−{formatPHP(Number(selectedOrder.pointsDiscount))}</span>
+                    </div>
+                  )}
+
                   {/* Charges list if present */}
                   {Array.isArray(selectedOrder.appliedCharges || selectedOrder.charges) && (selectedOrder.appliedCharges || selectedOrder.charges).map((ch: any, i: number) => {
                     const isChFree = Boolean(ch.isFree || Number(ch.computedAmount || ch.amount) === 0);
@@ -916,23 +1091,16 @@ export default function OrderHistoryModal({
 
                   {/* Grand Total */}
                   <div className="pt-2 border-t border-gray-200 flex justify-between items-center text-sm font-heading font-bold text-gray-900">
-                    <span className="order-detail-label">Total Amount:</span>
+                    <span className="order-detail-label">Order total:</span>
                     <span className="order-detail-value text-base text-slate-950 font-bold">
-                      {formatPHP(
-                        selectedOrder.deliveryFeePaymentMethod === "upon_delivery"
-                          ? (selectedOrder.payableNow !== undefined 
-                              ? Number(selectedOrder.payableNow) 
-                              : (Number(selectedOrder.totalAmount || 0) > Number(selectedOrder.deliveryFee || 0) 
-                                  ? Number(selectedOrder.totalAmount || 0) - Number(selectedOrder.deliveryFee || 0) 
-                                  : Number(selectedOrder.totalAmount || 0)))
-                          : (selectedOrder.totalAmount || selectedOrder.payableNow || 0)
-                      )}
+                      {formatPHP(Number(selectedOrder.totalAmount ?? selectedOrder.payableNow ?? 0))}
                     </span>
                   </div>
 
                   {/* Payable Splits if COD */}
                   {selectedOrder.deliveryFeePaymentMethod === "upon_delivery" && (
                     <div className="mt-2.5 pt-2 border-t border-dashed border-gray-200 space-y-1.5 text-[11px]">
+                      <p className="font-heading text-[9px] font-normal uppercase tracking-wide text-slate-500">Payment split</p>
                       <div className="flex justify-between items-center text-slate-600">
                         <span className="order-detail-label">Amount Paid Now (Checkout):</span>
                         <span className="order-detail-value text-slate-900">
@@ -976,15 +1144,15 @@ export default function OrderHistoryModal({
                       <span className="order-detail-value text-slate-800 leading-relaxed block">
                         {selectedOrder.deliveryAddress?.formatted || selectedOrder.deliveryAddress?.address || selectedOrder.address || "N/A"}
                         <span className="order-detail-value block text-gray-500 text-[11px] mt-0.5">
-                          Unit / Landmark: {selectedOrder.deliveryAddress?.unitDetails || "Non"}
+                          Unit / Landmark: {selectedOrder.deliveryAddress?.unitDetails || "None"}
                         </span>
                       </span>
                     </div>
 
                     <div>
                       <span className="text-[10px] uppercase text-gray-400 block font-bold">Delivery Notes / Instructions</span>
-                      <span className="text-slate-700 italic block font-ibm-condensed font-medium">
-                        {selectedOrder.notes || "Non"}
+                        <span className="text-slate-700 italic block font-mono font-medium">
+                        {selectedOrder.notes || "None"}
                       </span>
                     </div>
                   </div>
@@ -1011,7 +1179,7 @@ export default function OrderHistoryModal({
                           <option value="">Choose a payment method</option>
                           {paymentMethods.map((method: any) => <option key={method.id} value={method.id}>{method.name}</option>)}
                         </select>
-                        {selectedPaymentMethod?.paymentLinkUrl && /^https:\/\//i.test(String(selectedPaymentMethod.paymentLinkUrl)) && <a href={selectedPaymentMethod.paymentLinkUrl} target="_blank" rel="noopener noreferrer" className="block bg-slate-900 px-3 py-2 text-center text-xs font-bold uppercase text-white">Open secured payment link</a>}
+                        {selectedPaymentMethod?.paymentLinkUrl && <SecuredPaymentLink url={selectedPaymentMethod.paymentLinkUrl} />}
                         <label className="block text-xs text-amber-950">Upload the receipt for the additional payment<input type="file" accept="image/*" onChange={handleProofFileChange} className="mt-2 block w-full text-xs" /></label>
                         {proofError && <p className="text-xs text-red-700">{proofError}</p>}
                         <button type="button" onClick={() => void handleSubmitAdjustmentProof()} disabled={isSubmittingProof || !proofImage || !selectedPaymentMethod} className="w-full py-2.5 bg-amber-800 text-white text-xs font-bold uppercase disabled:opacity-50">{isSubmittingProof ? 'Submitting…' : 'Submit extra payment receipt'}</button>
@@ -1040,6 +1208,7 @@ export default function OrderHistoryModal({
                       </h4>
                       <p className="order-history__item-meta text-[11px] text-gray-500">
                         {selectedOrder.paymentStatus || (selectedOrder.status === "Completed" ? "Completed" : "Pending Verification")}
+                        {selectedOrder.paymentMethodName ? ` · ${selectedOrder.paymentMethodName}` : ""}
                       </p>
                     </div>
 
@@ -1068,6 +1237,8 @@ export default function OrderHistoryModal({
                         <p className="border-t border-gray-200 pt-3 text-xs text-gray-600">You do not need to pay again or upload another receipt just because the order was edited. Staff will compare your existing receipt with the revised amount due. Any verified overpayment will be returned as Store Credits. If the payment is short, staff will contact you before processing.</p>
                       )}
                     </div>
+                  ) : isVisualPreview ? (
+                    <p className="rounded border border-amber-200 bg-amber-50 p-2 text-[10px] text-amber-900">Visual preview only — payment actions are disabled and no receipt can be submitted.</p>
                   ) : canUploadPaymentProof(selectedOrder) ? (
                     /* If order is still Pending, unpaid, and within the payment window, allow customer to upload receipt */
                     <div className="space-y-3 pt-1">
@@ -1170,9 +1341,7 @@ export default function OrderHistoryModal({
                               {String(selectedPaymentMethod.paymentType || selectedPaymentMethod.type || "").toLowerCase() === "secured_payment_link" && (
                                 <div className="border border-emerald-200 bg-emerald-50 p-3 space-y-2">
                                   <p className="text-xs text-emerald-900">After payment, return here and upload your receipt for staff review. Link return alone does not confirm payment.</p>
-                                  {/^https:\/\//i.test(String(selectedPaymentMethod.paymentLinkUrl || "")) ? (
-                                    <a href={selectedPaymentMethod.paymentLinkUrl} target="_blank" rel="noopener noreferrer" className="block bg-slate-900 px-3 py-2 text-center text-xs font-bold uppercase text-white">Open Secured Payment Link</a>
-                                  ) : <p className="text-xs text-red-700">This payment link is unavailable. Contact the shop.</p>}
+                                  <SecuredPaymentLink url={selectedPaymentMethod.paymentLinkUrl} />
                                 </div>
                               )}
 
@@ -1244,6 +1413,8 @@ export default function OrderHistoryModal({
             )
           )}
         </div>
+
+        {customerEditOpen && selectedOrder && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-label="Edit order"><section className="w-full max-w-[398px] rounded-xl bg-white p-4 shadow-2xl"><h3 className="font-roboto-condensed-semibold text-base text-slate-900">Edit Order</h3><p className="mt-1 text-xs text-slate-600">Before payment approval, you can update the receiver and delivery instructions. Item or amount changes need staff review.</p><div className="mt-3 grid grid-cols-2 gap-2"><label className="col-span-2 text-xs">Receiver Name<input className="mt-1 min-h-10 w-full rounded border px-2 font-mono" value={customerEdit.receiverName} onChange={event => setCustomerEdit(draft => ({ ...draft, receiverName: event.target.value }))} /></label><label className="col-span-2 text-xs">Receiver Phone<input className="mt-1 min-h-10 w-full rounded border px-2 font-mono" value={customerEdit.receiverPhone} onChange={event => setCustomerEdit(draft => ({ ...draft, receiverPhone: event.target.value }))} inputMode="tel" /></label><label className="col-span-2 text-xs">Unit / Landmark<input className="mt-1 min-h-10 w-full rounded border px-2 font-mono" value={customerEdit.unitDetails} onChange={event => setCustomerEdit(draft => ({ ...draft, unitDetails: event.target.value }))} /></label><label className="col-span-2 text-xs">Delivery Notes<textarea className="mt-1 min-h-16 w-full rounded border p-2 font-mono" value={customerEdit.deliveryNotes} onChange={event => setCustomerEdit(draft => ({ ...draft, deliveryNotes: event.target.value }))} /></label></div>{orderActionError && <p role="alert" className="mt-2 text-xs text-rose-700">{orderActionError}</p>}<div className="mt-3 flex gap-2"><button type="button" className="min-h-10 flex-1 rounded border" onClick={() => setCustomerEditOpen(false)}>Close</button><button type="button" disabled={orderActionBusy} className="min-h-10 flex-1 rounded bg-emerald-700 px-2 text-white disabled:opacity-50" onClick={() => void saveCustomerEdit()}>{orderActionBusy ? 'Saving…' : 'Save Changes'}</button></div></section></div>}
 
         {receiptViewerUrl && (
           <div

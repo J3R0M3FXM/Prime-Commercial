@@ -209,10 +209,6 @@ function addressText(value: any) {
 function lifecycleInfo(order: ServerlessOrder) {
   const status = order.status.toLowerCase();
   const payment = order.paymentStatus.toLowerCase();
-  if (status === "expired") return {
-    tone: "expired", title: "Payment window expired",
-    message: "No receipt was submitted before the one-hour payment deadline. The order cannot proceed; inventory and eligible promo holds are released.",
-  };
   if (["completed", "delivered"].includes(status)) return {
     tone: "complete", title: "Order completed",
     message: "Delivery or fulfillment has been recorded. No further staff action is available for this order.",
@@ -227,10 +223,6 @@ function lifecycleInfo(order: ServerlessOrder) {
       ? `The order was edited before payment approval. Check the attached receipt against the provider transaction and the revised amount of ${formatPHP(order.payableNow)}. Approve only if the verified payment covers the amount due; any excess is issued as Store Credits. Approval moves the order to Processing.`
       : `Compare the receipt with the provider transaction for ${formatPHP(order.payableNow)} before approving payment. Approval moves the order to Processing.`,
   };
-  if (status === "pending" && payment === "unpaid" && order.staffEditVersion > 0) return {
-    tone: "waiting", title: "Edited order · waiting for payment",
-    message: `The revised amount due is ${formatPHP(order.payableNow)}. No receipt is attached yet, so the order stays Pending. Ask the customer to pay this amount and submit proof. After it arrives, verify the provider payment and approve it to move the order into Processing.`,
-  };
   if (status === "pending" && order.payableNow <= 0) return {
     tone: "review", title: "Staff review required · no upfront payment",
     message: order.payableOnDelivery > 0
@@ -238,8 +230,8 @@ function lifecycleInfo(order: ServerlessOrder) {
       : "Approve the zero balance after checking the order; no receipt is expected, and it will be marked Paid for processing.",
   };
   if (status === "pending") return {
-    tone: "waiting", title: "Waiting for customer payment",
-    message: `A receipt is due by ${displayDate(paymentDeadlineMs(order))}. When submitted, staff must verify the provider transaction before approving.`,
+    tone: "waiting", title: "Waiting for payment review",
+    message: "The customer submitted payment proof before order submission. Staff must verify the provider transaction before approving.",
   };
   if (["processing", "ready", "packed"].includes(status)) return {
     tone: "active", title: "In fulfillment",
@@ -431,7 +423,7 @@ export default function TelegramServerlessOrdersPanel({
     });
   }, [orders, search, statusFilter, queueFilter]);
 
-  const runAction = async (order: ServerlessOrder, action: "markPaid" | "approveZeroDue" | "markReady" | "dispatch" | "complete" | "expireUnpaid" | "approveAdjustmentPayment" | "edit", extra: Record<string, any> = {}) => {
+  const runAction = async (order: ServerlessOrder, action: "markPaid" | "approveZeroDue" | "markReady" | "dispatch" | "complete" | "approveAdjustmentPayment" | "edit", extra: Record<string, any> = {}) => {
     setBusyAction(`${order.id}:${action}`);
     setError("");
     try {
@@ -510,9 +502,6 @@ export default function TelegramServerlessOrdersPanel({
     && (["paid", "completed"].includes(payment) || selectedOrder.payableNow <= 0)
     && (selectedOrder.adjustmentDue <= 0 || selectedOrder.adjustmentStatus.toLowerCase() === "paid"));
   const canComplete = status === "dispatched";
-  const unpaidDeadline = selectedOrder ? paymentDeadlineMs(selectedOrder) : null;
-  const canExpireUnpaid = Boolean(selectedOrder && status === "pending" && payment === "unpaid"
-    && !selectedOrder.paymentProofImage && unpaidDeadline !== null && unpaidDeadline <= Date.now());
   const lifecycle = selectedOrder ? lifecycleInfo(selectedOrder) : null;
   const receiverName = String(selectedOrder?.deliveryAddress?.receiverName || selectedOrder?.customerName || "");
   const receiverPhone = String(selectedOrder?.deliveryAddress?.receiverPhone || selectedOrder?.customerPhone || "");
@@ -767,7 +756,7 @@ export default function TelegramServerlessOrdersPanel({
             </div></details>}
             {selectedOrder.notes && <details className="serverless-disclosure"><summary>Order notes</summary><div className="serverless-disclosure__body text-xs">{selectedOrder.notes}</div></details>}
 
-            {(canVerifyPayment || canApproveZeroDue || canReady || canDispatch || canComplete || canExpireUnpaid) && <details className="serverless-disclosure">
+            {(canVerifyPayment || canApproveZeroDue || canReady || canDispatch || canComplete) && <details className="serverless-disclosure">
               <summary>{canVerifyPayment ? "Next step · check payment" : canApproveZeroDue ? "Next step · confirm no upfront payment is due" : canReady ? "Next step · prepare order" : canDispatch ? "Next step · add courier tracking" : canComplete ? "Next step · confirm delivery" : "More order actions"}</summary>
               <div className="serverless-disclosure__body"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {canVerifyPayment && <div className="space-y-2"><label className="block text-xs text-emerald-900">Amount confirmed in the payment provider<input type="number" min={selectedOrder.payableNow} step="0.01" placeholder="Enter the amount received" value={verifiedPaidAmount} onChange={(event) => setVerifiedPaidAmount(event.target.value)} className="mt-1 w-full border px-3 py-2 text-sm" /></label><p className="text-xs text-slate-600">Compare the provider transaction with the order due. Any verified excess is issued as Store Credits.</p><button type="button" disabled={busyAction !== "" || !verifiedPaidAmount || Number(verifiedPaidAmount) < selectedOrder.payableNow} onClick={() => void runAction(selectedOrder, "markPaid", { confirmedAmount: verifiedPaidAmount })} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markPaid") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Confirm verified payment and continue</button></div>}
@@ -775,7 +764,6 @@ export default function TelegramServerlessOrdersPanel({
                 {canReady && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "markReady")} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markReady") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark Ready{selectedOrder.readyCreditDue > 0 ? ` · issue ${formatPHP(selectedOrder.readyCreditDue)} Store Credits` : ""}</button>}
                 {canDispatch && <div className="serverless-order-dispatch"><label htmlFor="order-tracking-url">Live tracking URL <span>Required</span></label><input id="order-tracking-url" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" placeholder="https://courier.example/track/..." value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} /><small>This URL will appear as “Track Location” in the customer’s order details.</small><button type="button" disabled={busyAction !== "" || !/^https:\/\//i.test(trackingUrl.trim())} onClick={() => void runAction(selectedOrder, "dispatch", { trackingUrl: trackingUrl.trim() })} className="px-3 py-2 bg-sky-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":dispatch") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Truck className="inline w-3 h-3 mr-1" />} Save tracking &amp; mark dispatched</button></div>}
                 {canComplete && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "complete")} className="px-3 py-2 bg-indigo-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":complete") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark delivered / completed</button>}
-                {canExpireUnpaid && <div className="space-y-2 border border-amber-200 bg-amber-50 p-3"><p className="text-xs text-amber-950">The one-hour payment window ended at {displayDate(unpaidDeadline)}. Expiring this order releases its inventory and promo holds and returns eligible Store Credits.</p><button type="button" disabled={busyAction !== ""} onClick={() => { if (window.confirm("Expire this overdue unpaid order? This releases its inventory and promo holds and returns eligible Store Credits.")) void runAction(selectedOrder, "expireUnpaid"); }} className="px-3 py-2 bg-amber-800 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":expireUnpaid") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Clock3 className="inline w-3 h-3 mr-1" />} Expire overdue unpaid order</button></div>}
               </div>
               {canVerifyPayment && <p className="mt-2 text-xs text-amber-700">Enter the exact total received from the provider. For an edited order, compare that amount with the revised due above. Any excess is issued as Store Credits when you approve.</p>}
               {canApproveZeroDue && <p className="mt-2 text-xs text-amber-700">Confirm no upfront amount is due. The order will be marked Paid for processing; any pay-on-delivery amount remains due to the courier.</p>}

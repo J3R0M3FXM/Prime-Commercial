@@ -1,8 +1,10 @@
 import { api, db } from 'sdk';
 import { asc, desc, eq } from 'sdk/db';
 import { telegramAutomationChats, telegramAutomationFlows, telegramAutomationSettings } from '../schema.js';
+import { flowButtons, resolveSecretaryPhoto, secretaryFlowMedia, validateFlowButtons } from './secretary-media.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const WELCOME_COOLDOWN_MS = 12 * 60 * 60 * 1000;
 
 export async function getAutomationSettings() {
   const row = await db.select().from(telegramAutomationSettings)
@@ -15,6 +17,7 @@ export async function getAutomationSettings() {
     businessUserId: row?.businessUserId == null ? '' : String(row.businessUserId),
     businessUserChatId: row?.businessUserChatId == null ? '' : String(row.businessUserChatId),
     welcomeFlowId: row?.welcomeFlowId || '',
+    welcomePhotoFileId: row?.welcomePhotoFileId || '',
   };
 }
 
@@ -86,10 +89,10 @@ export async function recordHumanTakeover(connectionId, chatId, now) {
 
 export function shouldStartAutomation(state, now) {
   if (state?.botPaused === true) return false;
-  if (!state?.lastCustomerMessageAt) return true;
-  if (now.getTime() - new Date(state.lastCustomerMessageAt).getTime() < DAY_MS) return false;
-  if (!state.humanTakeoverUntil) return true;
-  return now.getTime() >= new Date(state.humanTakeoverUntil).getTime();
+  if (state?.testMode === true) return true;
+  // Welcome throttling is governed only by lastBotMessageAt in
+  // findWelcomeResponse. Admin replies must not create a second cooldown.
+  return true;
 }
 
 function matches(value, trigger, mode) {
@@ -101,12 +104,40 @@ function matches(value, trigger, mode) {
   return source.includes(target);
 }
 
+function validateAutomationFlow(flow) {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(flow.id || ''))) throw new Error('Step ID must be 1–64 letters, numbers, dashes, or underscores.');
+  if (Array.from(String(flow.name || '')).length > 80) throw new Error('Step name must be 80 characters or fewer.');
+  if (Array.from(String(flow.responseText || '')).length > 4096) throw new Error('Message text exceeds Telegram’s 4096-character limit.');
+  const buttons = flowButtons(flow);
+  validateFlowButtons(flow.buttons || []);
+  if (buttons.length > 50) throw new Error('A step can contain at most 50 inline buttons.');
+  const ids = new Set();
+  for (const [index, button] of buttons.entries()) {
+    const buttonId = String(button?.id || '');
+    const label = String(button?.text || '').trim();
+    const action = String(button?.action || 'text').toLowerCase();
+    if (!buttonId || ids.has(buttonId)) throw new Error(`Button ${index + 1} needs a unique ID.`);
+    ids.add(buttonId);
+    if (!label || Array.from(label).length > 64) throw new Error(`Button ${index + 1} needs a label of 1–64 characters.`);
+    if (!['flow', 'text', 'reply', 'caption', 'media', 'markup', 'url'].includes(action)) throw new Error(`Button ${index + 1} has an unsupported action.`);
+    if (button?.url && !/^https:\/\//i.test(String(button.url))) throw new Error(`Button ${index + 1} URL must use HTTPS.`);
+    if (action === 'url' && !/^https:\/\//i.test(String(button?.url || ''))) throw new Error(`Button ${index + 1} needs an HTTPS URL.`);
+    if (action === 'media' && !String(button?.mediaFileId || button?.media_file_id || button?.mediaUrl || button?.media_url || '').trim()) throw new Error(`Button ${index + 1} needs an uploaded Telegram file.`);
+    if (action === 'caption' && Array.from(String(button?.caption ?? button?.response ?? '')).length > 1024) throw new Error(`Button ${index + 1} caption exceeds Telegram’s 1024-character limit.`);
+    if (action === 'media' && Array.from(String(button?.caption || '')).length > 1024) throw new Error(`Button ${index + 1} media caption exceeds Telegram’s 1024-character limit.`);
+    if (action !== 'url' && new TextEncoder().encode(`sec:${flow.id}:${buttonId}`).length > 64) throw new Error(`Button ${index + 1} callback data exceeds Telegram’s 64-byte limit.`);
+    const markup = button?.replyMarkup ?? button?.reply_markup;
+    if (markup !== undefined && (!markup || typeof markup !== 'object' || Array.isArray(markup))) throw new Error(`Button ${index + 1} inline markup must be an object.`);
+  }
+}
+
 export async function findAutomationResponse(triggerType, value) {
   const settings = await getAutomationSettings();
   if (!settings.enabled) return null;
   const flows = await getAutomationFlows();
   const flow = flows.find((item) => item.active && item.triggerType === triggerType &&
-    matches(value, item.triggerValue, item.matchMode));
+    ((triggerType === 'message' && !String(item.triggerValue || '').trim()) ||
+      matches(value, item.triggerValue, item.matchMode)));
   if (flow) return { flow, settings };
   if (triggerType === 'message' && settings.fallbackEnabled && settings.fallbackResponse) {
     return { flow: null, settings };
@@ -114,11 +145,12 @@ export async function findAutomationResponse(triggerType, value) {
   return null;
 }
 
-export async function findWelcomeResponse() {
+export async function findWelcomeResponse(state, now = new Date()) {
+  if (state?.lastBotMessageAt && now.getTime() - new Date(state.lastBotMessageAt).getTime() < WELCOME_COOLDOWN_MS) return null;
   const settings = await getAutomationSettings();
   if (!settings.enabled || !settings.welcomeFlowId) return null;
   const flows = await getAutomationFlows();
-  const flow = flows.find((item) => item.id === settings.welcomeFlowId && item.active && item.responseText);
+  const flow = flows.find((item) => item.id === settings.welcomeFlowId && item.active && (item.responseText || settings.welcomePhotoFileId || secretaryFlowMedia(item)));
   return flow ? { flow, settings } : null;
 }
 
@@ -131,20 +163,24 @@ export function renderTemplate(text, message) {
 }
 
 export function keyboard(flow) {
-  const buttons = Array.isArray(flow?.buttons) ? flow.buttons : [];
+  const buttons = flowButtons(flow);
   if (!buttons.length) return undefined;
-  return {
-    inline_keyboard: buttons.map((button) => [{
+  const rows = [];
+  for (let index = 0; index < buttons.length; index += 2) {
+    rows.push(buttons.slice(index, index + 2).map((button) => ({
       text: String(button.text || 'Option').slice(0, 64),
       ...(button.url ? { url: String(button.url) } : {
         callback_data: (String(button.action || '').toLowerCase() === 'url' ? '' : ('sec:' + flow.id + ':' + button.id).slice(0, 64)),
       }),
-    }]),
+    })));
+  }
+  return {
+    inline_keyboard: rows,
   };
 }
 
 export function findButton(flow, buttonId) {
-  return (Array.isArray(flow?.buttons) ? flow.buttons : []).find((button) => String(button.id) === String(buttonId));
+  return flowButtons(flow).find((button) => String(button.id) === String(buttonId));
 }
 
 export function parseSecretaryCallback(data) {
@@ -163,14 +199,16 @@ export function buildSecretaryAction(button, actionType, message, flow) {
   const fallbackText = renderTemplate(button?.response || flow?.responseText || '', message);
   const parseMode = button?.parseMode || button?.parse_mode;
   if (actionType === 'media') {
+    const mediaFileId = String(button?.mediaFileId || button?.media_file_id || '').trim();
     const mediaUrl = String(button?.mediaUrl || button?.media_url || button?.media?.url || '').trim();
     const mediaType = String(button?.mediaType || button?.media_type || button?.media?.type || 'photo').trim();
-    if (!mediaUrl) throw new Error('Telegram Secretary media action requires mediaUrl.');
+    const mediaSource = mediaFileId || mediaUrl;
+    if (!mediaSource) throw new Error('Telegram Secretary media action requires an uploaded file.');
     return {
       type: 'media',
       media: {
         type: mediaType,
-        media: mediaUrl,
+        media: mediaSource,
         ...(button?.caption !== undefined ? { caption: renderTemplate(String(button.caption), message) } :
           fallbackText ? { caption: fallbackText } : {}),
         ...(parseMode ? { parse_mode: parseMode } : {}),
@@ -207,10 +245,24 @@ function messageTarget(context) {
 
 export async function executeSecretaryAction(context, action) {
   const target = messageTarget(context);
-  if (action.type === 'media') return await api.editMessageMedia({
-    ...target, media: action.media,
-    ...(action.replyMarkup !== undefined ? { reply_markup: action.replyMarkup } : {}),
-  });
+  if (action.type === 'media') {
+    const reference = String(action.media?.media || '').trim();
+    if (reference.startsWith('tgmedia:')) {
+      const sent = await api.sendPhoto({
+        business_connection_id: target.business_connection_id,
+        chat_id: target.chat_id,
+        photo: await resolveSecretaryPhoto(reference),
+        ...(action.media?.caption ? { caption: String(action.media.caption).slice(0, 1024) } : {}),
+        ...(action.replyMarkup !== undefined ? { reply_markup: action.replyMarkup } : {}),
+      });
+      await api.editMessageReplyMarkup({ ...target, reply_markup: { inline_keyboard: [] } });
+      return sent;
+    }
+    return await api.editMessageMedia({
+      ...target, media: action.media,
+      ...(action.replyMarkup !== undefined ? { reply_markup: action.replyMarkup } : {}),
+    });
+  }
   if (action.type === 'caption') return await api.editMessageCaption({
     ...target, caption: String(action.caption || '').slice(0, 1024),
     ...(action.parseMode ? { parse_mode: action.parseMode } : {}),
@@ -236,7 +288,18 @@ export async function getAutomationChats(limit = 100) {
 }
 
 export async function setAutomationChatPaused(connectionId, chatId, paused) {
-  await updateAutomationChatState(connectionId, chatId, { botPaused: Boolean(paused) });
+  await updateAutomationChatState(connectionId, chatId, {
+    botPaused: Boolean(paused),
+    ...(paused ? { testMode: false } : {}),
+  });
+  return await getAutomationChatState(connectionId, chatId);
+}
+
+export async function setAutomationChatTestMode(connectionId, chatId, enabled) {
+  await updateAutomationChatState(connectionId, chatId, {
+    testMode: Boolean(enabled),
+    ...(enabled ? { botPaused: false } : {}),
+  });
   return await getAutomationChatState(connectionId, chatId);
 }
 
@@ -255,6 +318,9 @@ export async function updateAutomationSettings(input) {
     businessUserId,
     businessUserChatId,
     welcomeFlowId: String(input.welcomeFlowId || '') || null,
+    welcomePhotoFileId: input.welcomePhotoFileId === undefined
+      ? (await getAutomationSettings()).welcomePhotoFileId || null
+      : String(input.welcomePhotoFileId || '') || null,
     updatedAt: now,
   };
   await db.insert(telegramAutomationSettings).values(values).onConflictDoUpdate({
@@ -267,6 +333,7 @@ export async function updateAutomationSettings(input) {
       businessUserId: values.businessUserId,
       businessUserChatId: values.businessUserChatId,
       welcomeFlowId: values.welcomeFlowId,
+      welcomePhotoFileId: values.welcomePhotoFileId,
       updatedAt: now,
     },
   }).run();
@@ -290,6 +357,7 @@ export async function createAutomationFlow(input) {
     updatedAt: now,
   };
   if (!flow.name) throw new Error('Automation name is required.');
+  validateAutomationFlow(flow);
   await db.insert(telegramAutomationFlows).values(flow).run();
   return flow;
 }
@@ -317,6 +385,10 @@ export async function updateAutomationFlow(id, input) {
     if (!Number.isSafeInteger(priority)) throw new Error('priority must be an integer.');
     values.priority = priority;
   }
+  const current = await db.select().from(telegramAutomationFlows)
+    .where(eq(telegramAutomationFlows.id, id)).get();
+  if (!current) throw new Error('Automation flow not found.');
+  validateAutomationFlow({ ...current, ...values, id, buttons: values.buttons ?? current.buttons });
   const result = await db.update(telegramAutomationFlows).set(values)
     .where(eq(telegramAutomationFlows.id, id)).returning().run();
   if (!result[0]) throw new Error('Automation flow not found.');

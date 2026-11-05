@@ -11,10 +11,7 @@ export default function TelegramServerlessSystemPanel({ onBack }: { onBack: () =
   const [checkingSystem, setCheckingSystem] = useState(false);
   const [ocrSpaceConfigured, setOcrSpaceConfigured] = useState(false);
   const [googleVisionConfigured, setGoogleVisionConfigured] = useState(false);
-  const [taggunConfigured, setTaggunConfigured] = useState(false);
-  const [activeOcrProvider, setActiveOcrProvider] = useState("ocr_space");
   const [apiKey, setApiKey] = useState("");
-  const [taggunApiKey, setTaggunApiKey] = useState("");
   const [iplocationConfigured, setIplocationConfigured] = useState(false);
   const [iplocationApiKey, setIplocationApiKey] = useState("");
   const [tomtomConfigured, setTomtomConfigured] = useState(false);
@@ -27,14 +24,12 @@ export default function TelegramServerlessSystemPanel({ onBack }: { onBack: () =
     setLoading(true);
     try {
       const [result, iplocate, tomtom] = await Promise.all([
-        callServerless<{ taggunConfigured: boolean; googleVisionConfigured: boolean; ocrSpaceConfigured: boolean; provider: string }>("manageOcrSettings", { action: "status" }),
+        callServerless<{ googleVisionConfigured: boolean; ocrSpaceConfigured: boolean; provider: string }>("manageOcrSettings", { action: "status" }),
         callServerless<{ configured: boolean }>("manageIplocateSettings", { action: "status" }),
         callServerless<{ configured: boolean }>("manageTomtomSettings", { action: "status" }),
       ]);
-      setTaggunConfigured(Boolean(result?.taggunConfigured));
       setGoogleVisionConfigured(Boolean(result?.googleVisionConfigured));
       setOcrSpaceConfigured(Boolean(result?.ocrSpaceConfigured));
-      setActiveOcrProvider(result?.provider === "taggun" ? "taggun" : "ocr_space");
       setIplocationConfigured(Boolean(iplocate?.configured));
       setTomtomConfigured(Boolean(tomtom?.configured));
     } catch (error: any) {
@@ -89,57 +84,9 @@ export default function TelegramServerlessSystemPanel({ onBack }: { onBack: () =
       await callServerless("manageOcrSettings", { action: "set", provider: "ocr_space", apiKey: apiKey.trim() });
       setApiKey("");
       setOcrSpaceConfigured(true);
-      setActiveOcrProvider("ocr_space");
       setMessage("OCR.space key saved. Receipt scanning now uses OCR.space.");
     } catch (error: any) {
       setMessage(error?.message || "Could not save the OCR.space API key.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const saveTaggun = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!taggunApiKey.trim()) return;
-    setSaving(true);
-    setMessage("");
-    try {
-      await callServerless("manageOcrSettings", { action: "setTaggun", apiKey: taggunApiKey.trim() });
-      setTaggunApiKey("");
-      setTaggunConfigured(true);
-      setActiveOcrProvider("taggun");
-      setMessage("Taggun key saved securely and selected for receipt scans.");
-    } catch (error: any) {
-      setMessage(error?.message || "Could not save the Taggun API key.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const selectTaggun = async () => {
-    setSaving(true);
-    setMessage("");
-    try {
-      await callServerless("manageOcrSettings", { action: "selectTaggun" });
-      setActiveOcrProvider("taggun");
-      setMessage("Taggun selected for receipt scans.");
-    } catch (error: any) {
-      setMessage(error?.message || "Could not select Taggun.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const disconnectTaggun = async () => {
-    setSaving(true);
-    setMessage("");
-    try {
-      await callServerless("manageOcrSettings", { action: "disconnectTaggun" });
-      setTaggunConfigured(false);
-      setActiveOcrProvider("ocr_space");
-      setMessage("Taggun has been disconnected and its saved API key deleted. OCR.space is selected.");
-    } catch (error: any) {
-      setMessage(error?.message || "Could not disconnect Taggun.");
     } finally {
       setSaving(false);
     }
@@ -243,7 +190,7 @@ export default function TelegramServerlessSystemPanel({ onBack }: { onBack: () =
         </div>
         <div className="flex items-start gap-3">
           <ShieldCheck className="mt-0.5 h-5 w-5 text-emerald-700" />
-          <div><h2 className="font-bold">Receipt scanner: {activeOcrProvider === "taggun" ? "Taggun" : "OCR.space"}</h2><p className="mt-1 text-sm text-slate-600">Scans show a suggested amount, reference and transaction date/time. OCR remains advisory; staff must verify each payment with the provider before approval.</p></div>
+          <div><h2 className="font-bold">Receipt scanner: OCR.space (planned)</h2><p className="mt-1 text-sm text-slate-600">OCR is currently disabled. Image fingerprints are captured for fraud detection; staff must verify payments manually until OCR.space is connected through TGCloud.</p></div>
         </div>
         <p className="text-sm">OCR.space key: {loading ? "Checking…" : ocrSpaceConfigured ? <span className="font-bold text-emerald-700">Configured</span> : <span className="font-bold text-amber-700">Not configured</span>}</p>
         <form onSubmit={save} className="space-y-3">
@@ -251,16 +198,6 @@ export default function TelegramServerlessSystemPanel({ onBack }: { onBack: () =
           <label className="block text-sm font-semibold">OCR.space API key<input type="password" autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={ocrSpaceConfigured ? "Enter a new key to replace the saved key" : "Paste OCR.space API key"} className="mt-1 w-full border px-3 py-2 font-mono text-sm" /></label>
           <button type="submit" disabled={saving || !apiKey.trim()} className="inline-flex items-center gap-2 bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save OCR.space key</button>
         </form>
-        <div className="space-y-3 border-t pt-4">
-          <p className="text-sm text-slate-700">Taggun key: {loading ? "Checking…" : taggunConfigured ? <span className="font-semibold text-emerald-700">Configured</span> : <span className="font-semibold text-slate-500">Not configured</span>}</p>
-          <p className="text-xs text-slate-500">Taggun uses its encoded-receipt endpoint. Its API key is write-only and stays on the Serverless backend.</p>
-          <form onSubmit={saveTaggun} className="space-y-3">
-            <label className="block text-sm font-semibold">Taggun API key<input type="password" autoComplete="new-password" value={taggunApiKey} onChange={(event) => setTaggunApiKey(event.target.value)} placeholder={taggunConfigured ? "Enter a new key to replace the saved key" : "Paste Taggun API key"} className="mt-1 w-full border px-3 py-2 font-mono text-sm" /></label>
-            <button type="submit" disabled={saving || !taggunApiKey.trim()} className="inline-flex items-center gap-2 border border-slate-400 px-4 py-2 text-sm font-bold disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save key and use Taggun</button>
-          </form>
-          {taggunConfigured && activeOcrProvider !== "taggun" && <button type="button" onClick={() => void selectTaggun()} disabled={saving} className="border border-emerald-700 px-4 py-2 text-sm font-bold text-emerald-800 disabled:opacity-50">Use saved Taggun key</button>}
-          {taggunConfigured && <button type="button" onClick={() => void disconnectTaggun()} disabled={saving} className="mt-3 inline-flex items-center gap-2 border border-red-300 px-4 py-2 text-sm font-bold text-red-800 disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}Disconnect Taggun and delete key</button>}
-        </div>
         {googleVisionConfigured && <div className="border-t pt-4"><p className="text-sm text-slate-700">Legacy Google Cloud Vision key: <span className="font-semibold text-amber-700">Present but unused</span></p><button type="button" onClick={() => void disconnectGoogleVision()} disabled={saving} className="mt-3 inline-flex items-center gap-2 border border-red-300 px-4 py-2 text-sm font-bold text-red-800 disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}Delete Google key</button></div>}
         <div className="border-t pt-4 space-y-3">
           <div><h2 className="font-bold">IPLocate.io</h2><p className="mt-1 text-sm text-slate-600">Used for network and privacy indicators on order investigation, and as an approximate IP-area fallback when the primary lookup is unavailable.</p></div>

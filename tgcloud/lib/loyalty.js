@@ -3,7 +3,7 @@ export function calculateCustomerTier(completedOrders, now = new Date()) {
     return {
       tier: 'Silver', currentSpending: 0, cycleStartDate: now.toISOString(),
       cycleEndDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      daysRemainingInCycle: 30, nextTier: 'Bronze', amountNeededForNextTier: 5000,
+      daysRemainingInCycle: 30, nextTier: 'Bronze', amountNeededForNextTier: 10000,
       firstCompletedOrderDate: null, progressPercent: 0,
     };
   }
@@ -26,19 +26,19 @@ export function calculateCustomerTier(completedOrders, now = new Date()) {
   }
   let tier = 'Silver';
   let nextTier = 'Bronze';
-  let amountNeeded = 5000 - spending;
-  let progress = Math.min(100, Math.max(0, spending / 5000 * 100));
-  if (spending >= 20000) {
+  let amountNeeded = 10000 - spending;
+  let progress = Math.min(100, Math.max(0, spending / 10000 * 100));
+  if (spending >= 25000) {
     tier = 'Titanium'; nextTier = null; amountNeeded = 0; progress = 100;
+  } else if (spending >= 20000) {
+    tier = 'Platinum'; nextTier = 'Titanium'; amountNeeded = 25000 - spending;
+    progress = Math.min(100, Math.max(0, (spending - 20000) / 5000 * 100));
   } else if (spending >= 15000) {
-    tier = 'Platinum'; nextTier = 'Titanium'; amountNeeded = 20000 - spending;
+    tier = 'Gold'; nextTier = 'Platinum'; amountNeeded = 20000 - spending;
     progress = Math.min(100, Math.max(0, (spending - 15000) / 5000 * 100));
   } else if (spending >= 10000) {
-    tier = 'Gold'; nextTier = 'Platinum'; amountNeeded = 15000 - spending;
+    tier = 'Bronze'; nextTier = 'Gold'; amountNeeded = 15000 - spending;
     progress = Math.min(100, Math.max(0, (spending - 10000) / 5000 * 100));
-  } else if (spending >= 5000) {
-    tier = 'Bronze'; nextTier = 'Gold'; amountNeeded = 10000 - spending;
-    progress = Math.min(100, Math.max(0, (spending - 5000) / 5000 * 100));
   }
   return {
     tier, currentSpending: spending, cycleStartDate: cycleStart.toISOString(),
@@ -46,4 +46,21 @@ export function calculateCustomerTier(completedOrders, now = new Date()) {
     nextTier, amountNeededForNextTier: Math.max(0, amountNeeded),
     firstCompletedOrderDate: firstDate.toISOString(), progressPercent: Math.round(progress),
   };
+}
+
+const TIER_POINTS_PER_200 = Object.freeze({ Silver: 10, Bronze: 11, Gold: 12, Platinum: 13, Titanium: 14 });
+
+/** Whole points only. Two complete ₱100 blocks earn the exact half-percent tiers. */
+export function calculateOrderRewardPoints(itemsSubtotal, tier, promoCashbackPoints = 0, itemDiscount = 0, creditsUsed = 0) {
+  const subtotal = Number(itemsSubtotal);
+  const discount = Number(itemDiscount);
+  const credits = Number(creditsUsed);
+  const promoPoints = Number(promoCashbackPoints);
+  if (![subtotal, discount, credits, promoPoints].every(Number.isFinite)) return 0;
+  const eligibleSpend = Math.max(0, subtotal - Math.max(0, discount) - Math.max(0, credits));
+  const blocks = Math.floor(eligibleSpend / 100);
+  const pointsPer200 = TIER_POINTS_PER_200[tier] || TIER_POINTS_PER_200.Silver;
+  const tierPoints = Math.floor(blocks * pointsPer200 / 2);
+  // The richer of a voucher or tier reward is credited once through the purchasing ledger.
+  return Math.max(tierPoints, Math.max(0, Math.floor(promoPoints)));
 }
