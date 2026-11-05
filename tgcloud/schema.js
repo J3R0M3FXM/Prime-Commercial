@@ -7,6 +7,28 @@
  * in endpoint logic and in migration reconciliation.
  */
 import { table, text, integer, numeric, json, boolean, index, uniqueIndex, sql } from 'sdk/db';
+export const supportTickets = table('support_tickets', {
+  id: text('id').primaryKey(),
+  ownerTelegramId: text('owner_telegram_id').notNull(),
+  customerName: text('customer_name').notNull(),
+  requestKey: text('request_key').notNull(),
+  subject: text('subject').notNull(),
+  category: text('category').notNull(),
+  orderId: text('order_id'),
+  status: text('status').notNull().default('open'),
+  messages: json('messages').notNull().default([]),
+  version: integer('version').notNull().default(1),
+  customerSeenVersion: integer('customer_seen_version').notNull().default(1),
+  staffSeenVersion: integer('staff_seen_version').notNull().default(0),
+  lastMessage: text('last_message').notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  supportOwnerRequestUnique: uniqueIndex('support_owner_request_key').on(t.ownerTelegramId, t.requestKey),
+  supportOwnerUpdatedIdx: index('support_owner_updated_idx').on(t.ownerTelegramId, t.updatedAt, t.id),
+  supportStatusUpdatedIdx: index('support_status_updated_idx').on(t.status, t.updatedAt, t.id),
+  supportUpdatedIdx: index('support_updated_idx').on(t.updatedAt, t.id),
+}));
 
 const createdAt = () => integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`);
 const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`);
@@ -32,6 +54,10 @@ export const customers = table('customers', {
   tgName: text('tg_name'), tgUsername: text('tg_username'), phoneNumber: text('phone_number'),
   primeMemberId: text('prime_member_id'), points: numeric('points').default(0),
   storeCredits: numeric('store_credits').default(0), referralCode: text('referral_code'),
+  storeCreditsOperationId: text('store_credits_operation_id'),
+  storeCreditsOperationAmount: numeric('store_credits_operation_amount').notNull().default(0),
+  receivedTransferBalance: numeric('received_transfer_balance').notNull().default(0),
+  storeCreditsOperationReceivedAmount: numeric('store_credits_operation_received_amount').notNull().default(0),
   referredBy: text('referred_by'), totalOrders: integer('total_orders').default(0),
   lifetimeSpent: numeric('lifetime_spent').default(0), isBanned: boolean('is_banned').default(false),
   fingerprints: json('fingerprints').default([]),
@@ -53,12 +79,15 @@ export const orders = table('orders', {
   tgUserId: text('tg_user_id'), primeMemberId: text('prime_member_id'),
   items: json('items').notNull().default([]), subtotal: numeric('subtotal').notNull().default(0),
   deliveryFee: numeric('delivery_fee').default(0), discountAmount: numeric('discount_amount').default(0),
+  staffDiscountAmount: numeric('staff_discount_amount').notNull().default(0),
+  staffDiscountMode: text('staff_discount_mode').notNull().default('none'),
+  staffDiscountValue: numeric('staff_discount_value').notNull().default(0),
   appliedPromoCode: text('applied_promo_code'), pointsDiscount: numeric('points_discount').default(0),
   chargesBreakdown: json('charges_breakdown').default([]), totalAmount: numeric('total_amount').notNull().default(0),
   payableNow: numeric('payable_now').notNull().default(0), payableOnDelivery: numeric('payable_on_delivery').default(0),
   status: text('status').notNull().default('Processing'), paymentStatus: text('payment_status').notNull().default('Unpaid'),
   paymentMethodId: text('payment_method_id'), paymentMethodName: text('payment_method_name'),
-  paymentProofImage: text('payment_proof_image'), ocrAnalysis: json('ocr_analysis'),
+  paymentProofImage: text('payment_proof_image'), paymentProofData: text('payment_proof_data'), paymentProofContentType: text('payment_proof_content_type'), ocrAnalysis: json('ocr_analysis'),
   reviewStatus: text('review_status').default('Pending Manual Review'),
   requiresManualReview: boolean('requires_manual_review').default(true),
   deliveryAddress: json('delivery_address').default({}), courierId: text('courier_id'),
@@ -70,6 +99,12 @@ export const orders = table('orders', {
   mayaFundSourceType: text('maya_fund_source_type'), mayaLastWebhookStatus: text('maya_last_webhook_status'),
   mayaLastWebhookAt: integer('maya_last_webhook_at', { mode: 'timestamp' }),
   storeCreditsUsed: numeric('store_credits_used').notNull().default(0),
+  receivedTransferUsed: numeric('received_transfer_used').notNull().default(0),
+  staffEditVersion: integer('staff_edit_version').notNull().default(0),
+  controlState: text('control_state').notNull().default('normal'),
+  controlVersion: integer('control_version').notNull().default(0),
+  trackingOverrideReason: text('tracking_override_reason'),
+  trackingOverrideBy: text('tracking_override_by'),
   promoShippingSubsidy: numeric('promo_shipping_subsidy').notNull().default(0),
   cashbackPointsAmount: numeric('cashback_points_amount').notNull().default(0),
   cashbackPointsAwardedAt: integer('cashback_points_awarded_at', { mode: 'timestamp' }),
@@ -201,9 +236,53 @@ export const pointTransactions = table('point_transactions', {
   createdAt: createdAt(),
 });
 
+export const storeCreditTransfers = table('store_credit_transfers', {
+  id: text('id').primaryKey(), senderId: text('sender_id').notNull(),
+  recipientId: text('recipient_id').notNull(), amountCents: integer('amount_cents').notNull(),
+  createdAt: requiredCreatedAt(),
+}, (t) => ({
+  transferSenderCreatedIdx: index('store_credit_transfers_sender_created_idx').on(t.senderId, t.createdAt),
+  transferRecipientCreatedIdx: index('store_credit_transfers_recipient_created_idx').on(t.recipientId, t.createdAt),
+}));
+
+export const orderControlEvents = table('order_control_events', {
+  id: text('id').primaryKey(), orderId: text('order_id').notNull(),
+  actorTelegramId: text('actor_telegram_id').notNull(), action: text('action').notNull(),
+  reason: text('reason').notNull(), versionBefore: integer('version_before').notNull(),
+  statusBefore: text('status_before').notNull(), paymentBefore: text('payment_before').notNull(),
+  createdAt: requiredCreatedAt(),
+}, (t) => ({
+  orderControlEventsOrderCreatedIdx: index('order_control_events_order_created_idx').on(t.orderId, t.createdAt),
+}));
+
 export const systemSettings = table('system_settings', {
   key: text('key').primaryKey(), value: json('value').notNull(), updatedAt: updatedAt(),
 });
+
+// Durable, idempotent Store Credit refunds for paid staff cancellations and
+// downward edits. The order ID is unique so retries cannot double-credit.
+export const orderCreditRefunds = table('order_credit_refunds', {
+  id: text('id').primaryKey(), orderId: text('order_id').notNull(), customerId: text('customer_id').notNull(),
+  amount: numeric('amount').notNull().default(0), status: text('status').notNull().default('pending'),
+  reason: text('reason').notNull().default(''), error: text('error'),
+  createdAt: requiredCreatedAt(), completedAt: integer('completed_at', { mode: 'timestamp' }), updatedAt: requiredUpdatedAt(),
+}, (t) => ({
+  orderCreditRefundOrderUnique: uniqueIndex('order_credit_refunds_order_key').on(t.orderId),
+  orderCreditRefundStatusIdx: index('order_credit_refunds_status_idx').on(t.status, t.updatedAt),
+}));
+
+export const paymentSessions = table('payment_sessions', {
+  id: text('id').primaryKey(), customerId: text('customer_id').notNull(),
+  requestSnapshot: json('request_snapshot').notNull().default({}),
+  paymentMethodId: text('payment_method_id').notNull().default(''),
+  proofData: text('proof_data'), proofContentType: text('proof_content_type'), proofOcrAnalysis: json('proof_ocr_analysis'),
+  status: text('status').notNull().default('awaiting_proof'),
+  expiresAt: integer('expires_at').notNull(), consumedAt: integer('consumed_at'),
+  createdAt: requiredCreatedAt(), updatedAt: requiredUpdatedAt(),
+}, (t) => ({
+  paymentSessionsCustomerIdx: index('payment_sessions_customer_idx').on(t.customerId, t.updatedAt),
+  paymentSessionsExpiryIdx: index('payment_sessions_expiry_idx').on(t.expiresAt, t.status),
+}));
 
 export const telegramAutomationFlows = table('telegram_automation_flows', {
   id: text('id').primaryKey().default(uuidDefault()), name: text('name').notNull(),
@@ -240,6 +319,7 @@ export const telegramAutomationChats = table('telegram_automation_chats', {
   humanTakeoverUntil: integer('human_takeover_until', { mode: 'timestamp' }),
   createdAt: requiredCreatedAt(), updatedAt: requiredUpdatedAt(),
   botPaused: boolean('bot_paused').notNull().default(false),
+  testMode: boolean('test_mode').notNull().default(false),
 }, (t) => ({
   connectionChatUnique: uniqueIndex('telegram_automation_chats_pkey')
     .on(t.businessConnectionId, t.chatId),
