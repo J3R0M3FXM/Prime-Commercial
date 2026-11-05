@@ -1,7 +1,6 @@
 import { db, EndpointError } from 'sdk';
 import { and, eq, isNull, sql } from 'sdk/db';
 import { customers, mediaAssetContents, mediaAssets, orders, paymentMethods } from '../schema.js';
-import { expireUnpaidOrder } from '../lib/order-expiry.js';
 import { notifyPaymentProofSubmitted } from '../lib/order-notifications.js';
 
 function decodeBase64Url(value) {
@@ -41,12 +40,6 @@ function decodeJpeg(data) {
     throw new EndpointError('The uploaded content is not a valid JPEG image.', { code: 'INVALID_IMAGE' });
   }
   return bytes;
-}
-
-function deadlineMs(value) {
-  if (value instanceof Date) return value.getTime();
-  const parsed = Date.parse(String(value || ''));
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 async function removeUnlinkedMedia(id) {
@@ -90,11 +83,6 @@ export default async function (input, ctx) {
   const ownsOrder = String(order.tgUserId || '') === userId || Boolean(customer && String(order.customerId || '') === String(customer.id));
   if (!ownsOrder) throw new EndpointError('Order not found.', { code: 'NOT_FOUND' });
 
-  const expiry = await expireUnpaidOrder(order);
-  if (expiry.expired) {
-    throw new EndpointError('This order expired because its one-hour receipt window ended.', { code: 'ORDER_EXPIRED' });
-  }
-
   const pendingStatus = String(order.status || '').toLowerCase() === 'pending';
   const paymentStatus = String(order.paymentStatus || '').toLowerCase();
   const replacingUnverifiedProof = paymentStatus === 'pending review' && Boolean(String(order.paymentProofImage || '').trim());
@@ -107,13 +95,6 @@ export default async function (input, ctx) {
   if (order.expiredAt || (String(order.paymentProofImage || '').trim() && !replacingUnverifiedProof)) {
     throw new EndpointError('This order is expired or already has a payment receipt.', { code: 'ORDER_NOT_AWAITING_PAYMENT' });
   }
-  const explicitDeadline = deadlineMs(order.paymentDeadlineAt);
-  const createdAtMs = order.createdAt instanceof Date ? order.createdAt.getTime() : Number(order.createdAt) * (Number(order.createdAt) > 1e12 ? 1 : 1000);
-  const deadline = explicitDeadline ?? (Number.isFinite(createdAtMs) && createdAtMs > 0 ? createdAtMs + 60 * 60 * 1000 : null);
-  if (deadline === null || deadline <= Date.now()) {
-    throw new EndpointError('This order has expired because its one-hour receipt window ended.', { code: 'ORDER_EXPIRED' });
-  }
-
   const paymentMethodId = String(input?.paymentMethodId || order.paymentMethodId || '').trim();
   const paymentMethod = paymentMethodId
     ? await db.select().from(paymentMethods).where(eq(paymentMethods.id, paymentMethodId)).get()
