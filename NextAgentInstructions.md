@@ -1,0 +1,62 @@
+# Next Agent — Start Here
+
+Read AGENTS.md, docs/PROJECT_CONTINUATION.md and docs/SUPPORT_TICKETS.md completely before acting. The newest release entry supersedes historical preview-only statements.
+
+LATEST LIVE (2026-11-03): Owner explicitly authorized notification deployment. Scoped TGCloud backend release **r349** deployed order-expiry recovery, six-hour dispatch fallback in order-lifecycle, and bounded `maintainOrderNotifications`. Existing GitHub Cron-job bridge workflow now pulls live TGCloud modules into its ephemeral checkout and runs the maintenance endpoint; this was necessary because `tgcloud run` submits local source. Workflow commit `b9a46b9db15acb9294cea5863a76d528a5b9bd78`; first new scheduled run `41593109414` succeeded and expired one overdue unpaid order, with no cleanup errors or due completions. Telegram rejected that order's notice with 403 `user is deactivated`, so it does not establish delivery to an active recipient. Live linked project is clean, webhook synced, static 60 files up to date. Owner plans an active-account unpaid expiry test and a paid/Ready/Dispatched six-hour completion test. Those actual device outcomes remain unverified; timer starts on dispatch. No paid order was changed in deployment verification. See newest project handoff and `docs/ORDER_NOTIFICATION_MAINTENANCE.md`.
+
+LATEST LIVE (2026-11-03): Owner authorized immediate deployment of Checkout payment tiles as three columns by up to three rows (nine methods per carousel page) with a subtle 180ms directional page slide and reduced-motion support. Preview and production builds passed; scoped static-only deployment is **r348**. TGCloud reports clean linked project, synced webhook and 60 static files current. Served HTML/main JS `index-8gqIifrN.js`/CSS `index-UWkGKkcw.css` matched the production build byte for byte. No backend/schema or live order/payment changes. Real Telegram device interaction remains unverified. Notification maintenance below is still preview-only and was not part of r348.
+
+PRE-RELEASE NOTIFICATION FINDING (historical): Owner clarified Cron-job.org was integrated, but the old GitHub workflow invoked only the retry dispatcher and could not expire orders or create missing status events. The preview maintenance code and workflow were reviewed and subsequently released at r349 above. Device delivery is still unverified.
+
+LATEST LIVE (2026-11-03): Owner authorized tier cashback deployment. Scoped release **r347** promoted the preview's new 30-day tier thresholds (Bronze ₱10k, Gold ₱15k, Platinum ₱20k, Titanium ₱25k) and total purchasing-points rates (Silver 5%, Bronze 5.5%, Gold 6%, Platinum 6.5%, Titanium 7%). New orders issue whole points on complete ₱100 blocks of item spend after direct promo discounts and Store Credits. Voucher cashback counts toward the total award: the richer of tier or voucher points is credited once through the purchasing ledger. Old in-flight order snapshots keep the prior calculation; no historical records were rewritten. Three backend files plus production `dist/` were pushed; no schema push. TGCloud reports synced webhook, clean linked project and 60 files current. Live HTML/main JS `index-BXYU8bWO.js`/CSS `index-D79xt5aN.css` match the production build. Tests/builds pass; actual authenticated reward issuance remains unverified. Backup: `/data/data/com.termux/files/usr/tmp/prime-tier-cashback-release-20261103-ifHVKN/`. Older r346 and preview-only threshold statements below are historical.
+
+Payment logo guidance: checkout tiles are 2:1 in three columns. Recommend transparent 600×300 px artboard with 48 px left/right and 30 px top/bottom padding; QR code is a separate asset.
+
+NEWEST PREVIEW (2026-11-03): Owner requested all tier spending requirements increase by ₱5,000. Preview Serverless and legacy calculators now set Bronze ₱10k, Gold ₱15k, Platinum ₱20k, Titanium ₱25k per anchored 30-day cycle. Promo boundary tests, diff check and preview build passed. This threshold change is **not deployed**; live r346 still has the prior Bronze ₱5k/Gold ₱10k/Platinum ₱15k/Titanium ₱20k thresholds. No customer points/credits/orders changed. Tier-restricted voucher eligibility can shift when eventually deployed. See newest project handoff before promotion; do not overwrite the linked project's backend/schema.
+
+LATEST LIVE (2026-11-03): Owner explicitly authorized the Shopfront tap fix and 1px proprietary footer text increase. Static release **r346** is deployed. Product cards press with a small downward/scale movement, Shopfront buttons get a subtle inset press line, and product/variant popups animate on entry; broad brightness/scale flash rules were removed. Live HTML, JS `index-DdRx_ViC.js` and CSS `index-D79xt5aN.css` match the VITE_UI_PREVIEW=0 build. TGCloud reports webhook synced, linked project clean and 60 files current. Telegram phone feel remains unverified. No backend/schema or live orders/payments changed. Release backup: `/data/data/com.termux/files/usr/tmp/prime-shopfront-tap-release-20261103-cdBgID/`. No other owner-authorized deployment is pending; remaining preview/final differences are listed in the newest project handoff. The r345/r344 entries below are historical.
+
+LATEST LIVE (2026-11-03): Owner said “Deploy to live.” The reviewed Order Management UI was promoted from preview to the retained final checkout and deployed static-only as **r345**. TGCloud reports webhook in sync, clean linked working directory and 60 files current. Served live HTML/main JS `index-Dfq_FXBG.js`/CSS `index-C0CI1R4P.css` match the `VITE_UI_PREVIEW=0` production build byte for byte. Workflow test and diff check passed. No backend/schema or live order/payment mutations. Hold/Resubmit/Cancel and no-link dispatch Override stay disabled in production; their preview simulation remains local only. Phone appearance/taps in Telegram, actual Support customer/Admin exchange and payment gateway opening remain unverified. See the newest handoff section and release backup `/data/data/com.termux/files/usr/tmp/prime-orders-release-20261103-s1mCUN/`.
+
+The r344 and preview-only entries below are historical as of this release.
+
+LATEST LIVE: Product category grouping/dropdown/Add New Category was explicitly authorized and deployed at r344. Final-checkout production build matches served HTML/main assets; clean backend, webhook synced, 60 files current. No backend/schema changes. Prior release r343 below is historical.
+
+NEWEST PREVIEW: Order Action & Control Flow now has six 3D-feel, color-coded buttons, exact-due approval after provider check (no amount input), receipt zoom/pan/download popup, dispatch-link popup with preview-only Override, and Delivery Slip/Order Receipt print choices. Hold/Resubmit/Cancel are visual preview states only; production controls for those and Override are disabled because the live backend has no safe actions for them. Top-up proof uses View Receipt; Modify editor appears only when opened, and overdue expiry is separate. Both preview and production-check builds and the Order Management workflow test pass. Preview local assets: index-ClTZvkhv.js / index-C1oGaNqY.css. No deployment; live remains r344. Read the newest handoff section before changing backend or advertising these controls as live.
+
+LATEST REFINEMENT: six controls are three per row with matte natural colors and gray locked state. Stage locks were implemented and tested: after approval/Processing Hold locks; held Pending locks approval; Ready locks Hold/Modify; Dispatched locks Hold/Modify/Cancel; Completed/Expired lock all except available View Receipt. Successful progression clears the local Hold/Resubmit simulation. Local preview assets are now index-Ddm6Enf-.js / index-ZpA7JWuO.css. Build and workflow test pass. Still preview only; phone appearance is unverified.
+
+CURRENT PREVIEW: Order Management revision 2 now incorporates the owner's 2026-11-03 Order Details PNG references: summary/status/total card, five-stage progress rail, pale blue section bands and tabular item amounts, all adapted to 430px portrait. Existing provider and backend workflow gates remain. Inspect http://127.0.0.1:4192/admin?orders-preview=2 on this phone. Build and workflow test passed; phone visual review is pending. This work is NOT promoted/deployed. Live remains r344.
+
+NEWEST PREVIEW PASS: After four phone screenshots, Delivery and Payment & Customer use two short-field columns; absent tracking/identity fields are omitted; Modify Order controls stack; entirely empty Technical Evidence is summarized. The compact list is the default view at the same URL. Preview build/workflow test/diff check pass and served JS/CSS match the build (`index-DC_GfiNi.js` / `index-C3Tx5EMZ.css`). Phone review is pending; no deployment.
+
+The phone IP changes; localhost and current mobile IP 6.79.52.9 both returned HTTP 200. On this same phone, use http://127.0.0.1:4192/admin?orders-preview=2 while Termux keeps Vite running.
+
+LATEST CONTINUATION CHECK: Order Management test and diff check pass after the 2026-11-03 reference adaptation. Local served assets are index-C3etVYNf.js / index-Dcxn9uT7.css. The previous Admin logo inversion correction remains. TGCloud last reported r344 and 60 static files current; a fresh live HTTPS byte comparison was not repeated. Phone visual behavior remains unverified. No deployment or live order/payment mutation occurred.
+
+Owner explicitly said "Deploy them." on 2026-11-02. Release completed: app8830494959 / @primenetworkphbot, revision 343, webhook in sync, 60 static files current. Live HTML/main JS/CSS/header override were fetched and matched the final-checkout production build byte for byte. Database/schema in sync.
+
+Released: Secretary/Product configurator rebuilds and normalized type; fixed global Admin header/queue; light lock and logo shadow; payment/courier selector parity and secured payment link; customer/Admin Support ticket UI, endpoints and additive database table/indexes.
+
+Support migration requires its declaration inline in root schema: schema re-exports fail in the platform migration runner. Never replace the linked project's newer schema with the older preview schema. Tests assert the isolated support descriptor matches the inline declaration.
+
+Pending: actual Telegram customer/Admin ticket exchange, phone visual verification, and external payment-provider opening. Missing-identity customer/Admin requests were rejected in the cloud; no identity was forged or paid transaction initiated. Support is text-only, with no proactive Telegram/email alerts or attachments.
+
+EDIT HERE:
+`/data/data/com.termux/files/home/Prime-Commercial-header-preview`
+
+Retained final: `/data/data/com.termux/files/home/Prime-Serverless-Final`.
+Linked CLI: `/data/data/com.termux/files/home/primenetworkphbot`.
+Use only `npm exec --yes --package=@tgcloud/cli -- tgcloud` for this bot.
+Release build: `/data/data/com.termux/files/usr/tmp/prime-final-release-20261102`.
+Backup: `/data/data/com.termux/files/usr/tmp/prime-release-backup-20261102-8GDKKr`.
+
+Keep editing in preview, build immediately after UI edits, and preserve all dirty files. Do not restart accepted designs or create extra worktrees. Future unrelated releases still require authorization. Visual preview mode must never ship to live.
+
+Secretary/Product share configurator-ui.css. Preserve white Admin, compact collapsible cards, three-column short fields, blank new numeric inputs and the recorded typography/layout contract. Read the latest user instructions if they change that contract.
+
+Current local visual links are recorded in the handoff; recheck IP/server before quoting them. Use Vite preview, not Next dev hosting. Update project docs and Android Downloads snapshots after material changes. Never present a build/deployment as actual phone verification.
+
+## Mandatory clean-checkout policy
+
+Read `docs/WORKTREE_GOVERNANCE.md` and `docs/PRODUCTION_AUDIT.md` before any action. All future work belongs in `Prime-TGCloud-Sandbox`; promotion and deployment occur only from a committed, verified `Prime-TGCloud-Checkout`. Never deploy from either legacy dirty worktree.
