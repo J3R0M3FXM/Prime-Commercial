@@ -411,12 +411,17 @@ export async function getServerlessCatalog(options: { resolveMedia?: boolean } =
   const rows = await callServerless<ServerlessProduct[]>('getCatalog', {}, 20_000);
   if (!Array.isArray(rows)) throw new Error('The product catalog response was invalid.');
   const resolveMedia = options.resolveMedia !== false;
+  const safeMedia = async (reference: unknown) => {
+    const raw = String(reference || '');
+    if (!raw) return '';
+    try { return await resolveTelegramMedia(raw); } catch { return raw; }
+  };
 
   return await Promise.all(rows.map(async (product) => {
     const variants = await Promise.all((Array.isArray(product.variants) ? product.variants : []).map(async (variant) => ({
       ...variant,
       imageUrl: resolveMedia
-        ? await resolveTelegramMedia(String(variant.imageUrl || variant.image_url || ''))
+        ? await safeMedia(variant.imageUrl || variant.image_url)
         : String(variant.imageUrl || variant.image_url || ''),
     })));
     const bundleConfig = product.bundleConfig && typeof product.bundleConfig === 'object'
@@ -425,9 +430,9 @@ export async function getServerlessCatalog(options: { resolveMedia?: boolean } =
 
     return {
       ...product,
-      imageUrl: resolveMedia ? await resolveTelegramMedia(String(product.imageUrl || '')) : String(product.imageUrl || ''),
+      imageUrl: resolveMedia ? await safeMedia(product.imageUrl) : String(product.imageUrl || ''),
       gallery: resolveMedia
-        ? await Promise.all((Array.isArray(product.gallery) ? product.gallery : []).map((image) => resolveTelegramMedia(String(image || ''))))
+        ? await Promise.all((Array.isArray(product.gallery) ? product.gallery : []).map((image) => safeMedia(image)))
         : (Array.isArray(product.gallery) ? product.gallery : []),
       variants,
       bundleConfig,
