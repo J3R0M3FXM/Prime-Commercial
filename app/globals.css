@@ -194,6 +194,31 @@ button, input, select, textarea, optgroup {
 }
 .prime-checkout__dialog { display: flex; flex-direction: column; width: 100%; max-width: 430px; height: 100%; max-height: 100%; min-height: 0; overflow: hidden; border: 0; padding-bottom: 0; }
 .prime-checkout__scroll { flex: 1 1 0%; min-height: 0; overflow-y: auto; padding-bottom: 16px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.prime-checkout__notice { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid #dbe3ed; border-left: 4px solid #315782; border-radius: 10px; background: linear-gradient(110deg, #f4f7fb 0%, #fff 100%); box-shadow: 0 2px 8px rgb(15 23 42 / 5%); }
+.prime-checkout__notice--warning { border-color: #f1d7a1; border-left-color: #b7791f; background: linear-gradient(110deg, #fffaf0 0%, #fff 100%); }
+.prime-checkout__notice--success { border-color: #b9e4d1; border-left-color: #16845b; background: linear-gradient(110deg, #effaf5 0%, #fff 100%); }
+.prime-checkout__notice--order { grid-template-columns: 40px minmax(0, 1fr); align-items: start; gap: 12px; padding: 15px; }
+.prime-checkout__notice-icon { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid #cfdae7; border-radius: 50%; background: #fff; color: #315782; }
+.prime-checkout__notice-icon svg { width: 16px; height: 16px; }
+.prime-checkout__notice--warning .prime-checkout__notice-icon { border-color: #ecd4a3; color: #9b6413; }
+.prime-checkout__notice--success .prime-checkout__notice-icon { width: 36px; height: 36px; border-color: #b9e4d1; background: #e2f5eb; color: #16845b; }
+.prime-checkout__notice--order .prime-checkout__notice-icon { width: 40px; height: 40px; }
+.prime-checkout__notice--order .prime-checkout__notice-icon svg { width: 21px; height: 21px; }
+.prime-checkout__notice-kicker { margin: 0 0 2px; color: #16845b; font: 600 10px/1.2 'Roboto Condensed', sans-serif !important; letter-spacing: .08em; text-transform: uppercase; }
+.prime-checkout__notice-title { margin: 0; color: #1e293b; font: 600 12px/1.2 'Roboto Condensed', sans-serif !important; letter-spacing: .035em; text-transform: uppercase; }
+.prime-checkout__notice-copy { margin: 3px 0 0; color: #475569; font: 400 12px/1.4 'MiSans', sans-serif !important; overflow-wrap: anywhere; }
+.prime-checkout__notice--order .prime-checkout__notice-title { color: #0f5138; font-size: 15px !important; }
+.prime-checkout__notice--order .prime-checkout__notice-copy { color: #365f4d; }
+.prime-checkout__notice-action { justify-self: start; margin-top: 7px; padding: 6px 10px; border: 1px solid #d2b375; border-radius: 7px; background: #fff; color: #604616; font: 600 11px/1 'Roboto Condensed', sans-serif !important; }
+.prime-checkout__payment-total { min-height: 58px; padding: 10px 14px; border: 1px solid #294a73; border-radius: 11px; background: linear-gradient(115deg, #142b49 0%, #203f66 100%); box-shadow: 0 3px 10px rgb(15 39 68 / 18%); color: #fff; }
+.prime-checkout__payment-total > span:first-child { color: #d7e5f6; font: 600 11px/1.15 'Roboto Condensed', sans-serif !important; letter-spacing: .07em; }
+.prime-checkout__payment-total > span:last-child { color: #fff; font: 600 21px/1 'MiSans', sans-serif !important; white-space: nowrap; }
+.prime-checkout__payment-method-heading { display: flex; flex-direction: column; gap: 2px; padding: 2px 1px 7px; border-bottom: 1px solid #dce3ec; }
+.prime-checkout__payment-method-heading > span:first-child { color: #172b45; font: 600 14px/1.1 'Roboto Condensed', sans-serif !important; letter-spacing: .045em; text-transform: uppercase; }
+.prime-checkout__payment-method-heading > span:last-child { color: #64748b; font: 400 11px/1.2 'MiSans', sans-serif !important; }
+.prime-payment-grid__pagination { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 5px 0 2px; }
+.prime-payment-grid__pagination button { width: 7px; height: 7px; padding: 0; border: 0; border-radius: 99px; background: #cbd5e1; }
+.prime-payment-grid__pagination button.is-active { width: 20px; background: #17375d; }
 .prime-checkout__actions { position: relative; z-index: auto; right: auto; bottom: auto; left: auto; box-sizing: border-box; display: flex; width: 100%; margin: 0; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid rgb(226 232 240); background: #fff; box-shadow: 0 -5px 14px rgb(15 23 42 / 12%); }
 .prime-checkout__confirm { flex: 0 1 auto; min-width: 0; align-items: stretch; }
 .prime-checkout__confirm > span { width: 100%; max-width: none; white-space: normal; overflow-wrap: anywhere; }
@@ -264,6 +289,10 @@ body .prime-order-history .font-misans-regular { font-family: 'MiSans', sans-ser
 .prime-live-clock { display: flex; flex: 0 1 218px; width: clamp(164px, 52vw, 218px); min-width: 0; height: 28px; flex-direction: column; justify-content: center; overflow: hidden; text-align: right; user-select: none; }
 .prime-live-clock__time { display: block; width: 100%; overflow: hidden; color: #1e293b; font-family: 'Roboto Condensed', sans-serif !important; font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1, 'lnum' 1; white-space: nowrap; text-overflow: clip; }
 .prime-live-clock__time { font-size: clamp(9.5px, 2.8vw, 12px); font-weight: 600; line-height: 1; letter-spacing: -0.04em; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.prime-live-clock { height: auto; min-height: 26px; gap: 2px; overflow: visible; }
+.prime-live-clock__time { flex: 0 0 auto; font-size: clamp(8px, 2.3vw, 10px); line-height: 11px; letter-spacing: -0.015em; }
+.prime-live-clock__rule { display: block; width: 100%; height: 1px; flex: 0 0 1px; background: currentColor; opacity: .42; }
+.prime-live-clock__access { display: block; width: 100%; flex: 0 0 auto; overflow: hidden; font: 600 8px/10px 'Roboto Condensed', sans-serif !important; letter-spacing: .025em; text-align: right; text-overflow: clip; white-space: nowrap; }
 .prime-live-clock__placeholder { height: 12px; border-radius: 3px; background: #f1f5f9; animation: prime-clock-pulse 1.3s ease-in-out infinite; }
 .prime-system-footer__text { margin: 0; overflow: hidden; color: #e2e8f0; font-family: 'Roboto Condensed', sans-serif; font-size: 11.5px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 @keyframes prime-clock-pulse { 50% { opacity: .45; } }
