@@ -4,8 +4,9 @@
 
 - The live Mini App previously had no R2 origin configured. The app client now defaults to the publicly verified Pages gateway `https://prime-media-gateway.pages.dev`, which forwards to the private `prime-media-preview` Worker through a service binding. It does not expose or connect to `workers.dev` directly.
 - Before release, the public `/videos` route returned HTTP 200 with an empty catalog, and the live TGCloud origin's CORS preflight returned 204. This is a read-only infrastructure check; no R2 object or catalog row was created or changed.
-- Local Worker tests cover Telegram initData auth, signing, privacy and byte-range behavior. Production build embeds the gateway and uses `VITE_UI_PREVIEW=0`; Telegram Serverless contract tests pass. Release revision, asset hashes and device-verification limits are recorded after deployment below.
-- R2 Admin upload and customer playback will be available after the production bundle is released. A real authenticated Telegram upload/playback/range test remains necessary; do not report it as device-verified until performed.
+- Local Worker tests cover Telegram initData auth, signing, privacy and byte-range behavior. Production build embeds the gateway and uses `VITE_UI_PREVIEW=0`; Telegram Serverless contract tests pass.
+- Promoted Sandbox commit `3013ecd` to Checkout commit `57625c9`; deployed only `dist/` to app8830494959 at r408. TGCloud reports webhook in sync and 51 static files up to date. Live JS `index-Dp05_Qw7.js` SHA-256 `c132ceceb3a981a46539dabab94142bcddb20cdc1cdadb9ec34e2c745073181d` matches local production output and contains the gateway origin. CSS is `index-DNrG5qZe.css`.
+- Public gateway `/videos` returned HTTP 200 with an empty catalog; live-origin CORS preflight returned 204. No R2 object or catalog row was created or changed. Real authenticated Admin upload, customer playback/range seeking, and Android behavior remain device-unverified.
 
 ## Product/payment media and promo audit — 2026-11-06
 
