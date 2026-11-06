@@ -162,8 +162,14 @@ assert.doesNotMatch(publicCouriers, /db\.(insert|update|delete)/, 'Public courie
 assert.doesNotMatch(publicCouriers, /latitude|longitude|address/, 'Public courier endpoint must not expose warehouse location data');
 
 const deliveryQuote = readFileSync('tgcloud/endpoints/getDeliveryQuote.js', 'utf8');
-assert.match(deliveryQuote, /calculateRoadDistanceFallback/, 'Delivery quote must calculate distance server-side');
-assert.match(deliveryQuote, /calculateDeliveryFee/, 'Delivery quote must calculate fees server-side');
+assert.match(deliveryQuote, /quoteDelivery\(input\.destinationLat, input\.destinationLon, input\.courierId \|\| ''\)/, 'Delivery quote must return all active courier options without requiring a preselected courier');
+assert.doesNotMatch(deliveryQuote, /!courierId/, 'Initial delivery quote must not require a courier selection');
+const deliveryCore = readFileSync('tgcloud/lib/delivery.js', 'utf8');
+assert.match(deliveryCore, /couriers: computedCouriers/, 'Delivery quote must return all computed courier options');
+assert.match(deliveryCore, /routeTimeMinutes/, 'Delivery quote must return the route-time field consumed by checkout');
+assert.match(deliveryCore, /calculateRoadDistanceFallback/, 'Delivery quote must calculate distance server-side');
+assert.match(deliveryCore, /calculateDeliveryFee/, 'Delivery quote must calculate fees server-side');
+assert.match(deliveryCore, /eq\(couriers\.isActive, true\)/, 'Delivery quote must use active couriers only');
 assert.doesNotMatch(deliveryQuote, /input\?\.deliveryFee|input\.deliveryFee/, 'Delivery quote must not trust a client-supplied fee');
 assert.doesNotMatch(deliveryQuote, /return \{[^}]*latitude|return \{[^}]*longitude/, 'Delivery quote must not return warehouse coordinates');
 
