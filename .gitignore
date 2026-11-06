@@ -43,3 +43,4 @@ yarn-error.log*
 cloudflare/**/node_modules/
 cloudflare/**/__pycache__/
 cloudflare/**/dist/
+/dist/
