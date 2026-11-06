@@ -1,5 +1,13 @@
 # Production Reconstruction Audit
 
+## Screenshot-led payment and clipping repair — 2026-11-06
+
+- Reviewed the 17:38–17:43 Telegram screenshots. The pre-submit payment renderer only showed method logos and a bare selected-method name; it did not render QR media or bank/e-wallet account details. The shop's fixed header/search wrapper also had no reserved in-flow height, so the first product row could be hidden underneath it.
+- Selected QR methods now show the resolved QR image inline with account name/number and copy controls; transfer and wallet details are rendered when provided. Gateway types use the existing confirmation dialog. Order confirmation now has one concise proof-review card rather than repeating the order number/amount/status in multiple cards.
+- The fixed header/search wrapper's real height is measured and reserved with a ResizeObserver, including tab/responsive changes. QR dialog is constrained to the portrait app width and scrolls within small viewports.
+- Promoted Sandbox `4effa97` to Checkout `96617ab`; production build and Serverless contract suite passed. Static-only TGCloud deploy is **r413**, webhook in sync, clean working directory, 51 static files current. Served HTML references `index-CSQar3uv.js` and `index-4OA0BF_s.css`; live JS contains the new payment and confirmation strings.
+- No backend/schema, payment configuration, order, or customer data was changed. Code is live; actual QR scan, transfer copy and product first-row alignment still need owner-device visual confirmation.
+
 ## Payment and checkout recovery — 2026-11-06
 
 - Fixed order submission rejecting a populated receiver: `createOrder.js` now parses the payment session's SQLite JSON `request_snapshot`; deployed at r409. Contract regression checks pass.
