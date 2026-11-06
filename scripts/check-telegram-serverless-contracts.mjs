@@ -46,6 +46,8 @@ assert.match(charges, /isDefault,/, 'Public charges must expose the configured d
 const paymentSession = readFileSync('tgcloud/endpoints/createPaymentSession.js', 'utf8');
 assert.match(paymentSession, /existing\.status === 'consumed'/, 'Consumed payment sessions must be replaced with a distinct proof-session ID');
 assert.match(paymentSession, /Number\(existing\.expiresAt\) <= now/, 'Expired payment sessions must be replaced');
+assert.match(paymentSession, /previousOperation\?\.status === 'failed'/, 'A fully compensated failed attempt must receive a fresh operation key on retry');
+assert.match(paymentSession, /operation_key TEXT NOT NULL DEFAULT ''/, 'Payment sessions must persist their effective operation key');
 assert.match(paymentSession, /const saved = await db\.get/, 'Payment session creation must verify persistence');
 assert.match(paymentSession, /PAYMENT_SESSION_CREATE_FAILED/, 'Invalid session persistence must fail explicitly');
 const createOrder = readFileSync('tgcloud/endpoints/createOrder.js', 'utf8');
@@ -53,6 +55,7 @@ assert.match(createOrder, /Resolve an earlier submission before validating a ret
 assert.match(createOrder, /const prior = await findCheckoutOperation\(\{ customerId: customer\.id, requestKey \}\)/, 'Order retry recovery must use the authenticated customer and operation key');
 assert.match(createOrder, /if \(prior\.status === 'failed'\)/, 'Failed attempts must not be replayed under the same key');
 assert.match(createOrder, /customer_id AS customerId[\s\S]*request_snapshot AS requestSnapshot[\s\S]*proof_data AS proofData[\s\S]*expires_at AS expiresAt/, 'Order submission must explicitly map payment-session database columns');
+assert.match(createOrder, /operation_key AS operationKey[\s\S]*FROM payment_sessions WHERE id=:id AND customer_id=:customer_id/, 'Order submission must use the authenticated payment session operation key');
 const proofUpload = readFileSync('tgcloud/endpoints/uploadPaymentProof.js', 'utf8');
 assert.match(proofUpload, /customer_id AS customerId[\s\S]*expires_at AS expiresAt/, 'Proof upload must explicitly map payment-session ownership and expiry columns');
 
