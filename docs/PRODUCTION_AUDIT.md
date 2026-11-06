@@ -1,5 +1,13 @@
 # Production Reconstruction Audit
 
+## Payment and checkout recovery — 2026-11-06
+
+- Fixed order submission rejecting a populated receiver: `createOrder.js` now parses the payment session's SQLite JSON `request_snapshot`; deployed at r409. Contract regression checks pass.
+- Deployed secure payment-link handling and customer projection at r412 by storing the validated HTTPS URL in the existing `payment_methods.public_key` field only for `secured_payment_link` methods. QR wallet address copy support and root-viewport scroll reset for Shop/Continue are included. No new database column or migration.
+- Production build, backend syntax checks, Telegram Serverless contracts, and `git diff --check` passed. TGCloud r412 reports webhook in sync, working directory clean, and static up to date (51 files). Live read-only inspection found 10 configured methods (9 QR, 1 secured link), 9 QR image references, and one QR media asset successfully returned as PNG. Sensitive payment values were not printed.
+- While preparing this fix, an attempted schema module push included a proposed field; it was promptly reverted by pushing the original schema source. No `tgcloud migrate` command was run and no business data was changed. TGCloud continues to report 48 pre-existing schema/database differences; do not migrate as part of this checkout/UI repair.
+- No test orders or payment changes were made. Real customer flow, QR visibility/copy, and mobile clipping are not device-verified; the viewport scroll handling is corrected in source but must be visually checked on the customer's phone.
+
 ## R2 production activation — 2026-11-06
 
 - Enabled the R2 media client against `https://prime-media-gateway.pages.dev`, which forwards to the private R2 Worker through the Cloudflare Pages service binding. The Mini App does not call `workers.dev` directly. Source change was reviewed/committed in Sandbox `3013ecd` and promoted to Checkout `57625c9`.
