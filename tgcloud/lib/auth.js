@@ -39,14 +39,9 @@ export async function requireAdmin(ctx) {
     .where(eq(systemSettings.key, 'admin_telegram_user_id'))
     .get();
 
-  const configured = row?.value;
-  const adminId = typeof configured === 'string' || typeof configured === 'number'
-    ? String(configured).trim()
-    : configured && typeof configured === 'object' && configured.userId != null
-      ? String(configured.userId).trim()
-      : '';
+  const adminIds = configuredAdminIds(row?.value);
 
-  if (!adminId || !/^[0-9]+$/.test(adminId) || userId !== adminId) {
+  if (!adminIds.includes(userId)) {
     throw new EndpointError('Admin access required.', { code: 'ADMIN_REQUIRED' });
   }
 
