@@ -15,7 +15,6 @@ import SplashScreen from "./components/splash-screen";
 import VideoGalleryModal from "./components/video-gallery-modal";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
-import { authenticatedFetch } from "./components/telegram-auth-client";
 import { callServerless, getServerlessCatalog, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
@@ -129,7 +128,7 @@ export default function Shopfront() {
     return () => window.clearInterval(interval);
   }, [authorized, loadPublicOrderQueue]);
 
-  // Refresh the Serverless catalog periodically in place of the former Supabase Realtime subscription.
+  // Refresh the Serverless catalog periodically.
   useEffect(() => {
     if (!authorized) return;
     if (import.meta.env.VITE_UI_PREVIEW === "1") return;
@@ -428,7 +427,7 @@ export default function Shopfront() {
                 >
                   <div className="relative aspect-square overflow-hidden bg-gray-50 border-b border-gray-100">
                     <img
-                      src={p.imageUrl || "https://picsum.photos/seed/prime/600/600"}
+                      src={p.imageUrl || "/product-image-unavailable.svg"}
                       alt={p.name}
                       className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
                     />

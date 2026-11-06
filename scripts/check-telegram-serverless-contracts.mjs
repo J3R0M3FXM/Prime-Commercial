@@ -115,12 +115,19 @@ const automationCore = readFileSync('tgcloud/lib/telegram-automation.js', 'utf8'
 assert.match(automationCore, /onConflictDoUpdate/, 'Automation chat state must use upsert semantics');
 assert.match(automationCore, /humanTakeoverUntil/, 'Automation must preserve human takeover state');
 assert.match(automationCore, /botPaused/, 'Automation must preserve per-chat pause state');
-assert.doesNotMatch(automationCore, /botPaused: false/, 'Customer activity must not unpause an explicitly paused bot');
+const customerMessageRecorder = automationCore.match(/export async function recordCustomerMessage\([\s\S]*?\n\}/)?.[0] || '';
+assert.ok(customerMessageRecorder, 'Customer activity recorder must exist');
+assert.doesNotMatch(customerMessageRecorder, /botPaused\s*:\s*false/, 'Customer activity must not unpause an explicitly paused bot');
+const automationGate = automationCore.match(/export function shouldStartAutomation\([\s\S]*?\n\}/)?.[0] || '';
+assert.ok(automationGate, 'Secretary automation gate must exist');
+assert.doesNotMatch(automationGate, /humanTakeoverUntil/, 'Human takeover must not suppress the 12-hour welcome cooldown policy');
+assert.match(automationCore, /WELCOME_COOLDOWN_MS\s*=\s*12\s*\*\s*60\s*\*\s*60\s*\*\s*1000/, 'Secretary welcome cooldown must be 12 hours');
 for (const file of ['business_message.js', 'business_connection.js', 'callback_query.js']) {
   assert.ok(existsSync('tgcloud/handlers/' + file), 'Missing Telegram automation handler: ' + file);
 }
 const businessMessageHandler = readFileSync('tgcloud/handlers/business_message.js', 'utf8');
-assert.match(businessMessageHandler, /recordHumanTakeover/, 'Business owner messages must enable human takeover');
+assert.doesNotMatch(businessMessageHandler, /recordHumanTakeover/, 'Business owner replies must not activate a takeover suppression timer');
+assert.match(businessMessageHandler, /Admin replies are not a welcome cooldown or automation suppression gate/, 'Business owner replies must not override the bot-send-based welcome cooldown');
 assert.match(businessMessageHandler, /recordCustomerMessage/, 'Business messages must update customer activity');
 const callbackHandler = readFileSync('tgcloud/handlers/callback_query.js', 'utf8');
 assert.match(callbackHandler, /answerSecretaryCallback/, 'Secretary callbacks must always answer the callback query');
@@ -174,6 +181,14 @@ assert.doesNotMatch(publicVideos, /db\.(insert|update|delete)/, 'Public video ga
 const manageVideos = readFileSync('tgcloud/endpoints/manageVideos.js', 'utf8');
 assert.doesNotMatch(manageVideos, /'views'\s*,|'views'\]/, 'Video views must not be writable through metadata CRUD');
 assert.match(manageVideos, /await requireAdmin\(ctx\)/, 'Video metadata mutations must require admin authorization');
+
+const mediaManager = readFileSync('tgcloud/endpoints/manageMediaAssets.js', 'utf8');
+assert.match(mediaManager, /action === 'uploadPublicImage' \|\| action === 'uploadProductImage'/, 'Catalog image upload actions must be implemented');
+assert.match(mediaManager, /mediaAssetContents\)\.values\(\{ id, bytes/, 'Uploaded image bytes must be stored with the media reference');
+assert.match(mediaManager, /fileId: 'inline:' \+ id/, 'Inline media references must not depend on a Telegram file_id');
+const mediaReader = readFileSync('tgcloud/endpoints/getMediaContent.js', 'utf8');
+assert.match(mediaReader, /mediaAssetContents\)\.where\(eq\(mediaAssetContents\.id, asset\.id\)\)/, 'Media reader must serve locally stored image bytes');
+assert.match(mediaReader, /api\.getFileContent\(asset\.fileId\)/, 'Legacy Telegram-hosted media must remain supported');
 
 const promoCodec = readFileSync('tgcloud/lib/promos.js', 'utf8');
 assert.match(promoCodec, /realDescription/, 'Promo description metadata must preserve the human-readable description');

@@ -412,9 +412,16 @@ export async function getServerlessCatalog(options: { resolveMedia?: boolean } =
   if (!Array.isArray(rows)) throw new Error('The product catalog response was invalid.');
   const resolveMedia = options.resolveMedia !== false;
   const safeMedia = async (reference: unknown) => {
-    const raw = String(reference || '');
+    const raw = String(reference || '').trim();
     if (!raw) return '';
-    try { return await resolveTelegramMedia(raw); } catch { return ''; }
+    try { return await resolveTelegramMedia(raw); }
+    catch (error) {
+      console.warn('[PRIME media] Catalog image could not be resolved', {
+        reference: raw,
+        reason: error instanceof Error ? error.message : 'Media request failed',
+      });
+      return '';
+    }
   };
 
   return await Promise.all(rows.map(async (product) => {
