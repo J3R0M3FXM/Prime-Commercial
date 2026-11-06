@@ -1,5 +1,9 @@
 # Production Reconstruction Audit
 
+## Screenshot fix promoted to production — 2026-11-06
+
+- Sandbox commit `4effa97` fixes omitted QR/account instructions on the pre-submit payment screen, consolidates order confirmation, and measures the fixed top shell for proper document spacing. Promoted to Checkout `96617ab` and deployed static-only at r413. Build and contracts passed. No payment/order/customer data or backend/schema was changed. Device-level visual verification remains pending; full release record is in the Checkout audit.
+
 ## R2 activation release — 2026-11-06
 
 - The live Mini App previously had no R2 origin configured. The app client now defaults to the publicly verified Pages gateway `https://prime-media-gateway.pages.dev`, which forwards to the private `prime-media-preview` Worker through a service binding. It does not expose or connect to `workers.dev` directly.
