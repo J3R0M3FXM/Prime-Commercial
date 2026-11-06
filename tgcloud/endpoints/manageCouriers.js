@@ -2,7 +2,7 @@ import { db, EndpointError } from 'sdk';
 import { asc, eq } from 'sdk/db';
 import { couriers } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
-import { ensureCourierTimeRateColumn } from '../lib/ensure-courier-time-rate.js';
+import { ensureCourierTimeRateColumn, getCourierTimeRates, saveCourierTimeRate } from '../lib/ensure-courier-time-rate.js';
 
 const textFields = new Set(['name', 'trackingUrlPattern', 'logo', 'type']);
 const numericFields = new Set(['baseFare', 'firstMile', 'firstMileFee', 'exceedingKmFee', 'surcharge', 'nightDifferential', 'timeBasedFeePerMinute']);
@@ -52,21 +52,35 @@ export default async function (input, ctx) {
   await ensureCourierTimeRateColumn();
   const action = input?.action;
 
-  if (action === 'list') return await db.select().from(couriers).orderBy(asc(couriers.sortOrder)).all();
+  if (action === 'list') {
+    const [rows, rates] = await Promise.all([
+      db.select().from(couriers).orderBy(asc(couriers.sortOrder)).all(), getCourierTimeRates(),
+    ]);
+    return rows.map((row) => ({ ...row, timeBasedFeePerMinute: rates.get(String(row.id)) || 0 }));
+  }
 
   if (action === 'create') {
     const values = normalize(input, true);
+    const timeRate = Object.hasOwn(values, 'timeBasedFeePerMinute') ? values.timeBasedFeePerMinute : 0;
+    delete values.timeBasedFeePerMinute;
     values.createdAt = new Date();
     const [courier] = await db.insert(couriers).values(values).returning().run();
-    return { success: true, courier };
+    const timeBasedFeePerMinute = await saveCourierTimeRate(courier.id, timeRate);
+    return { success: true, courier: { ...courier, timeBasedFeePerMinute } };
   }
 
   if (action === 'update') {
     if (typeof input?.id !== 'string' || !input.id.trim()) throw new EndpointError('A courier ID is required.', { code: 'INVALID_INPUT' });
     const values = normalize(input, false);
-    const [courier] = await db.update(couriers).set(values).where(eq(couriers.id, input.id)).returning().run();
+    const hasTimeRate = Object.hasOwn(values, 'timeBasedFeePerMinute');
+    const timeRate = values.timeBasedFeePerMinute;
+    delete values.timeBasedFeePerMinute;
+    const [courier] = Object.keys(values).length
+      ? await db.update(couriers).set(values).where(eq(couriers.id, input.id)).returning().run()
+      : [await db.select().from(couriers).where(eq(couriers.id, input.id)).get()];
     if (!courier) throw new EndpointError('Courier not found.', { code: 'NOT_FOUND' });
-    return { success: true, courier };
+    const timeBasedFeePerMinute = hasTimeRate ? await saveCourierTimeRate(courier.id, timeRate) : (await getCourierTimeRates()).get(String(courier.id)) || 0;
+    return { success: true, courier: { ...courier, timeBasedFeePerMinute } };
   }
 
   if (action === 'delete') {

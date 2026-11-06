@@ -3,7 +3,7 @@ import { fetch } from 'sdk/fetch';
 import { asc, desc, eq } from 'sdk/db';
 import { couriers, systemSettings, warehouses } from '../schema.js';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from './delivery-fee.js';
-import { ensureCourierTimeRateColumn } from './ensure-courier-time-rate.js';
+import { getCourierTimeRates, ensureCourierTimeRateColumn } from './ensure-courier-time-rate.js';
 
 export async function quoteDelivery(destinationLatValue, destinationLonValue, courierId = '') {
   await ensureCourierTimeRateColumn();
@@ -24,6 +24,7 @@ export async function quoteDelivery(destinationLatValue, destinationLonValue, co
     Number.isFinite(Number(row.latitude)) && Number.isFinite(Number(row.longitude)));
   if (!warehouse) throw new EndpointError('No active warehouse with valid coordinates is configured.', { code: 'WAREHOUSE_UNCONFIGURED' });
   if (!courierRows.length) throw new EndpointError('No active couriers are configured.', { code: 'COURIERS_UNAVAILABLE' });
+  const courierTimeRates = await getCourierTimeRates();
 
   const [tomtomKeyRow] = await Promise.all([
     db.select({ value: systemSettings.value }).from(systemSettings)
@@ -83,10 +84,10 @@ export async function quoteDelivery(destinationLatValue, destinationLonValue, co
     exceedingKmFee: Number(courier.exceedingKmFee) || 0,
     surcharge: Number(courier.surcharge) || 0,
     nightDifferential: Number(courier.nightDifferential) || 0,
-    timeBasedFeePerMinute: Number(courier.timeBasedFeePerMinute) || 0,
+    timeBasedFeePerMinute: courierTimeRates.get(String(courier.id)) || 0,
     estimatedTravelMinutes: routeTimeMinutes,
-    calculatedTimeFee: routeTimeMinutes == null ? 0 : Math.round((Number(courier.timeBasedFeePerMinute) || 0) * routeTimeMinutes * 100) / 100,
-    calculatedFee: calculateDeliveryFee(courier, distanceKm, routeTimeMinutes),
+    calculatedTimeFee: routeTimeMinutes == null ? 0 : Math.round((courierTimeRates.get(String(courier.id)) || 0) * routeTimeMinutes * 100) / 100,
+    calculatedFee: calculateDeliveryFee({ ...courier, timeBasedFeePerMinute: courierTimeRates.get(String(courier.id)) || 0 }, distanceKm, routeTimeMinutes),
     distanceKm,
   }));
   const selectedId = String(courierId || '').trim();
