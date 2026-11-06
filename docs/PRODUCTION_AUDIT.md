@@ -58,3 +58,10 @@ The production reconstruction audit is maintained in the sibling `Prime-TGCloud-
 - The 12-hour check correctly suppressed the welcome response, but the generic message matcher could select the same welcome flow again when its message trigger was blank (blank message triggers match any customer message). This bypassed the configured welcome cooldown.
 - Commit `dd9d9ff` excludes the configured welcome-flow ID from generic message matching while retaining independent keyword-triggered flows. `node --check tgcloud/lib/telegram-automation.js`, the Telegram Serverless contract suite, and `git diff --check` passed.
 - Pushed only `tgcloud/lib/telegram-automation.js`. TGCloud now reports revision 401, webhook synced, static unchanged/up-to-date. Module SHA-256: `f3ef192b255458e982174c9482eb40f0d78d00dfe2d111924804ee1285b262db`. Actual customer-chat behavior is not yet device-verified.
+
+## Checkout charge and payment-session fixes — pending source promotion — 2026-11-06
+
+- Sandbox fixed charge hydration: public JSON maps saved `rate` to `amount`/`value` and decodes schedule/default metadata from description JSON.
+- Sandbox fixed payment retries: preserve valid proof sessions; issue a new session after expiry; recover consumed sessions through the original idempotency key; verify conditional proof writes.
+- Focused contracts, endpoint syntax checks, diff check, and production Mini App build pass. Source promotion is pending; nothing is live yet.
+- Promotion/deployment remains blocked by unreconciled linked-only endpoint modules and modified linked schema. No live order/payment/credit/customer data changed.
