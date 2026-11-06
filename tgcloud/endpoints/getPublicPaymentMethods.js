@@ -13,6 +13,7 @@ export default async function () {
       name: paymentMethods.name,
       logo: paymentMethods.logo,
       paymentType: paymentMethods.paymentType,
+      paymentLinkUrl: paymentMethods.paymentLinkUrl,
       publicKey: paymentMethods.publicKey,
       qrCodeImage: paymentMethods.qrCodeImage,
       walletAddress: paymentMethods.walletAddress,

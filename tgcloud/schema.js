@@ -150,6 +150,7 @@ export const orders = table('orders', {
 export const paymentMethods = table('payment_methods', {
   id: text('id').primaryKey().default(uuidDefault()), name: text('name').notNull(), logo: text('logo'),
   paymentType: text('payment_type').notNull(), qrCodeImage: text('qr_code_image'),
+  paymentLinkUrl: text('payment_link_url'),
   webhookUrl: text('webhook_url'), publicKey: text('public_key'),
   // Server-only secret. Never expose this table directly to the Mini App.
   secretKey: text('secret_key'), walletAddress: text('wallet_address'),

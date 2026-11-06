@@ -3087,6 +3087,16 @@ export default function CheckoutModal({
               </div>
             )}
 
+            {zoomedPaymentMethod.walletAddress && (
+              <div className="p-2.5 bg-gray-50 border border-gray-100 rounded-none text-left text-[11px] font-mono text-gray-700">
+                <div className="font-bold text-gray-400 uppercase text-[9px] tracking-wider">Wallet Address</div>
+                <div className="mt-1 flex items-start gap-2">
+                  <span className="min-w-0 flex-1 break-all font-bold text-slate-800 select-all">{zoomedPaymentMethod.walletAddress}</span>
+                  <button type="button" onClick={() => { void navigator.clipboard.writeText(String(zoomedPaymentMethod.walletAddress)); setCopiedField("wallet"); setTimeout(() => setCopiedField(null), 2000); }} className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 font-heading text-[10px] font-semibold text-slate-800">{copiedField === "wallet" ? "Copied" : "Copy"}</button>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-2 pt-1">
               {(zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image) && (
                 <button

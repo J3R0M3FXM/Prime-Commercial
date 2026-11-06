@@ -59,6 +59,10 @@ assert.match(createOrder, /operation_key AS operationKey[\s\S]*FROM payment_sess
 assert.match(createOrder, /const sessionRequest = parseJson\(session\.requestSnapshot, null\)/, 'Order submission must parse the JSON-text request snapshot from its payment session');
 const proofUpload = readFileSync('tgcloud/endpoints/uploadPaymentProof.js', 'utf8');
 assert.match(proofUpload, /customer_id AS customerId[\s\S]*expires_at AS expiresAt/, 'Proof upload must explicitly map payment-session ownership and expiry columns');
+const publicPayments = readFileSync('tgcloud/endpoints/getPublicPaymentMethods.js', 'utf8');
+assert.match(publicPayments, /paymentLinkUrl: paymentMethods\.paymentLinkUrl/, 'Public payment methods must return the configured customer-facing secure payment link');
+const paymentAdmin = readFileSync('tgcloud/endpoints/managePaymentMethods.js', 'utf8');
+assert.match(paymentAdmin, /key === 'paymentLinkUrl'[\s\S]*parsed\.protocol !== 'https:'/,'Admin payment links must be validated as HTTPS before saving');
 
 console.log('Telegram Serverless contracts OK: ' + requiredTables.length + ' tables, ' + requiredEndpoints.length + ' endpoint modules, public-field safeguards.');
 
