@@ -41,6 +41,10 @@ assert.doesNotMatch(charges, /db\.(insert|update|delete)/, 'Public charges endpo
 
 console.log('Telegram Serverless contracts OK: ' + requiredTables.length + ' tables, ' + requiredEndpoints.length + ' endpoint modules, public-field safeguards.');
 
+const secretaryAutomation = readFileSync('tgcloud/lib/telegram-automation.js', 'utf8');
+assert.match(secretaryAutomation, /WELCOME_COOLDOWN_MS\s*=\s*12\s*\*\s*60\s*\*\s*60\s*\*\s*1000/, 'Secretary welcome cooldown must remain 12 hours');
+assert.match(secretaryAutomation, /triggerType === 'message' && welcomeFlowId && String\(item\.id\) === welcomeFlowId/, 'Generic message matching must not bypass the welcome cooldown');
+
 const adminGuard = readFileSync('tgcloud/lib/auth.js', 'utf8');
 assert.match(adminGuard, /ctx\?\.initData\?\.user/, 'Admin guard must use platform-verified initData');
 assert.match(adminGuard, /admin_telegram_user_id/, 'Admin guard must use a server-side allowlist');

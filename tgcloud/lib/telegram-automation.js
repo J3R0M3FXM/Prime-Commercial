@@ -135,7 +135,12 @@ export async function findAutomationResponse(triggerType, value) {
   const settings = await getAutomationSettings();
   if (!settings.enabled) return null;
   const flows = await getAutomationFlows();
-  const flow = flows.find((item) => item.active && item.triggerType === triggerType &&
+  const welcomeFlowId = String(settings.welcomeFlowId || '');
+  const flow = flows.find((item) => item.active &&
+    // Welcome is checked separately with its 12-hour send throttle. Prevent an
+    // empty message trigger from selecting that same welcome flow on every message.
+    !(triggerType === 'message' && welcomeFlowId && String(item.id) === welcomeFlowId) &&
+    item.triggerType === triggerType &&
     ((triggerType === 'message' && !String(item.triggerValue || '').trim()) ||
       matches(value, item.triggerValue, item.matchMode)));
   if (flow) return { flow, settings };
