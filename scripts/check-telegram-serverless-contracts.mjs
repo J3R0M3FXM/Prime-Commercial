@@ -56,6 +56,7 @@ assert.match(createOrder, /const prior = await findCheckoutOperation\(\{ custome
 assert.match(createOrder, /if \(prior\.status === 'failed'\)/, 'Failed attempts must not be replayed under the same key');
 assert.match(createOrder, /customer_id AS customerId[\s\S]*request_snapshot AS requestSnapshot[\s\S]*proof_data AS proofData[\s\S]*expires_at AS expiresAt/, 'Order submission must explicitly map payment-session database columns');
 assert.match(createOrder, /operation_key AS operationKey[\s\S]*FROM payment_sessions WHERE id=:id AND customer_id=:customer_id/, 'Order submission must use the authenticated payment session operation key');
+assert.match(createOrder, /const sessionRequest = parseJson\(session\.requestSnapshot, null\)/, 'Order submission must parse the JSON-text request snapshot from its payment session');
 const proofUpload = readFileSync('tgcloud/endpoints/uploadPaymentProof.js', 'utf8');
 assert.match(proofUpload, /customer_id AS customerId[\s\S]*expires_at AS expiresAt/, 'Proof upload must explicitly map payment-session ownership and expiry columns');
 
