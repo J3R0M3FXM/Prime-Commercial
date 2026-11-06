@@ -44,14 +44,14 @@ assert.match(charges, /schedules,/, 'Public charges must expose decoded schedule
 assert.match(charges, /isDefault,/, 'Public charges must expose the configured default-charge flag');
 
 const paymentSession = readFileSync('tgcloud/endpoints/createPaymentSession.js', 'utf8');
-assert.match(paymentSession, /existing\?\.status === 'consumed'/, 'Consumed payment sessions must not be reused');
+assert.match(paymentSession, /existing\.status === 'consumed'/, 'Consumed payment sessions must be replaced with a distinct proof-session ID');
 assert.match(paymentSession, /Number\(existing\.expiresAt\) <= now/, 'Expired payment sessions must be replaced');
-assert.match(paymentSession, /PAYMENT_SESSION_CONSUMED/, 'Consumed sessions must direct retries to idempotent order recovery');
 assert.match(paymentSession, /const saved = await db\.get/, 'Payment session creation must verify persistence');
 assert.match(paymentSession, /PAYMENT_SESSION_CREATE_FAILED/, 'Invalid session persistence must fail explicitly');
-const checkoutUi = readFileSync('app/components/checkout-modal.tsx', 'utf8');
-assert.match(checkoutUi, /PAYMENT_SESSION_CONSUMED/, 'Checkout must recognize consumed-session recovery');
-assert.match(checkoutUi, /operationKey, resume: true/, 'Consumed-session retry must resume the same idempotent order');
+const createOrder = readFileSync('tgcloud/endpoints/createOrder.js', 'utf8');
+assert.match(createOrder, /Resolve an earlier submission before validating a retry/, 'Order retries must recover before validating a new payment session');
+assert.match(createOrder, /const prior = await findCheckoutOperation\(\{ customerId: customer\.id, requestKey \}\)/, 'Order retry recovery must use the authenticated customer and operation key');
+assert.match(createOrder, /if \(prior\.status === 'failed'\)/, 'Failed attempts must not be replayed under the same key');
 
 console.log('Telegram Serverless contracts OK: ' + requiredTables.length + ' tables, ' + requiredEndpoints.length + ' endpoint modules, public-field safeguards.');
 

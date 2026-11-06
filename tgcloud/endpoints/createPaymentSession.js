@@ -25,19 +25,16 @@ export default async function (input, ctx) {
   const operationKey = text(input?.operationKey, 128);
   if (!request || !paymentMethodId || !operationKey) throw new EndpointError('Checkout details and payment method are required.', { code: 'INVALID_INPUT' });
   const now = Math.floor(Date.now() / 1000);
-  // Keep the operation key as the stable session ID. A consumed session means
-  // createOrder already accepted this attempt; never mint another proof session
-  // under the same key because that would conflict with its immutable snapshot.
+  // Use a deterministic ID for the first attempt. If its session was consumed,
+  // createOrder will recover the existing immutable operation by operationKey
+  // before looking at the new session, preventing duplicate reservations/orders.
   const baseSessionId = id(operationKey, 'payment-session');
   const existing = await db.get('SELECT customer_id AS customerId, status, expires_at AS expiresAt FROM payment_sessions WHERE id=:id', { ':id': baseSessionId });
   if (existing && String(existing.customerId) !== String(customer.id)) {
     throw new EndpointError('This checkout key is already in use. Refresh checkout and try again.', { code: 'CHECKOUT_KEY_CONFLICT' });
   }
-  if (existing?.status === 'consumed') {
-    throw new EndpointError('This order was already submitted or is being recovered. Retry order recovery instead of submitting again.', { code: 'PAYMENT_SESSION_CONSUMED' });
-  }
-  const sessionId = existing && Number(existing.expiresAt) <= now
-    ? id(operationKey + '-' + now.toString(36) + '-' + crypto.randomUUID(), 'payment-session')
+  const sessionId = existing && (existing.status === 'consumed' || Number(existing.expiresAt) <= now)
+    ? id(operationKey + '-' + now.toString(36) + '-' + globalThis.crypto.randomUUID(), 'payment-session')
     : baseSessionId;
   const expiresAt = now + 60 * 60;
   await db.run(`INSERT INTO payment_sessions (id,customer_id,request_snapshot,payment_method_id,status,expires_at,created_at,updated_at)
