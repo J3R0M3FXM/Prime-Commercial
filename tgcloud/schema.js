@@ -6,7 +6,7 @@
  * Telegram Serverless SQLite does not enforce foreign keys: validate references
  * in endpoint logic and in migration reconciliation.
  */
-import { table, text, integer, numeric, json, boolean, index, uniqueIndex, sql } from 'sdk/db';
+import { table, text, integer, numeric, json, boolean, blob, index, uniqueIndex, sql } from 'sdk/db';
 export const supportTickets = table('support_tickets', {
   id: text('id').primaryKey(),
   ownerTelegramId: text('owner_telegram_id').notNull(),
@@ -370,5 +370,27 @@ export const mediaAssets = table('media_assets', {
   mediaAssetBucketPathUnique: uniqueIndex('media_assets_bucket_path_key').on(t.bucket, t.path),
   mediaAssetOrderIdx: index('media_assets_order_id_idx').on(t.orderId),
   mediaAssetVisibilityIdx: index('media_assets_visibility_idx').on(t.visibility),
+}));
+
+export const mediaAssetContents = table('media_asset_contents', {
+  id: text('id').primaryKey(),
+  bytes: blob('bytes').notNull(),
+  createdAt: requiredCreatedAt(),
+});
+
+export const inventoryReservations = table('inventory_reservations', {
+  id: text('id').primaryKey(),
+  orderId: text('order_id').notNull(),
+  productId: text('product_id').notNull(),
+  variantId: text('variant_id').notNull().default('default'),
+  quantity: integer('quantity').notNull(),
+  status: text('status').notNull().default('held'),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  createdAt: requiredCreatedAt(),
+  updatedAt: requiredUpdatedAt(),
+}, (t) => ({
+  inventoryReservationLineUnique: uniqueIndex('inventory_reservations_order_product_variant_key').on(t.orderId, t.productId, t.variantId),
+  inventoryReservationProductIdx: index('inventory_reservations_product_variant_idx').on(t.productId, t.variantId),
+  inventoryReservationOrderIdx: index('inventory_reservations_order_idx').on(t.orderId),
 }));
 
