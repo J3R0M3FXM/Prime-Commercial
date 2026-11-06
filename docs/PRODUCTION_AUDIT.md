@@ -8,7 +8,13 @@
 - Read-only `getActivePromos` returned four active promos that passed its current start/end-date and global-use-limit filters. `validatePromo` remains authenticated and enforces audience/tier, payment/courier, schedule, minimums, redemption and device-fingerprint rules without writing during validation. Actual eligibility for a customer requires that customer's authenticated context and was not simulated or redeemed.
 - The live-read-only endpoint inventory reports 20 products, six couriers, ten payment methods, and four public active promos as described above; media probes did not mark an order paid or touch customer/order records.
 - The promo/tier test had a stale Silver-to-Bronze example at ₱6,000 despite the current 30-day tier thresholds being Bronze ₱10,000, Gold ₱15,000, Platinum ₱20,000 and Titanium ₱25,000. Updated the test fixture to ₱11,000, retaining its 20% progress assertion. Tier reward rates remain Silver 5%, Bronze 5.5%, Gold 6%, Platinum 6.5%, Titanium 7% (whole points, in complete ₱100 blocks).
-- Contract checks pass and the production Mini App build passes. The promo codec suite passes after correcting that stale fixture. These changes remain in Sandbox only; no deploy was attempted because the documented local/live endpoint inventory mismatch is still a release gate.
+- Contract checks pass and the production Mini App build passes. The promo codec suite passes after correcting that stale fixture. At this audit checkpoint, the QR download change is committed in Sandbox; the three media backend changes are already present in Checkout but not deployed.
+
+## TGCloud module/schema parity recheck — 2026-11-06
+
+- Ran the supported read-only `tgcloud fetch` from the clean linked Checkout: app8830494959, revision 406, snapshot updated for 68 modules; webhook remained in sync. This refreshed only TGCloud's snapshot, not working source files.
+- The Checkout source tree contains the same 68 modules (43 endpoints, 3 handlers, 21 libraries, and schema). After fetch, `tgcloud status` reported no added/deleted backend modules—only the three intentional media changes (`getMediaContent.js`, `manageMediaAssets.js`, `lib/media.js`). `tgcloud diff tgcloud/schema.js` returned no changes. This resolves the previously documented 61-vs-43/module-category mismatch and old dirty-schema blocker; the prior count was stale and should no longer block a scoped media release.
+- Static build files are a separate expected diff. No `tgcloud pull`, schema migration, module deletion, or live database write was performed. The only remaining release delta is the reviewed media backend repair plus the QR-download UI fix; deploy those narrowly from a committed, built Checkout and verify revision/assets afterward.
 
 ## Latest live update — 2026-11-06
 
