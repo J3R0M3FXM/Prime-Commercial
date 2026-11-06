@@ -697,7 +697,7 @@ export default async function (input, ctx) {
   if (!customer) throw new EndpointError('Customer account was not found. Reopen the Mini App and try again.', { code: 'CUSTOMER_MISSING' });
   if (customer.isBanned === true) throw new EndpointError('This customer account cannot place orders.', { code: 'CUSTOMER_BANNED' });
 
-  const requestKey = text(input?.operationKey, 128);
+  let requestKey = text(input?.operationKey, 128);
   const resuming = input?.resume === true;
   let request;
   let operation;
@@ -711,6 +711,18 @@ export default async function (input, ctx) {
     // Resolve an earlier submission before validating a retry's newly-created
     // payment session. A lost response can leave the original session consumed;
     // the checkout operation key remains the durable identity of that order.
+    const submittedRequest = sanitizedRequest(input);
+    let paymentSession = null;
+    if (submittedRequest.paymentSessionId) {
+      paymentSession = await db.get(`SELECT id, customer_id AS customerId, operation_key AS operationKey,
+          request_snapshot AS requestSnapshot, payment_method_id AS paymentMethodId,
+          proof_data AS proofData, proof_content_type AS proofContentType,
+          proof_ocr_analysis AS proofOcrAnalysis, status, expires_at AS expiresAt
+        FROM payment_sessions WHERE id=:id AND customer_id=:customer_id`, {
+        ':id': submittedRequest.paymentSessionId, ':customer_id': String(customer.id),
+      });
+      if (paymentSession?.operationKey) requestKey = String(paymentSession.operationKey);
+    }
     const prior = await findCheckoutOperation({ customerId: customer.id, requestKey });
     if (prior.ok) {
       if (!prior.requestSnapshot) {
@@ -722,14 +734,10 @@ export default async function (input, ctx) {
       operation = prior;
       request = prior.requestSnapshot;
     } else {
-      request = sanitizedRequest(input);
+      request = submittedRequest;
       if (request.paymentSessionId) {
-        const session = await db.get(`SELECT id, customer_id AS customerId, request_snapshot AS requestSnapshot,
-            payment_method_id AS paymentMethodId, proof_data AS proofData,
-            proof_content_type AS proofContentType, proof_ocr_analysis AS proofOcrAnalysis,
-            status, expires_at AS expiresAt
-          FROM payment_sessions WHERE id=:id`, { ':id': request.paymentSessionId });
-        if (!session || String(session.customerId) !== String(customer.id) || session.status !== 'proof_uploaded' || Number(session.expiresAt) <= submittedAt)
+        const session = paymentSession;
+        if (!session || session.status !== 'proof_uploaded' || Number(session.expiresAt) <= submittedAt)
           throw new EndpointError('Upload payment proof before submitting this order.', { code: 'PAYMENT_PROOF_REQUIRED' });
         const sessionRequest = session.requestSnapshot && typeof session.requestSnapshot === 'object' ? session.requestSnapshot : {};
         request = { ...sanitizedRequest(sessionRequest), paymentSessionId: request.paymentSessionId,
