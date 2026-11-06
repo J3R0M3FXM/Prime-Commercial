@@ -414,11 +414,16 @@ export async function getServerlessCatalog(options: { resolveMedia?: boolean } =
   const safeMedia = async (reference: unknown) => {
     const raw = String(reference || '');
     if (!raw) return '';
-    try { return await resolveTelegramMedia(raw); } catch { return raw; }
+    try { return await resolveTelegramMedia(raw); } catch { return ''; }
   };
 
   return await Promise.all(rows.map(async (product) => {
-    const variants = await Promise.all((Array.isArray(product.variants) ? product.variants : []).map(async (variant) => ({
+    const sourceVariants = Array.isArray(product.variants)
+      ? product.variants
+      : product.bundleConfig && typeof product.bundleConfig === 'object' && Array.isArray((product.bundleConfig as any).variants)
+        ? (product.bundleConfig as any).variants
+        : [];
+    const variants = await Promise.all(sourceVariants.map(async (variant) => ({
       ...variant,
       imageUrl: resolveMedia
         ? await safeMedia(variant.imageUrl || variant.image_url)
