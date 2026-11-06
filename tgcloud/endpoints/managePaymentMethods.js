@@ -3,8 +3,8 @@ import { asc, eq } from 'sdk/db';
 import { paymentMethods } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
 
-const stringFields = new Set(['name', 'logo', 'paymentType', 'qrCodeImage', 'paymentLinkUrl', 'webhookUrl', 'publicKey', 'secretKey', 'walletAddress', 'accountName', 'accountNumber']);
-const writable = new Set([...stringFields, 'sortOrder', 'isActive']);
+const stringFields = new Set(['name', 'logo', 'paymentType', 'qrCodeImage', 'webhookUrl', 'publicKey', 'secretKey', 'walletAddress', 'accountName', 'accountNumber']);
+const writable = new Set([...stringFields, 'paymentLinkUrl', 'sortOrder', 'isActive']);
 
 function normalize(input, creating) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new EndpointError('Invalid payment method payload.', { code: 'INVALID_INPUT' });
@@ -12,16 +12,24 @@ function normalize(input, creating) {
   for (const [key, value] of Object.entries(input)) {
     if (key === 'action' || key === 'id') continue;
     if (!writable.has(key)) throw new EndpointError('Unsupported payment method field: ' + key, { code: 'INVALID_FIELD' });
+    if (key === 'paymentLinkUrl') {
+      const normalized = value == null ? '' : String(value).trim();
+      if (normalized.length > 4000) throw new EndpointError('Payment link is too long.', { code: 'INVALID_INPUT' });
+      if (normalized) {
+        let parsed;
+        try { parsed = new URL(normalized); } catch { throw new EndpointError('Payment link must be a valid HTTPS URL.', { code: 'INVALID_PAYMENT_LINK' }); }
+        if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) throw new EndpointError('Payment link must be a valid HTTPS URL.', { code: 'INVALID_PAYMENT_LINK' });
+      }
+      // payment_methods has no payment_link_url column in the deployed schema.
+      // The existing public_key slot is repurposed only for this link method.
+      output.publicKey = normalized;
+      continue;
+    }
     if (stringFields.has(key)) {
       if (typeof value !== 'string' && value !== null) throw new EndpointError(key + ' must be text.', { code: 'INVALID_INPUT' });
       const normalized = value == null ? '' : value.trim();
       if ((key === 'name' || key === 'paymentType') && !normalized) throw new EndpointError(key + ' is required.', { code: 'INVALID_INPUT' });
       if (normalized.length > 4000) throw new EndpointError(key + ' is too long.', { code: 'INVALID_INPUT' });
-      if (key === 'paymentLinkUrl' && normalized) {
-        let parsed;
-        try { parsed = new URL(normalized); } catch { throw new EndpointError('Payment link must be a valid HTTPS URL.', { code: 'INVALID_PAYMENT_LINK' }); }
-        if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) throw new EndpointError('Payment link must be a valid HTTPS URL.', { code: 'INVALID_PAYMENT_LINK' });
-      }
       if (key === 'secretKey' && !normalized) continue; // never erase an existing secret by submitting a blank masked field
       output[key] = normalized;
     } else if (key === 'sortOrder') {

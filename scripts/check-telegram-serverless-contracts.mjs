@@ -28,7 +28,7 @@ assert.match(paymentMethods, /publicKey:\s*paymentMethods\.publicKey/, 'Public p
 assert.doesNotMatch(paymentMethods, /secretKey:\s*paymentMethods\.secretKey/, 'Never expose payment secret keys from a public endpoint');
 assert.doesNotMatch(paymentMethods, /webhookUrl:\s*paymentMethods\.webhookUrl/, 'Never expose payment webhook URLs from a public endpoint');
 assert.match(paymentMethods, /eq\(paymentMethods\.isActive, true\)/, 'Public payment methods must filter inactive rows');
-assert.match(paymentMethods, /return rows;/, 'Payment methods endpoint must preserve the existing array response shape');
+assert.match(paymentMethods, /return rows\.map\(/, 'Payment methods endpoint must preserve the existing array response shape');
 
 const catalog = readFileSync('tgcloud/endpoints/getCatalog.js', 'utf8');
 assert.match(catalog, /eq\(products\.isActive, true\)/, 'Public catalog must filter inactive products');
@@ -60,7 +60,7 @@ assert.match(createOrder, /const sessionRequest = parseJson\(session\.requestSna
 const proofUpload = readFileSync('tgcloud/endpoints/uploadPaymentProof.js', 'utf8');
 assert.match(proofUpload, /customer_id AS customerId[\s\S]*expires_at AS expiresAt/, 'Proof upload must explicitly map payment-session ownership and expiry columns');
 const publicPayments = readFileSync('tgcloud/endpoints/getPublicPaymentMethods.js', 'utf8');
-assert.match(publicPayments, /paymentLinkUrl: paymentMethods\.paymentLinkUrl/, 'Public payment methods must return the configured customer-facing secure payment link');
+assert.match(publicPayments, /paymentLinkUrl: row\.paymentType === 'secured_payment_link' \? String\(row\.publicKey \|\| ''\)/, 'Public payment methods must return the customer-facing HTTPS link from the existing public_key column');
 const paymentAdmin = readFileSync('tgcloud/endpoints/managePaymentMethods.js', 'utf8');
 assert.match(paymentAdmin, /key === 'paymentLinkUrl'[\s\S]*parsed\.protocol !== 'https:'/,'Admin payment links must be validated as HTTPS before saving');
 
