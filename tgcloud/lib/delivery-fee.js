@@ -11,17 +11,22 @@ export function normalizeDeliveryRate(raw) {
     exceedingKmFee: money(raw?.exceedingKmFee ?? raw?.exceeding_km_fee),
     surcharge: money(raw?.surcharge),
     nightDifferential: money(raw?.nightDifferential ?? raw?.night_differential),
+    timeBasedFeePerMinute: money(raw?.timeBasedFeePerMinute ?? raw?.time_based_fee_per_minute),
   };
 }
 
-export function calculateDeliveryFee(raw, distanceKm) {
+export function calculateDeliveryFee(raw, distanceKm, routeTimeMinutes = null) {
   const rate = normalizeDeliveryRate(raw);
   const distance = Math.max(0, Number(distanceKm) || 0);
+  const routeMinutes = Number(routeTimeMinutes);
   const includedKm = Math.min(distance, rate.firstMile);
   const excessKm = Math.max(0, distance - rate.firstMile);
   const fee = rate.baseFare + includedKm * rate.firstMileFee +
-    excessKm * rate.exceedingKmFee + rate.surcharge + rate.nightDifferential;
-  return Math.round(Math.max(0, fee) * 100) / 100;
+    excessKm * rate.exceedingKmFee + rate.surcharge + rate.nightDifferential +
+    (Number.isFinite(routeMinutes) && routeMinutes > 0 ? rate.timeBasedFeePerMinute * routeMinutes : 0);
+  // Delivery fares are charged in whole Philippine pesos. Round once, after
+  // combining every configured component, so quote and order totals agree.
+  return Math.round(Math.max(0, fee));
 }
 
 export function calculateRoadDistanceFallback(originLat, originLon, destinationLat, destinationLon) {

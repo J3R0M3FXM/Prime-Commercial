@@ -38,7 +38,7 @@ import {
   RefreshCw,
   FileCheck
 } from "lucide-react";
-import { formatPHP } from "@/lib/currency";
+import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
 import { getClientFingerprint, getOrCreateSessionToken, getFreshClientLocation } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
@@ -1732,7 +1732,7 @@ export default function CheckoutModal({
                               {formatCourierName(courier.name)}
                             </span>
                             <span className="block text-xs sm:text-[13px] font-mono font-bold text-slate-950 tracking-tight">
-                              {formatPHP(courier.calculatedFee || 0)}
+                              {formatPHPWhole(courier.calculatedFee || 0)}
                             </span>
                           </div>
                         </div>
@@ -1747,7 +1747,7 @@ export default function CheckoutModal({
                 <div className="space-y-3 pt-2">
                   <div className="border-b border-slate-100 pb-3 mb-4 text-center">
                     <p className="text-xs text-slate-700 font-mono leading-relaxed max-w-lg mx-auto">
-                      You have chosen <span className="font-bold text-slate-900">{selectedCourier?.name}</span> to handle your delivery from PRIME Fulfillment Hub with a corresponding charge of <span className="font-bold text-slate-900 font-mono">{formatPHP(courierDeliveryFee)}</span>. How would you like to pay for the charge?
+                      You have chosen <span className="font-bold text-slate-900">{selectedCourier?.name}</span> to handle your delivery from PRIME Fulfillment Hub with a corresponding charge of <span className="font-bold text-slate-900 font-mono">{formatPHPWhole(courierDeliveryFee)}</span>. How would you like to pay for the charge?
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3 w-full">
@@ -1922,12 +1922,12 @@ export default function CheckoutModal({
                     ) : appliedPromo?.shippingSubsidy && appliedPromo.shippingSubsidy > 0 ? (
                       <div>
                         <span className="line-through text-gray-400 text-[11px] mr-1.5 font-mono">{formatPHP(courierDeliveryFee)}</span>
-                        <span className="prime-checkout__charge-value font-semibold text-gray-900 font-mono">{formatPHP(effectiveCourierDeliveryFee)}</span>
+                        <span className="prime-checkout__charge-value font-semibold text-gray-900 font-mono">{formatPHPWhole(effectiveCourierDeliveryFee)}</span>
                         <span className="text-[10px] text-emerald-600 block font-mono">(-{formatPHP(appliedPromo.shippingSubsidy)} subsidy)</span>
                       </div>
                     ) : (
                       <span className="prime-checkout__charge-value font-semibold text-gray-900 font-mono">
-                        {formatPHP(courierDeliveryFee)}
+                        {formatPHPWhole(courierDeliveryFee)}
                       </span>
                     )}
                   </div>
@@ -2206,7 +2206,7 @@ export default function CheckoutModal({
                     <div className="flex justify-between items-center text-xs font-mono text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
                       <span className="font-medium">To be paid to Courier upon delivery:</span>
                       <span className="font-bold font-mono">
-                        {appliedPromo?.isFreeShipping ? "FREE" : formatPHP(courierDeliveryFee)}
+                        {appliedPromo?.isFreeShipping ? "FREE" : formatPHPWhole(courierDeliveryFee)}
                       </span>
                     </div>
                   )}
@@ -2337,7 +2337,7 @@ export default function CheckoutModal({
                   {completedOrder.deliveryFeePaymentMethod === "upon_delivery" && (
                     <div className="flex justify-between items-center text-[10px] text-amber-800 bg-amber-50 px-2 py-1 rounded border border-amber-200">
                       <span>Delivery Fee to Courier on arrival:</span>
-                      <span className="font-bold font-mono">{formatPHP(completedOrder.deliveryFee || 0)}</span>
+                      <span className="font-bold font-mono">{formatPHPWhole(completedOrder.deliveryFee || 0)}</span>
                     </div>
                   )}
                 </div>

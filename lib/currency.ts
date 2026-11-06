@@ -22,6 +22,12 @@ export function formatPHP(amount: number | string | null | undefined): string {
   }
 }
 
+export function formatPHPWhole(amount: number | string | null | undefined): string {
+  const numeric = typeof amount === "number" ? amount : Number(amount);
+  if (!Number.isFinite(numeric)) return "₱0";
+  return `₱${Math.round(numeric).toLocaleString("en-PH", { maximumFractionDigits: 0 })}`;
+}
+
 export function formatNumber(val: number | string | null | undefined, decimals = 2): string {
   try {
     const numeric = typeof val === "number" ? val : Number(val);

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { formatPHP } from "@/lib/currency";
+import { formatPHP, formatPHPWhole } from "@/lib/currency";
 
 interface OrderPrintViewProps {
   order: any;
@@ -180,7 +180,7 @@ export default function OrderPrintView({
           {deliveryFee > 0 && (
             <div className="flex justify-between">
               <span>Delivery Fee:</span>
-              <span>{formatPHP(deliveryFee)}</span>
+              <span>{formatPHPWhole(deliveryFee)}</span>
             </div>
           )}
 
@@ -520,7 +520,7 @@ export default function OrderPrintView({
 
             <div className="flex justify-between text-slate-600">
               <span>Delivery Fee:</span>
-              <span className="font-bold text-slate-900">{formatPHP(deliveryFee)}</span>
+              <span className="font-bold text-slate-900">{formatPHPWhole(deliveryFee)}</span>
             </div>
 
             {discount > 0 && (

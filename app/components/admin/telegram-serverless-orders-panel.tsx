@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Clock3, Download, ExternalLink, Eye, Loader2, Minus, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, Truck, X } from "lucide-react";
-import { formatPHP } from "@/lib/currency";
+import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import { callServerless, getTelegramServerlessSession, resolveTelegramMedia } from "@/lib/telegram-serverless-client";
 
 type ServerlessOrder = {
@@ -728,7 +728,7 @@ export default function TelegramServerlessOrdersPanel({
                   <summary>View fee and discount breakdown</summary>
                   <div>
                     {selectedOrder.chargesBreakdown.map((charge: any, index) => <p key={`${charge.id || charge.name || "charge"}-${index}`}><span>{charge.name || "Additional charge"}</span><b>{formatPHP(Number(charge.computedAmount ?? charge.amount) || 0)}</b></p>)}
-                    {selectedOrder.deliveryFee > 0 && <p><span>Delivery fee</span><b>{formatPHP(selectedOrder.deliveryFee)}</b></p>}
+                    {selectedOrder.deliveryFee > 0 && <p><span>Delivery fee</span><b>{formatPHPWhole(selectedOrder.deliveryFee)}</b></p>}
                     {selectedOrder.discountAmount > 0 && <p><span>Promo discount{selectedOrder.appliedPromoCode ? ` · ${selectedOrder.appliedPromoCode}` : ""}</span><b>−{formatPHP(selectedOrder.discountAmount)}</b></p>}
                     {selectedOrder.staffDiscountAmount > 0 && <p><span>Staff discount · {selectedOrder.staffDiscountMode === "percent" ? `${selectedOrder.staffDiscountValue}%` : selectedOrder.staffDiscountMode === "fixed" ? formatPHP(selectedOrder.staffDiscountValue) : "manual"}</span><b>−{formatPHP(selectedOrder.staffDiscountAmount)}</b></p>}
                     {selectedOrder.pointsDiscount > 0 && <p><span>Points discount</span><b>−{formatPHP(selectedOrder.pointsDiscount)}</b></p>}
