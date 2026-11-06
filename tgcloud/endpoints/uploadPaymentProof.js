@@ -11,7 +11,8 @@ export default async function (input, ctx) {
   const contentType = String(input?.contentType || 'image/jpeg');
   if (!customer || !sessionId || !/^[A-Za-z0-9_-]+$/.test(data) || data.length > 820000 || !['image/jpeg', 'image/png', 'image/webp'].includes(contentType))
     throw new EndpointError('Choose a supported payment proof image.', { code: 'INVALID_PROOF' });
-  const session = await db.get('SELECT * FROM payment_sessions WHERE id=:id', { ':id': sessionId });
+  const session = await db.get(`SELECT id, customer_id AS customerId, status, expires_at AS expiresAt
+    FROM payment_sessions WHERE id=:id`, { ':id': sessionId });
   if (!session || String(session.customerId) !== String(customer.id) || session.status === 'consumed' || Number(session.expiresAt) <= Math.floor(Date.now() / 1000))
     throw new EndpointError('This payment session expired. Start checkout again.', { code: 'PAYMENT_SESSION_EXPIRED' });
   const ocrAnalysis = input?.ocrAnalysis && typeof input.ocrAnalysis === 'object' ? input.ocrAnalysis : null;

@@ -52,6 +52,9 @@ const createOrder = readFileSync('tgcloud/endpoints/createOrder.js', 'utf8');
 assert.match(createOrder, /Resolve an earlier submission before validating a retry/, 'Order retries must recover before validating a new payment session');
 assert.match(createOrder, /const prior = await findCheckoutOperation\(\{ customerId: customer\.id, requestKey \}\)/, 'Order retry recovery must use the authenticated customer and operation key');
 assert.match(createOrder, /if \(prior\.status === 'failed'\)/, 'Failed attempts must not be replayed under the same key');
+assert.match(createOrder, /customer_id AS customerId[\s\S]*request_snapshot AS requestSnapshot[\s\S]*proof_data AS proofData[\s\S]*expires_at AS expiresAt/, 'Order submission must explicitly map payment-session database columns');
+const proofUpload = readFileSync('tgcloud/endpoints/uploadPaymentProof.js', 'utf8');
+assert.match(proofUpload, /customer_id AS customerId[\s\S]*expires_at AS expiresAt/, 'Proof upload must explicitly map payment-session ownership and expiry columns');
 
 console.log('Telegram Serverless contracts OK: ' + requiredTables.length + ' tables, ' + requiredEndpoints.length + ' endpoint modules, public-field safeguards.');
 

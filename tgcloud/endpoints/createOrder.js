@@ -724,7 +724,11 @@ export default async function (input, ctx) {
     } else {
       request = sanitizedRequest(input);
       if (request.paymentSessionId) {
-        const session = await db.get('SELECT * FROM payment_sessions WHERE id=:id', { ':id': request.paymentSessionId });
+        const session = await db.get(`SELECT id, customer_id AS customerId, request_snapshot AS requestSnapshot,
+            payment_method_id AS paymentMethodId, proof_data AS proofData,
+            proof_content_type AS proofContentType, proof_ocr_analysis AS proofOcrAnalysis,
+            status, expires_at AS expiresAt
+          FROM payment_sessions WHERE id=:id`, { ':id': request.paymentSessionId });
         if (!session || String(session.customerId) !== String(customer.id) || session.status !== 'proof_uploaded' || Number(session.expiresAt) <= submittedAt)
           throw new EndpointError('Upload payment proof before submitting this order.', { code: 'PAYMENT_PROOF_REQUIRED' });
         const sessionRequest = session.requestSnapshot && typeof session.requestSnapshot === 'object' ? session.requestSnapshot : {};
