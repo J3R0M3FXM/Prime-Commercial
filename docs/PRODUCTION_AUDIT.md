@@ -1,5 +1,13 @@
 # Production Reconstruction Audit
 
+## Checkout notices, payment tiles and header clock — 2026-11-06
+
+- Based on the latest screenshots, restored the earlier three-column/three-row payment tile paging and swipe model (9 methods per page), rather than rendering all methods in one unpaged grid. Existing QR/account detail and secure-payment confirmation behavior are retained.
+- Replaced the plain amber receipt strip with a structured neutral receipt notice, emphasized payable-now in a dark high-contrast panel, added a clear payment-method heading, and aligned load/error/receipt/order status notices to one visual system.
+- The header clock was present in the component but the 28px fixed-height/overflow-hidden style could clip its date-time row. CSS now allocates explicit line heights for the right-aligned date/time, divider and access label.
+- Promoted Sandbox `d3ba126` to Checkout `b51dd8b`; build and Serverless contracts passed. Static-only deployment is TGCloud **r414**, clean working directory, 51 files current. Live HTML references `index-TROudVo4.js` and `index-CNFrQPLF.css`; required release strings/classes were verified in the served assets.
+- No backend/schema/payment configuration/order/customer data changed. Phone visual confirmation after refresh remains outstanding.
+
 ## Screenshot-led payment and clipping repair — 2026-11-06
 
 - Reviewed the 17:38–17:43 Telegram screenshots. The pre-submit payment renderer only showed method logos and a bare selected-method name; it did not render QR media or bank/e-wallet account details. The shop's fixed header/search wrapper also had no reserved in-flow height, so the first product row could be hidden underneath it.
