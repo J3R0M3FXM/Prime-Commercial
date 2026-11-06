@@ -52,3 +52,9 @@ The production reconstruction audit is maintained in the sibling `Prime-TGCloud-
 - Released the committed fix from `Prime-TGCloud-Checkout` with a narrowly scoped `tgcloud push tgcloud/endpoints/getDeliveryQuote.js dist/`. No schema or unrelated backend modules were pushed. TGCloud reports app `app8830494959`, revision 400, webhook in sync, and static up to date (51 files).
 - Live HTML references `index-gxU3U0s4.js` and `index-DNrG5qZe.css`; downloaded live assets match the built assets byte-for-byte (SHA-256 JS `8636ff1adef44c8e04828c9927ad57e38c0b0f77676a474d580344ec3da777c6`; CSS `223097d126b6bfb7d2034fd84270247b8feec75f1ffffe8525cf84bae75d7d21`). The focused Telegram Serverless contract test passed before release.
 - Deployment/build verification is complete, but customer-device verification of courier loading, quote display, and Continue remains outstanding. The unrelated linked-only endpoint and schema mismatch remains a future release gate; this narrowly scoped incident release did not reconcile it.
+
+## Secretary repeat-welcome incident release — 2026-11-06
+
+- The 12-hour check correctly suppressed the welcome response, but the generic message matcher could select the same welcome flow again when its message trigger was blank (blank message triggers match any customer message). This bypassed the configured welcome cooldown.
+- Commit `dd9d9ff` excludes the configured welcome-flow ID from generic message matching while retaining independent keyword-triggered flows. `node --check tgcloud/lib/telegram-automation.js`, the Telegram Serverless contract suite, and `git diff --check` passed.
+- Pushed only `tgcloud/lib/telegram-automation.js`. TGCloud now reports revision 401, webhook synced, static unchanged/up-to-date. Module SHA-256: `f3ef192b255458e982174c9482eb40f0d78d00dfe2d111924804ee1285b262db`. Actual customer-chat behavior is not yet device-verified.
