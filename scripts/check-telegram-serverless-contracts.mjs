@@ -38,6 +38,20 @@ assert.match(catalog, /return await Promise\.all\(rows\.map/, 'Catalog endpoint 
 const charges = readFileSync('tgcloud/endpoints/getPublicCharges.js', 'utf8');
 assert.match(charges, /eq\(charges\.isActive, true\)/, 'Public charges must filter inactive rows');
 assert.doesNotMatch(charges, /db\.(insert|update|delete)/, 'Public charges endpoint must remain read-only');
+assert.match(charges, /amount:\s*charges\.rate/, 'Public charges must map rate to the Mini App amount field');
+assert.match(charges, /value:\s*charges\.rate/, 'Public charges must map rate to the Mini App value field');
+assert.match(charges, /schedules,/, 'Public charges must expose decoded schedule metadata to the Shopfront');
+assert.match(charges, /isDefault,/, 'Public charges must expose the configured default-charge flag');
+
+const paymentSession = readFileSync('tgcloud/endpoints/createPaymentSession.js', 'utf8');
+assert.match(paymentSession, /existing\?\.status === 'consumed'/, 'Consumed payment sessions must not be reused');
+assert.match(paymentSession, /Number\(existing\.expiresAt\) <= now/, 'Expired payment sessions must be replaced');
+assert.match(paymentSession, /PAYMENT_SESSION_CONSUMED/, 'Consumed sessions must direct retries to idempotent order recovery');
+assert.match(paymentSession, /const saved = await db\.get/, 'Payment session creation must verify persistence');
+assert.match(paymentSession, /PAYMENT_SESSION_CREATE_FAILED/, 'Invalid session persistence must fail explicitly');
+const checkoutUi = readFileSync('app/components/checkout-modal.tsx', 'utf8');
+assert.match(checkoutUi, /PAYMENT_SESSION_CONSUMED/, 'Checkout must recognize consumed-session recovery');
+assert.match(checkoutUi, /operationKey, resume: true/, 'Consumed-session retry must resume the same idempotent order');
 
 console.log('Telegram Serverless contracts OK: ' + requiredTables.length + ' tables, ' + requiredEndpoints.length + ' endpoint modules, public-field safeguards.');
 

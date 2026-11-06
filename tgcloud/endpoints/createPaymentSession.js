@@ -3,7 +3,7 @@ import { customers } from '../schema.js';
 import { eq } from 'sdk/db';
 
 const text = (value, max = 500) => String(value ?? '').trim().slice(0, max);
-const id = (value, prefix) => prefix + '-' + text(value, 80).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+const id = (value, prefix) => prefix + '-' + text(value, 120).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 96);
 
 export default async function (input, ctx) {
   const telegramId = ctx?.initData?.user?.id == null ? '' : String(ctx.initData.user.id);
@@ -24,8 +24,21 @@ export default async function (input, ctx) {
   const paymentMethodId = text(input?.paymentMethodId, 120);
   const operationKey = text(input?.operationKey, 128);
   if (!request || !paymentMethodId || !operationKey) throw new EndpointError('Checkout details and payment method are required.', { code: 'INVALID_INPUT' });
-  const sessionId = id(operationKey, 'payment-session');
   const now = Math.floor(Date.now() / 1000);
+  // Keep the operation key as the stable session ID. A consumed session means
+  // createOrder already accepted this attempt; never mint another proof session
+  // under the same key because that would conflict with its immutable snapshot.
+  const baseSessionId = id(operationKey, 'payment-session');
+  const existing = await db.get('SELECT customer_id AS customerId, status, expires_at AS expiresAt FROM payment_sessions WHERE id=:id', { ':id': baseSessionId });
+  if (existing && String(existing.customerId) !== String(customer.id)) {
+    throw new EndpointError('This checkout key is already in use. Refresh checkout and try again.', { code: 'CHECKOUT_KEY_CONFLICT' });
+  }
+  if (existing?.status === 'consumed') {
+    throw new EndpointError('This order was already submitted or is being recovered. Retry order recovery instead of submitting again.', { code: 'PAYMENT_SESSION_CONSUMED' });
+  }
+  const sessionId = existing && Number(existing.expiresAt) <= now
+    ? id(operationKey + '-' + now.toString(36) + '-' + crypto.randomUUID(), 'payment-session')
+    : baseSessionId;
   const expiresAt = now + 60 * 60;
   await db.run(`INSERT INTO payment_sessions (id,customer_id,request_snapshot,payment_method_id,status,expires_at,created_at,updated_at)
     VALUES (:id,:customer_id,json(:request),:method,'awaiting_proof',:expires_at,unixepoch(),unixepoch())
@@ -33,5 +46,9 @@ export default async function (input, ctx) {
     WHERE payment_sessions.customer_id=:customer_id AND payment_sessions.status <> 'consumed'`, {
     ':id': sessionId, ':customer_id': String(customer.id), ':request': JSON.stringify(request), ':method': paymentMethodId, ':expires_at': expiresAt,
   });
-  return { success: true, paymentSessionId: sessionId, expiresAt: new Date(expiresAt * 1000).toISOString(), status: 'awaiting_proof' };
+  const saved = await db.get('SELECT customer_id AS customerId, status, expires_at AS expiresAt FROM payment_sessions WHERE id=:id', { ':id': sessionId });
+  if (!saved || String(saved.customerId) !== String(customer.id) || saved.status === 'consumed') {
+    throw new EndpointError('A fresh payment session could not be started. Retry checkout.', { code: 'PAYMENT_SESSION_CREATE_FAILED' });
+  }
+  return { success: true, paymentSessionId: sessionId, expiresAt: new Date(Number(saved.expiresAt) * 1000).toISOString(), status: saved.status };
 }

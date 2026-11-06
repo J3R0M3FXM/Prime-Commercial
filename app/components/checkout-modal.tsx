@@ -1334,14 +1334,25 @@ export default function CheckoutModal({
       if (hasTelegramServerlessBridge()) {
         const operationKey = getOrCreateServerlessCheckoutKey(String(tgCustomer.id));
         activeOperationKey = operationKey;
-        const paymentSession = await createPaymentSession(orderData, String(selectedPaymentMethod.id), operationKey);
-        if (!paymentSession?.success || !paymentSession.paymentSessionId) throw new Error("We couldn't start the payment session. Please try again.");
-        await uploadPaymentProofDataUrl(uploadedProofImage, paymentSession.paymentSessionId, "image/jpeg", ocrAnalysis);
-        orderResult = await callServerless<any>("createOrder", {
-          ...orderData,
-          paymentSessionId: paymentSession.paymentSessionId,
-          operationKey,
-        }, 60_000);
+        let paymentSession: Awaited<ReturnType<typeof createPaymentSession>> | null = null;
+        try {
+          paymentSession = await createPaymentSession(orderData, String(selectedPaymentMethod.id), operationKey);
+        } catch (sessionError: any) {
+          // A consumed payment session means the prior createOrder may have
+          // committed while its response was lost. Recover by idempotency key;
+          // never create a second order attempt or replace its proof snapshot.
+          if (sessionError?.code !== "PAYMENT_SESSION_CONSUMED") throw sessionError;
+          orderResult = await callServerless<any>("createOrder", { operationKey, resume: true }, 60_000);
+        }
+        if (!orderResult) {
+          if (!paymentSession?.success || !paymentSession.paymentSessionId) throw new Error("We couldn't start the payment session. Please try again.");
+          await uploadPaymentProofDataUrl(uploadedProofImage, paymentSession.paymentSessionId, "image/jpeg", ocrAnalysis);
+          orderResult = await callServerless<any>("createOrder", {
+            ...orderData,
+            paymentSessionId: paymentSession.paymentSessionId,
+            operationKey,
+          }, 60_000);
+        }
         if (!orderResult || orderResult.success === false) {
           throw new Error(orderResult?.error || "We couldn't submit your order. Please try again.");
         }
