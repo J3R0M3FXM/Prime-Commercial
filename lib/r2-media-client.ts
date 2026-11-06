@@ -6,7 +6,9 @@ export type R2Video = {
   createdAt: string; storageType: 'r2';
 };
 
-const origin = String(import.meta.env.VITE_R2_MEDIA_ORIGIN || '').trim().replace(/\/$/, '');
+// Use the publicly verified Pages gateway by default. It forwards to the private
+// R2 Worker through a service binding; do not point the Mini App at workers.dev.
+const origin = String(import.meta.env.VITE_R2_MEDIA_ORIGIN || 'https://prime-media-gateway.pages.dev').trim().replace(/\/$/, '');
 const maxBytes = 150 * 1024 * 1024;
 const uploadPrefix = 'prime_r2_upload_v1:';
 

@@ -1,8 +1,8 @@
 # Prime Media R2 pilot
 
-The private R2 Worker and exact-origin bucket CORS were configured on 2026-11-04. **The Mini App R2 integration remains preview only; TGCloud live was not changed.** The existing Telegram Media Gallery remains the live path. Worker URL: `https://prime-media-preview.jerome-businessplatform.workers.dev`.
+The private R2 Worker, exact-origin bucket CORS, and Pages gateway are configured. The production Mini App uses `https://prime-media-gateway.pages.dev`; the gateway forwards to the private Worker through a Cloudflare service binding. Do not point the Mini App directly at `workers.dev`.
 
-The account key was used only to configure Cloudflare. Worker signing uses a new key scoped to `prime-media-preview`; its only local copy is `/data/data/com.termux/files/home/.config/prime-commercial/prime-media-preview-secrets.json` (mode 600). No secret belongs in this repository. Termux cannot establish TCP connections to `workers.dev` from the current network, so real Worker runtime and device playback still need verification before Mini App release.
+The account key was used only to configure Cloudflare. Worker signing uses a key scoped to `prime-media-preview`; secrets remain outside this repository. The public Pages gateway was verified from this environment: `/videos` returns HTTP 200 and the live-origin CORS preflight returns 204. Authenticated upload, playback, and Android behavior still require a real Telegram-device check.
 
 ## Cloudflare account setup (completed; retain for recovery)
 
@@ -11,13 +11,13 @@ The account key was used only to configure Cloudflare. Worker signing uses a new
 3. Create a Worker named `prime-media-preview` and bind the bucket as `MEDIA_BUCKET`. `wrangler.jsonc` describes that binding. This was deployed through the Cloudflare API because Termux Android ARM64 cannot install Cloudflare's `workerd` binary.
 4. Set Worker secrets `TELEGRAM_BOT_TOKEN` (the same bot that launches the Mini App), `ADMIN_TELEGRAM_IDS` (comma-separated Telegram IDs permitted to manage videos), and `STREAM_SIGNING_KEY` (a fresh random secret of at least 32 bytes). Set Worker variables `CLOUDFLARE_ACCOUNT_ID` and `ALLOWED_ORIGINS` (comma-separated **exact** Mini App origins). The current TGCloud origin is `https://app8830494959.tgcloud.ai`; add only preview origins actually used for testing. Keep all token values out of Git.
 5. Bucket CORS currently permits the live TGCloud origin and local port 4193 preview origin. `PUT`, `Content-Type`, and exposed `ETag` are required for browser multipart uploads. The Worker separately checks `ALLOWED_ORIGINS` for its API.
-6. The retained preview was built with `VITE_R2_MEDIA_ORIGIN=https://prime-media-preview.jerome-businessplatform.workers.dev` and `VITE_UI_PREVIEW=1`. This public origin is not a secret. The R2 option appears in Admin Media Gallery only when this variable is set. Existing Telegram videos remain available.
+6. The Mini App client defaults to the verified Pages gateway (`https://prime-media-gateway.pages.dev`). `VITE_R2_MEDIA_ORIGIN` may override it for a controlled test build. Existing Telegram videos remain available alongside R2 videos.
 
 ## Pilot check before release
 
 - Open the preview from a real verified Telegram Admin session. Upload a disposable MP4; the browser sends 10 MiB parts directly to R2, keeps completed part ETags locally for retry, and checks the final object size before creating a draft gallery entry.
 - Publish the draft, play it from a real Telegram customer account, seek forward to exercise HTTP range, then unpublish and confirm the customer cannot obtain a fresh playback grant. A video link is a ten-minute bearer URL and should not be shared.
 - Confirm the Worker logs, bucket object, catalog record, CORS response, and actual Android playback. Delete the disposable video after testing.
-- Owner authorized TGCloud deployment once setup is complete. First verify Worker reachability and authentic Telegram upload/playback, then review and promote a scoped production build. Do not enable preview mode in the live build.
+- The gateway is reachable and the Admin/customer R2 code paths are integrated. Owner authorized deployment. Do not enable preview mode in the live build. A real authenticated upload and customer playback/range test remains a post-release device check; do not claim that behavior is device-verified until performed.
 
 Local checks: `node cloudflare/prime-media/test-worker.mjs` after `node_modules/.bin/rolldown cloudflare/prime-media/src/index.mjs --platform browser --format esm --file cloudflare/prime-media/dist/worker.mjs`. The test uses a fake R2 bucket and generated local Telegram initData; it does not prove Cloudflare account or device behavior.
