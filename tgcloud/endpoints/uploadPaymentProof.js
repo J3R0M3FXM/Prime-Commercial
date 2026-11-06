@@ -15,6 +15,9 @@ export default async function (input, ctx) {
   if (!session || String(session.customerId) !== String(customer.id) || session.status === 'consumed' || Number(session.expiresAt) <= Math.floor(Date.now() / 1000))
     throw new EndpointError('This payment session expired. Start checkout again.', { code: 'PAYMENT_SESSION_EXPIRED' });
   const ocrAnalysis = input?.ocrAnalysis && typeof input.ocrAnalysis === 'object' ? input.ocrAnalysis : null;
-  await db.run(`UPDATE payment_sessions SET proof_data=:data, proof_content_type=:type, proof_ocr_analysis=json(:analysis), status='proof_uploaded', updated_at=unixepoch() WHERE id=:id AND customer_id=:customer_id AND status <> 'consumed'`, { ':data': data, ':type': contentType, ':analysis': JSON.stringify(ocrAnalysis), ':id': sessionId, ':customer_id': String(customer.id) });
+  const updated = await db.run(`UPDATE payment_sessions SET proof_data=:data, proof_content_type=:type, proof_ocr_analysis=json(:analysis), status='proof_uploaded', updated_at=unixepoch() WHERE id=:id AND customer_id=:customer_id AND status <> 'consumed' AND expires_at > unixepoch() RETURNING id`, { ':data': data, ':type': contentType, ':analysis': JSON.stringify(ocrAnalysis), ':id': sessionId, ':customer_id': String(customer.id) });
+  if (Number(updated?.rowsAffected) < 1) {
+    throw new EndpointError('This payment session is no longer available. Retry checkout to restore your submission.', { code: 'PAYMENT_SESSION_EXPIRED' });
+  }
   return { success: true, paymentSessionId: sessionId, status: 'proof_uploaded' };
 }
