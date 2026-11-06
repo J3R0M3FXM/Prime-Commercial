@@ -13,7 +13,6 @@ export default async function () {
       name: paymentMethods.name,
       logo: paymentMethods.logo,
       paymentType: paymentMethods.paymentType,
-      paymentLinkUrl: paymentMethods.paymentLinkUrl,
       publicKey: paymentMethods.publicKey,
       qrCodeImage: paymentMethods.qrCodeImage,
       walletAddress: paymentMethods.walletAddress,
@@ -27,5 +26,8 @@ export default async function () {
     .orderBy(asc(paymentMethods.sortOrder))
     .all();
 
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    paymentLinkUrl: row.paymentType === 'secured_payment_link' ? String(row.publicKey || '') : '',
+  }));
 }
