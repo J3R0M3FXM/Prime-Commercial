@@ -18,3 +18,9 @@ The production reconstruction audit is maintained in the sibling `Prime-TGCloud-
 - The Maya return screen no longer queries `/api/orders`; it resolves the returning order through `getMyOrders`. The active Vite client now has no legacy `/api/*` request reference outside intentionally archived Next routes.
 - The verified sandbox commit was promoted into this clean checkout for final build and deployment review.
 - No deployment has occurred from this checkout.
+
+## Delivery quote and courier selection — 2026-11-06
+
+- Checkout sent destination coordinates only, but `getDeliveryQuote` required `courierId`, returned one quote, and omitted route-time fields expected by the UI. This produced the screenshot's invalid-destination/courier message and empty courier list.
+- Source commit `298019f` changes the endpoint to delegate to shared `quoteDelivery`, returning all active courier quotes and route estimate fields. Checkout clears stale selections on destination changes and ignores out-of-order responses.
+- Contract checks and `npm run build:miniapp` pass in the sandbox. Checkout build verification is in progress; source promotion only, not deployed. Linked endpoint inventory/schema drift remains a hard release blocker; no Telegram-device verification occurred.

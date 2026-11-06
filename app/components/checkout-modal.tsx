@@ -309,6 +309,7 @@ export default function CheckoutModal({
   const [isLoadingCouriers, setIsLoadingCouriers] = useState<boolean>(false);
   const [courierFetchError, setCourierFetchError] = useState<string>("");
   const [deliveryPaymentMethod, setDeliveryPaymentMethod] = useState<"upon_checkout" | "upon_delivery" | "">("");
+  const courierQuoteRequestRef = useRef(0);
 
   // Step 4: Admin Charges State
   const [activeCharges, setActiveCharges] = useState<any[]>([]);
@@ -721,6 +722,11 @@ export default function CheckoutModal({
       const newCoords = { lat: item.lat, lon: item.lon };
       setCoords(newCoords);
       setHasSelectedAddress(true);
+      setAvailableCouriers([]);
+      setSelectedCourierId("");
+      setDeliveryPaymentMethod("");
+      setCalculatedDistance(0);
+      setEstimatedTravelMinutes(null);
       fetchCouriersForLocation(newCoords.lat, newCoords.lon);
     }
   };
@@ -750,6 +756,11 @@ export default function CheckoutModal({
     setHasSelectedAddress(true);
     setAddressError("");
     setLocationNotice("");
+    setAvailableCouriers([]);
+    setSelectedCourierId("");
+    setDeliveryPaymentMethod("");
+    setCalculatedDistance(0);
+    setEstimatedTravelMinutes(null);
     reverseGeocode(lat, lon);
     fetchCouriersForLocation(lat, lon);
   };
@@ -837,14 +848,19 @@ export default function CheckoutModal({
 
   // Fetch Couriers & Rates when destination is selected
   const fetchCouriersForLocation = async (lat: number, lon: number) => {
+    const requestId = ++courierQuoteRequestRef.current;
     try {
       setIsLoadingCouriers(true);
       setCourierFetchError("");
+      setAvailableCouriers([]);
+      setCalculatedDistance(0);
+      setEstimatedTravelMinutes(null);
 
       const data = await callServerless<any>("getDeliveryQuote", {
         destinationLat: lat,
         destinationLon: lon,
       }, 20_000);
+      if (requestId !== courierQuoteRequestRef.current) return;
       setCalculatedDistance(data.distanceKm || 0);
       setEstimatedTravelMinutes(Number.isFinite(Number(data.routeTimeMinutes)) ? Number(data.routeTimeMinutes) : null);
       setTrafficEstimateType(String(data.trafficModel || "unavailable"));
@@ -854,12 +870,16 @@ export default function CheckoutModal({
         : data.courier ? [data.courier] : [];
 
       setAvailableCouriers(couriersList);
-      // Do not pre-select any courier
+      if (selectedCourierId && !couriersList.some((courier: any) => String(courier.id) === selectedCourierId)) {
+        setSelectedCourierId("");
+        setDeliveryPaymentMethod("");
+      }
     } catch (err: any) {
+      if (requestId !== courierQuoteRequestRef.current) return;
       console.error("Courier pricing error:", err);
       setCourierFetchError(err.message || "Failed to calculate delivery fee.");
     } finally {
-      setIsLoadingCouriers(false);
+      if (requestId === courierQuoteRequestRef.current) setIsLoadingCouriers(false);
     }
   };
 
