@@ -208,8 +208,7 @@ export const couriers = table('couriers', {
   logo: text('logo'), type: text('type').default('Standard'), baseFare: numeric('base_fare').default(0),
   firstMile: numeric('first_mile').default(0), firstMileFee: numeric('first_mile_fee').default(0),
   exceedingKmFee: numeric('exceeding_km_fee').default(0), surcharge: numeric('surcharge').default(0),
-  nightDifferential: numeric('night_differential').default(0),
-  timeBasedFeePerMinute: numeric('time_based_fee_per_minute').default(0), createdAt: createdAt(), updatedAt: updatedAt(),
+  nightDifferential: numeric('night_differential').default(0), createdAt: createdAt(), updatedAt: updatedAt(),
 });
 
 export const videos = table('videos', {
