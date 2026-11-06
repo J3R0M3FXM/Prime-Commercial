@@ -1,26 +1,40 @@
 # Production Reconstruction Audit
 
+## R2 activation release — 2026-11-06
+
+- The live Mini App previously had no R2 origin configured. The app client now defaults to the publicly verified Pages gateway `https://prime-media-gateway.pages.dev`, which forwards to the private `prime-media-preview` Worker through a service binding. It does not expose or connect to `workers.dev` directly.
+- Before release, the public `/videos` route returned HTTP 200 with an empty catalog, and the live TGCloud origin's CORS preflight returned 204. This is a read-only infrastructure check; no R2 object or catalog row was created or changed.
+- Local Worker tests cover Telegram initData auth, signing, privacy and byte-range behavior. Production build embeds the gateway and uses `VITE_UI_PREVIEW=0`; Telegram Serverless contract tests pass. Release revision, asset hashes and device-verification limits are recorded after deployment below.
+- R2 Admin upload and customer playback will be available after the production bundle is released. A real authenticated Telegram upload/playback/range test remains necessary; do not report it as device-verified until performed.
+
 ## Product/payment media and promo audit — 2026-11-06
 
 - Read-only calls against app8830494959 at r406 returned 20 active products with `tgmedia:` primary-image references, six active couriers with logo references, and ten active payment methods with logo references. Nine payment methods are QR-based and have QR-image references. No catalog, courier, payment-method, QR, or promo rows were changed.
-- Four representative media references (product photo, courier logo, payment-provider logo, and QR) returned valid JPEG/PNG bytes through the sandbox media reader. Important boundary: the deployed `getMediaContent.js` still calls Telegram `getFileContent` only; it does not read `media_asset_contents`. The deployed `manageMediaAssets.js` also lacks the `uploadProductImage` / `uploadPublicImage` actions. The sandbox candidate supports inline bytes and those upload actions. Therefore the newly uploaded inline-media path is not live yet; valid old Telegram file IDs may still load, but invalid legacy IDs require the original image to be reattached. Do not claim all catalog images are restored based only on successful candidate-reader probes.
-- Checkout already resolves Telegram-backed logos and QR images for display. The QR Download action was passing the raw `tgmedia:` reference to an anchor; sandbox now resolves it before download and contract coverage checks this path.
+- Four representative media references (product photo, courier logo, payment-provider logo, and QR) returned valid JPEG/PNG bytes through the deployed inline-first reader after r407. Newly uploaded inline media is now supported; any legacy reference with no inline bytes and an invalid Telegram file ID still needs its original image reattached. The samples do not prove every catalog item resolves.
+- Checkout resolves Telegram-backed logos and QR images for display. The QR Download action's raw `tgmedia:` bug was fixed and deployed at r407; actual Telegram tap behavior remains device-unverified.
 - Read-only `getActivePromos` returned four active promos that passed its current start/end-date and global-use-limit filters. `validatePromo` remains authenticated and enforces audience/tier, payment/courier, schedule, minimums, redemption and device-fingerprint rules without writing during validation. Actual eligibility for a customer requires that customer's authenticated context and was not simulated or redeemed.
 - The live-read-only endpoint inventory reports 20 products, six couriers, ten payment methods, and four public active promos as described above; media probes did not mark an order paid or touch customer/order records.
 - The promo/tier test had a stale Silver-to-Bronze example at ₱6,000 despite the current 30-day tier thresholds being Bronze ₱10,000, Gold ₱15,000, Platinum ₱20,000 and Titanium ₱25,000. Updated the test fixture to ₱11,000, retaining its 20% progress assertion. Tier reward rates remain Silver 5%, Bronze 5.5%, Gold 6%, Platinum 6.5%, Titanium 7% (whole points, in complete ₱100 blocks).
-- Contract checks pass and the production Mini App build passes. The promo codec suite passes after correcting that stale fixture. At this audit checkpoint, the QR download change is committed in Sandbox; the three media backend changes are already present in Checkout but not deployed.
+- Contract checks pass and the production Mini App build passes. The promo codec suite passes after correcting that stale fixture. The reviewed QR-download fix and media handlers were promoted and deployed from Checkout at r407, recorded below.
 
 ## TGCloud module/schema parity recheck — 2026-11-06
 
 - Ran the supported read-only `tgcloud fetch` from the clean linked Checkout: app8830494959, revision 406, snapshot updated for 68 modules; webhook remained in sync. This refreshed only TGCloud's snapshot, not working source files.
 - The Checkout source tree contains the same 68 modules (43 endpoints, 3 handlers, 21 libraries, and schema). After fetch, `tgcloud status` reported no added/deleted backend modules—only the three intentional media changes (`getMediaContent.js`, `manageMediaAssets.js`, `lib/media.js`). `tgcloud diff tgcloud/schema.js` returned no changes. This resolves the previously documented 61-vs-43/module-category mismatch and old dirty-schema blocker; the prior count was stale and should no longer block a scoped media release.
-- Static build files are a separate expected diff. No `tgcloud pull`, schema migration, module deletion, or live database write was performed. The only remaining release delta is the reviewed media backend repair plus the QR-download UI fix; deploy those narrowly from a committed, built Checkout and verify revision/assets afterward.
+- Static build files are a separate expected diff. No `tgcloud pull`, schema migration, module deletion, or live database write was performed. The scoped r407 media release is complete; the initial parity gate is cleared.
+
+## Media and QR release — r407 — 2026-11-06
+
+- Sandbox review commits: `7aa6855` (QR download resolver/regression checks), `7b43aba` (media/promo handoff), `fbee889` (fresh module/schema parity). Promoted into Checkout commit `b80830d` and deployed only `tgcloud/lib/media.js`, `tgcloud/endpoints/getMediaContent.js`, `tgcloud/endpoints/manageMediaAssets.js`, and `dist/` (7 files, 1004.9 KB).
+- TGCloud reports revision 407, webhook in sync, working directory clean, and static up to date (51 files). All three backend target diffs are clean. Live HTML references `/assets/index-DR9jB5HA.js` and `/assets/index-DNrG5qZe.css`; fetched JS SHA-256 `307bbc5094f9c6635f79e0319324b49c5853000c9ed75c1aea8e585a8e85a830` and CSS SHA-256 `223097d126b6bfb7d2034fd84270247b8feec75f1ffffe8525cf84bae75d7d21` match Checkout build files. Production bundle contains QR download/resolver, no preview fixture markers.
+- Four post-deploy, read-only media calls succeeded: product JPEG 75,975 bytes; courier-logo JPEG 18,016 bytes; payment-logo PNG 150,993 bytes; QR JPEG 124,530 bytes. No live media upload or config edit was performed. This confirms those samples only; any legacy `tgmedia:` record with neither stored inline bytes nor a valid Telegram file ID still needs its original image reattached.
+- Four public promos remain configured and no promo/order/payment/customer rows were changed. The customer-visible Telegram rendering and an actual QR Download tap remain device-unverified.
 
 ## Latest live update — 2026-11-06
 
 - The delivery checkout incident fix has been deployed from the clean production checkout to app8830494959 at TGCloud revision 400. Scope was `tgcloud/endpoints/getDeliveryQuote.js` plus the production `dist/`; no schema or unrelated backend modules were deployed.
 - Live HTML references `index-gxU3U0s4.js` / `index-DNrG5qZe.css`, and fetched assets matched the built files byte-for-byte. Customer-device verification of courier loading and Continue is still pending.
-- The unrelated endpoint inventory/schema mismatch remains unresolved and blocks future releases; it was not resolved by this scoped incident deployment.
+- At the r400 incident release, the later r406 endpoint/schema reconciliation and r407 media release had not yet happened; see their entries above.
 
 ## Secretary repeat-welcome fix — 2026-11-06
 
@@ -53,7 +67,7 @@ The production reconstruction audit is maintained in the sibling `Prime-TGCloud-
 - UI collision: `index.html` loaded the stale `prime-header-override-r325.css`, while `app/globals.css` applied later Lato-based root selectors after the new MiSans/Roboto rules. The stale link/file was removed, the Vite entry no longer bundles Lato, and one final shared typography/header layer now enforces the approved typography and non-cropped `prime-global-header.jpg` on both Shopfront and Admin.
 - Generic repeated Picsum fallback was replaced with an explicit local unavailable-image illustration in Shopfront, product modal, cart, checkout, and order history.
 - Verification: `node scripts/check-telegram-serverless-contracts.mjs`, JavaScript syntax checks, and `git diff --check` pass. `npm run build:miniapp` succeeds (2,367 modules transformed); Vite reports existing non-fatal configuration/module-directive/large-chunk warnings. Existing live product photo bytes have not been recovered or reattached. If an old media row has no inline byte record and its Telegram file ID is invalid, the correct original product image must be re-uploaded; no unrelated local image has been assigned.
-- Release remains blocked: linked TGCloud status reports app `app8830494959`, revision 393, webhook in sync, 244 static files up to date, and a modified `tgcloud/schema.js`. The linked backend has 61 top-level endpoint modules versus 43 in this sandbox, with 18 linked-only names. No deployment or live catalog mutation has occurred. No browser/device visual verification has occurred.
+- Historical r393 note, superseded by the fresh r406 module/schema reconciliation and r407 media release above: it recorded a stale 61-vs-43 count and dirty schema. No bulk module deletion was performed. Device visual verification remains outstanding.
 
 ## Delivery quote and courier selection — 2026-11-06
 
