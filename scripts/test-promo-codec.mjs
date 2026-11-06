@@ -63,7 +63,7 @@ assert.equal(calculatePromoDiscount({ discountType: 'coins_cashback', cashbackPe
 
 const now = new Date('2026-10-17T00:00:00.000Z');
 assert.equal(calculateCustomerTier([], now).tier, 'Silver', 'Tier defaults must remain Silver for customers without completed orders');
-const tier = calculateCustomerTier([{ status: 'delivered', subtotal: 6000, createdAt: new Date('2026-10-10T00:00:00.000Z') }], now);
+const tier = calculateCustomerTier([{ status: 'delivered', subtotal: 11000, createdAt: new Date('2026-10-10T00:00:00.000Z') }], now);
 assert.equal(tier.tier, 'Bronze', 'Tier calculation must apply the current 30-day spending cycle');
 assert.equal(tier.progressPercent, 20, 'Tier progress must reflect spending toward the next tier');
 const trusted = resolveTrustedFingerprint({ fingerprints: [{ deviceId: 'device-1', hardwareId: 'hardware-1', deviceFingerprintId: 'fp-1', sessionToken: 'session-1' }] }, { hardwareId: 'hardware-1' });

@@ -1,5 +1,15 @@
 # Production Reconstruction Audit
 
+## Product/payment media and promo audit — 2026-11-06
+
+- Read-only calls against app8830494959 at r406 returned 20 active products with `tgmedia:` primary-image references, six active couriers with logo references, and ten active payment methods with logo references. Nine payment methods are QR-based and have QR-image references. No catalog, courier, payment-method, QR, or promo rows were changed.
+- Four representative media references (product photo, courier logo, payment-provider logo, and QR) returned valid JPEG/PNG bytes through the sandbox media reader. Important boundary: the deployed `getMediaContent.js` still calls Telegram `getFileContent` only; it does not read `media_asset_contents`. The deployed `manageMediaAssets.js` also lacks the `uploadProductImage` / `uploadPublicImage` actions. The sandbox candidate supports inline bytes and those upload actions. Therefore the newly uploaded inline-media path is not live yet; valid old Telegram file IDs may still load, but invalid legacy IDs require the original image to be reattached. Do not claim all catalog images are restored based only on successful candidate-reader probes.
+- Checkout already resolves Telegram-backed logos and QR images for display. The QR Download action was passing the raw `tgmedia:` reference to an anchor; sandbox now resolves it before download and contract coverage checks this path.
+- Read-only `getActivePromos` returned four active promos that passed its current start/end-date and global-use-limit filters. `validatePromo` remains authenticated and enforces audience/tier, payment/courier, schedule, minimums, redemption and device-fingerprint rules without writing during validation. Actual eligibility for a customer requires that customer's authenticated context and was not simulated or redeemed.
+- The live-read-only endpoint inventory reports 20 products, six couriers, ten payment methods, and four public active promos as described above; media probes did not mark an order paid or touch customer/order records.
+- The promo/tier test had a stale Silver-to-Bronze example at ₱6,000 despite the current 30-day tier thresholds being Bronze ₱10,000, Gold ₱15,000, Platinum ₱20,000 and Titanium ₱25,000. Updated the test fixture to ₱11,000, retaining its 20% progress assertion. Tier reward rates remain Silver 5%, Bronze 5.5%, Gold 6%, Platinum 6.5%, Titanium 7% (whole points, in complete ₱100 blocks).
+- Contract checks pass and the production Mini App build passes. The promo codec suite passes after correcting that stale fixture. These changes remain in Sandbox only; no deploy was attempted because the documented local/live endpoint inventory mismatch is still a release gate.
+
 ## Latest live update — 2026-11-06
 
 - The delivery checkout incident fix has been deployed from the clean production checkout to app8830494959 at TGCloud revision 400. Scope was `tgcloud/endpoints/getDeliveryQuote.js` plus the production `dist/`; no schema or unrelated backend modules were deployed.
