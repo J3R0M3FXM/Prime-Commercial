@@ -1,6 +1,13 @@
 # Production Reconstruction Audit
 
-The production reconstruction audit is maintained in the sibling `Prime-TGCloud-Checkout/docs/PRODUCTION_AUDIT.md`. Read it before modifying this sandbox. The initial audit found a mismatch between locally deleted Serverless handlers and handlers still present in the deployed TGCloud snapshot; no deployment is safe until that mismatch is resolved.
+## TGCloud parity and media release — 2026-11-06
+
+- Read-only `tgcloud fetch` from the clean linked Checkout refreshed app8830494959 at revision 406 with 68 modules; webhook remained in sync. Checkout contains 68 modules (43 endpoints, 3 handlers, 21 libraries, and schema). `tgcloud status` reported no backend modules added or missing—only the three intended media changes (`getMediaContent.js`, `manageMediaAssets.js`, `lib/media.js`). `tgcloud diff tgcloud/schema.js` returned no changes. This supersedes the stale 61-vs-43 count and dirty-schema observation; parity is not a blocker for this scoped release.
+- Read-only live calls returned 20 active products with image references, six couriers with logos, ten payment methods with logos (nine QR-based), and four active promos. Four representative product/courier/payment-logo/QR images returned bytes through the candidate inline-first reader. No business records were changed.
+- Deployed media read/upload handlers lacked inline-byte support and image-upload actions; those three scoped files are prepared for release. Invalid legacy Telegram file IDs without stored bytes still need their original images reattached; no images were fabricated or reassigned.
+- Checkout display already resolves `tgmedia:` QR references, but the Download control passed the raw reference to the browser. This release resolves the media before download. Promo validation stays authenticated/read-only; the tier test fixture was corrected to ₱11,000 for Bronze under the current 30-day ₱10k/₱15k/₱20k/₱25k thresholds. Rates remain 5%–7%.
+
+The production reconstruction audit was started during an earlier endpoint/schema mismatch. The fresh r406 snapshot reconciliation below supersedes that initial hold; retain this audit as the source of current release state.
 
 ## Sandbox progress — 2026-11-06
 
@@ -41,8 +48,7 @@ The production reconstruction audit is maintained in the sibling `Prime-TGCloud-
 ## Live-linked endpoint parity — 2026-11-06
 
 - TGCloud status reports app `app8830494959`, revision 393, webhook synced, static dist 244 files current, and a modified linked `tgcloud/schema.js`.
-- The linked local `schema.js` differs from checkout: it lacks `media_asset_contents` and `inventory_reservations` declarations (and the `blob` import), while linked media/order handlers reference those tables. Do not push schema or depend on a migration until reconciled against the actual cloud database.
-- Endpoint inventory is 43 in checkout vs 61 linked (18 linked-only). The unmatched set includes scheduled notification dispatch/maintenance, active support-ticket routes, legacy Supabase storefront routes, Taggun-capable receipt analysis, old storefront/geocoding/profile/media upload routes, and settings utilities. Several are policy-incompatible or potentially active; they must not be copied/deleted in bulk.
+- Historical note: schema and endpoint inventory appeared mismatched at r393. The fresh r406 snapshot above found 68 matching modules and a clean schema diff; no bulk copy/deletion was performed.
 - Checkout Secretary code uses the bot-send 12-hour throttle and does not suppress on human takeover. The linked handler still calls `recordHumanTakeover`, so that deployed behavior remains out of sync.
 - CLI supports scoped pushes, but the governance gate remains until each unmatched handler and dirty schema are reconciled. No deployment was attempted.
 
@@ -51,7 +57,7 @@ The production reconstruction audit is maintained in the sibling `Prime-TGCloud-
 - The latest customer screenshot showed delivery checkout unable to continue. The previously deployed `getDeliveryQuote` implementation required a courier ID even though the client must first request the available courier list with destination coordinates. This produced the visible “A valid destination and courier are required” error and an empty courier list.
 - Released the committed fix from `Prime-TGCloud-Checkout` with a narrowly scoped `tgcloud push tgcloud/endpoints/getDeliveryQuote.js dist/`. No schema or unrelated backend modules were pushed. TGCloud reports app `app8830494959`, revision 400, webhook in sync, and static up to date (51 files).
 - Live HTML references `index-gxU3U0s4.js` and `index-DNrG5qZe.css`; downloaded live assets match the built assets byte-for-byte (SHA-256 JS `8636ff1adef44c8e04828c9927ad57e38c0b0f77676a474d580344ec3da777c6`; CSS `223097d126b6bfb7d2034fd84270247b8feec75f1ffffe8525cf84bae75d7d21`). The focused Telegram Serverless contract test passed before release.
-- Deployment/build verification is complete, but customer-device verification of courier loading, quote display, and Continue remains outstanding. The unrelated linked-only endpoint and schema mismatch remains a future release gate; this narrowly scoped incident release did not reconcile it.
+- Deployment/build verification is complete, but customer-device verification of courier loading, quote display, and Continue remains outstanding. At r400 the later r406 endpoint/schema parity check had not yet occurred; see the reconciliation above.
 
 ## Secretary repeat-welcome incident release — 2026-11-06
 

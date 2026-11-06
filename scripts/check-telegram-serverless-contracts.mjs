@@ -217,6 +217,10 @@ assert.match(mediaManager, /fileId: 'inline:' \+ id/, 'Inline media references m
 const mediaReader = readFileSync('tgcloud/endpoints/getMediaContent.js', 'utf8');
 assert.match(mediaReader, /mediaAssetContents\)\.where\(eq\(mediaAssetContents\.id, asset\.id\)\)/, 'Media reader must serve locally stored image bytes');
 assert.match(mediaReader, /api\.getFileContent\(asset\.fileId\)/, 'Legacy Telegram-hosted media must remain supported');
+const serverlessClient = readFileSync('lib/telegram-serverless-client.ts', 'utf8');
+assert.match(serverlessClient, /export async function downloadTelegramMedia[\s\S]*resolveTelegramMedia\(reference\)/, 'Media downloads must resolve Telegram-backed references first');
+const checkoutUi = readFileSync('app/components/checkout-modal.tsx', 'utf8');
+assert.match(checkoutUi, /downloadTelegramMedia\(String\(url \|\| ""\), filename\)/, 'Payment QR download must use the media resolver');
 
 const promoCodec = readFileSync('tgcloud/lib/promos.js', 'utf8');
 assert.match(promoCodec, /realDescription/, 'Promo description metadata must preserve the human-readable description');

@@ -52,6 +52,7 @@ import {
   createPaymentSession,
   uploadPaymentProofDataUrl,
   resolveTelegramMedia,
+  downloadTelegramMedia,
   uploadPaymentReceiptDataUrl,
 } from "@/lib/telegram-serverless-client";
 
@@ -3092,13 +3093,11 @@ export default function CheckoutModal({
                   type="button"
                   onClick={() => {
                     const url = zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image;
-                    const filename = `PRIME_QR_${zoomedPaymentMethod.name.replace(/\\s+/g, "_")}.png`;
-                    const link = document.createElement("a");
-                    link.href = url;
-                    link.download = filename;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                    const filename = `PRIME_QR_${String(zoomedPaymentMethod.name || "payment").replace(/[^a-zA-Z0-9_-]+/g, "_")}.png`;
+                    void downloadTelegramMedia(String(url || ""), filename).catch((error) => {
+                      console.error("[PRIME payment QR] Download failed", error);
+                      window.alert("The QR image could not be downloaded. Please try again.");
+                    });
                   }}
 
                   className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-none text-xs font-bold uppercase tracking-wider font-mono transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"

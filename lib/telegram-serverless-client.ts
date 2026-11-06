@@ -226,6 +226,19 @@ export async function resolveTelegramMedia(reference: string): Promise<string> {
   }
 }
 
+/** Download a public media reference only after resolving Telegram-backed assets. */
+export async function downloadTelegramMedia(reference: string, filename: string): Promise<void> {
+  const url = await resolveTelegramMedia(reference);
+  if (!url) throw new Error('This image is not available to download.');
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 /** Load a published Telegram-hosted video through the public gallery media gate. */
 export async function resolveTelegramVideo(videoId: string): Promise<string> {
   const reference = String(videoId || '').trim();
