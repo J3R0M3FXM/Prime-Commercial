@@ -61,6 +61,8 @@ export default function Shopfront() {
   });
   const [publicOrderQueue, setPublicOrderQueue] = useState<PublicOrderQueue | null>(null);
   const queueRequestInFlight = useRef(false);
+  const fixedTopRef = useRef<HTMLDivElement>(null);
+  const fixedTopSpacerRef = useRef<HTMLDivElement>(null);
 
   const { cart, cartCount, addToCart, updateQuantity } = useCart();
 
@@ -68,6 +70,25 @@ export default function Shopfront() {
     if (!authorized) return;
     document.getElementById("mobile-portrait-viewport")?.scrollTo({ top: 0, behavior: "auto" });
   }, [activeTab, authorized]);
+
+  // The header, queue, and shop search are fixed; reserve their measured height
+  // in document flow so the first row of content cannot sit underneath them.
+  useEffect(() => {
+    const fixedTop = fixedTopRef.current;
+    const spacer = fixedTopSpacerRef.current;
+    if (!fixedTop || !spacer) return;
+    const syncSpacer = () => {
+      spacer.style.height = `${Math.ceil(fixedTop.getBoundingClientRect().height)}px`;
+    };
+    syncSpacer();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncSpacer) : null;
+    observer?.observe(fixedTop);
+    window.addEventListener("resize", syncSpacer);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", syncSpacer);
+    };
+  }, [activeTab, isAdmin, authorized]);
 
   const loadCatalog = useCallback(async () => {
     if (import.meta.env.VITE_UI_PREVIEW === "1") {
@@ -310,7 +331,7 @@ export default function Shopfront() {
 
   return (
     <div className="prime-shopfront-shell min-h-screen bg-gray-50 flex flex-col relative pb-20">
-      <div className="prime-shopfront-fixed-top">
+      <div ref={fixedTopRef} className="prime-shopfront-fixed-top">
       {isAdmin && (
         <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-[11px] font-mono shrink-0">
           <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
@@ -367,7 +388,7 @@ export default function Shopfront() {
         </div>
       </div>
       </div>
-      <div aria-hidden="true" className="prime-shopfront-fixed-top-spacer" style={{ "--prime-search-height": activeTab === "shop" ? "45px" : "0px", "--prime-admin-bar-height": isAdmin ? "32px" : "0px" } as React.CSSProperties} />
+      <div ref={fixedTopSpacerRef} aria-hidden="true" className="prime-shopfront-fixed-top-spacer" />
 
       {/* Main Content */}
       <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 px-3 sm:px-3.5 pt-[4.8px] pb-[4.8px] sm:pt-[5.6px] sm:pb-[5.6px] w-full`}>
