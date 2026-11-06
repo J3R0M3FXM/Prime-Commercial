@@ -1,5 +1,11 @@
 # Production Reconstruction Audit
 
+## Latest live update — 2026-11-06
+
+- The delivery checkout incident fix has been deployed from the clean production checkout to app8830494959 at TGCloud revision 400. Scope was `tgcloud/endpoints/getDeliveryQuote.js` plus the production `dist/`; no schema or unrelated backend modules were deployed.
+- Live HTML references `index-gxU3U0s4.js` / `index-DNrG5qZe.css`, and fetched assets matched the built files byte-for-byte. Customer-device verification of courier loading and Continue is still pending.
+- The unrelated endpoint inventory/schema mismatch remains unresolved and blocks future releases; it was not resolved by this scoped incident deployment.
+
 The production reconstruction audit is maintained in the sibling `Prime-TGCloud-Checkout/docs/PRODUCTION_AUDIT.md`. Read it before modifying this sandbox. The initial audit found a mismatch between locally deleted Serverless handlers and handlers still present in the deployed TGCloud snapshot; no deployment is safe until that mismatch is resolved.
 
 ## Sandbox progress — 2026-11-06

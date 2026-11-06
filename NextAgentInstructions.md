@@ -1,5 +1,7 @@
 # Next Agent Instructions
 
+LATEST LIVE INCIDENT UPDATE (2026-11-06): Delivery checkout was blocked because live `getDeliveryQuote` required `courierId` before checkout could request the courier list. The committed fix was promoted from `Prime-TGCloud-Checkout` and deployed narrowly with only that handler and `dist/`. App8830494959 is at TGCloud revision 400; webhook synced; live JS/CSS hashes match the checkout build. Device-level courier selection/Continue remains unverified. Do not repeat the deployment; continue from sandbox and retain the unresolved 18 linked-only endpoint/schema audit as a gate for future releases.
+
 Before acting, read this file, `docs/WORKTREE_GOVERNANCE.md`, `docs/PRODUCTION_AUDIT.md` here, and the production checkout audit. The old `docs/PROJECT_CONTINUATION.md` and `docs/SUPPORT_TICKETS.md` references are absent in these clean checkouts; do not assume their contents. Keep this handoff and audit current after material changes.
 
 All implementation belongs in `Prime-TGCloud-Sandbox`. Promote only reviewed, committed, built, and verified changes into `Prime-TGCloud-Checkout`. Do not deploy from a dirty worktree. The outstanding endpoint-parity mismatch is a hard release blocker until reconciled.
