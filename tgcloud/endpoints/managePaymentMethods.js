@@ -3,7 +3,7 @@ import { asc, eq } from 'sdk/db';
 import { paymentMethods } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
 
-const stringFields = new Set(['name', 'logo', 'paymentType', 'qrCodeImage', 'webhookUrl', 'publicKey', 'secretKey', 'walletAddress', 'accountName', 'accountNumber']);
+const stringFields = new Set(['name', 'logo', 'paymentType', 'qrCodeImage', 'paymentLinkUrl', 'webhookUrl', 'publicKey', 'secretKey', 'walletAddress', 'accountName', 'accountNumber']);
 const writable = new Set([...stringFields, 'sortOrder', 'isActive']);
 
 function normalize(input, creating) {
@@ -17,6 +17,11 @@ function normalize(input, creating) {
       const normalized = value == null ? '' : value.trim();
       if ((key === 'name' || key === 'paymentType') && !normalized) throw new EndpointError(key + ' is required.', { code: 'INVALID_INPUT' });
       if (normalized.length > 4000) throw new EndpointError(key + ' is too long.', { code: 'INVALID_INPUT' });
+      if (key === 'paymentLinkUrl' && normalized) {
+        let parsed;
+        try { parsed = new URL(normalized); } catch { throw new EndpointError('Payment link must be a valid HTTPS URL.', { code: 'INVALID_PAYMENT_LINK' }); }
+        if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) throw new EndpointError('Payment link must be a valid HTTPS URL.', { code: 'INVALID_PAYMENT_LINK' });
+      }
       if (key === 'secretKey' && !normalized) continue; // never erase an existing secret by submitting a blank masked field
       output[key] = normalized;
     } else if (key === 'sortOrder') {

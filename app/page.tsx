@@ -493,7 +493,7 @@ export default function Shopfront() {
           onClose={() => { setIsCheckoutActive(false); setIsCartOpen(false); setActiveTab("shop"); }}
           onCheckoutOpenChange={(open) => {
             setIsCheckoutActive(open);
-            if (open) window.scrollTo({ top: 0, behavior: "auto" });
+            if (open) document.getElementById("mobile-portrait-viewport")?.scrollTo({ top: 0, behavior: "auto" });
           }}
         />
       )}
@@ -532,9 +532,7 @@ export default function Shopfront() {
             setActiveTab("shop");
             setSearchTerm("");
             setSelectedCategory("All");
-            if (typeof window !== "undefined") {
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }
+            document.getElementById("mobile-portrait-viewport")?.scrollTo({ top: 0, behavior: "smooth" });
           }}
           className={`flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors cursor-pointer ${
             activeTab === "shop" ? "text-slate-950 font-normal" : "text-gray-500 hover:text-gray-900 font-light"
