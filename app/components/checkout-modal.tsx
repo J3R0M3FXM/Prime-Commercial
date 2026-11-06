@@ -503,6 +503,7 @@ export default function CheckoutModal({
   // Load payment instructions when the customer reaches the payment step.
   useEffect(() => {
     if (!isOpen || currentStep !== 5) return;
+    setCurrentPaymentPage(0);
     let active = true;
     const fetchPaymentMethods = async () => {
       try {
@@ -2220,12 +2221,21 @@ export default function CheckoutModal({
           {/* ================= STEP 5: PAYMENT & PROOF BEFORE SUBMISSION ================= */}
           {currentStep === 5 && (
             <section className="prime-checkout__payment-section space-y-3 border-t border-slate-200 pt-3">
-              <div className="border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-950">
-                Pay the amount below, then attach your receipt or payment screenshot. The order is created only after the proof is attached.
+              <div className="prime-checkout__notice prime-checkout__notice--info" role="note">
+                <span className="prime-checkout__notice-icon"><Receipt aria-hidden="true" /></span>
+                <div className="min-w-0">
+                  <p className="prime-checkout__notice-title">Keep your payment receipt</p>
+                  <p className="prime-checkout__notice-copy">Please ensure to obtain a copy of the payment receipt. This is required prior to order submission.</p>
+                </div>
               </div>
-              <div className="flex items-center justify-between border-2 border-blue-300 bg-blue-50 px-3 py-3">
-                <span className="font-heading font-bold uppercase text-blue-950">Total Payable Now</span>
-                <span className="font-mono text-xl font-bold text-blue-950">{formatPHP(payableNow)}</span>
+              <div className="prime-checkout__payment-total flex items-center justify-between">
+                <span className="font-heading font-bold uppercase">Total Payable Now</span>
+                <span className="font-mono">{formatPHP(payableNow)}</span>
+              </div>
+
+              <div className="prime-checkout__payment-method-heading">
+                <span>Choose your preferred payment method</span>
+                <span>Select one method below</span>
               </div>
 
               {isLoadingPaymentMethods ? (
@@ -2233,38 +2243,63 @@ export default function CheckoutModal({
                   <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin text-black" />Loading payment options...
                 </div>
               ) : paymentMethodsLoadError ? (
-                <div className="space-y-2 border border-amber-200 bg-amber-50 p-4 text-center text-xs font-mono text-amber-900">
-                  <p>Payment options could not load. Please retry before submitting your order.</p>
-                  <button type="button" onClick={() => setPaymentMethodsReloadKey((key) => key + 1)} className="rounded border border-amber-400 bg-white px-3 py-2 font-heading font-semibold text-amber-950">Retry Payment Options</button>
+                <div className="prime-checkout__notice prime-checkout__notice--warning" role="alert">
+                  <span className="prime-checkout__notice-icon"><AlertTriangle aria-hidden="true" /></span>
+                  <div className="min-w-0">
+                    <p className="prime-checkout__notice-title">Payment methods unavailable</p>
+                    <p className="prime-checkout__notice-copy">Payment options could not load. Retry before submitting your order.</p>
+                    <button type="button" onClick={() => setPaymentMethodsReloadKey((key) => key + 1)} className="prime-checkout__notice-action">Retry payment options</button>
+                  </div>
                 </div>
               ) : paymentMethods.length === 0 ? (
                 <div className="border border-gray-200 bg-gray-50 p-4 text-center text-xs font-mono text-gray-600">No active payment methods are currently configured. Please contact shop support.</div>
               ) : (
                 <>
-                  <div className="prime-payment-grid grid grid-cols-3 gap-2">
-                    {paymentMethods.map((method) => {
-                      const type = String(method.paymentType || method.type || "").toLowerCase();
-                      const selected = selectedPaymentMethod?.id === method.id;
-                      return <div key={method.id} className="flex min-w-0 flex-col items-center gap-1">
-                        <button type="button" onClick={() => {
-                          if (type === "secured_payment_link" || type === "api" || type === "webhook") {
-                            setGatewayMethodPending(method);
-                            setIsGatewayPromptOpen(true);
-                            return;
-                          }
-                          setSelectedPaymentMethod(method);
-                          setUploadedProofImage("");
-                          setOcrAnalysis(null);
-                          setSubmitError("");
-                        }} aria-pressed={selected} className={selectorTileClass(selected)}>
-                          <CheckoutTileLogo reference={String(method.logo || "")} name={method.name} selected={selected} payment />
-                          <span className="sr-only">{method.name}</span>
-                          {type === "qr_code" && <QrCode className="absolute bottom-1 right-1 h-3 w-3 text-slate-500" aria-hidden="true" />}
-                        </button>
-                        <span className={selectorLabelClass}>{method.name}</span>
-                      </div>;
-                    })}
-                  </div>
+                  {(() => {
+                    const itemsPerPage = 9;
+                    const totalPages = Math.ceil(paymentMethods.length / itemsPerPage);
+                    const pageIndex = Math.min(currentPaymentPage, Math.max(0, totalPages - 1));
+                    const slicedMethods = paymentMethods.slice(pageIndex * itemsPerPage, (pageIndex + 1) * itemsPerPage);
+                    return <div className="space-y-2.5">
+                      <div className="relative w-full overflow-hidden p-0.5 select-none" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={() => handleTouchEnd(totalPages)}>
+                        <div key={pageIndex} className={`prime-payment-grid prime-payment-grid--page prime-payment-grid--${paymentPageDirection === 1 ? "next" : "previous"} grid grid-cols-3 gap-1.5 sm:gap-2`}>
+                          {slicedMethods.map((method) => {
+                            const type = String(method.paymentType || method.type || "").toLowerCase();
+                            const selected = selectedPaymentMethod?.id === method.id;
+                            const qr = method.qrCodeImage || method.qrCode || method.qrImage || method.qr_code_image || "";
+                            return <div key={method.id} className="flex min-w-0 flex-col items-center gap-1">
+                              <button type="button" onClick={() => {
+                                if (type === "secured_payment_link" || type === "api" || type === "webhook") {
+                                  setGatewayMethodPending(method);
+                                  setIsGatewayPromptOpen(true);
+                                  return;
+                                }
+                                setSelectedPaymentMethod(method);
+                                setUploadedProofImage("");
+                                setOcrAnalysis(null);
+                                setSubmitError("");
+                                if (type.includes("qr") && qr) {
+                                  setZoomedPaymentMethod(method);
+                                  setIsPaymentQrModalOpen(true);
+                                }
+                              }} aria-pressed={selected} className={selectorTileClass(selected)} title={method.name}>
+                                <CheckoutTileLogo reference={String(method.logo || "")} name={method.name} selected={selected} payment />
+                                {type.includes("qr") && <QrCode className="absolute bottom-1 right-1 h-3 w-3 text-slate-500" aria-hidden="true" />}
+                              </button>
+                              <span className={selectorLabelClass}>{method.name}</span>
+                            </div>;
+                          })}
+                        </div>
+                      </div>
+                      {totalPages > 1 && <div className="prime-payment-grid__pagination" aria-label="Payment method pages">
+                        {Array.from({ length: totalPages }).map((_, index) => <button key={index} type="button" aria-label={`Show payment methods page ${index + 1}`} aria-current={index === pageIndex ? "page" : undefined} onClick={() => {
+                          if (index === pageIndex) return;
+                          setPaymentPageDirection(index > pageIndex ? 1 : -1);
+                          setCurrentPaymentPage(index);
+                        }} className={index === pageIndex ? "is-active" : ""} />)}
+                      </div>}
+                    </div>;
+                  })()}
 
                   {selectedPaymentMethod && (() => {
                     const type = String(selectedPaymentMethod.paymentType || selectedPaymentMethod.type || "").toLowerCase();
@@ -2298,7 +2333,7 @@ export default function CheckoutModal({
                       </div>}
                       {selectedPaymentMethod.instructions && <p className="break-words font-mono text-slate-600">{selectedPaymentMethod.instructions}</p>}
                       {selectedPaymentMethod.paymentLinkUrl && <SecuredPaymentLink url={selectedPaymentMethod.paymentLinkUrl} />}
-                      {type.includes("qr") && !qr && <p className="border border-amber-300 bg-amber-50 p-2 text-amber-900">No QR image is configured for this method. Choose another method or contact support.</p>}
+                      {type.includes("qr") && !qr && <div className="prime-checkout__notice prime-checkout__notice--warning" role="alert"><span className="prime-checkout__notice-icon"><AlertTriangle aria-hidden="true" /></span><div className="min-w-0"><p className="prime-checkout__notice-title">QR code unavailable</p><p className="prime-checkout__notice-copy">Choose another payment method or contact support.</p></div></div>}
                     </div>;
                   })()}
 
@@ -2314,8 +2349,8 @@ export default function CheckoutModal({
                     {!selectedPaymentMethod?.id ? "Select Payment Method First" : uploadedProofImage ? "Replace Payment Proof" : "Attach Payment Proof"}
                   </button>
                   {isAnalyzingReceipt && <p className="text-center text-[11px] font-mono text-slate-600">Analyzing proof image…</p>}
-                  {uploadedProofImage && !isAnalyzingReceipt && <p className="border border-emerald-200 bg-emerald-50 p-2 text-center text-[11px] font-mono text-emerald-800">Payment proof attached. You can now submit the order for staff review.</p>}
-                  {ocrError && <p className="border border-red-200 bg-red-50 p-2 text-[11px] font-mono text-red-700">{ocrError}</p>}
+                  {uploadedProofImage && !isAnalyzingReceipt && <div className="prime-checkout__notice prime-checkout__notice--success" role="status"><span className="prime-checkout__notice-icon"><CheckCircle2 aria-hidden="true" /></span><div className="min-w-0"><p className="prime-checkout__notice-title">Receipt attached</p><p className="prime-checkout__notice-copy">You can submit the order for staff review.</p></div></div>}
+                  {ocrError && <div className="prime-checkout__notice prime-checkout__notice--warning" role="alert"><span className="prime-checkout__notice-icon"><AlertTriangle aria-hidden="true" /></span><div className="min-w-0"><p className="prime-checkout__notice-title">Receipt scan needs attention</p><p className="prime-checkout__notice-copy">{ocrError}</p></div></div>}
                 </>
               )}
             </section>
@@ -2355,18 +2390,15 @@ export default function CheckoutModal({
 
               {/* Proof is already stored before this confirmation is reachable. */}
               {true ? (
-                <div className="border-t border-gray-200 pt-3">
-                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-none text-center space-y-1.5 w-full">
-                    <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
-                      <CheckCircle2 className="w-6 h-6" />
+                <div>
+                  <div className="prime-checkout__notice prime-checkout__notice--success prime-checkout__notice--order" role="status">
+                    <span className="prime-checkout__notice-icon"><CheckCircle2 aria-hidden="true" /></span>
+                    <div className="min-w-0">
+                      <p className="prime-checkout__notice-kicker">Order submitted</p>
+                      <h3 className="prime-checkout__notice-title">Payment proof received</h3>
+                      <p className="prime-checkout__notice-copy">Order <span className="font-mono">{completedOrder.orderNumber || completedOrder.id}</span> <span className="mx-1 text-emerald-700">·</span> Payable <span className="font-mono font-semibold">{formatPHP(currentPayableNow)}</span></p>
+                      <p className="prime-checkout__notice-copy mt-1">Staff will review the receipt. Payment is not confirmed until verified.</p>
                     </div>
-                    <h4 className="text-sm font-heading font-bold uppercase tracking-wider text-emerald-950">
-                      Order Submitted — Payment Proof Attached
-                    </h4>
-                    <p className="break-all font-mono text-[11px] text-emerald-900">Order {completedOrder.orderNumber || completedOrder.id} · Payable {formatPHP(currentPayableNow)}</p>
-                    <p className="text-xs font-mono text-emerald-800 leading-relaxed">
-                      Staff will review your receipt. The order is not marked paid until payment is verified.
-                    </p>
                   </div>
                 </div>
               ) : (
