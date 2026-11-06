@@ -1,5 +1,13 @@
 # Production Reconstruction Audit
 
+## R2 production activation — 2026-11-06
+
+- Enabled the R2 media client against `https://prime-media-gateway.pages.dev`, which forwards to the private R2 Worker through the Cloudflare Pages service binding. The Mini App does not call `workers.dev` directly. Source change was reviewed/committed in Sandbox `3013ecd` and promoted to Checkout `57625c9`.
+- Production build passed with `VITE_UI_PREVIEW=0`; the gateway origin is present in the emitted bundle. The local Worker test suite passed in Sandbox (Telegram initData auth, signing, privacy, byte ranges), and Telegram Serverless contract checks passed. The clean Checkout lacked the Worker-local `aws4fetch` dependency, so its repeated Worker test invocation could not run there; no Worker code was changed or deployed.
+- Before and after deployment, `https://prime-media-gateway.pages.dev/videos` returned HTTP 200 with `[]`; live app-origin CORS preflight returned 204. This read-only check indicates the bucket catalog is currently empty. No R2 uploads or deletions were performed.
+- Deployed only `dist/` to `app8830494959`; TGCloud now reports r408, webhook in sync, and 51 static files up to date. Live HTML serves `/assets/index-Dp05_Qw7.js`; downloaded live JS SHA-256 `c132ceceb3a981a46539dabab94142bcddb20cdc1cdadb9ec34e2c745073181d` matches local build and contains the Pages gateway origin. CSS remains `/assets/index-DNrG5qZe.css`.
+- R2 is connected in production, but authentic Telegram Admin upload, customer playback, range seeking, and Android rendering remain to be tested on-device. Existing Telegram gallery media is retained alongside R2; no existing media was migrated.
+
 ## TGCloud parity and media release — 2026-11-06
 
 - Read-only `tgcloud fetch` from the clean linked Checkout refreshed app8830494959 at revision 406 with 68 modules; webhook remained in sync. Checkout contains 68 modules (43 endpoints, 3 handlers, 21 libraries, and schema). `tgcloud status` reported no backend modules added or missing—only the three intended media changes (`getMediaContent.js`, `manageMediaAssets.js`, `lib/media.js`). `tgcloud diff tgcloud/schema.js` returned no changes. This supersedes the stale 61-vs-43 count and dirty-schema observation; parity is not a blocker for this scoped release.
