@@ -1,5 +1,9 @@
 # Production Reconstruction Audit
 
+## Checkout presentation repair promoted — 2026-11-06
+
+- Sandbox commit `d3ba126` was promoted to Checkout `b51dd8b` and deployed static-only at r414. It restores payment-method carousel paging, styles checkout notices/payable total, and corrects global header clock clipping. Build and Serverless contract checks passed. No backend/schema or business data changed. Device visual confirmation remains pending; full release evidence is in Checkout's audit.
+
 ## Screenshot fix promoted to production — 2026-11-06
 
 - Sandbox commit `4effa97` fixes omitted QR/account instructions on the pre-submit payment screen, consolidates order confirmation, and measures the fixed top shell for proper document spacing. Promoted to Checkout `96617ab` and deployed static-only at r413. Build and contracts passed. No payment/order/customer data or backend/schema was changed. Device-level visual verification remains pending; full release record is in the Checkout audit.
