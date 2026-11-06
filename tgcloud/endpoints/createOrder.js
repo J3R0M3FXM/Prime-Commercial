@@ -739,7 +739,13 @@ export default async function (input, ctx) {
         const session = paymentSession;
         if (!session || session.status !== 'proof_uploaded' || Number(session.expiresAt) <= submittedAt)
           throw new EndpointError('Upload payment proof before submitting this order.', { code: 'PAYMENT_PROOF_REQUIRED' });
-        const sessionRequest = session.requestSnapshot && typeof session.requestSnapshot === 'object' ? session.requestSnapshot : {};
+        // SQLite returns request_snapshot as JSON text through the raw db.get
+        // path. Parse it before sanitizing; treating that string as an object
+        // silently discards receiver, address, courier and item fields.
+        const sessionRequest = parseJson(session.requestSnapshot, null);
+        if (!sessionRequest || typeof sessionRequest !== 'object' || Array.isArray(sessionRequest)) {
+          throw new EndpointError('Payment session checkout details could not be read. Please restart checkout.', { code: 'PAYMENT_SESSION_SNAPSHOT_INVALID' });
+        }
         request = { ...sanitizedRequest(sessionRequest), paymentSessionId: request.paymentSessionId,
           paymentMethodId: String(session.paymentMethodId || ''), paymentProofData: String(session.proofData || ''),
           paymentProofContentType: String(session.proofContentType || ''), paymentProofOcrAnalysis: session.proofOcrAnalysis || null };
