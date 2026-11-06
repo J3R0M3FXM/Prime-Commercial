@@ -2,7 +2,7 @@ import { db } from 'sdk';
 import { and, eq } from 'sdk/db';
 import { mediaAssets } from '../schema.js';
 
-const BUCKETS = ['product-images', 'receipt-proofs', 'media-gallery'];
+const BUCKETS = ['product-images', 'receipt-proofs', 'media-gallery', 'courier-logos', 'payment-method-logos', 'payment-qr-codes'];
 
 export function parseStorageReference(reference) {
   if (typeof reference !== 'string' || !reference.trim()) return null;

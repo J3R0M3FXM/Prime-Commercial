@@ -145,10 +145,10 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: 
                       className="h-4 w-4 cursor-pointer accent-slate-900 shrink-0"
                     />
                     <img
-                      src={item.imageUrl || "https://picsum.photos/seed/prime/100"}
+                      src={item.imageUrl || "/product-image-unavailable.svg"}
                       alt={item.name || "Item"}
                       className="h-14 w-14 aspect-square object-cover rounded-lg bg-white border border-gray-200 shrink-0"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = "https://picsum.photos/seed/prime/100"; }}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/product-image-unavailable.svg"; }}
                     />
                   </div>
                   <div className="min-w-0 flex-1 pt-0.5">

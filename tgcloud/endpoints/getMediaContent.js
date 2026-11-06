@@ -1,6 +1,6 @@
 import { api, db, EndpointError } from 'sdk';
 import { and, eq } from 'sdk/db';
-import { customers, mediaAssets, orders, videos } from '../schema.js';
+import { customers, mediaAssetContents, mediaAssets, orders, videos } from '../schema.js';
 import { isAdminUser } from '../lib/auth.js';
 
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -81,7 +81,14 @@ export default async function (input, ctx) {
     throw new EndpointError('This media file exceeds the supported inline transfer size.', { code: 'MEDIA_TOO_LARGE' });
   }
 
-  const content = await api.getFileContent(asset.fileId);
+  const stored = await db.select().from(mediaAssetContents).where(eq(mediaAssetContents.id, asset.id)).get();
+  let content = stored?.bytes || null;
+  if (!content && String(asset.fileId || '').startsWith('inline:')) {
+    const inlineId = String(asset.fileId).slice('inline:'.length);
+    if (inlineId !== String(asset.id)) throw new EndpointError('Media reference is invalid.', { code: 'MEDIA_READ_FAILED' });
+    throw new EndpointError('Media content is unavailable.', { code: 'MEDIA_READ_FAILED' });
+  }
+  if (!content) content = await api.getFileContent(asset.fileId);
   const bytes = await asBytes(content);
   if (bytes.length > 20 * 1024 * 1024 || (Number(asset.size) > 0 && bytes.length !== Number(asset.size))) {
     throw new EndpointError('Media size verification failed.', { code: 'MEDIA_SIZE_MISMATCH' });

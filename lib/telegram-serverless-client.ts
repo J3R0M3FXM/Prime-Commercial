@@ -411,12 +411,29 @@ export async function getServerlessCatalog(options: { resolveMedia?: boolean } =
   const rows = await callServerless<ServerlessProduct[]>('getCatalog', {}, 20_000);
   if (!Array.isArray(rows)) throw new Error('The product catalog response was invalid.');
   const resolveMedia = options.resolveMedia !== false;
+  const safeMedia = async (reference: unknown) => {
+    const raw = String(reference || '').trim();
+    if (!raw) return '';
+    try { return await resolveTelegramMedia(raw); }
+    catch (error) {
+      console.warn('[PRIME media] Catalog image could not be resolved', {
+        reference: raw,
+        reason: error instanceof Error ? error.message : 'Media request failed',
+      });
+      return '';
+    }
+  };
 
   return await Promise.all(rows.map(async (product) => {
-    const variants = await Promise.all((Array.isArray(product.variants) ? product.variants : []).map(async (variant) => ({
+    const sourceVariants = Array.isArray(product.variants)
+      ? product.variants
+      : product.bundleConfig && typeof product.bundleConfig === 'object' && Array.isArray((product.bundleConfig as any).variants)
+        ? (product.bundleConfig as any).variants
+        : [];
+    const variants = await Promise.all(sourceVariants.map(async (variant) => ({
       ...variant,
       imageUrl: resolveMedia
-        ? await resolveTelegramMedia(String(variant.imageUrl || variant.image_url || ''))
+        ? await safeMedia(variant.imageUrl || variant.image_url)
         : String(variant.imageUrl || variant.image_url || ''),
     })));
     const bundleConfig = product.bundleConfig && typeof product.bundleConfig === 'object'
@@ -425,9 +442,9 @@ export async function getServerlessCatalog(options: { resolveMedia?: boolean } =
 
     return {
       ...product,
-      imageUrl: resolveMedia ? await resolveTelegramMedia(String(product.imageUrl || '')) : String(product.imageUrl || ''),
+      imageUrl: resolveMedia ? await safeMedia(product.imageUrl) : String(product.imageUrl || ''),
       gallery: resolveMedia
-        ? await Promise.all((Array.isArray(product.gallery) ? product.gallery : []).map((image) => resolveTelegramMedia(String(image || ''))))
+        ? await Promise.all((Array.isArray(product.gallery) ? product.gallery : []).map((image) => safeMedia(image)))
         : (Array.isArray(product.gallery) ? product.gallery : []),
       variants,
       bundleConfig,

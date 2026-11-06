@@ -1818,7 +1818,7 @@ export default function CheckoutModal({
                       <div key={item.id} className="p-2 flex items-center justify-between gap-3 text-xs">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <img
-                            src={item.imageUrl || "https://picsum.photos/seed/prime/100"}
+                            src={item.imageUrl || "/product-image-unavailable.svg"}
                             alt={displayProductName}
                             className="w-10 h-10 object-cover rounded bg-white border border-gray-200 shrink-0"
                           />

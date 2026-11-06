@@ -8,21 +8,17 @@ import OrderHistoryModal from "./components/order-history-modal";
 import AccountModal from "./components/account-modal";
 import { useCart } from "./components/cart-context";
 import PrimeIdentityHeader from "./components/prime-identity-header";
+import SupportTickets from "./components/support-tickets";
+import PrimeOrderQueue, { type PublicOrderQueue } from "./components/prime-order-queue";
 import PrimePageHeading from "./components/prime-page-heading";
 import SplashScreen from "./components/splash-screen";
 import VideoGalleryModal from "./components/video-gallery-modal";
-import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Bell, Film, Headphones, Info } from "lucide-react";
+import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
 import { callServerless, getServerlessCatalog, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 
-type PublicOrderQueue = {
-  ordersInQueue: number;
-  ordersInProcessing: number;
-  averageReadyMinutes: number | null;
-  trafficFlowStatus: string;
-};
 
 const VISUAL_PREVIEW_PRODUCT = {
   id: "visual-preview-product",
@@ -37,12 +33,6 @@ const VISUAL_PREVIEW_PRODUCT = {
     { id: "large", name: "500g", price: 320, stock: 8, imageUrl: "/preview-variant-500g.svg", tag: "NONE" },
   ],
 };
-
-function isVisualPreviewMode() {
-  return import.meta.env.VITE_UI_PREVIEW === "1"
-    && typeof window !== "undefined"
-    && new URLSearchParams(window.location.search).get("visual-preview") === "1";
-}
 
 export default function Shopfront() {
   const router = useRouter();
@@ -62,7 +52,13 @@ export default function Shopfront() {
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [initialOrderIdFromLink, setInitialOrderIdFromLink] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("shop");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window === "undefined" || import.meta.env?.VITE_UI_PREVIEW !== "1") return "shop";
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("account-preview")) return "account";
+    if (params.has("support-preview")) return "support";
+    return "shop";
+  });
   const [publicOrderQueue, setPublicOrderQueue] = useState<PublicOrderQueue | null>(null);
   const queueRequestInFlight = useRef(false);
 
@@ -74,6 +70,12 @@ export default function Shopfront() {
   }, [activeTab, authorized]);
 
   const loadCatalog = useCallback(async () => {
+    if (import.meta.env.VITE_UI_PREVIEW === "1") {
+      setProducts([VISUAL_PREVIEW_PRODUCT]);
+      setCatalogError("");
+      setCatalogLoading(false);
+      return;
+    }
     setCatalogLoading(true);
     try {
       const latest = await getServerlessCatalog();
@@ -83,9 +85,9 @@ export default function Shopfront() {
         ? latest.find(product => String(product.id) === String(selected.id)) || null
         : null);
     } catch (error) {
-      if (isVisualPreviewMode()) {
+      if (import.meta.env.VITE_UI_PREVIEW === "1") {
         setProducts([VISUAL_PREVIEW_PRODUCT]);
-        setSelectedProduct((current: any) => current || VISUAL_PREVIEW_PRODUCT);
+        setSelectedProduct(null);
         setCatalogError("");
         return;
       }
@@ -117,6 +119,10 @@ export default function Shopfront() {
 
   useEffect(() => {
     if (!authorized) return;
+    if (import.meta.env.VITE_UI_PREVIEW === "1") {
+      setPublicOrderQueue({ ordersInQueue: 3, ordersInProcessing: 2, averageReadyMinutes: 12, trafficFlowStatus: "MODERATE" });
+      return;
+    }
     void loadPublicOrderQueue();
     const interval = window.setInterval(() => { void loadPublicOrderQueue(); }, 15_000);
     return () => window.clearInterval(interval);
@@ -125,6 +131,7 @@ export default function Shopfront() {
   // Refresh the Serverless catalog periodically.
   useEffect(() => {
     if (!authorized) return;
+    if (import.meta.env.VITE_UI_PREVIEW === "1") return;
     let cancelled = false;
     const refreshCatalog = () => {
       if (!cancelled) void loadCatalog();
@@ -138,13 +145,12 @@ export default function Shopfront() {
 
   useEffect(() => {
     async function checkAuth() {
-      const previewMode = isVisualPreviewMode();
+      const previewMode = import.meta.env.VITE_UI_PREVIEW === "1";
       if (previewMode) {
         setAuthorized(true);
         setChecking(false);
         setProducts([VISUAL_PREVIEW_PRODUCT]);
-        setSelectedProduct(VISUAL_PREVIEW_PRODUCT);
-        void loadCatalog().catch(() => undefined);
+        setSelectedProduct(null);
         return;
       }
       const startTime = Date.now();
@@ -274,13 +280,6 @@ export default function Shopfront() {
     p && (selectedCategory === "All" || (p?.category || "General") === selectedCategory) &&
     ((p?.name || "").toLowerCase().includes(searchTerm.toLowerCase()))
   );
-  const hasActiveOrders = Boolean(publicOrderQueue && (
-    publicOrderQueue.ordersInQueue + publicOrderQueue.ordersInProcessing > 0
-  ));
-  const trafficFlowClass = !hasActiveOrders ? "text-slate-500"
-    : publicOrderQueue?.trafficFlowStatus === "LIGHT" ? "text-emerald-700"
-      : publicOrderQueue?.trafficFlowStatus === "MODERATE" ? "text-orange-600"
-        : publicOrderQueue?.trafficFlowStatus === "HEAVY" ? "text-red-700" : "text-slate-500";
 
   if (routingToAdmin) {
     return <SplashScreen title="ADMIN CREDENTIALS VERIFIED" subtitle="ROUTING TO SECURE ADMIN CONSOLE..." />;
@@ -340,20 +339,7 @@ export default function Shopfront() {
           )}
         </PrimeIdentityHeader>
         <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
-        <div aria-label="Live order status" className="grid h-[38.5px] grid-cols-4 border-t border-gray-100 bg-slate-50">
-          <div className="flex min-w-0 flex-col items-center justify-center border-r border-gray-200 px-1">
-            <span className="truncate text-[9.5px] font-bold uppercase leading-3 tracking-wide text-slate-500">On queue</span><strong className="mt-0.5 min-h-4 font-mono text-[13.5px] leading-4 text-slate-900">{publicOrderQueue?.ordersInQueue ?? "—"}</strong>
-          </div>
-          <div className="flex min-w-0 flex-col items-center justify-center border-r border-gray-200 px-1">
-            <span className="truncate text-[9.5px] font-bold uppercase leading-3 tracking-wide text-slate-500">Processing</span><strong className="mt-0.5 min-h-4 font-mono text-[13.5px] leading-4 text-slate-900">{publicOrderQueue?.ordersInProcessing ?? "—"}</strong>
-          </div>
-          <div className="flex min-w-0 flex-col items-center justify-center border-r border-gray-200 px-1">
-            <span className="truncate text-[9.5px] font-bold uppercase leading-3 tracking-wide text-slate-500">Est. wait (mins)</span><strong className="mt-0.5 min-h-4 font-mono text-[13.5px] leading-4 text-slate-900">{!publicOrderQueue ? "Updating" : !hasActiveOrders ? "--" : publicOrderQueue.averageReadyMinutes == null ? "--" : publicOrderQueue.averageReadyMinutes < 1 ? "<1" : publicOrderQueue.averageReadyMinutes}</strong>
-          </div>
-          <div className="flex min-w-0 flex-col items-center justify-center px-1">
-            <span className="truncate text-[9.5px] font-bold uppercase leading-3 tracking-wide text-slate-500">ORDER FLOW</span><strong className={`mt-0.5 min-h-4 truncate font-mono text-[13.5px] font-bold leading-4 ${trafficFlowClass}`}>{!publicOrderQueue ? "Updating" : hasActiveOrders ? publicOrderQueue.trafficFlowStatus : "--"}</strong>
-          </div>
-        </div>
+        <PrimeOrderQueue queue={publicOrderQueue} />
         <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
       </header>
 
@@ -381,7 +367,7 @@ export default function Shopfront() {
         </div>
       </div>
       </div>
-      <div aria-hidden="true" className="prime-shopfront-fixed-top-spacer" style={{ height: `${(activeTab === "shop" ? 115.5 : 76.5) + (isAdmin ? 32 : 0)}px` }} />
+      <div aria-hidden="true" className="prime-shopfront-fixed-top-spacer" style={{ "--prime-search-height": activeTab === "shop" ? "45px" : "0px", "--prime-admin-bar-height": isAdmin ? "32px" : "0px" } as React.CSSProperties} />
 
       {/* Main Content */}
       <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 px-3 sm:px-3.5 pt-[4.8px] pb-[4.8px] sm:pt-[5.6px] sm:pb-[5.6px] w-full`}>
@@ -429,7 +415,7 @@ export default function Shopfront() {
               return (
                 <div
                   key={p.id}
-                  className="bg-white border border-gray-200/60 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all group flex flex-col cursor-pointer active:scale-[0.98]"
+                  className="prime-shopfront-product-card bg-white border border-gray-200/60 rounded-xl overflow-hidden shadow-sm group flex flex-col cursor-pointer"
                   onClick={() => setSelectedProduct(p)}
                   role="button"
                   tabIndex={0}
@@ -441,9 +427,9 @@ export default function Shopfront() {
                 >
                   <div className="relative aspect-square overflow-hidden bg-gray-50 border-b border-gray-100">
                     <img
-                      src={p.imageUrl || "https://picsum.photos/seed/prime/600/600"}
+                      src={p.imageUrl || "/product-image-unavailable.svg"}
                       alt={p.name}
-                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
+                      className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
                     />
                     {p.tag && p.tag !== "NONE" && !isOutOfStock && <span className="absolute left-2 top-2 z-10 max-w-[calc(100%-1rem)] truncate border border-slate-500/40 bg-slate-900/85 px-2 py-1 text-[8px] font-mono font-bold uppercase tracking-wide text-white shadow-sm">{p.tag}</span>}
                     {isOutOfStock && (
@@ -499,28 +485,7 @@ export default function Shopfront() {
         )}
       </main>
 
-      {activeTab === "notifications" && (
-        <div className="w-full bg-white flex justify-center">
-          <section className="prime-page-shell prime-shopfront-info-page w-full max-w-[430px] mx-auto bg-white min-h-[calc(100vh-120px)]">
-          <PrimePageHeading icon={<Bell />} title="NOTIFICATIONS" />
-          <div className="prime-shopfront-info-card">
-            <p className="text-sm font-semibold text-slate-800">Telegram order notifications are enabled.</p>
-            <p className="prime-shopfront-info-card__description">You will receive updates when an order is received, its status changes, payment information is updated, or tracking information is added.</p>
-          </div>
-          </section>
-        </div>
-      )}
-      {activeTab === "support" && (
-        <div className="w-full bg-white flex justify-center">
-          <section className="prime-page-shell prime-shopfront-info-page w-full max-w-[430px] mx-auto bg-white min-h-[calc(100vh-120px)]">
-          <PrimePageHeading icon={<Headphones />} title="SUPPORT" />
-          <div className="prime-shopfront-info-card">
-            <p className="text-sm font-semibold text-slate-800">Need help with an order?</p>
-            <p className="prime-shopfront-info-card__description">Open MY ORDERS to review your purchase details and current order status. Telegram notifications will keep you informed as your order progresses.</p>
-          </div>
-          </section>
-        </div>
-      )}
+      {activeTab === "support" && <SupportTickets />}
 
       {(activeTab === "cart" || isCheckoutActive) && (
         <CartDrawer
@@ -549,6 +514,8 @@ export default function Shopfront() {
         isOpen={true}
         onClose={() => setActiveTab("shop")}
         onSelectOrder={(ord) => {
+          setInitialOrderIdFromLink(String(ord?.id || ord?.order_id || ord?.orderId || ""));
+          setActiveTab("orders");
           setIsAccountOpen(false);
           setIsOrderHistoryOpen(true);
         }}
@@ -557,7 +524,7 @@ export default function Shopfront() {
       {activeTab === "media" && <VideoGalleryModal isOpen onClose={() => setActiveTab("shop")} />}
 
       {/* Fixed Non-Scrolling Bottom Navigation Bar (sitting right above system footer) */}
-      <nav className="fixed bottom-[20px] left-0 right-0 max-w-[430px] mx-auto z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/90 shadow-lg px-0.5 py-1.5 flex items-center justify-between font-['Roboto_Condensed'] select-none">
+      <nav className="prime-shopfront-bottom-nav fixed bottom-[20px] left-0 right-0 max-w-[430px] mx-auto z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/90 shadow-lg px-0.5 py-1.5 flex items-center justify-between font-['Roboto_Condensed'] select-none">
         {/* 1. SHOP */}
         <button
           type="button"
@@ -611,19 +578,7 @@ export default function Shopfront() {
           <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">ORDERS</span>
         </button>
 
-        {/* 4. NOTIFICATIONS */}
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab("notifications");
-          }}
-          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
-        >
-          <Bell className="w-4 h-4 mb-0.5 shrink-0" />
-          <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">NOTIFICATIONS</span>
-        </button>
-
-        {/* 5. MEDIA — CLICKABLE, CONTENT TEMPORARILY LOCKED */}
+        {/* MEDIA — CLICKABLE, CONTENT TEMPORARILY LOCKED */}
         <button
           type="button"
           onClick={() => {
@@ -659,7 +614,9 @@ export default function Shopfront() {
           onClick={() => {
             setActiveTab("support");
           }}
-          className="flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors text-gray-400 hover:text-gray-800 cursor-pointer"
+          className={`flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors cursor-pointer ${
+            activeTab === "support" ? "text-emerald-700 font-normal" : "text-gray-500 hover:text-gray-900 font-light"
+          }`}
         >
           <Headphones className="w-4 h-4 mb-0.5 shrink-0" />
           <span className="text-[9px] uppercase tracking-tighter leading-none font-roboto-condensed-semibold">SUPPORT</span>

@@ -980,8 +980,8 @@ export default function OrderHistoryModal({
                         <div key={idx} className="order-history__item p-2 flex items-center justify-between gap-3 text-xs">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <TelegramMediaImage
-                              src={item.imageUrl || "https://picsum.photos/seed/prime/100"}
-                              fallbackSrc="https://picsum.photos/seed/prime/100"
+                              src={item.imageUrl || "/product-image-unavailable.svg"}
+                              fallbackSrc="/product-image-unavailable.svg"
                               alt={item.name}
                               className="w-10 h-10 object-cover rounded-lg bg-white border border-gray-200 shrink-0"
                             />
