@@ -708,18 +708,33 @@ export default async function (input, ctx) {
     }
     request = operation.requestSnapshot || {};
   } else {
-    request = sanitizedRequest(input);
-    if (request.paymentSessionId) {
-      const session = await db.get('SELECT * FROM payment_sessions WHERE id=:id', { ':id': request.paymentSessionId });
-      if (!session || String(session.customerId) !== String(customer.id) || session.status !== 'proof_uploaded' || Number(session.expiresAt) <= submittedAt)
-        throw new EndpointError('Upload payment proof before submitting this order.', { code: 'PAYMENT_PROOF_REQUIRED' });
-      const sessionRequest = session.requestSnapshot && typeof session.requestSnapshot === 'object' ? session.requestSnapshot : {};
-      request = { ...sanitizedRequest(sessionRequest), paymentSessionId: request.paymentSessionId,
-        paymentMethodId: String(session.paymentMethodId || ''), paymentProofData: String(session.proofData || ''),
-        paymentProofContentType: String(session.proofContentType || ''), paymentProofOcrAnalysis: session.proofOcrAnalysis || null };
+    // Resolve an earlier submission before validating a retry's newly-created
+    // payment session. A lost response can leave the original session consumed;
+    // the checkout operation key remains the durable identity of that order.
+    const prior = await findCheckoutOperation({ customerId: customer.id, requestKey });
+    if (prior.ok) {
+      if (!prior.requestSnapshot) {
+        throw new EndpointError('This checkout attempt has no recovery snapshot. Start a new checkout.', { code: 'OPERATION_SNAPSHOT_MISSING' });
+      }
+      if (prior.status === 'failed') {
+        throw new EndpointError('This checkout attempt could not be completed. Start a new checkout to try again.', { code: 'CHECKOUT_ATTEMPT_FAILED' });
+      }
+      operation = prior;
+      request = prior.requestSnapshot;
+    } else {
+      request = sanitizedRequest(input);
+      if (request.paymentSessionId) {
+        const session = await db.get('SELECT * FROM payment_sessions WHERE id=:id', { ':id': request.paymentSessionId });
+        if (!session || String(session.customerId) !== String(customer.id) || session.status !== 'proof_uploaded' || Number(session.expiresAt) <= submittedAt)
+          throw new EndpointError('Upload payment proof before submitting this order.', { code: 'PAYMENT_PROOF_REQUIRED' });
+        const sessionRequest = session.requestSnapshot && typeof session.requestSnapshot === 'object' ? session.requestSnapshot : {};
+        request = { ...sanitizedRequest(sessionRequest), paymentSessionId: request.paymentSessionId,
+          paymentMethodId: String(session.paymentMethodId || ''), paymentProofData: String(session.proofData || ''),
+          paymentProofContentType: String(session.proofContentType || ''), paymentProofOcrAnalysis: session.proofOcrAnalysis || null };
+      }
+      operation = await beginCheckoutOperation({ customerId: customer.id, requestKey,
+        requestSnapshot: request, expiresAt: submittedAt + 20 * 60, submittedAt });
     }
-    operation = await beginCheckoutOperation({ customerId: customer.id, requestKey,
-      requestSnapshot: request, expiresAt: submittedAt + 20 * 60, submittedAt });
   }
   if (!operation.ok) throw new EndpointError('Checkout retry key is invalid or was reused with different order details.', { code: 'IDEMPOTENCY_CONFLICT' });
   if (operation.status === 'complete' && operation.responseSnapshot) {
