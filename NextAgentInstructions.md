@@ -1,5 +1,7 @@
 # Next Agent Instructions
 
+LATEST LIVE SECRETARY FIX (2026-11-06): Fixed repeat welcome messages by excluding the configured welcome flow from generic message matching (blank message triggers had selected it on every inbound message, bypassing the 12-hour check). Sandbox commit `927de3e`, promoted checkout commit `dd9d9ff`; syntax and contract tests passed. Only `tgcloud/lib/telegram-automation.js` was pushed. App8830494959 is at TGCloud revision 401; webhook synced; static unchanged. Actual customer-chat behavior is still unverified. Correct stale configurator wording “sent after 24 hours” in a later UI build.
+
 LATEST LIVE INCIDENT UPDATE (2026-11-06): Delivery checkout was blocked because live `getDeliveryQuote` required `courierId` before checkout could request the courier list. The committed fix was promoted from `Prime-TGCloud-Checkout` and deployed narrowly with only that handler and `dist/`. App8830494959 is at TGCloud revision 400; webhook synced; live JS/CSS hashes match the checkout build. Device-level courier selection/Continue remains unverified. Do not repeat the deployment; continue from sandbox and retain the unresolved 18 linked-only endpoint/schema audit as a gate for future releases.
 
 Before acting, read this file, `docs/WORKTREE_GOVERNANCE.md`, `docs/PRODUCTION_AUDIT.md` here, and the production checkout audit. The old `docs/PROJECT_CONTINUATION.md` and `docs/SUPPORT_TICKETS.md` references are absent in these clean checkouts; do not assume their contents. Keep this handoff and audit current after material changes.

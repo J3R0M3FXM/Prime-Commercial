@@ -6,6 +6,11 @@
 - Live HTML references `index-gxU3U0s4.js` / `index-DNrG5qZe.css`, and fetched assets matched the built files byte-for-byte. Customer-device verification of courier loading and Continue is still pending.
 - The unrelated endpoint inventory/schema mismatch remains unresolved and blocks future releases; it was not resolved by this scoped incident deployment.
 
+## Secretary repeat-welcome fix — 2026-11-06
+
+- Live revision 401 includes the narrow shared-library fix from sandbox commit `927de3e` / checkout commit `dd9d9ff`: generic message matching now skips the configured welcome flow, preventing its blank trigger from bypassing the 12-hour cooldown. Only `tgcloud/lib/telegram-automation.js` was deployed; static assets were unchanged.
+- Syntax/contract checks passed. Customer-chat behavior still needs real Telegram verification. Secretary configurator wording still says “sent after 24 hours” and is queued for a UI correction.
+
 The production reconstruction audit is maintained in the sibling `Prime-TGCloud-Checkout/docs/PRODUCTION_AUDIT.md`. Read it before modifying this sandbox. The initial audit found a mismatch between locally deleted Serverless handlers and handlers still present in the deployed TGCloud snapshot; no deployment is safe until that mismatch is resolved.
 
 ## Sandbox progress — 2026-11-06
