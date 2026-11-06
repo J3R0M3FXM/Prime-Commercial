@@ -5,6 +5,7 @@ export interface DeliveryRateConfig {
   exceedingKmFee: number;
   surcharge: number;
   nightDifferential: number;
+  timeBasedFeePerMinute: number;
 }
 
 function money(value: unknown): number {
@@ -20,6 +21,7 @@ export function normalizeDeliveryRate(raw: any): DeliveryRateConfig {
     exceedingKmFee: money(raw?.exceedingKmFee ?? raw?.exceeding_km_fee),
     surcharge: money(raw?.surcharge),
     nightDifferential: money(raw?.nightDifferential ?? raw?.night_differential),
+    timeBasedFeePerMinute: money(raw?.timeBasedFeePerMinute ?? raw?.time_based_fee_per_minute),
   };
 }
 
@@ -33,9 +35,10 @@ export function normalizeDeliveryRate(raw: any): DeliveryRateConfig {
  * A zero first-mile threshold means the entire route is charged at the
  * exceeding-km rate.
  */
-export function calculateDeliveryFee(raw: any, distanceKm: number): number {
+export function calculateDeliveryFee(raw: any, distanceKm: number, routeTimeMinutes: number | null = null): number {
   const rate = normalizeDeliveryRate(raw);
   const distance = Math.max(0, Number(distanceKm) || 0);
+  const routeMinutes = Number(routeTimeMinutes);
 
   const includedKm = Math.min(distance, rate.firstMile);
   const excessKm = Math.max(0, distance - rate.firstMile);
@@ -45,9 +48,11 @@ export function calculateDeliveryFee(raw: any, distanceKm: number): number {
     includedKm * rate.firstMileFee +
     excessKm * rate.exceedingKmFee +
     rate.surcharge +
-    rate.nightDifferential;
+    rate.nightDifferential +
+    (Number.isFinite(routeMinutes) && routeMinutes > 0 ? routeMinutes * rate.timeBasedFeePerMinute : 0);
 
-  return Math.round(Math.max(0, fee) * 100) / 100;
+  // Delivery charges are collected in whole PHP; round only the final total.
+  return Math.round(Math.max(0, fee));
 }
 
 export function calculateRoadDistanceFallback(

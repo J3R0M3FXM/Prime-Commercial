@@ -193,6 +193,10 @@ assert.match(deliveryCore, /couriers: computedCouriers/, 'Delivery quote must re
 assert.match(deliveryCore, /routeTimeMinutes/, 'Delivery quote must return the route-time field consumed by checkout');
 assert.match(deliveryCore, /calculateRoadDistanceFallback/, 'Delivery quote must calculate distance server-side');
 assert.match(deliveryCore, /calculateDeliveryFee/, 'Delivery quote must calculate fees server-side');
+assert.match(deliveryCore, /ensureCourierTimeRateColumn/, 'Delivery quote must safely additively provision the time-rate column');
+const manageCouriers = readFileSync('tgcloud/endpoints/manageCouriers.js', 'utf8');
+assert.match(manageCouriers, /timeBasedFeePerMinute/, 'Courier settings must persist the time-based fee');
+assert.match(manageCouriers, /ensureCourierTimeRateColumn/, 'Courier settings must provision the additive time-rate column');
 assert.match(deliveryCore, /eq\(couriers\.isActive, true\)/, 'Delivery quote must use active couriers only');
 assert.doesNotMatch(deliveryQuote, /input\?\.deliveryFee|input\.deliveryFee/, 'Delivery quote must not trust a client-supplied fee');
 assert.doesNotMatch(deliveryQuote, /return \{[^}]*latitude|return \{[^}]*longitude/, 'Delivery quote must not return warehouse coordinates');

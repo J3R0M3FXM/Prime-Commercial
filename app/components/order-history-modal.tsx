@@ -26,7 +26,7 @@ import {
   Info,
   Sliders
 } from "lucide-react";
-import { formatPHP } from "@/lib/currency";
+import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import TelegramMediaImage from "./telegram-media-image";
 import SecuredPaymentLink from "./secured-payment-link";
 import PrimePageHeading from "./prime-page-heading";
@@ -1084,7 +1084,7 @@ export default function OrderHistoryModal({
                       <span className="order-detail-value order-history__charge-amount text-emerald-600">WAIVED / FREE</span>
                     ) : (
                       <span className="order-detail-value order-history__charge-amount text-gray-900">
-                        {formatPHP(selectedOrder.deliveryFee || selectedOrder.courier?.fee || 0)}
+                        {formatPHPWhole(selectedOrder.deliveryFee || selectedOrder.courier?.fee || 0)}
                       </span>
                     )}
                   </div>
@@ -1110,7 +1110,7 @@ export default function OrderHistoryModal({
                       <div className="flex justify-between items-center text-amber-800 bg-amber-50 p-1.5 rounded border border-amber-200">
                         <span className="order-detail-label font-bold">Pay to Courier upon delivery:</span>
                         <span className="order-detail-value">
-                          {formatPHP(selectedOrder.payableOnDelivery ?? selectedOrder.deliveryFee ?? 0)}
+                          {formatPHPWhole(selectedOrder.payableOnDelivery ?? selectedOrder.deliveryFee ?? 0)}
                         </span>
                       </div>
                     </div>

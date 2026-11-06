@@ -2,9 +2,10 @@ import { db, EndpointError } from 'sdk';
 import { asc, eq } from 'sdk/db';
 import { couriers } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
+import { ensureCourierTimeRateColumn } from '../lib/ensure-courier-time-rate.js';
 
 const textFields = new Set(['name', 'trackingUrlPattern', 'logo', 'type']);
-const numericFields = new Set(['baseFare', 'firstMile', 'firstMileFee', 'exceedingKmFee', 'surcharge', 'nightDifferential']);
+const numericFields = new Set(['baseFare', 'firstMile', 'firstMileFee', 'exceedingKmFee', 'surcharge', 'nightDifferential', 'timeBasedFeePerMinute']);
 const writable = new Set([...textFields, ...numericFields, 'isActive', 'sortOrder']);
 
 function normalize(input, creating) {
@@ -48,6 +49,7 @@ function normalize(input, creating) {
 
 export default async function (input, ctx) {
   await requireAdmin(ctx);
+  await ensureCourierTimeRateColumn();
   const action = input?.action;
 
   if (action === 'list') return await db.select().from(couriers).orderBy(asc(couriers.sortOrder)).all();

@@ -3,8 +3,10 @@ import { fetch } from 'sdk/fetch';
 import { asc, desc, eq } from 'sdk/db';
 import { couriers, systemSettings, warehouses } from '../schema.js';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from './delivery-fee.js';
+import { ensureCourierTimeRateColumn } from './ensure-courier-time-rate.js';
 
 export async function quoteDelivery(destinationLatValue, destinationLonValue, courierId = '') {
+  await ensureCourierTimeRateColumn();
   const destinationLat = Number(destinationLatValue);
   const destinationLon = Number(destinationLonValue);
   if (destinationLatValue == null || destinationLonValue == null ||
