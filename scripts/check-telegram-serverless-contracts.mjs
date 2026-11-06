@@ -44,7 +44,8 @@ console.log('Telegram Serverless contracts OK: ' + requiredTables.length + ' tab
 const adminGuard = readFileSync('tgcloud/lib/auth.js', 'utf8');
 assert.match(adminGuard, /ctx\?\.initData\?\.user/, 'Admin guard must use platform-verified initData');
 assert.match(adminGuard, /admin_telegram_user_id/, 'Admin guard must use a server-side allowlist');
-assert.match(adminGuard, /if \(!adminId[\s\S]*userId !== adminId\)/, 'Admin guard must fail closed when allowlist is absent or mismatched');
+assert.match(adminGuard, /configuredAdminIds\(row\?\.value\)/, 'Admin guard must normalize configured admin identities');
+assert.match(adminGuard, /if \(!adminIds\.includes\(userId\)\)/, 'Admin guard must fail closed when an identity is not allowlisted');
 
 const manageCharges = readFileSync('tgcloud/endpoints/manageCharges.js', 'utf8');
 assert.match(manageCharges, /await requireAdmin\(ctx\)/, 'Charge mutations must require admin authorization');
