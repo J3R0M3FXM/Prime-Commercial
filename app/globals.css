@@ -138,7 +138,7 @@
 .prime-admin-app .prime-admin-global-header .prime-identity-header { box-sizing: border-box; min-height: 35px; height: 35px; padding-block: 0; }
 .prime-admin-app .admin-shell { min-height: 0; }
 .prime-admin-app > .admin-shell,
-.prime-admin-app > .serverless-admin-panel { height: 100dvh; min-height: 0; overflow-y: auto; padding-top: 104px; padding-bottom: 34px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.prime-admin-app > .serverless-admin-panel { height: 100dvh; min-height: 0; overflow-y: auto; padding-top: 118px; padding-bottom: 64px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .prime-admin-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 10px 0 14px; }
 .prime-admin-kpis button { display: flex; min-width: 0; min-height: 82px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; border: 1px solid #d7e1ef; border-radius: 9px; background: #fff; padding: 8px; text-align: left; }
 .prime-admin-kpis button > span { color: #60708a; font-size: 11px; line-height: 1.15; }
@@ -2334,15 +2334,15 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   flex: 0 0 35px !important;
 }
 #mobile-portrait-viewport .prime-shopfront-search {
-  position: fixed !important;
-  top: 93px !important;
-  left: 50% !important;
-  width: min(100%, 430px) !important;
-  transform: translateX(-50%) !important;
-  z-index: 59 !important;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  width: 100% !important;
+  transform: none !important;
+  z-index: auto !important;
   flex: 0 0 auto;
 }
-#mobile-portrait-viewport .prime-shopfront-shell > main { padding-top: 141px !important; }
+#mobile-portrait-viewport .prime-shopfront-shell > main { padding-top: 148px !important; }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-page-shell,
 #mobile-portrait-viewport .prime-shopfront-shell .prime-cart,
 #mobile-portrait-viewport .prime-shopfront-shell .prime-order-history,
