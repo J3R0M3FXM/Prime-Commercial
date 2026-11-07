@@ -61,6 +61,7 @@ type ServerlessOrder = {
 };
 
 type RawOrder = Record<string, any>;
+type OrderDetailTab = "overview" | "fulfillment" | "payment" | "evidence";
 
 function field(row: RawOrder, camel: string, snake: string, fallback: any = "") {
   return row[camel] ?? row[snake] ?? fallback;
@@ -217,10 +218,10 @@ function lifecycleInfo(order: ServerlessOrder) {
     tone: "active", title: "With courier",
     message: "The order remains with the courier until delivery is confirmed. Record completion when the customer confirms receipt or staff verifies delivery.",
   };
-  if (status === "pending" && payment === "pending review") return {
+  if (status === "pending" && (payment === "pending review" || (payment === "unpaid" && Boolean(order.paymentProofImage)))) return {
     tone: "review", title: "Payment needs manual review",
     message: order.staffEditVersion > 0
-      ? `The order was edited before payment approval. Check the attached receipt against the provider transaction and the revised amount of ${formatPHP(order.payableNow)}. Approve only if the verified payment covers the amount due; any excess is issued as Store Credits. Approval moves the order to Processing.`
+      ? `The order was edited before payment approval. Verify the provider transaction for the revised amount of ${formatPHP(order.payableNow)}. Do not include any delivery fee payable to the courier. Approval moves the order to Processing.`
       : `Compare the receipt with the provider transaction for ${formatPHP(order.payableNow)} before approving payment. Approval moves the order to Processing.`,
   };
   if (status === "pending" && order.payableNow <= 0) return {
@@ -265,6 +266,7 @@ export default function TelegramServerlessOrdersPanel({
   const [statusFilter, setStatusFilter] = useState("all");
   const [queueFilter, setQueueFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(initialOrderId || null);
+  const [orderDetailTab, setOrderDetailTab] = useState<OrderDetailTab>("overview");
   const [receiptUrl, setReceiptUrl] = useState("");
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptZoom, setReceiptZoom] = useState(1);
@@ -349,6 +351,7 @@ export default function TelegramServerlessOrdersPanel({
     setTrackingUrl("");
     setVerifiedPaidAmount("");
     setReceiptOpen(false);
+    setOrderDetailTab("overview");
   }, [selectedId]);
 
   const selectedOrder = orders.find((order) => order.id === selectedId || order.orderNumber === selectedId) || null;
@@ -493,7 +496,8 @@ export default function TelegramServerlessOrdersPanel({
 
   const payment = selectedOrder?.paymentStatus.toLowerCase() || "";
   const status = selectedOrder?.status.toLowerCase() || "";
-  const canVerifyPayment = Boolean(selectedOrder && status === "pending" && payment === "pending review" && selectedOrder.paymentProofImage);
+  const canVerifyPayment = Boolean(selectedOrder && status === "pending"
+    && ["pending review", "unpaid"].includes(payment) && selectedOrder.paymentProofImage);
   const canApproveZeroDue = Boolean(selectedOrder && status === "pending" && payment === "unpaid"
     && selectedOrder.payableNow <= 0 && !selectedOrder.paymentProofImage);
   const canReady = Boolean(selectedOrder && status === "processing" && payment === "paid"
@@ -532,9 +536,10 @@ export default function TelegramServerlessOrdersPanel({
   const discountsTotal = selectedOrder
     ? selectedOrder.discountAmount + selectedOrder.staffDiscountAmount + selectedOrder.pointsDiscount + selectedOrder.promoShippingSubsidy
     : 0;
-  const stageIndex = status === "completed" || status === "delivered" ? 3
-    : status === "dispatched" ? 2
-    : ["processing", "ready", "packed"].includes(status) ? 1 : 0;
+  const stageIndex = status === "completed" || status === "delivered" ? 4
+    : status === "dispatched" ? 3
+    : ["ready", "packed"].includes(status) ? 2
+    : status === "processing" ? 1 : 0;
 
   return (
     <section className="serverless-admin-panel serverless-orders-panel text-slate-900" aria-label="Telegram Serverless order management">
@@ -562,7 +567,7 @@ export default function TelegramServerlessOrdersPanel({
           </div>
         </header>
 
-        {authorized && <section aria-label="Orders needing staff attention" className="border-b border-slate-200 bg-slate-50 p-2">
+        {authorized && !selectedOrder && <section aria-label="Orders needing staff attention" className="border-b border-slate-200 bg-slate-50 p-2">
           <h2 className="mb-1.5 font-heading text-xs font-bold uppercase tracking-wider text-slate-700">Work queue</h2>
           <div className="grid grid-cols-2 gap-1.5">
             {[
@@ -592,14 +597,52 @@ export default function TelegramServerlessOrdersPanel({
 
         {authorized && selectedOrder && (
           <div className="serverless-record-list serverless-order-detail">
-            <section className={`serverless-order-guidance serverless-order-guidance--${lifecycle?.tone || "waiting"}`}>
-              <div className="serverless-order-guidance__badges"><span>Order status: {selectedOrder.status}</span><span>Payment: {selectedOrder.paymentStatus}</span></div>
-              <strong>{lifecycle?.title}</strong><p>{lifecycle?.message}</p>
+            <section className="prime-order-summary" aria-label="Order summary">
+              <div className="prime-order-summary__top">
+                <div><span>Order total</span><strong>{formatPHP(selectedOrder.totalAmount ?? selectedOrder.subtotal)}</strong></div>
+                <div className="prime-order-summary__badges"><span data-tone={status}>{selectedOrder.status}</span><span data-tone={payment}>{selectedOrder.paymentStatus}</span></div>
+              </div>
+              <div className="prime-order-summary__facts">
+                <div><span>Customer</span><strong>{selectedOrder.customerName || selectedOrder.telegramName || "Customer unavailable"}</strong></div>
+                <div><span>Payment</span><strong>{selectedOrder.paymentMethodName || "Not recorded"}</strong></div>
+                <div><span>Delivery</span><strong>{selectedOrder.courierName || (selectedOrder.deliveryFee > 0 ? "Delivery" : "Pickup / not recorded")}</strong></div>
+              </div>
+              {!canVerifyPayment && !canApproveZeroDue && !canReady && !canDispatch && !canComplete && <p className="prime-order-summary__guidance">{lifecycle?.message}</p>}
             </section>
+            {!["cancelled", "expired"].includes(status) && <div className="prime-order-progress"><ol aria-label="Order progress">
+              {["Placed", "Processing", "Ready", "Dispatched", "Completed"].map((step, index) => {
+                const done = index < stageIndex || (stageIndex === 4 && index === 4);
+                const current = index === stageIndex && stageIndex < 4;
+                return <li key={step} className={done ? "is-done" : current ? "is-current" : ""} aria-current={current ? "step" : undefined}>
+                  <span>{done ? "✓" : index + 1}</span><small>{step}</small>
+                </li>;
+              })}
+            </ol></div>}
+            {["cancelled", "expired"].includes(status) && <div className="prime-order-closed-state">This order is {status}. The normal fulfillment sequence is closed.</div>}
+            {(canVerifyPayment || canApproveZeroDue || canReady || canDispatch || canComplete) && <details open className="serverless-disclosure prime-order-next-action">
+              <summary>{canVerifyPayment ? "NEXT ACTION · verify payment" : canApproveZeroDue ? "NEXT ACTION · confirm payment due" : canReady ? "NEXT ACTION · mark ready" : canDispatch ? "NEXT ACTION · dispatch" : canComplete ? "NEXT ACTION · complete delivery" : "NEXT ACTION"}</summary>
+              <div className="serverless-disclosure__body"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {canVerifyPayment && <div className="space-y-2"><label className="block text-xs text-emerald-900">Exact amount paid to the store<input type="number" min={selectedOrder.payableNow} step="0.01" placeholder={formatPHP(selectedOrder.payableNow)} value={verifiedPaidAmount} onChange={(event) => setVerifiedPaidAmount(event.target.value)} className="mt-1 w-full border px-3 py-2 text-sm" /></label><p className="text-xs text-slate-600">Verify this exact amount in the provider account. Exclude any delivery fee payable to the courier.</p><button type="button" disabled={busyAction !== "" || !verifiedPaidAmount || Math.round(Number(verifiedPaidAmount) * 100) !== Math.round(selectedOrder.payableNow * 100)} onClick={() => void runAction(selectedOrder, "markPaid", { confirmedAmount: verifiedPaidAmount })} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markPaid") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Confirm verified payment</button></div>}
+                {canApproveZeroDue && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "approveZeroDue")} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":approveZeroDue") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Approve zero upfront due · mark Paid</button>}
+                {canReady && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "markReady")} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markReady") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark Ready{selectedOrder.readyCreditDue > 0 ? ` · issue ${formatPHP(selectedOrder.readyCreditDue)} Store Credits` : ""}</button>}
+                {canDispatch && <div className="serverless-order-dispatch"><label htmlFor="order-tracking-url">Live tracking URL <span>Required</span></label><input id="order-tracking-url" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" placeholder="https://courier.example/track/..." value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} /><small>This URL will appear as “Track Location” in the customer’s order details.</small><button type="button" disabled={busyAction !== "" || !/^https:\/\//i.test(trackingUrl.trim())} onClick={() => void runAction(selectedOrder, "dispatch", { trackingUrl: trackingUrl.trim() })} className="px-3 py-2 bg-sky-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":dispatch") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Truck className="inline w-3 h-3 mr-1" />} Save tracking &amp; mark dispatched</button></div>}
+                {canComplete && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "complete")} className="px-3 py-2 bg-indigo-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":complete") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark delivered / completed</button>}
+              </div>
+              {canVerifyPayment && <p className="mt-2 text-xs text-amber-700">Payment approval is recorded only when the provider-confirmed amount matches the payable-to-store total.</p>}
+              {canApproveZeroDue && <p className="mt-2 text-xs text-amber-700">Confirm no upfront amount is due. The order will be marked Paid for processing; any pay-on-delivery amount remains due to the courier.</p>}
+              </div>
+            </details>}
+            <nav className="prime-order-tabs" role="tablist" aria-label="Order details">
+              {(["overview", "fulfillment", "payment", "evidence"] as const).map((tab) => <button key={tab} type="button" role="tab"
+                aria-selected={orderDetailTab === tab} onClick={() => setOrderDetailTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}
+            </nav>
+            <section hidden={orderDetailTab !== "evidence"}>
             {(selectedOrder.reviewStatus === "Flagged for Forensics Review" || (Array.isArray(selectedOrder.ocrAnalysis?.forensicsFlags) && selectedOrder.ocrAnalysis.forensicsFlags.length > 0)) && <section role="alert" className="border border-rose-300 bg-rose-50 p-3 text-xs text-rose-950">
               <b className="block uppercase tracking-wide">Extra receipt checks needed</b>
               <span>A receipt image may have been reused or changed. This is a review signal, not proof of fraud. Check the payment in the provider account before approving it.</span>
             </section>}
+            </section>
+            <section hidden={orderDetailTab !== "overview"}>
             {(["pending", "processing"].includes(status)) && <details className="serverless-disclosure">
               <summary>Change order items, discount, or delivery fee</summary>
               <div className="serverless-disclosure__body space-y-2">
@@ -629,6 +672,9 @@ export default function TelegramServerlessOrdersPanel({
               </div>
             </details>}
 
+            </section>
+
+            <section hidden={orderDetailTab !== "evidence"}>
             <details className="serverless-disclosure">
               <summary>Optional technical details · device and location</summary>
               <div className="serverless-disclosure__body space-y-3 text-xs">
@@ -652,7 +698,9 @@ export default function TelegramServerlessOrdersPanel({
                 })()}
               </div>
             </details>
+            </section>
 
+            <section hidden={orderDetailTab !== "payment"}>
             <details className="serverless-disclosure">
               <summary>Customer and payment details</summary>
               <div className="serverless-disclosure__body"><div className="serverless-fields text-xs">
@@ -686,7 +734,9 @@ export default function TelegramServerlessOrdersPanel({
                 {selectedOrder.adjustmentDue > 0 && selectedOrder.adjustmentStatus.toLowerCase() !== "paid" && <p className="text-xs text-amber-800">Dispatch stays blocked until staff verifies the extra payment.</p>}
               </div>
             </section>}
+            </section>
 
+            <section hidden={orderDetailTab !== "fulfillment"}>
             <details className="serverless-disclosure">
               <summary>DISPATCH DETAILS</summary>
               <div className="serverless-disclosure__body"><div className="serverless-fields text-xs">
@@ -701,7 +751,9 @@ export default function TelegramServerlessOrdersPanel({
                 <div><span>Completed</span><strong>{displayDate(selectedOrder.deliveredAt)}</strong></div>
               </div></div>
             </details>
+            </section>
 
+            <section hidden={orderDetailTab !== "overview"}>
             <details className="serverless-disclosure" open>
               <summary>Items and totals</summary>
               <div className="serverless-disclosure__body">
@@ -738,13 +790,17 @@ export default function TelegramServerlessOrdersPanel({
                 </details>}
               </div>
             </details>
+            </section>
 
+            <section hidden={orderDetailTab !== "payment"}>
             {selectedOrder.paymentProofImage && (
               <section className="serverless-disclosure"><div className="serverless-disclosure__body serverless-order-receipt-row">
                 <div><b>Payment receipt attached</b><small>Open only when you need to inspect the proof.</small></div>
                 <button type="button" disabled={!receiptUrl} onClick={() => { setReceiptZoom(1); setReceiptOpen(true); }}><Eye /> View receipt</button>
               </div></section>
             )}
+            </section>
+            <section hidden={orderDetailTab !== "evidence"}>
             {selectedOrder.ocrAnalysis && <details className="serverless-disclosure"><summary>Receipt check details</summary><div className="serverless-disclosure__body space-y-1 text-xs">
               <b>Automated image checks · staff payment verification still required</b>
               {selectedOrder.ocrAnalysis.forensicsResult && <p>{selectedOrder.ocrAnalysis.forensicsResult}</p>}
@@ -754,21 +810,12 @@ export default function TelegramServerlessOrdersPanel({
               {selectedOrder.ocrAnalysis.rawSummary && <details className="mt-2 border bg-white"><summary className="cursor-pointer p-2 font-bold">Older text-scan result</summary><div className="max-h-64 space-y-1 overflow-y-auto border-t p-2">{selectedOrder.ocrAnalysis.rawSummary}<p>Detected amount: {formatPHP(Number(selectedOrder.ocrAnalysis.amountPaid) || 0)} · Reference: {selectedOrder.ocrAnalysis.referenceNumber || "Unreadable"}</p>{selectedOrder.ocrAnalysis.providerResponse && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words border-t p-2 text-[10px]">{selectedOrder.ocrAnalysis.providerResponse}</pre>}{Array.isArray(selectedOrder.ocrAnalysis.extractedFields) && selectedOrder.ocrAnalysis.extractedFields.map((field: any, index: number) => <p key={`${field.label}-${index}`} className="break-words border-b py-1"><b>{field.label}: </b>{field.value}</p>)}</div></details>}
               <p className="font-bold text-amber-800">Image matches are review clues only. They do not prove payment or image tampering. Verify the transaction directly with the payment provider.</p>
             </div></details>}
+            </section>
+            <section hidden={orderDetailTab !== "overview"}>
             {selectedOrder.notes && <details className="serverless-disclosure"><summary>Order notes</summary><div className="serverless-disclosure__body text-xs">{selectedOrder.notes}</div></details>}
+            </section>
 
-            {(canVerifyPayment || canApproveZeroDue || canReady || canDispatch || canComplete) && <details className="serverless-disclosure">
-              <summary>{canVerifyPayment ? "Next step · check payment" : canApproveZeroDue ? "Next step · confirm no upfront payment is due" : canReady ? "Next step · prepare order" : canDispatch ? "Next step · add courier tracking" : canComplete ? "Next step · confirm delivery" : "More order actions"}</summary>
-              <div className="serverless-disclosure__body"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {canVerifyPayment && <div className="space-y-2"><label className="block text-xs text-emerald-900">Amount confirmed in the payment provider<input type="number" min={selectedOrder.payableNow} step="0.01" placeholder="Enter the amount received" value={verifiedPaidAmount} onChange={(event) => setVerifiedPaidAmount(event.target.value)} className="mt-1 w-full border px-3 py-2 text-sm" /></label><p className="text-xs text-slate-600">Compare the provider transaction with the order due. Any verified excess is issued as Store Credits.</p><button type="button" disabled={busyAction !== "" || !verifiedPaidAmount || Number(verifiedPaidAmount) < selectedOrder.payableNow} onClick={() => void runAction(selectedOrder, "markPaid", { confirmedAmount: verifiedPaidAmount })} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markPaid") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Confirm verified payment and continue</button></div>}
-                {canApproveZeroDue && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "approveZeroDue")} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":approveZeroDue") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Approve zero upfront due · mark Paid</button>}
-                {canReady && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "markReady")} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markReady") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark Ready{selectedOrder.readyCreditDue > 0 ? ` · issue ${formatPHP(selectedOrder.readyCreditDue)} Store Credits` : ""}</button>}
-                {canDispatch && <div className="serverless-order-dispatch"><label htmlFor="order-tracking-url">Live tracking URL <span>Required</span></label><input id="order-tracking-url" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" placeholder="https://courier.example/track/..." value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} /><small>This URL will appear as “Track Location” in the customer’s order details.</small><button type="button" disabled={busyAction !== "" || !/^https:\/\//i.test(trackingUrl.trim())} onClick={() => void runAction(selectedOrder, "dispatch", { trackingUrl: trackingUrl.trim() })} className="px-3 py-2 bg-sky-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":dispatch") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Truck className="inline w-3 h-3 mr-1" />} Save tracking &amp; mark dispatched</button></div>}
-                {canComplete && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "complete")} className="px-3 py-2 bg-indigo-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":complete") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark delivered / completed</button>}
-              </div>
-              {canVerifyPayment && <p className="mt-2 text-xs text-amber-700">Enter the exact total received from the provider. For an edited order, compare that amount with the revised due above. Any excess is issued as Store Credits when you approve.</p>}
-              {canApproveZeroDue && <p className="mt-2 text-xs text-amber-700">Confirm no upfront amount is due. The order will be marked Paid for processing; any pay-on-delivery amount remains due to the courier.</p>}
-              </div>
-            </details>}
+
           </div>
         )}
 

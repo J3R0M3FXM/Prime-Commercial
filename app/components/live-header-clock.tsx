@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 
 export default function LiveHeaderClock({ accessLabel = "ENCRYPTED CUSTOMER ACCESS" }: { accessLabel?: string }) {
   const [mounted, setMounted] = useState(false);
+  const [dateStr, setDateStr] = useState("");
   const [timeStr, setTimeStr] = useState("");
 
   useEffect(() => {
@@ -15,7 +16,8 @@ export default function LiveHeaderClock({ accessLabel = "ENCRYPTED CUSTOMER ACCE
       const time = new Intl.DateTimeFormat("en-PH", {
         timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true,
       }).format(now).toUpperCase();
-      setTimeStr(`${date} | ${time}`);
+      setDateStr(date);
+      setTimeStr(time);
     };
     
     updateTime();
@@ -27,7 +29,6 @@ export default function LiveHeaderClock({ accessLabel = "ENCRYPTED CUSTOMER ACCE
     return (
       <div className="prime-live-clock" id="live-clock-placeholder">
         <div className="prime-live-clock__time prime-live-clock__placeholder" />
-        <span className="prime-live-clock__rule" />
         <span className="prime-live-clock__access">{accessLabel}</span>
       </div>
     );
@@ -36,9 +37,9 @@ export default function LiveHeaderClock({ accessLabel = "ENCRYPTED CUSTOMER ACCE
   return (
     <div className="prime-live-clock" id="live-clock-container">
       <div className="prime-live-clock__time">
-        <span className="prime-live-clock__time-text">{timeStr}</span>
+        <span className="prime-live-clock__time-text prime-live-clock__date">{dateStr}</span>
+        <span className="prime-live-clock__time-text prime-live-clock__time-value">{timeStr}</span>
       </div>
-      <span className="prime-live-clock__rule" aria-hidden="true" />
       <span className="prime-live-clock__access">{accessLabel}</span>
     </div>
   );
