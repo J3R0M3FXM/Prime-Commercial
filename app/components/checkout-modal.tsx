@@ -150,6 +150,7 @@ export default function CheckoutModal({
   const [currentPaymentPage, setCurrentPaymentPage] = useState(0);
   const [paymentPageDirection, setPaymentPageDirection] = useState<1 | -1>(1);
   const [isPaymentQrModalOpen, setIsPaymentQrModalOpen] = useState(false);
+  const [isPaymentDetailsModalOpen, setIsPaymentDetailsModalOpen] = useState(false);
   const [zoomedPaymentMethod, setZoomedPaymentMethod] = useState<any>(null);
   const [isStartingMayaCheckout, setIsStartingMayaCheckout] = useState(false);
   const [mayaCheckoutError, setMayaCheckoutError] = useState("");
@@ -2256,7 +2257,7 @@ export default function CheckoutModal({
               ) : (
                 <>
                   {(() => {
-                    const itemsPerPage = 9;
+                    const itemsPerPage = 6;
                     const totalPages = Math.ceil(paymentMethods.length / itemsPerPage);
                     const pageIndex = Math.min(currentPaymentPage, Math.max(0, totalPages - 1));
                     const slicedMethods = paymentMethods.slice(pageIndex * itemsPerPage, (pageIndex + 1) * itemsPerPage);
@@ -2301,41 +2302,10 @@ export default function CheckoutModal({
                     </div>;
                   })()}
 
-                  {selectedPaymentMethod && (() => {
-                    const type = String(selectedPaymentMethod.paymentType || selectedPaymentMethod.type || "").toLowerCase();
-                    const qr = selectedPaymentMethod.qrCodeImage || selectedPaymentMethod.qrCode || selectedPaymentMethod.qrImage || selectedPaymentMethod.qr_code_image || "";
-                    const copyDetail = async (key: string, value: string) => {
-                      try {
-                        await navigator.clipboard.writeText(value);
-                        setCopiedField(key);
-                        window.setTimeout(() => setCopiedField(null), 1800);
-                      } catch {
-                        window.alert("Copy was unavailable. Press and hold the value to copy it.");
-                      }
-                    };
-                    return <div className="space-y-3 border border-slate-200 bg-slate-50 p-3 text-xs">
-                      <p className="font-heading font-bold uppercase text-slate-900">Pay with {selectedPaymentMethod.name}</p>
-                      {type.includes("qr") && qr && <div className="flex flex-col items-center gap-2 border border-slate-200 bg-white p-2">
-                        <TelegramMediaImage src={qr} alt={`${selectedPaymentMethod.name} payment QR code`} className="h-44 w-44 max-w-full object-contain" />
-                        <span className="text-[10px] text-slate-600">Scan this code with your banking or wallet app.</span>
-                      </div>}
-                      {selectedPaymentMethod.accountName && <div className="flex min-w-0 items-center justify-between gap-2 border border-slate-200 bg-white p-2">
-                        <div className="min-w-0"><span className="block text-[9px] font-heading font-semibold uppercase text-slate-500">Account name</span><span className="break-words font-mono text-slate-900">{selectedPaymentMethod.accountName}</span></div>
-                        <button type="button" onClick={() => void copyDetail("name", selectedPaymentMethod.accountName)} className="shrink-0 border border-slate-300 px-2 py-1 font-heading font-semibold">{copiedField === "name" ? "Copied" : "Copy"}</button>
-                      </div>}
-                      {selectedPaymentMethod.accountNumber && <div className="flex min-w-0 items-center justify-between gap-2 border border-slate-200 bg-white p-2">
-                        <div className="min-w-0"><span className="block text-[9px] font-heading font-semibold uppercase text-slate-500">Account / mobile number</span><span className="break-all font-mono font-bold text-slate-900">{selectedPaymentMethod.accountNumber}</span></div>
-                        <button type="button" onClick={() => void copyDetail("number", selectedPaymentMethod.accountNumber)} className="shrink-0 border border-slate-300 px-2 py-1 font-heading font-semibold">{copiedField === "number" ? "Copied" : "Copy"}</button>
-                      </div>}
-                      {selectedPaymentMethod.walletAddress && <div className="flex min-w-0 items-center justify-between gap-2 border border-slate-200 bg-white p-2">
-                        <div className="min-w-0"><span className="block text-[9px] font-heading font-semibold uppercase text-slate-500">Wallet address</span><span className="break-all font-mono text-slate-900">{selectedPaymentMethod.walletAddress}</span></div>
-                        <button type="button" onClick={() => void copyDetail("wallet", selectedPaymentMethod.walletAddress)} className="shrink-0 border border-slate-300 px-2 py-1 font-heading font-semibold">{copiedField === "wallet" ? "Copied" : "Copy"}</button>
-                      </div>}
-                      {selectedPaymentMethod.instructions && <p className="break-words font-mono text-slate-600">{selectedPaymentMethod.instructions}</p>}
-                      {selectedPaymentMethod.paymentLinkUrl && <SecuredPaymentLink url={selectedPaymentMethod.paymentLinkUrl} />}
-                      {type.includes("qr") && !qr && <div className="prime-checkout__notice prime-checkout__notice--warning" role="alert"><span className="prime-checkout__notice-icon"><AlertTriangle aria-hidden="true" /></span><div className="min-w-0"><p className="prime-checkout__notice-title">QR code unavailable</p><p className="prime-checkout__notice-copy">Choose another payment method or contact support.</p></div></div>}
-                    </div>;
-                  })()}
+                  {selectedPaymentMethod && <div className="flex items-center justify-between gap-2 border border-slate-200 bg-slate-50 p-3 text-xs">
+                    <div className="min-w-0"><p className="font-heading font-bold uppercase text-slate-900">{selectedPaymentMethod.name}</p><p className="mt-0.5 text-[11px] text-slate-600">Payment instructions are available in a secure pop-up.</p></div>
+                    <button type="button" onClick={() => setIsPaymentDetailsModalOpen(true)} className="shrink-0 min-h-10 border border-slate-300 bg-white px-3 font-heading font-semibold uppercase text-slate-800">View details</button>
+                  </div>}
 
                   <input ref={preSubmitProofInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => {
                     const file = event.target.files?.[0];
@@ -2436,7 +2406,7 @@ export default function CheckoutModal({
                   <div className="space-y-2.5">
                     {/* Three columns and up to three rows per page. */}
                     {(() => {
-                      const itemsPerPage = 9;
+                      const itemsPerPage = 6;
                       const totalPages = Math.ceil(paymentMethods.length / itemsPerPage);
                       
                       // Safety: if the current page is out of bounds, clip it
@@ -3025,6 +2995,23 @@ export default function CheckoutModal({
               Got it, thanks!
             </button>
           </div>
+        </div>
+      )}
+
+      {isPaymentDetailsModalOpen && selectedPaymentMethod && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/75 p-2.5 backdrop-blur-xs" role="presentation" onClick={() => setIsPaymentDetailsModalOpen(false)}>
+          <section className="w-full max-w-[430px] space-y-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-2xl" role="dialog" aria-modal="true" aria-label="Payment instructions" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div><h3 className="font-heading text-sm font-bold uppercase text-slate-900">Payment details</h3><p className="text-[11px] text-slate-500">{selectedPaymentMethod.name}</p></div>
+              <button type="button" onClick={() => setIsPaymentDetailsModalOpen(false)} className="grid min-h-10 min-w-10 place-items-center rounded-full bg-slate-100 text-slate-700" aria-label="Close payment details">✕</button>
+            </div>
+            {selectedPaymentMethod.accountName && <div className="border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[10px] font-heading font-semibold uppercase text-slate-500">Account name</span><div className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 break-words font-mono text-sm text-slate-900">{selectedPaymentMethod.accountName}</span><button type="button" onClick={() => { void navigator.clipboard.writeText(String(selectedPaymentMethod.accountName)); setCopiedField("modal-name"); window.setTimeout(() => setCopiedField(null), 1800); }} className="min-h-10 shrink-0 border border-slate-300 bg-white px-2 text-xs">{copiedField === "modal-name" ? "Copied" : "Copy"}</button></div></div>}
+            {selectedPaymentMethod.accountNumber && <div className="border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[10px] font-heading font-semibold uppercase text-slate-500">Account / mobile number</span><div className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 break-all font-mono text-sm font-bold text-slate-900">{selectedPaymentMethod.accountNumber}</span><button type="button" onClick={() => { void navigator.clipboard.writeText(String(selectedPaymentMethod.accountNumber)); setCopiedField("modal-number"); window.setTimeout(() => setCopiedField(null), 1800); }} className="min-h-10 shrink-0 border border-slate-300 bg-white px-2 text-xs">{copiedField === "modal-number" ? "Copied" : "Copy"}</button></div></div>}
+            {selectedPaymentMethod.walletAddress && <div className="border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[10px] font-heading font-semibold uppercase text-slate-500">Wallet address</span><div className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 break-all font-mono text-sm text-slate-900">{selectedPaymentMethod.walletAddress}</span><button type="button" onClick={() => { void navigator.clipboard.writeText(String(selectedPaymentMethod.walletAddress)); setCopiedField("modal-wallet"); window.setTimeout(() => setCopiedField(null), 1800); }} className="min-h-10 shrink-0 border border-slate-300 bg-white px-2 text-xs">{copiedField === "modal-wallet" ? "Copied" : "Copy"}</button></div></div>}
+            {selectedPaymentMethod.instructions && <p className="break-words border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-950">{selectedPaymentMethod.instructions}</p>}
+            {selectedPaymentMethod.paymentLinkUrl && <SecuredPaymentLink url={selectedPaymentMethod.paymentLinkUrl} />}
+            <button type="button" onClick={() => setIsPaymentDetailsModalOpen(false)} className="min-h-11 w-full bg-slate-900 px-3 text-xs font-heading font-bold uppercase tracking-wider text-white">Done</button>
+          </section>
         </div>
       )}
 
