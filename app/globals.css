@@ -105,6 +105,52 @@
 #mobile-portrait-viewport.admin-viewport .admin-shell .command-fixed-header .prime-identity-header {
   background: #f7f8fa url('/prime-global-header.jpg') center / 100% 100% no-repeat !important;
 }
+
+/* Keep the shared viewport in normal flow so first paint cannot hide page content. */
+#mobile-portrait-viewport .prime-shopfront-fixed-top {
+  position: sticky !important;
+  top: 0 !important;
+  left: auto !important;
+  width: 100% !important;
+  max-width: 430px !important;
+  transform: none !important;
+}
+#mobile-portrait-viewport .prime-shopfront-fixed-top-spacer { display: none !important; }
+#mobile-portrait-viewport.admin-viewport {
+  width: 100% !important;
+  max-width: 430px !important;
+  min-height: 100dvh !important;
+  margin-inline: auto !important;
+  border-inline: 0 !important;
+  box-shadow: none !important;
+  background: #f3f5f7 !important;
+}
+#mobile-portrait-viewport.admin-viewport .prime-admin-global-header .prime-identity-header {
+  box-sizing: border-box;
+  min-height: 35px;
+  height: 35px;
+  padding-block: 0;
+}
+.prime-admin-app { width: 100%; max-width: 430px; min-height: 100dvh; margin-inline: auto; background: #f3f5f7; }
+.prime-admin-app > .prime-admin-global-header { position: sticky; top: 0; z-index: 40; background: #f7f8fa; }
+.prime-admin-app .prime-admin-global-header .prime-identity-header { box-sizing: border-box; min-height: 35px; height: 35px; padding-block: 0; }
+.prime-admin-app .admin-shell { min-height: 0; }
+.prime-admin-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 10px 0 14px; }
+.prime-admin-kpis button { display: flex; min-width: 0; min-height: 82px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; border: 1px solid #d7e1ef; border-radius: 9px; background: #fff; padding: 8px; text-align: left; }
+.prime-admin-kpis button > span { color: #60708a; font-size: 11px; line-height: 1.15; }
+.prime-admin-kpis button > strong { color: #102a56; font-size: 20px; line-height: 1; }
+.prime-admin-kpis button > small { color: #77879a; font-size: 10px; line-height: 1.15; }
+.prime-admin-tool-group { margin-top: 12px; }
+.prime-admin-tool-group > h2 { margin: 0 0 5px; color: #60708a; font: 600 11px/1.2 'Roboto Condensed', sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.prime-admin-tool-list { overflow: hidden; border: 1px solid #d7e1ef; border-radius: 9px; background: #fff; }
+.prime-admin-tool-list > button { display: flex; width: 100%; min-height: 48px; align-items: center; gap: 9px; border: 0; border-bottom: 1px solid #edf1f5; background: #fff; padding: 5px 9px; text-align: left; }
+.prime-admin-tool-list > button:last-child { border-bottom: 0; }
+.prime-admin-tool-icon { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 7px; background: #edf3f8; }
+.prime-admin-tool-icon svg { width: 16px; height: 16px; }
+.prime-admin-tool-list > button > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
+.prime-admin-tool-list strong { overflow: hidden; color: #102a56; font: 600 13px/1.15 'Roboto Condensed', sans-serif; text-overflow: ellipsis; }
+.prime-admin-tool-list small { overflow: hidden; color: #60708a; font-size: 11px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.prime-admin-tool-list > button > svg { width: 15px; height: 15px; flex: 0 0 15px; margin-left: auto; color: #94a3b8; }
 #mobile-portrait-viewport .prime-identity-header__logo {
   align-self: center;
   transform: translateY(-2px);
@@ -113,6 +159,23 @@
 #mobile-portrait-viewport .prime-live-clock__time-text,
 #mobile-portrait-viewport .prime-live-clock__access {
   text-shadow: 0 1px 1px rgb(255 255 255 / 85%), 0 1.5px 2px rgb(16 42 86 / 28%) !important;
+}
+#mobile-portrait-viewport .prime-live-clock__time:not(.prime-live-clock__placeholder) {
+  display: inline-flex !important;
+  box-sizing: content-box !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  flex: 0 0 auto !important;
+  align-self: flex-end !important;
+  justify-content: flex-end !important;
+  border-bottom: 1.5px solid currentColor !important;
+}
+#mobile-portrait-viewport .prime-live-clock__date,
+#mobile-portrait-viewport .prime-live-clock__time-value {
+  display: inline-block !important;
+  width: auto !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
 }
 #system-wide-proprietary-footer .prime-system-footer__text {
   font-size: 12px !important;
@@ -286,9 +349,9 @@ body .prime-order-history .font-misans-regular { font-family: 'MiSans', sans-ser
 .prime-identity-header { display: flex; min-width: 0; min-height: 42px; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 8px; background: #fff; }
 .prime-identity-header__logo { display: block; width: auto; max-width: 40%; height: 34px; flex: 0 1 auto; object-fit: contain; object-position: left center; }
 .prime-identity-header__right { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; justify-content: flex-end; gap: 6px; }
-.prime-live-clock { display: flex; flex: 0 1 218px; width: clamp(164px, 52vw, 218px); min-width: 0; height: 28px; flex-direction: column; justify-content: center; overflow: hidden; text-align: right; user-select: none; }
+.prime-live-clock { display: flex; flex: 0 1 218px; width: clamp(164px, 52vw, 218px); min-width: 0; height: 28px; flex-direction: column; align-items: flex-end; justify-content: center; overflow: hidden; text-align: right; user-select: none; }
 .prime-live-clock__time { display: block; width: 100%; overflow: hidden; color: #1e293b; font-family: 'Roboto Condensed', sans-serif !important; font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1, 'lnum' 1; white-space: nowrap; text-overflow: clip; }
-.prime-live-clock__time { font-size: clamp(9.5px, 2.8vw, 12px); font-weight: 600; line-height: 1; letter-spacing: -0.04em; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.prime-live-clock__time { font-size: clamp(9.5px, 2.8vw, 12px); font-weight: 600; line-height: 1; letter-spacing: -0.04em; }
 .prime-live-clock { height: auto; min-height: 26px; gap: 2px; overflow: visible; }
 .prime-live-clock__time { flex: 0 0 auto; font-size: clamp(8px, 2.3vw, 10px); line-height: 11px; letter-spacing: -0.015em; }
 .prime-live-clock__rule { display: block; width: 100%; height: 1px; flex: 0 0 1px; background: currentColor; opacity: .42; }
@@ -296,6 +359,23 @@ body .prime-order-history .font-misans-regular { font-family: 'MiSans', sans-ser
 .prime-live-clock__placeholder { height: 12px; border-radius: 3px; background: #f1f5f9; animation: prime-clock-pulse 1.3s ease-in-out infinite; }
 .prime-system-footer__text { margin: 0; overflow: hidden; color: #e2e8f0; font-family: 'Roboto Condensed', sans-serif; font-size: 11.5px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 @keyframes prime-clock-pulse { 50% { opacity: .45; } }
+
+.prime-live-clock__time:not(.prime-live-clock__placeholder) {
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  height: auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-left: auto;
+  border-bottom: 1.5px solid currentColor;
+  overflow: visible;
+  text-align: right;
+  white-space: nowrap;
+}
+.prime-live-clock__time-text { display: inline-block; flex: 0 0 auto; text-align: right; white-space: nowrap; }
+.prime-live-clock__placeholder { border-bottom: 0; }
 
 
 /* Hide scrollbar globally */
@@ -498,6 +578,49 @@ body .prime-order-history .font-misans-regular { font-family: 'MiSans', sans-ser
 .command-admin-module--parked { cursor: not-allowed; }
 
 .serverless-orders-panel { padding: 0; }
+.serverless-order-detail { gap: 9px; padding: 0 10px 12px; }
+.serverless-order-detail > section[hidden] { display: none !important; }
+.prime-order-summary { min-width: 0; padding: 12px; border: 1px solid #d7e1ef; border-radius: 12px; background: #fff; box-shadow: 0 3px 12px rgb(15 45 91 / 5%); }
+.prime-order-summary__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.prime-order-summary__top > div:first-child { display: grid; gap: 3px; }
+.prime-order-summary__top > div:first-child > span,
+.prime-order-summary__facts > div > span { color: #718096; font-size: 11px; line-height: 1.2; }
+.prime-order-summary__top > div:first-child > strong { color: #102a56; font-size: 25px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.prime-order-summary__badges { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.prime-order-summary__badges > span { max-width: 140px; padding: 4px 8px; overflow: hidden; border-radius: 999px; background: #edf2f7; color: #40536b; font-size: 11px; font-weight: 600; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.prime-order-summary__badges > [data-tone="paid"],
+.prime-order-summary__badges > [data-tone="completed"],
+.prime-order-summary__badges > [data-tone="delivered"] { background: #e4f5ee; color: #087456; }
+.prime-order-summary__badges > [data-tone="pending review"],
+.prime-order-summary__badges > [data-tone="pending_review"],
+.prime-order-summary__badges > [data-tone="ready"] { background: #fff2d3; color: #8a5a00; }
+.prime-order-summary__badges > [data-tone="cancelled"],
+.prime-order-summary__badges > [data-tone="expired"] { background: #fde8e8; color: #a52b32; }
+.prime-order-summary__facts { display: grid; margin-top: 10px; }
+.prime-order-summary__facts > div { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid #edf1f5; }
+.prime-order-summary__facts > div > strong { min-width: 0; color: #273b55; font-size: 13px; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.prime-order-summary__guidance { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid #edf1f5; color: #60708a; font-size: 12px; line-height: 1.4; }
+.prime-order-progress { padding: 10px 8px; border: 1px solid #d7e1ef; border-radius: 12px; background: #fff; }
+.prime-order-progress > ol { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; margin: 0; padding: 0; list-style: none; }
+.prime-order-progress li { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 4px; color: #8290a2; text-align: center; }
+.prime-order-progress li > span { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 50%; background: #edf2f8; color: #718096; font-size: 12px; font-weight: 700; }
+.prime-order-progress li.is-done > span { background: #12805c; color: #fff; }
+.prime-order-progress li.is-current > span { background: #f5d982; color: #705414; }
+.prime-order-progress li > small { font-size: 10px; line-height: 1.15; }
+.prime-order-progress li.is-done,
+.prime-order-progress li.is-current { color: #40536b; }
+.prime-order-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; padding: 4px; border-radius: 12px; background: #edf2f7; }
+.prime-order-tabs > button { display: grid; min-width: 0; min-height: 44px; place-items: center; padding: 5px 2px; border: 0; border-radius: 9px; background: transparent; color: #64748b; font-size: 12px; font-weight: 600; }
+.prime-order-tabs > button[aria-selected="true"] { background: #fff; color: #163657; box-shadow: 0 2px 7px rgb(15 45 91 / 10%); }
+.serverless-order-detail .prime-order-next-action { overflow: hidden; border-color: #bdd9ce; background: #f7fcf9; box-shadow: 0 2px 8px rgb(15 91 63 / 6%); }
+.serverless-order-detail .prime-order-next-action > summary { min-height: 40px; color: #145c45; font-size: 11px; letter-spacing: .045em; }
+.serverless-order-detail .prime-order-next-action[open] > summary { border-bottom: 1px solid #d9ebe3; }
+.serverless-order-detail .prime-order-next-action .serverless-disclosure__body { padding: 10px 12px; }
+.serverless-order-detail .prime-order-next-action button { min-height: 44px; }
+.prime-order-detail > section:not([hidden]) { display: grid; min-width: 0; gap: 8px; }
+.serverless-order-detail .serverless-disclosure { margin-top: 0; border-radius: 12px; }
+.serverless-order-detail .serverless-disclosure > summary { min-height: 46px; padding: 13px; font-size: 13px; }
+.serverless-order-detail .serverless-disclosure__body { padding: 12px; }
 .serverless-orders-panel .serverless-record__summary { flex-wrap: wrap; }
 .serverless-orders-panel .serverless-record__copy { flex-basis: 100%; }
 .serverless-orders-panel .serverless-fields { grid-template-columns: minmax(0, 1fr); gap: 0; }
@@ -1573,8 +1696,7 @@ body.splash-active #system-wide-proprietary-footer {
 
 
 /* ========================================================================== */
-/* PRIME ADMIN CORRECTION — full-bleed, calmer, compact dashboard              */
-/* The admin control plane must not inherit the storefront's 430px phone rail. */
+/* PRIME Admin shell follows the shared 430px portrait viewport. */
 /* ========================================================================== */
 body.admin-mode {
   background: #f3f5f7 !important;
@@ -1582,9 +1704,9 @@ body.admin-mode {
 
 #mobile-portrait-viewport.admin-viewport {
   width: 100% !important;
-  max-width: none !important;
+  max-width: 430px !important;
   min-height: 100dvh !important;
-  margin: 0 !important;
+  margin-inline: auto !important;
   border-inline: 0 !important;
   box-shadow: none !important;
   overflow-x: hidden !important;
@@ -2200,21 +2322,6 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   top: auto !important;
   z-index: auto !important;
   flex: 0 0 auto;
-}
-#mobile-portrait-viewport .prime-shopfront-fixed-top {
-  position: fixed !important;
-  top: 0 !important;
-  left: 50% !important;
-  z-index: 60 !important;
-  width: min(100vw, 430px) !important;
-  max-width: 430px !important;
-  transform: translateX(-50%) !important;
-  background: #fff;
-}
-#mobile-portrait-viewport .prime-shopfront-fixed-top-spacer {
-  display: block !important;
-  width: 100%;
-  flex: 0 0 auto !important;
 }
 #mobile-portrait-viewport .prime-shopfront-global-header .prime-identity-header {
   box-sizing: border-box !important;

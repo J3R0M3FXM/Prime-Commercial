@@ -274,7 +274,13 @@ export default async function (input, ctx) {
       if (pending.customerId) await db.run(`UPDATE customers SET store_credits_operation_id=NULL, store_credits_operation_amount=0, updated_at=unixepoch() WHERE id=:id AND store_credits_operation_id=:operation`, { ':id': pending.customerId, ':operation': priorCreditOperation });
       return { success: true, orderId, status: pending.status, paymentStatus: pending.paymentStatus, alreadyApproved: true };
     }
-    if (!pending || String(pending.status || '').toLowerCase() !== 'pending' || String(pending.paymentStatus || '').toLowerCase() !== 'pending review' || !String(pending.paymentProofImage || '').trim() || String(pending.controlState || 'normal').toLowerCase() === 'held')
+    const pendingPaymentStatus = String(pending?.paymentStatus || '').toLowerCase();
+    const hasSubmittedProof = Boolean(String(pending?.paymentProofImage || '').trim());
+    // Initial checkout may attach a payment-session receipt before the order exists.
+    // That path historically persisted the order as Unpaid; allow the same manual
+    // provider verification used for Pending Review receipts without trusting the image.
+    const awaitingProofReview = pendingPaymentStatus === 'pending review' || (pendingPaymentStatus === 'unpaid' && hasSubmittedProof);
+    if (!pending || String(pending.status || '').toLowerCase() !== 'pending' || !awaitingProofReview || !hasSubmittedProof || String(pending.controlState || 'normal').toLowerCase() === 'held')
       throw new EndpointError('Only a Pending order with a submitted receipt can be approved.', { code: 'ORDER_NOT_AWAITING_REVIEW' });
     const amountDueCents = Math.max(0, Math.round((Number(pending.payableNow ?? pending.totalAmount) || 0) * 100));
     const receivedCents = Math.max(0, Math.round(confirmedAmount * 100));
@@ -326,7 +332,9 @@ export default async function (input, ctx) {
     }
     if (!approvalSaved) {
       latest ||= await db.select().from(orders).where(eq(orders.id, orderId)).get();
-      if (!latest || String(latest.status || '').toLowerCase() !== 'pending' || String(latest.paymentStatus || '').toLowerCase() !== 'pending review' || !String(latest.paymentProofImage || '').trim()) {
+      const latestPaymentStatus = String(latest?.paymentStatus || '').toLowerCase();
+      const latestHasSubmittedProof = Boolean(String(latest?.paymentProofImage || '').trim());
+      if (!latest || String(latest.status || '').toLowerCase() !== 'pending' || !(latestPaymentStatus === 'pending review' || (latestPaymentStatus === 'unpaid' && latestHasSubmittedProof)) || !latestHasSubmittedProof) {
         if (String(latest?.status || '').toLowerCase() === 'pending') await rollbackStagedCredit();
         throw new EndpointError('Payment was not approved because the order is no longer awaiting receipt review. Refresh the order to see its current status.', { code: 'ORDER_NOT_AWAITING_REVIEW' });
       }
