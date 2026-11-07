@@ -108,12 +108,14 @@
 
 /* Keep the shared viewport in normal flow so first paint cannot hide page content. */
 #mobile-portrait-viewport .prime-shopfront-fixed-top {
-  position: sticky !important;
+  position: fixed !important;
   top: 0 !important;
-  left: auto !important;
+  left: 50% !important;
   width: 100% !important;
   max-width: 430px !important;
-  transform: none !important;
+  transform: translateX(-50%) !important;
+  z-index: 60 !important;
+  background: #fff !important;
 }
 #mobile-portrait-viewport .prime-shopfront-fixed-top-spacer { display: none !important; }
 #mobile-portrait-viewport.admin-viewport {
@@ -131,10 +133,12 @@
   height: 35px;
   padding-block: 0;
 }
-.prime-admin-app { width: 100%; max-width: 430px; min-height: 100dvh; margin-inline: auto; background: #f3f5f7; }
-.prime-admin-app > .prime-admin-global-header { position: sticky; top: 0; z-index: 40; background: #f7f8fa; }
+.prime-admin-app { width: 100%; max-width: 430px; height: 100dvh; min-height: 100dvh; margin-inline: auto; overflow: hidden; background: #f3f5f7; }
+.prime-admin-app > .prime-admin-global-header { position: fixed; top: 0; left: 50%; width: min(100%, 430px); transform: translateX(-50%); z-index: 60; background: #f7f8fa; }
 .prime-admin-app .prime-admin-global-header .prime-identity-header { box-sizing: border-box; min-height: 35px; height: 35px; padding-block: 0; }
 .prime-admin-app .admin-shell { min-height: 0; }
+.prime-admin-app > .admin-shell,
+.prime-admin-app > .serverless-admin-panel { height: 100dvh; min-height: 0; overflow-y: auto; padding-top: 104px; padding-bottom: 34px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .prime-admin-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 10px 0 14px; }
 .prime-admin-kpis button { display: flex; min-width: 0; min-height: 82px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; border: 1px solid #d7e1ef; border-radius: 9px; background: #fff; padding: 8px; text-align: left; }
 .prime-admin-kpis button > span { color: #60708a; font-size: 11px; line-height: 1.15; }
@@ -2330,11 +2334,15 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   flex: 0 0 35px !important;
 }
 #mobile-portrait-viewport .prime-shopfront-search {
-  position: relative !important;
-  top: auto !important;
-  z-index: auto !important;
+  position: fixed !important;
+  top: 93px !important;
+  left: 50% !important;
+  width: min(100%, 430px) !important;
+  transform: translateX(-50%) !important;
+  z-index: 59 !important;
   flex: 0 0 auto;
 }
+#mobile-portrait-viewport .prime-shopfront-shell > main { padding-top: 141px !important; }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-page-shell,
 #mobile-portrait-viewport .prime-shopfront-shell .prime-cart,
 #mobile-portrait-viewport .prime-shopfront-shell .prime-order-history,
@@ -2390,6 +2398,13 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 #mobile-portrait-viewport .prime-shopfront-shell .prime-account__stat { min-width: 0; padding: 8px !important; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-payment-grid,
 #mobile-portrait-viewport .prime-shopfront-shell .prime-courier-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-payment-grid--page { min-height: 152px; align-content: start; transform: translateZ(0); }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-payment-grid--next { animation: prime-payment-carousel-next .22s ease-out both; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-payment-grid--previous { animation: prime-payment-carousel-previous .22s ease-out both; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-payment-grid__pagination { min-height: 24px; }
+#mobile-portrait-viewport .prime-shopfront-shell .prime-checkout__payment-section > .space-y-3 > .border.border-slate-200.bg-slate-50 { margin-top: 4px; }
+@keyframes prime-payment-carousel-next { from { opacity: .35; transform: translate3d(18px, 0, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes prime-payment-carousel-previous { from { opacity: .35; transform: translate3d(-18px, 0, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
 #mobile-portrait-viewport .prime-shopfront-shell .order-detail-label,
 #mobile-portrait-viewport .prime-shopfront-shell .order-history__payment-breakdown > div > :first-child { font-family: 'Roboto Condensed', sans-serif !important; font-weight: 400 !important; }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-order-history [class*="overflow-x-auto"] { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px !important; overflow-x: hidden !important; }
