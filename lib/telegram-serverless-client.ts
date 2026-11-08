@@ -1,4 +1,5 @@
 'use client';
+import { setMediaOwner } from '@/lib/media-library';
 
 type ServerlessError = Error & { type?: string; parameters?: Record<string, unknown> };
 type ServerlessBridge = {
@@ -240,14 +241,12 @@ export async function downloadTelegramMedia(reference: string, filename: string)
 }
 
 /** Load a published Telegram-hosted video through the public gallery media gate. */
-export async function resolveTelegramVideo(videoId: string): Promise<string> {
+export async function resolveTelegramVideo(videoId: string, signal?: AbortSignal): Promise<string> {
   const reference = String(videoId || '').trim();
   const isAssetReference = reference.startsWith('tgmedia:');
   const id = isAssetReference ? reference.slice('tgmedia:'.length).trim() : reference;
   if (!id) throw new Error('This video has no playable media attached.');
-  const cacheKey = 'video:' + id;
-  const existing = mediaUrlCache.get(cacheKey);
-  if (existing) return await existing;
+  signal?.throwIfAborted();
   const pending = (async () => {
     if (isAssetReference) {
       const media = await callServerless<{ contentType: string; base64: string }>('getMediaContent', { id }, 30_000);
@@ -275,6 +274,7 @@ export async function resolveTelegramVideo(videoId: string): Promise<string> {
     };
     const parts: Uint8Array[] = [decodePart(first.base64)];
     for (let index = 1; index < first.chunkCount; index += 1) {
+      signal?.throwIfAborted();
       const part = await callServerless<VideoPart>('getMediaContent', { videoId: id, chunkIndex: index }, 30_000);
       if (!part?.base64 || part.size !== first.size || part.chunkCount !== first.chunkCount || part.chunkIndex !== index) {
         throw new Error('A video stream part could not be loaded. Tap Retry Stream to try again.');
@@ -286,15 +286,16 @@ export async function resolveTelegramVideo(videoId: string): Promise<string> {
     const bytes = new Uint8Array(totalBytes);
     let offset = 0;
     for (const part of parts) { bytes.set(part, offset); offset += part.length; }
+    signal?.throwIfAborted();
     return URL.createObjectURL(new Blob([bytes], { type: first.contentType }));
   })();
-  mediaUrlCache.set(cacheKey, pending);
-  try { return await pending; }
-  catch (error) { mediaUrlCache.delete(cacheKey); throw error; }
+  // The active player owns/revokes this URL. Never retain every watched video
+  // in the global image cache and exhaust the mobile decoder's memory.
+  return await pending;
 }
 
 export type ServerlessGalleryVideo = {
-  id: string; title: string; description?: string; category: string; tags?: string[];
+  id: string; title: string; description?: string; category: string; categories?: string[]; tags?: string[]; storageType?: string;
   mediaId?: string; directUrl?: string; thumbnailUrl?: string; duration?: number;
   views?: number; rating?: number; publishedAt?: string; featured?: boolean; createdAt?: string;
 };
@@ -302,14 +303,11 @@ export type ServerlessGalleryVideo = {
 export async function getServerlessVideos(): Promise<ServerlessGalleryVideo[]> {
   const rows = await callServerless<ServerlessGalleryVideo[]>('getPublicVideos', {}, 20_000);
   if (!Array.isArray(rows)) throw new Error('The video gallery response was invalid.');
-  return await Promise.all(rows.map(async (video) => ({
-    ...video,
-    thumbnailUrl: await resolveTelegramMedia(String(video.thumbnailUrl || '')),
-  })));
+  return rows;
 }
 
 export async function uploadServerlessGalleryVideo(file: File, metadata: {
-  title: string; description?: string; category?: string; tags?: string[];
+  title: string; description?: string; category?: string; categories?: string[]; duration?: number; width?: number; height?: number; tags?: string[];
   thumbnailUrl?: string; rating?: number; isPublished?: boolean; featured?: boolean;
 }, onProgress?: (completed: number, total: number) => void): Promise<{ success: boolean; video?: ServerlessGalleryVideo }> {
   const maxBytes = 20 * 1024 * 1024;
@@ -408,10 +406,12 @@ export async function getTelegramServerlessSession(options: { heartbeat?: boolea
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   const fingerprint = await collectSessionFingerprint();
-  return await callServerless<TelegramServerlessSession>('getTelegramSession', {
+  const session = await callServerless<TelegramServerlessSession>('getTelegramSession', {
     ...(fingerprint ? { fingerprint } : {}),
     ...(options.heartbeat ? { heartbeat: true } : {}),
   }, 20_000);
+  if (session.authenticated && session.tgUserId) setMediaOwner(String(session.tgUserId));
+  return session;
 }
 
 type ServerlessProduct = {

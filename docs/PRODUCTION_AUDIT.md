@@ -1,5 +1,15 @@
 # Production Reconstruction Audit
 
+## Coordinated media release — 2026-11-09
+
+The owner superseded the earlier deployment hold: deploy media together with parked checkout/rewards commits `772f9a7` and `bf17a90`, only after Sandbox validation and clean promotion. The existing private R2 bucket, Pages gateway and secret bindings are retained. Read-only gateway checks returned catalog HTTP200 and live-origin OPTIONS204; the catalog was empty. No customer orders, provider payment confirmations, fake live identities or inventory mutations are used for validation.
+
+Implemented Admin R2/Telegram upload, title, multiple manual/existing categories, three actual decoder-generated thumbnail choices, edit, publish/hide and removal. MP4 limits remain R2 150MiB and Telegram 20MiB. Telegram upload has ownership-bound chunk journaling and safe completion recovery; an ambiguous Telegram send is not blindly repeated. Telegram category metadata uses reserved tags, avoiding global schema migration. Lazy SQLite tables support upload parts, short-lived transfer chunks and account-scoped feedback.
+
+Customer gallery has a pinned two-column wider-search/category strip, three cards per row, 30 cards per page, duration/views/rating/reactions, local playlists and bounded offline CacheStorage. Search/filter changes reset pagination. Only one player is mounted; close/change aborts transfers, clears watchdogs and releases media/Blob URLs. Playback has bounded stall recovery, native fullscreen and best-effort orientation. Hidden R2 entries revoke old streaming grants. Offline media and playlists are device/account-local, not cloud-synchronized. Offline copies cannot receive publication revocation until an online refresh. Download controls are hidden; this is not DRM or an absolute copying prohibition. Offline shell caching excludes authenticated business APIs and cannot authorize checkout/admin.
+
+Expanded release validation covers SQLite concurrent inventory/referral/payment safety, all tier boundaries, checkout reload identity, real React DOM 30/30/5 pagination, upload forms and thumbnail selection, playlists/account isolation, incomplete offline saves, single-player cleanup, fullscreen fallback, static-only service-worker caching, and Worker auth/ranges/CORS/unpublish. Decoder fixtures and DOM tests do not prove Android hardware playback, real Telegram uploads, orientation support or bank-app switching. Those remain explicit post-release device checks. Deployment evidence is recorded separately after release.
+
 ## Owner correction: Silver base rewards and Bronze threshold — 2026-11-09
 
 Supersedes the Member/zero-reward interpretation in the previous audit entry. The owner explicitly confirmed: Silver PHP0-9,999.99 at 5.0%; Bronze PHP10,000-14,999.99 at 5.5%; Gold PHP15,000-19,999.99 at 6.0%; Platinum PHP20,000-24,999.99 at 6.5%; Titanium PHP25,000+ at 7.0%, within the same anchored 30-day completed-order spending cycle.

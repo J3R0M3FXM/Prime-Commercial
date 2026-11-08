@@ -1,5 +1,7 @@
 # Next Agent Instructions
 
+Media release (2026-11-09): owner now authorizes coordinated deployment of media plus the parked checkout/rewards commits after validation and promotion. Admin supports R2/Telegram, multi-categories, three generated thumbnail choices, edit/publication/removal. Customer gallery is three columns, 30 cards/page, pinned search/category strip, authenticated feedback, device-local playlists/offline video, and a single cleaned-up player. Run the expanded `npm run validate:miniapp` only in Sandbox. Promote the exact source and generated dist/Worker bundle; deploy only from clean Checkout. `python -B cloudflare/prime-media/update-worker.py --deploy` updates the existing Worker without rotating secrets or changing the bucket/gateway. Real Telegram upload, Android background/reload, codec and rotation checks remain device-unverified. See latest production audit for deployment evidence; older parked statements below are historical.
+
 Current work is the checkout safety, loyalty, referral, and reload-recovery audit dated 2026-11-09. All implementation and builds belong in Prime-TGCloud-Sandbox; promote only a clean committed result after `npm run validate:miniapp` passes. Deploy only from Prime-TGCloud-Checkout. Both branches must finish at the same commit with no untracked files. Do not use legacy worktrees.
 
 Read AGENTS.md, docs/WORKTREE_GOVERNANCE.md, and the latest entry in docs/PRODUCTION_AUDIT.md. Current typography instructions in AGENTS.md take precedence over historical audit text.

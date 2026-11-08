@@ -5,6 +5,15 @@ const PART_SIZE = 10 * 1024 * 1024;
 const MAX_SIZE = 150 * 1024 * 1024;
 const encoder = new TextEncoder();
 
+function categories(values) {
+  if (!Array.isArray(values) || values.length > 12 || values.some(value => typeof value !== 'string' || !value.trim() || value.length > 80)) throw new Error('Invalid categories');
+  const seen = new Set();
+  return values.map(value => value.trim()).filter(value => {
+    const key = value.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true;
+  });
+}
+function validThumbnail(value) { return !value || /^tgmedia:[A-Za-z0-9_-]{8,80}$/.test(value) || /^https:\/\/[^\s]+$/.test(value); }
+
 function json(value, status = 200, headers = {}) {
   return new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers } });
 }
@@ -63,28 +72,34 @@ async function signPart(env, key, uploadId, partNumber) {
   const signed = await client.sign(new Request(url, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' } }), { aws: { signQuery: true } });
   return signed.url.toString();
 }
-async function bearer(id, env) {
-  const expiry = Math.floor(Date.now() / 1000) + 600;
+async function bearer(id, env, lifetime = 600) {
+  const expiry = Math.floor(Date.now() / 1000) + lifetime;
   const data = `${id}.${expiry}`;
   const signature = base64url(await hmac(encoder.encode(env.STREAM_SIGNING_KEY), data));
   return `${data}.${signature}`;
 }
 async function validBearer(token, id, env) {
   const match = /^([a-f0-9]{32})\.([0-9]{10})\.([A-Za-z0-9_-]{43})$/.exec(token || '');
-  if (!match || match[1] !== id || Number(match[2]) < Date.now() / 1000 || Number(match[2]) > Date.now() / 1000 + 600) return false;
+  if (!match || match[1] !== id || Number(match[2]) < Date.now() / 1000 || Number(match[2]) > Date.now() / 1000 + 7200) return false;
   return equalBytes(await hmac(encoder.encode(env.STREAM_SIGNING_KEY), `${match[1]}.${match[2]}`), unbase64url(match[3]));
 }
 async function handle(request, env) {
   const url = new URL(request.url);
   const origin = request.headers.get('Origin') || '';
   const allowed = String(env.ALLOWED_ORIGINS || '').split(',').map(x => x.trim()).includes(origin);
-  const cors = allowed ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'Content-Type, X-Telegram-Init-Data', 'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS' } : {};
+  const cors = allowed ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'Content-Type, X-Telegram-Init-Data, Range', 'Access-Control-Allow-Methods': 'GET, HEAD, POST, PATCH, DELETE, OPTIONS', 'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges' } : {};
   if (request.method === 'OPTIONS') return allowed ? new Response(null, { status: 204, headers: cors }) : fail('Origin not allowed.', 403);
   const respond = (value, status = 200) => json(value, status, cors);
   if (origin && !allowed) return fail('Origin not allowed.', 403);
   if (!env.MEDIA_BUCKET || !env.STREAM_SIGNING_KEY) return respond({ error: 'Storage service is not configured.' }, 503);
   const userId = await identity(request, env);
   const admin = isAdmin(userId, env);
+
+  if (url.pathname === '/health' && request.method === 'GET') {
+    if (!admin) return respond({ error: 'Admin access required.' }, 403);
+    await env.MEDIA_BUCKET.list({ prefix: 'catalog/', limit: 1 });
+    return respond({ connected: true, storage: 'r2', multipart: Boolean(env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.CLOUDFLARE_ACCOUNT_ID) });
+  }
 
   if (url.pathname === '/videos' && request.method === 'GET') {
     const rows = [];
@@ -125,9 +140,19 @@ async function handle(request, env) {
     if (!admin) return respond({ error: 'Admin access required.' }, 403);
     const id = complete[1];
     const session = await readJson(env.MEDIA_BUCKET, uploadKey(id));
-    if (!session || session.owner !== userId) return respond({ error: 'Upload session not found.' }, 404);
+    if (!session) {
+      const completed = await readJson(env.MEDIA_BUCKET, infoKey(id));
+      if (completed) return respond({ video: completed });
+      return respond({ error: 'Upload session not found.' }, 404);
+    }
+    if (session.owner !== userId || Date.now() - session.createdAt > 86400000) return respond({ error: 'Upload session not found.' }, 404);
     const body = await request.json();
     if (!String(body.title || '').trim()) return respond({ error: 'Title is required.' }, 400);
+    let categoryList;
+    try { categoryList = categories(body.categories || [body.category || 'Uncategorized']); }
+    catch { return respond({ error: 'Choose up to 12 categories, each 80 characters or less.' }, 400); }
+    if (!categoryList.length) return respond({ error: 'At least one category is required.' }, 400);
+    if (!validThumbnail(String(body.thumbnailUrl || ''))) return respond({ error: 'Invalid thumbnail reference.' }, 400);
     const expected = Math.ceil(session.size / PART_SIZE);
     if (!Array.isArray(body.parts) || body.parts.length !== expected || body.parts.some((p, i) => p.partNumber !== i + 1 || !/^"?[a-f0-9-]{16,80}"?$/i.test(p.etag))) return respond({ error: 'Incomplete upload parts.' }, 400);
     const upload = env.MEDIA_BUCKET.resumeMultipartUpload(videoKey(id), session.uploadId);
@@ -135,6 +160,11 @@ async function handle(request, env) {
     const object = await env.MEDIA_BUCKET.head(videoKey(id));
     if (!object || object.size !== session.size) return respond({ error: 'Stored file size verification failed.' }, 500);
     const info = { id, title: String(body.title || '').trim().slice(0, 180), description: String(body.description || '').trim().slice(0, 4000), category: String(body.category || 'Product Demos').trim().slice(0, 80), tags: Array.isArray(body.tags) ? body.tags.slice(0, 20).map(x => String(x).slice(0, 40)) : [], thumbnailUrl: String(body.thumbnailUrl || '').slice(0, 1000), fileSize: object.size, isPublished: false, featured: Boolean(body.featured), createdAt: new Date().toISOString() };
+    info.categories = categoryList; info.category = info.categories[0] || 'Uncategorized';
+    info.duration = Math.max(0, Math.min(86400, Math.round(Number(body.duration) || 0)));
+    info.width = Math.max(1, Math.round(Number(body.width) || 1920));
+    info.height = Math.max(1, Math.round(Number(body.height) || 1080));
+    if (!validThumbnail(info.thumbnailUrl)) return respond({ error: 'Invalid thumbnail reference.' }, 400);
     await writeJson(env.MEDIA_BUCKET, infoKey(id), info);
     await env.MEDIA_BUCKET.delete(uploadKey(id));
     return respond({ video: info });
@@ -157,6 +187,13 @@ async function handle(request, env) {
     for (const key of ['title', 'description', 'category', 'thumbnailUrl']) if (typeof body[key] === 'string') info[key] = body[key].trim().slice(0, key === 'description' ? 4000 : 1000);
     for (const key of ['isPublished', 'featured']) if (typeof body[key] === 'boolean') info[key] = body[key];
     if (Array.isArray(body.tags)) info.tags = body.tags.slice(0, 20).map(x => String(x).slice(0, 40));
+    if (body.categories !== undefined) {
+      try { info.categories = categories(body.categories); }
+      catch { return respond({ error: 'Invalid categories.' }, 400); }
+      if (!info.categories.length) return respond({ error: 'At least one category is required.' }, 400);
+      info.category = info.categories[0];
+    }
+    if (!validThumbnail(info.thumbnailUrl)) return respond({ error: 'Invalid thumbnail reference.' }, 400);
     if (!info.title) return respond({ error: 'Title is required.' }, 400);
     await writeJson(env.MEDIA_BUCKET, infoKey(video[1]), info);
     return respond({ video: info });
@@ -171,16 +208,27 @@ async function handle(request, env) {
     if (!userId) return respond({ error: 'Telegram access required.' }, 401);
     const info = await readJson(env.MEDIA_BUCKET, infoKey(grant[1]));
     if (!info || !info.isPublished && !admin) return respond({ error: 'Video not found.' }, 404);
-    return respond({ url: `${url.origin}/stream/${grant[1]}?token=${encodeURIComponent(await bearer(grant[1], env))}`, expiresIn: 600 });
+    const lifetime = Math.min(7200, Math.max(600, (Number(info.duration) || 0) + 300));
+    return respond({ url: `${url.origin}/stream/${grant[1]}?token=${encodeURIComponent(await bearer(grant[1], env, lifetime))}`, expiresIn: lifetime });
   }
   const stream = /^\/stream\/([a-f0-9]{32})$/.exec(url.pathname);
   if (stream && (request.method === 'GET' || request.method === 'HEAD')) {
-    if (!await validBearer(url.searchParams.get('token'), stream[1], env)) return fail('Video link expired.', 403);
+    if (!await validBearer(url.searchParams.get('token'), stream[1], env)) return respond({ error: 'Video link expired.' }, 403);
     const info = await readJson(env.MEDIA_BUCKET, infoKey(stream[1]));
-    if (!info) return fail('Video not found.', 404);
+    if (!info || !info.isPublished) return respond({ error: 'Video not found.' }, 404);
+    const head = await env.MEDIA_BUCKET.head(videoKey(stream[1]));
+    if (!head) return respond({ error: 'Video not found.' }, 404);
+    const rangeHeader = request.headers.get('Range');
+    if (rangeHeader) {
+      const rangeMatch = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
+      const start = rangeMatch?.[1] ? Number(rangeMatch[1]) : 0;
+      const end = rangeMatch?.[2] ? Number(rangeMatch[2]) : head.size - 1;
+      if (!rangeMatch || (!rangeMatch[1] && !rangeMatch[2]) || start >= head.size || (rangeMatch[1] && end < start))
+        return new Response(null, { status: 416, headers: { ...cors, 'Content-Range': `bytes */${head.size}` } });
+    }
     const object = await env.MEDIA_BUCKET.get(videoKey(stream[1]), { range: request.headers });
     if (!object) return fail('Video not found.', 404);
-    const headers = new Headers({ 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, no-store', 'Content-Disposition': 'inline' });
+    const headers = new Headers({ ...cors, 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, no-store', 'Content-Disposition': 'inline', 'X-Content-Type-Options': 'nosniff' });
     const range = object.range;
     if (range) headers.set('Content-Range', `bytes ${range.offset}-${range.offset + range.length - 1}/${object.size}`);
     headers.set('Content-Length', String(range ? range.length : object.size));

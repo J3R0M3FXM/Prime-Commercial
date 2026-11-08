@@ -2,6 +2,7 @@ import { db } from 'sdk';
 import { desc, eq } from 'sdk/db';
 import { videos } from '../schema.js';
 import { publicMediaReference } from '../lib/media.js';
+import { publicVideoMetadata, videoCategories } from '../lib/video-metadata.js';
 
 /** Public gallery metadata; unpublished items are never returned. */
 export default async function (input = {}) {
@@ -16,7 +17,7 @@ export default async function (input = {}) {
   const featuredOnly = input.featured === true || String(input.featured).toLowerCase() === 'true';
 
   const filtered = rows.filter((video) => {
-    if (category && category !== 'all' && String(video.category || '').toLowerCase() !== category) return false;
+    if (category && category !== 'all' && !videoCategories(video).some(value => value.toLowerCase() === category)) return false;
     if (featuredOnly && !video.featured) return false;
     if (search) {
       const tags = Array.isArray(video.tags) ? video.tags : [];
@@ -37,7 +38,8 @@ export default async function (input = {}) {
     title: video.title,
     description: video.description,
     category: video.category,
-    tags: video.tags,
+    categories: videoCategories(video),
+    tags: publicVideoMetadata(video).tags,
     mediaId: video.id,
     storageType: video.storageType,
     directUrl: await publicMediaReference(video.directUrl),

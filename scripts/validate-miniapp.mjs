@@ -30,5 +30,20 @@ run('node', ['scripts/check-telegram-serverless-contracts.mjs'], 'Serverless con
 run('node', ['scripts/test-promo-codec.mjs'], 'promo regressions');
 run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
 run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
+run('node', ['scripts/test-media.mjs'], 'media upload/gallery/offline/playlist safety');
+run('node', ['--check', 'public/media-offline-worker.js'], 'offline media worker syntax');
+run('node_modules/.bin/rolldown', ['cloudflare/prime-media/src/index.mjs', '--platform', 'browser', '--format', 'esm', '--file', 'cloudflare/prime-media/dist/worker.mjs'], 'R2 Worker bundle');
+run('node', ['cloudflare/prime-media/test-worker.mjs'], 'R2 Worker auth/metadata/range/unpublish safety');
+run('python', ['-B', '-c', `import runpy
+m = runpy.run_path('cloudflare/prime-media/update-worker.py')['metadata']
+names = ['R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','TELEGRAM_BOT_TOKEN','ADMIN_TELEGRAM_IDS','STREAM_SIGNING_KEY']
+s = {'compatibility_date':'2026-11-04','bindings':[{'name':'MEDIA_BUCKET','type':'r2_bucket','bucket_name':'prime-media-preview'}] + [{'name':n,'type':'secret_text'} for n in names]}
+r=m(s)
+assert r['keep_bindings']==['secret_text'] and len(r['bindings'])==1
+s['bindings'][0]['bucket_name']='other'
+try: m(s)
+except RuntimeError: pass
+else: raise AssertionError('Unexpected bucket accepted')
+`], 'Worker release binding preservation');
 if (process.env.VITE_UI_PREVIEW === '1') throw new Error('Production validation must not enable VITE_UI_PREVIEW');
 run('npm', ['run', 'build:miniapp'], 'production build', true);

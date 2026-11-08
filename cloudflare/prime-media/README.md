@@ -1,5 +1,7 @@
 # Prime Media R2 pilot
 
+Current release adds multi-categories, generated selectable thumbnails, duration metadata, stream CORS and publication rechecks on every signed stream. Grants expire after a duration-aware 10–120 minutes. Admin `/health` checks the real bucket/signer configuration. Use `python -B cloudflare/prime-media/update-worker.py` for a read-only binding check; add `--deploy` only from validated clean Checkout. It preserves existing remote secrets and bindings and refuses an unexpected bucket. Do not rerun initial provisioning for an update. The unchanged Pages service-binding gateway needs no redeployment.
+
 The private R2 Worker, exact-origin bucket CORS, and Pages gateway are configured. The production Mini App uses `https://prime-media-gateway.pages.dev`; the gateway forwards to the private Worker through a Cloudflare service binding. Do not point the Mini App directly at `workers.dev`.
 
 The account key was used only to configure Cloudflare. Worker signing uses a key scoped to `prime-media-preview`; secrets remain outside this repository. The public Pages gateway was verified from this environment: `/videos` returns HTTP 200 and the live-origin CORS preflight returns 204. Authenticated upload, playback, and Android behavior still require a real Telegram-device check.

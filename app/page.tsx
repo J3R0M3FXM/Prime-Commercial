@@ -199,8 +199,7 @@ export default function Shopfront() {
           throw new Error("Valid Telegram WebApp session is required. Open PRIME from Telegram.");
         }
 
-        // Media remains locked for content access, but the tab and deep-link open the
-        // customer-facing availability announcement.
+        // Open the customer media library for Telegram media deep links.
         if (telegramWebApp.initDataUnsafe?.start_param === "media") {
           setActiveTab("media");
         }
@@ -585,7 +584,7 @@ export default function Shopfront() {
           onClick={() => {
             setActiveTab("media");
           }}
-          title="Media availability announcement"
+          title="Media library"
           className={`flex-1 flex flex-col items-center justify-center py-0.5 px-0.5 text-center transition-colors cursor-pointer ${
             activeTab === "media"
               ? "text-emerald-700 font-normal"

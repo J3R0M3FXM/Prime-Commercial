@@ -81,6 +81,34 @@ export default async function (input, ctx) {
     throw new EndpointError('This media file exceeds the supported inline transfer size.', { code: 'MEDIA_TOO_LARGE' });
   }
 
+  if (videoId) {
+    const userId = String(ctx?.initData?.user?.id || '');
+    if (!/^\d+$/.test(userId)) throw new EndpointError('Telegram access required.', { code: 'AUTH_REQUIRED' });
+    const chunkSize = 512 * 1024;
+    const index = Number(input?.chunkIndex ?? 0);
+    if (!Number.isInteger(index) || index < 0 || index >= 40) throw new EndpointError('Invalid stream part.', { code: 'INVALID_INPUT' });
+    // Short-lived server-side transfer cache avoids re-downloading the complete
+    // Telegram file for every bridge-sized part. Publication is checked above
+    // on every request, including cached reads.
+    await db.run(`CREATE TABLE IF NOT EXISTS media_video_transfer_cache (id TEXT PRIMARY KEY, file_id TEXT NOT NULL, bytes BLOB NOT NULL, expires_at INTEGER NOT NULL)`);
+    await db.run(`DELETE FROM media_video_transfer_cache WHERE expires_at<=unixepoch()`);
+    let cached = await db.get(`SELECT length(bytes) AS size, substr(bytes,:offset,:length) AS bytes
+      FROM media_video_transfer_cache WHERE id=:id AND file_id=:file_id AND expires_at>unixepoch()`,
+    { ':id': asset.id, ':file_id': asset.fileId, ':offset': index * chunkSize + 1, ':length': chunkSize });
+    if (!cached) {
+      const source = await asBytes(await api.getFileContent(asset.fileId));
+      if (source.length > 20 * 1024 * 1024 || (Number(asset.size) > 0 && source.length !== Number(asset.size)))
+        throw new EndpointError('Media size verification failed.', { code: 'MEDIA_SIZE_MISMATCH' });
+      await db.run(`INSERT INTO media_video_transfer_cache VALUES (:id,:file_id,:bytes,unixepoch()+180)
+        ON CONFLICT(id) DO UPDATE SET file_id=excluded.file_id,bytes=excluded.bytes,expires_at=excluded.expires_at`,
+      { ':id': asset.id, ':file_id': asset.fileId, ':bytes': source });
+      cached = { size: source.length, bytes: source.subarray(index * chunkSize, (index + 1) * chunkSize) };
+    }
+    const count = Math.ceil(Number(cached.size) / chunkSize);
+    if (index >= count) throw new EndpointError('Invalid stream part.', { code: 'INVALID_INPUT' });
+    return { id: asset.id, contentType: 'video/mp4', size: Number(cached.size), chunkIndex: index, chunkCount: count, base64: encodeBase64(await asBytes(cached.bytes)) };
+  }
+
   const stored = await db.select().from(mediaAssetContents).where(eq(mediaAssetContents.id, asset.id)).get();
   let content = stored?.bytes || null;
   if (!content && String(asset.fileId || '').startsWith('inline:')) {
