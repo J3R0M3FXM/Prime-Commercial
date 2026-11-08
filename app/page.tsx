@@ -18,6 +18,7 @@ import { formatPHP } from "@/lib/currency";
 import { callServerless, getServerlessCatalog, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
+import { readCheckoutDraft } from "@/lib/checkout-draft";
 
 
 const VISUAL_PREVIEW_PRODUCT = {
@@ -254,6 +255,10 @@ export default function Shopfront() {
             localStorage.setItem("prime_customer_name", customerName);
             localStorage.setItem("prime_customer_username", customerUsername);
             localStorage.setItem("prime_member_id", memberId);
+            if (!openOrderId && readCheckoutDraft(String(customerId))) {
+              setActiveTab("cart");
+              setIsCartOpen(true);
+            }
           }
 
           setAuthorized(true);

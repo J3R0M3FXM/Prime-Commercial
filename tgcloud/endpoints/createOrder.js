@@ -354,24 +354,19 @@ async function makeCanonicalSnapshot(request, customer, submittedAt) {
 
   let referrer = null;
   if (customer.referredByUserId || customer.referredByMemberId) {
-    referrer = { id: customer.referredByUserId || '', memberId: customer.referredByMemberId || '' };
+    const linked = await db.get(`SELECT id, prime_member_id AS memberId FROM customers
+      WHERE (:id <> '' AND id = :id) OR (:member <> '' AND upper(prime_member_id) = upper(:member))
+      ORDER BY CASE WHEN id = :id THEN 0 ELSE 1 END LIMIT 1`,
+    { ':id': String(customer.referredByUserId || ''), ':member': String(customer.referredByMemberId || '') });
+    if (linked && String(linked.id) !== String(customer.id)) referrer = { id: linked.id, memberId: linked.memberId || '' };
   } else if (request.referralCode) {
     referrer = await db.select({ id: customers.id, primeMemberId: customers.primeMemberId })
       .from(customers).where(eq(customers.primeMemberId, request.referralCode)).get();
     if (!referrer || referrer.id === customer.id) throw new EndpointError('Referral code is invalid.', { code: 'REFERRAL_INVALID' });
     referrer = { id: referrer.id, memberId: referrer.primeMemberId || request.referralCode };
   }
-  if (referrer?.id) {
-    const eligible = await db.get(
-      `SELECT id FROM orders WHERE customer_id = :referrer_id
-         AND lower(trim(coalesce(status, ''))) IN ('completed', 'delivered') LIMIT 1`,
-      { ':referrer_id': String(referrer.id) },
-    );
-    if (!eligible?.id) throw new EndpointError(
-      'Referral code is not eligible yet. The referring member needs a completed order first.',
-      { code: 'REFERRER_NOT_ELIGIBLE' },
-    );
-  }
+  // Attribution is allowed before the referrer's first delivery. The award
+  // remains pending until both members have a successful completed order.
 
   const shippingPromo = ['free_shipping', 'shipping_discount'].includes(String(promo?.discountType || '').toLowerCase());
   const promoDiscount = shippingPromo ? 0 : money(promo?.discountAmount || 0);
@@ -533,6 +528,7 @@ async function persistOrder(snapshot, operationId, customer) {
     return jsonColumns.has(column) ? 'json(' + key + ')' : key;
   });
   params[':operation_id'] = operationId;
+  params[':reservations'] = JSON.stringify(snapshot.reservations);
   let persisted = false;
   for (let attempt = 0; attempt < 120; attempt++) {
     params[':v' + columns.indexOf('order_number')] = orderNumber;
@@ -541,6 +537,13 @@ async function persistOrder(snapshot, operationId, customer) {
        SELECT ${placeholders.join(', ')}
         WHERE EXISTS (SELECT 1 FROM checkout_operations o
           WHERE o.id = :operation_id AND o.status = 'processing')
+          AND NOT EXISTS (
+            SELECT 1 FROM json_each(:reservations) line
+            LEFT JOIN inventory_reservations r ON r.order_id = :operation_id
+              AND r.product_id = json_extract(line.value, '$.productId')
+              AND r.variant_id = json_extract(line.value, '$.variantId')
+            WHERE r.id IS NULL OR r.status <> 'held' OR r.expires_at <= unixepoch()
+              OR r.quantity <> json_extract(line.value, '$.quantity'))
        ON CONFLICT DO NOTHING RETURNING id`, params,
     );
     if (Number(result?.rowsAffected) > 0) {
@@ -554,6 +557,15 @@ async function persistOrder(snapshot, operationId, customer) {
       persisted = true;
       break;
     }
+    const expiredHold = await db.get(`SELECT 1 AS invalid
+      FROM json_each(:reservations) line
+      LEFT JOIN inventory_reservations r ON r.order_id = :operation_id
+        AND r.product_id = json_extract(line.value, '$.productId')
+        AND r.variant_id = json_extract(line.value, '$.variantId')
+      WHERE r.id IS NULL OR r.status <> 'held' OR r.expires_at <= unixepoch()
+        OR r.quantity <> json_extract(line.value, '$.quantity') LIMIT 1`,
+    { ':reservations': params[':reservations'], ':operation_id': operationId });
+    if (expiredHold) throw new EndpointError('The stock reservation expired. Retry checkout to check availability.', { code: 'INVENTORY_RESERVATION_EXPIRED' });
     orderNumber = formatOrderNumber(orderTimestamp + attempt + 1);
   }
   if (!persisted) throw new EndpointError('Could not allocate a unique order number. Retry this checkout.', { code: 'ORDER_NUMBER_UNAVAILABLE' });
@@ -636,6 +648,9 @@ async function processOperation(operation, request, customer) {
     };
     if (snapshot) snapshot.orderNumber = existingOrder.orderNumber || snapshot.orderNumber;
   } else if (!snapshot) {
+    if (!request.paymentSessionId || !request.paymentProofData || !request.paymentMethodId) {
+      throw new EndpointError('Upload payment proof before submitting this order.', { code: 'PAYMENT_PROOF_REQUIRED' });
+    }
     snapshot = await makeCanonicalSnapshot(request, customer, operation.createdAt);
     const stored = await saveCanonicalCheckoutSnapshot({ operationId, snapshot });
     if (!stored.saved) throw new EndpointError('Checkout could not save its recovery snapshot.', { code: 'SNAPSHOT_FAILED' });
@@ -643,6 +658,9 @@ async function processOperation(operation, request, customer) {
   }
 
   if (!existingOrder) {
+    if (!snapshot.paymentProofData || !snapshot.paymentMethodId) {
+      throw new EndpointError('Upload payment proof before submitting this order.', { code: 'PAYMENT_PROOF_REQUIRED' });
+    }
     if (Number(operation.expiresAt) <= Math.floor(Date.now() / 1000)) {
       throw new EndpointError('This checkout attempt expired. Start checkout again.', { code: 'OPERATION_EXPIRED' });
     }
@@ -735,9 +753,12 @@ export default async function (input, ctx) {
       request = prior.requestSnapshot;
     } else {
       request = submittedRequest;
+      if (!request.paymentSessionId) {
+        throw new EndpointError('Upload payment proof before submitting this order.', { code: 'PAYMENT_PROOF_REQUIRED' });
+      }
       if (request.paymentSessionId) {
         const session = paymentSession;
-        if (!session || session.status !== 'proof_uploaded' || Number(session.expiresAt) <= submittedAt)
+        if (!session || session.status !== 'proof_uploaded' || !session.proofData || !session.paymentMethodId || Number(session.expiresAt) <= submittedAt)
           throw new EndpointError('Upload payment proof before submitting this order.', { code: 'PAYMENT_PROOF_REQUIRED' });
         // SQLite returns request_snapshot as JSON text through the raw db.get
         // path. Parse it before sanitizing; treating that string as an object

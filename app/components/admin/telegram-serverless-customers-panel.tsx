@@ -9,7 +9,7 @@ type Customer = {
   id: string; tgUserId?: string; tgName?: string; tgUsername?: string; phoneNumber?: string;
   primeMemberId?: string; points?: number; referralPoints?: number; storeCredits?: number;
   totalOrders?: number; lifetimeSpent?: number; isBanned?: boolean; referredByMemberId?: string; createdAt?: string;
-  fingerprintCount?: number; latestFingerprint?: any;
+  fingerprintCount?: number; latestFingerprint?: any; isVisitor?: boolean;
 };
 
 function date(value?: string) {

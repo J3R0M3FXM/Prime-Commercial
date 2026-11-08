@@ -234,8 +234,8 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
 
   if (!isOpen) return null;
 
-  const activeTier = tier?.tier || 'Silver';
-  const tierPointsRate: Record<string, string> = { Silver: '5.0%', Bronze: '5.5%', Gold: '6.0%', Platinum: '6.5%', Titanium: '7.0%' };
+  const activeTier = tier?.tier || 'Member';
+  const tierPointsRate: Record<string, string> = { Member: '0%', Silver: '5.5%', Gold: '6.0%', Platinum: '6.5%', Titanium: '7.0%' };
 
   return (
     <div id="account-modal-overlay" className="prime-account w-full bg-gray-50 flex justify-center py-[4.8px]">
@@ -323,7 +323,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                   <div className="prime-account__tier flex shrink-0 flex-col items-end justify-center border-l border-gray-200 pl-2">
                     <div className="prime-account__tier-label uppercase">Membership Tier</div>
                     <div className="prime-account__tier-value mt-0.5 uppercase">{activeTier}</div>
-                    <div className="prime-account__tier-rate mt-1">Cashback Rate: {tierPointsRate[activeTier] || '5.0%'}</div>
+                    <div className="prime-account__tier-rate mt-1">Cashback Rate: {tierPointsRate[activeTier] || '0%'}</div>
                   </div>
                 </div>
 
@@ -526,13 +526,13 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
               {/* TAB 3: REFERRALS */}
               {activeTab === 'referrals' && (
                 <div className="prime-account__referrals space-y-3">
-                  {Number(c?.lifetimeSuccessfulOrders || 0) < 1 && <p role="note" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Referral eligibility: complete your first successful order before others can use your PRIME Member ID as a referral code. They will see this reason if they try it early.</p>}
+                  {Number(c?.lifetimeSuccessfulOrders || 0) < 1 && <p role="note" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Referral bonuses stay on hold until both you and the referred customer have a completed or delivered order.</p>}
                   {/* Share Card */}
                   <div className="prime-account__section prime-account__share border border-gray-200 rounded-lg p-3 bg-gray-50 font-mono text-xs space-y-2">
                     <div>
                       <h4 className="text-sm font-bold text-gray-900 uppercase">Your Permanent Referral Code</h4>
                       <p className="text-gray-500 text-[11px] mt-0.5">
-                        {Number(c?.lifetimeSuccessfulOrders || 0) < 1 ? 'Your referral code becomes valid after your first completed order.' : 'Share your PRIME Member ID with friends. After their order is completed, you can earn 50 Referral Points.'}
+                        Share your PRIME Member ID with friends. Earn 50 Referral Points after both members have a completed or delivered order. Cancelled or undelivered orders do not qualify.
                       </p>
                     </div>
 
@@ -670,7 +670,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
       </div>
 
       <AnimatePresence>
-        {pointsHelp && <motion.div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPointsHelp(null)}><section role="dialog" aria-modal="true" aria-label="Points and Credits information" className="w-full max-w-[398px] rounded-xl bg-white p-4 text-slate-900 shadow-xl" onClick={event => event.stopPropagation()}><h3 className="font-roboto-condensed-semibold text-base">{pointsHelp === 'credits' ? 'Store Credits' : pointsHelp === 'purchasing' ? 'Purchasing Points' : 'Referral Points'}</h3><p className="mt-2 text-sm">{pointsHelp === 'credits' ? 'Store Credits can be used at checkout. Credits received from another member cannot be transferred again.' : pointsHelp === 'purchasing' ? 'Purchasing Points come from eligible completed orders and can be converted to Store Credits.' : 'Referral Points are awarded after a referred member completes an order. You need your own completed order before your referral code is eligible.'}</p><button type="button" className="mt-4 rounded border px-4 py-2 text-sm" onClick={() => setPointsHelp(null)}>Close</button></section></motion.div>}
+        {pointsHelp && <motion.div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPointsHelp(null)}><section role="dialog" aria-modal="true" aria-label="Points and Credits information" className="w-full max-w-[398px] rounded-xl bg-white p-4 text-slate-900 shadow-xl" onClick={event => event.stopPropagation()}><h3 className="font-roboto-condensed-semibold text-base">{pointsHelp === 'credits' ? 'Store Credits' : pointsHelp === 'purchasing' ? 'Purchasing Points' : 'Referral Points'}</h3><p className="mt-2 text-sm">{pointsHelp === 'credits' ? 'Store Credits can be used at checkout. Credits received from another member cannot be transferred again.' : pointsHelp === 'purchasing' ? 'Purchasing Points come from eligible completed orders and can be converted to Store Credits.' : 'Referral Points are awarded after a referred member completes an order. Bonuses stay on hold until both you and the referred member have a completed or delivered order.'}</p><button type="button" className="mt-4 rounded border px-4 py-2 text-sm" onClick={() => setPointsHelp(null)}>Close</button></section></motion.div>}
         {transferOpen && <motion.div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 px-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !transferBusy && setTransferOpen(false)}><section role="dialog" aria-modal="true" aria-label="Transfer Store Credits" className="w-full max-w-[398px] rounded-xl bg-white p-4 text-slate-900 shadow-xl" onClick={event => event.stopPropagation()}><h3 className="font-roboto-condensed-semibold text-base">Transfer Store Credits</h3><p className="mt-1 text-xs">Send eligible credits using the recipient’s PRIME Member ID. Received credits cannot be transferred again.</p><label className="mt-3 block text-xs">Recipient PRIME Member ID<input className="mt-1 min-h-10 w-full rounded border px-3 font-mono" value={transferMemberId} onChange={event => setTransferMemberId(event.target.value.toUpperCase())} autoCapitalize="characters" /></label><label className="mt-3 block text-xs">Amount (₱)<input className="mt-1 min-h-10 w-full rounded border px-3 font-mono" type="number" inputMode="decimal" min="0.01" step="0.01" value={transferAmount} onChange={event => setTransferAmount(event.target.value)} /></label>{transferError && <p role="alert" className="mt-2 text-xs text-rose-700">{transferError}</p>}{transferSuccess && <p role="status" className="mt-2 text-xs text-emerald-700">{transferSuccess}</p>}<div className="mt-4 flex gap-2"><button type="button" className="min-h-10 flex-1 rounded border" onClick={() => setTransferOpen(false)}>Close</button><button type="button" disabled={transferBusy || !transferMemberId.trim() || !(Number(transferAmount) > 0)} className="min-h-10 flex-1 rounded bg-emerald-700 px-2 text-white disabled:opacity-50" onClick={() => void submitCreditTransfer()}>{transferBusy ? 'Sending…' : 'Transfer'}</button></div></section></motion.div>}
         {conversionType && (
           <motion.div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 px-4 py-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !conversionBusy && setConversionType(null)}>

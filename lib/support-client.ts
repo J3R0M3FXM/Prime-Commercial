@@ -7,10 +7,7 @@ export type TicketPage = { tickets: SupportTicket[]; total: number; unread: numb
 export const ticketStatusLabels: Record<TicketStatus, string> = { open: "Open", waiting_customer: "Awaiting Your Reply", resolved: "Resolved", closed: "Closed" };
 export const supportPreview = () => import.meta.env?.VITE_UI_PREVIEW === "1";
 export async function requestSupport<T = { ticket: SupportTicket }>(admin: boolean, input: Record<string, unknown>): Promise<T> {
-  if (import.meta.env.VITE_UI_PREVIEW === "1") {
-    const { previewSupportRequest } = await import("./support-preview");
-    return await previewSupportRequest<T>(admin, input);
-  }
+  if (supportPreview()) throw new Error("Support tickets require a verified Telegram session.");
   return await callServerless<T>(admin ? "manageSupportTickets" : "supportTickets", input, 20_000);
 }
 

@@ -1,0 +1,34 @@
+import { spawnSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+function run(command, args, label, summarize = false) {
+  const result = spawnSync(command, args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+  if (result.error || result.status !== 0) {
+    process.stdout.write(result.stdout || ''); process.stderr.write(result.stderr || '');
+    if (result.error) console.error(result.error);
+    throw new Error(label + ' failed');
+  }
+  if (summarize) {
+    for (const line of (result.stdout || '').split('\n').filter(line => /modules transformed|built in|dist\/index.html/.test(line))) console.log(line);
+    if (result.stderr) console.log('Vite emitted non-fatal dependency/configuration/chunk warnings.');
+  } else if (result.stdout) process.stdout.write(result.stdout);
+  console.log('PASS: ' + label);
+}
+
+run('git', ['diff', '--check'], 'diff whitespace');
+for (const directory of ['tgcloud/lib', 'tgcloud/endpoints', 'tgcloud/handlers']) {
+  for (const file of readdirSync(directory).filter(file => file.endsWith('.js'))) {
+    const path = join(directory, file);
+    const result = spawnSync('node', ['--check', path], { encoding: 'utf8' });
+    if (result.status !== 0) throw new Error(path + ': ' + result.stderr);
+  }
+}
+console.log('PASS: all backend module syntax');
+run('npm', ['run', 'typecheck:miniapp'], 'production Mini App type-check');
+run('node', ['scripts/check-telegram-serverless-contracts.mjs'], 'Serverless contracts');
+run('node', ['scripts/test-promo-codec.mjs'], 'promo regressions');
+run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
+run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
+if (process.env.VITE_UI_PREVIEW === '1') throw new Error('Production validation must not enable VITE_UI_PREVIEW');
+run('npm', ['run', 'build:miniapp'], 'production build', true);

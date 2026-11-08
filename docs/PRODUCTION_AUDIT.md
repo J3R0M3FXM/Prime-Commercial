@@ -1,5 +1,26 @@
 # Production Reconstruction Audit
 
+## Checkout safety, rewards, referrals, and reload recovery — 2026-11-09
+
+This entry supersedes historical worktree/release and loyalty statements below for the current source. Implementation and all builds/tests took place in Sandbox. Checkout was initially clean at `cf2d356`; Sandbox was clean at `d2ea637`. Application code matched exactly; only three governance/document files differed. The Checkout branch was merged into Sandbox, preserving the historical audit evidence. Promotion is a fast-forward of the validated final Sandbox commit, so both branches share the exact same source and documentation.
+
+Findings and repairs:
+
+- The UI required proof, but a direct new `createOrder` call could omit `paymentSessionId`. New orders now require a customer-owned, unexpired `proof_uploaded` session containing proof bytes and a method, including operation recovery before an order has been persisted. Proof upload validates the claimed image header/type; new sessions require an active method. Changing session request/method invalidates the earlier proof. Arbitrary inline proof on an order request is not accepted as a substitute. Existing saved orders remain recoverable. An uploaded receipt is evidence only: provider payment is still manually verified, and submission records Pending Review, never Paid.
+- Inventory was already reserved before staff approval through a single conditional SQLite write. A hold could nevertheless expire between reservation and the order INSERT. The INSERT now atomically verifies every expected product/variant/quantity hold is present, held, and unexpired. Missing/expired holds reject persistence and use the existing compensation path. Proof-backed pending orders continue reserving stock after the old unpaid deadline. Catalog availability subtracts those reservations. No live stock/order test or inventory mutation was performed.
+- The old tiers were Silver at zero spending/5.0% and Bronze at PHP10,000/5.5%. The new anchored 30-day ladder is Member below PHP10,000/0% tier cashback, Silver PHP10,000/5.5%, Gold PHP15,000/6.0%, Platinum PHP20,000/6.5%, Titanium PHP25,000/7.0%. The below-threshold rule is the stated implementation assumption pending any owner correction. Awards use eligible item spend after item discount and Store Credits, floor to whole points once, and choose the richer of voucher/tier rewards without stacking. Existing awarded balances and old canonical order snapshots were not rewritten. Unix-second completion dates and cancelled-order exclusion are covered.
+- Referral validation formerly rejected a code until the referrer had a completed order. It now preserves attribution and explains the hold. Award selection and the actual customer balance UPDATE both require the referrer's own completed/delivered order; the referred order must itself be completed/delivered. The existing 50-point amount, 30-minute maturity delay, ledger identity, and recovery marker remain. Account refresh reconciles mature eligible awards and shows the hold reason. Noncompleted/cancelled referred orders do not qualify. Reconciliation remains request-driven, not a guaranteed timed background job. Existing member-only attribution is resolved to the referrer's customer ID.
+- A 24-hour per-Telegram-account local draft retains checkout step, fixed cart snapshot, receiver/address/courier/payment details, prepared receipt and forensics metadata, promo/credit choices, and the effective payment-session/operation retry identity. Backgrounding and pagehide flush the latest draft. After a reload, the normal Telegram server authentication runs again before restoring the payment page. No initData, authentication token, or cached admin authority is persisted. The bridge is allowed time to reinject after Android resumes. A lost submission response is recovered by the same session/key, even if the original request had not reached the server; no second payment is requested. Explicit checkout close and success clear the draft. Cart hydration no longer writes an empty cart over saved data during mount. Receipt preparation fits the backend's approximately 600 KB payload limit; unavailable device storage is reported.
+
+Validation and scope:
+
+- Final combined validation passed: backend syntax, strict Mini App TypeScript, contracts, promo/delivery tests, all six checkout safety groups, and production build (2,368 modules). Sandbox production assets: `index-B3YGY8O8.js` SHA-256 `ddb735292f1d12127d6ba0c412b21420222a2be430e9024c829f6eaeae6e6318`; `index-DhKq8E-y.css` SHA-256 `265049c5e64523443a795c3eb4d9229211057182675feeb63aa80a20f2a6aae2`. Promotion transfers this exact generated dist, with no Checkout rebuild.
+
+- `npm run validate:miniapp` is the release gate: all TGCloud backend syntax, strict production Vite-entry TypeScript, Serverless contracts, promo regression, delivery-fee regression, checkout safety tests, and production build must pass before promotion. The safety suite uses two real concurrent SQLite connections for the last-unit race and exercises variant isolation, orphan expiry, proof-backed stock retention, expired-hold order persistence, forged/missing/foreign proof sessions, proof invalidation on request changes, effective retry identity, all tier boundaries, cycle reset, cancelled-order exclusion, reward conservation, referral hold/release/exactly-once credit, and account-scoped draft reload/expiry/cleanup.
+- The initial repository-wide legacy Next/native `tsc` command was not clean. A separate `tsconfig.miniapp.json` now validates the actual production entry with bundler resolution and a modern target. Added React DOM types; repaired missing declarations/annotations and removed unreachable references to an undefined retired Maya response and an absent support preview module. Native/legacy Next validation is outside this release gate. The generated tracked `tsconfig.tsbuildinfo` was removed and is ignored; it is reproducible.
+- Production Vite build succeeds with existing non-fatal dependency/configuration/chunk warnings. No preview build is promoted. Build/SQLite/draft tests do not establish on-device Telegram process-kill, bank-app-switch behavior, or provider settlement. Those device checks remain outstanding.
+- Read-only TGCloud status from Checkout returned app8830494959, local revision 432, webhook in sync, backend working directory clean, and 51 static files current before these changes. This task does not deploy the new source, push schema, place real orders, change payment settings, or rewrite existing business records. Both trees finish at the same validated commit, clean and without untracked files. For a later requested deployment, recheck status/parity and push only the reviewed changed modules plus the Sandbox-built production dist from Checkout.
+
 ## Checkout presentation repair promoted — 2026-11-06
 
 - Sandbox commit `d3ba126` was promoted to Checkout `b51dd8b` and deployed static-only at r414. It restores payment-method carousel paging, styles checkout notices/payable total, and corrects global header clock clipping. Build and Serverless contract checks passed. No backend/schema or business data changed. Device visual confirmation remains pending; full release evidence is in Checkout's audit.
@@ -51,6 +72,46 @@
 - Syntax/contract checks passed. Customer-chat behavior still needs real Telegram verification. Secretary configurator wording still says “sent after 24 hours” and is queued for a UI correction.
 
 The production reconstruction audit is maintained in the sibling `Prime-TGCloud-Checkout/docs/PRODUCTION_AUDIT.md`. Read it before modifying this sandbox. The initial audit found a mismatch between locally deleted Serverless handlers and handlers still present in the deployed TGCloud snapshot; no deployment is safe until that mismatch is resolved.
+## Checkout notices, payment tiles and header clock — 2026-11-06
+
+- Based on the latest screenshots, restored the earlier three-column/three-row payment tile paging and swipe model (9 methods per page), rather than rendering all methods in one unpaged grid. Existing QR/account detail and secure-payment confirmation behavior are retained.
+- Replaced the plain amber receipt strip with a structured neutral receipt notice, emphasized payable-now in a dark high-contrast panel, added a clear payment-method heading, and aligned load/error/receipt/order status notices to one visual system.
+- The header clock was present in the component but the 28px fixed-height/overflow-hidden style could clip its date-time row. CSS now allocates explicit line heights for the right-aligned date/time, divider and access label.
+- Promoted Sandbox `d3ba126` to Checkout `b51dd8b`; build and Serverless contracts passed. Static-only deployment is TGCloud **r414**, clean working directory, 51 files current. Live HTML references `index-TROudVo4.js` and `index-CNFrQPLF.css`; required release strings/classes were verified in the served assets.
+- No backend/schema/payment configuration/order/customer data changed. Phone visual confirmation after refresh remains outstanding.
+
+## Screenshot-led payment and clipping repair — 2026-11-06
+
+- Reviewed the 17:38–17:43 Telegram screenshots. The pre-submit payment renderer only showed method logos and a bare selected-method name; it did not render QR media or bank/e-wallet account details. The shop's fixed header/search wrapper also had no reserved in-flow height, so the first product row could be hidden underneath it.
+- Selected QR methods now show the resolved QR image inline with account name/number and copy controls; transfer and wallet details are rendered when provided. Gateway types use the existing confirmation dialog. Order confirmation now has one concise proof-review card rather than repeating the order number/amount/status in multiple cards.
+- The fixed header/search wrapper's real height is measured and reserved with a ResizeObserver, including tab/responsive changes. QR dialog is constrained to the portrait app width and scrolls within small viewports.
+- Promoted Sandbox `4effa97` to Checkout `96617ab`; production build and Serverless contract suite passed. Static-only TGCloud deploy is **r413**, webhook in sync, clean working directory, 51 static files current. Served HTML references `index-CSQar3uv.js` and `index-4OA0BF_s.css`; live JS contains the new payment and confirmation strings.
+- No backend/schema, payment configuration, order, or customer data was changed. Code is live; actual QR scan, transfer copy and product first-row alignment still need owner-device visual confirmation.
+
+## Payment and checkout recovery — 2026-11-06
+
+- Fixed order submission rejecting a populated receiver: `createOrder.js` now parses the payment session's SQLite JSON `request_snapshot`; deployed at r409. Contract regression checks pass.
+- Deployed secure payment-link handling and customer projection at r412 by storing the validated HTTPS URL in the existing `payment_methods.public_key` field only for `secured_payment_link` methods. QR wallet address copy support and root-viewport scroll reset for Shop/Continue are included. No new database column or migration.
+- Production build, backend syntax checks, Telegram Serverless contracts, and `git diff --check` passed. TGCloud r412 reports webhook in sync, working directory clean, and static up to date (51 files). Live read-only inspection found 10 configured methods (9 QR, 1 secured link), 9 QR image references, and one QR media asset successfully returned as PNG. Sensitive payment values were not printed.
+- While preparing this fix, an attempted schema module push included a proposed field; it was promptly reverted by pushing the original schema source. No `tgcloud migrate` command was run and no business data was changed. TGCloud continues to report 48 pre-existing schema/database differences; do not migrate as part of this checkout/UI repair.
+- No test orders or payment changes were made. Real customer flow, QR visibility/copy, and mobile clipping are not device-verified; the viewport scroll handling is corrected in source but must be visually checked on the customer's phone.
+
+## R2 production activation — 2026-11-06
+
+- Enabled the R2 media client against `https://prime-media-gateway.pages.dev`, which forwards to the private R2 Worker through the Cloudflare Pages service binding. The Mini App does not call `workers.dev` directly. Source change was reviewed/committed in Sandbox `3013ecd` and promoted to Checkout `57625c9`.
+- Production build passed with `VITE_UI_PREVIEW=0`; the gateway origin is present in the emitted bundle. The local Worker test suite passed in Sandbox (Telegram initData auth, signing, privacy, byte ranges), and Telegram Serverless contract checks passed. The clean Checkout lacked the Worker-local `aws4fetch` dependency, so its repeated Worker test invocation could not run there; no Worker code was changed or deployed.
+- Before and after deployment, `https://prime-media-gateway.pages.dev/videos` returned HTTP 200 with `[]`; live app-origin CORS preflight returned 204. This read-only check indicates the bucket catalog is currently empty. No R2 uploads or deletions were performed.
+- Deployed only `dist/` to `app8830494959`; TGCloud now reports r408, webhook in sync, and 51 static files up to date. Live HTML serves `/assets/index-Dp05_Qw7.js`; downloaded live JS SHA-256 `c132ceceb3a981a46539dabab94142bcddb20cdc1cdadb9ec34e2c745073181d` matches local build and contains the Pages gateway origin. CSS remains `/assets/index-DNrG5qZe.css`.
+- R2 is connected in production, but authentic Telegram Admin upload, customer playback, range seeking, and Android rendering remain to be tested on-device. Existing Telegram gallery media is retained alongside R2; no existing media was migrated.
+
+## TGCloud parity and media release — 2026-11-06
+
+- Read-only `tgcloud fetch` from the clean linked Checkout refreshed app8830494959 at revision 406 with 68 modules; webhook remained in sync. Checkout contains 68 modules (43 endpoints, 3 handlers, 21 libraries, and schema). `tgcloud status` reported no backend modules added or missing—only the three intended media changes (`getMediaContent.js`, `manageMediaAssets.js`, `lib/media.js`). `tgcloud diff tgcloud/schema.js` returned no changes. This supersedes the stale 61-vs-43 count and dirty-schema observation; parity is not a blocker for this scoped release.
+- Read-only live calls returned 20 active products with image references, six couriers with logos, ten payment methods with logos (nine QR-based), and four active promos. Four representative product/courier/payment-logo/QR images returned bytes through the candidate inline-first reader. No business records were changed.
+- Deployed media read/upload handlers lacked inline-byte support and image-upload actions; those three scoped files are prepared for release. Invalid legacy Telegram file IDs without stored bytes still need their original images reattached; no images were fabricated or reassigned.
+- Checkout display already resolves `tgmedia:` QR references, but the Download control passed the raw reference to the browser. This release resolves the media before download. Promo validation stays authenticated/read-only; the tier test fixture was corrected to ₱11,000 for Bronze under the current 30-day ₱10k/₱15k/₱20k/₱25k thresholds. Rates remain 5%–7%.
+
+The production reconstruction audit was started during an earlier endpoint/schema mismatch. The fresh r406 snapshot reconciliation below supersedes that initial hold; retain this audit as the source of current release state.
 
 ## Sandbox progress — 2026-11-06
 
@@ -66,9 +127,13 @@ The production reconstruction audit is maintained in the sibling `Prime-TGCloud-
 - Replaced the large legacy `app/admin/page.tsx` with a clean Telegram-only Admin shell that launches the existing TGCloud panels directly. Removed the unused legacy diagnostics and order-modification UI files; the Secretary configurator remains because it is still the active Secretary panel and needs its internal fallback branch audited separately.
 - Secretary configurator now rejects non-Serverless use and routes all automation operations through `manageAutomation`; its old `/api/admin/automation` fallback was removed. The Admin source now has no `/api/*`, Supabase, or Vercel references in the active Admin shell/panels.
 - The Maya return screen no longer queries `/api/orders`; it resolves the returning order through `getMyOrders`. The active Vite client now has no legacy `/api/*` request reference outside intentionally archived Next routes.
-- No promotion or deployment has occurred from this sandbox.
-- Production baseline d7511ff was merged into this sandbox on 2026-11-06 for parity. This does not resolve the historical endpoint mismatch or authorize deployment.
+- The verified sandbox commit was promoted into this clean checkout for final build and deployment review.
+- No deployment has occurred from this checkout.
 
+## Delivery quote and courier selection — 2026-11-06
+
+- Checkout sent destination coordinates only, but `getDeliveryQuote` required `courierId`, returned one quote, and omitted route-time fields expected by the UI. This produced the screenshot's invalid-destination/courier message and empty courier list.
+- Source commit `298019f` changes the endpoint to delegate to shared `quoteDelivery`, returning all active courier quotes and route estimate fields. Checkout clears stale selections on destination changes and ignores out-of-order responses.
 ## Shopfront product media and visual consistency — 2026-11-06
 
 - Confirmed failure: old `tgmedia:` catalog references eventually call `getMediaContent`, which previously unconditionally used Telegram `api.getFileContent(file_id)`; several live product media reads returned Telegram `400 invalid file_id`. The client swallowed those errors and each card displayed the same Picsum fallback.
@@ -77,6 +142,7 @@ The production reconstruction audit is maintained in the sibling `Prime-TGCloud-
 - Generic repeated Picsum fallback was replaced with an explicit local unavailable-image illustration in Shopfront, product modal, cart, checkout, and order history.
 - Verification: `node scripts/check-telegram-serverless-contracts.mjs`, JavaScript syntax checks, and `git diff --check` pass. `npm run build:miniapp` succeeds (2,367 modules transformed); Vite reports existing non-fatal configuration/module-directive/large-chunk warnings. Existing live product photo bytes have not been recovered or reattached. If an old media row has no inline byte record and its Telegram file ID is invalid, the correct original product image must be re-uploaded; no unrelated local image has been assigned.
 - Historical r393 note, superseded by the fresh r406 module/schema reconciliation and r407 media release above: it recorded a stale 61-vs-43 count and dirty schema. No bulk module deletion was performed. Device visual verification remains outstanding.
+- Source changes are now merged into this production checkout. Historical invalid Telegram file IDs still require correct original image bytes to be re-uploaded; no live catalog mutation or deployment has occurred.
 
 ## Delivery quote and courier selection — 2026-11-06
 
@@ -90,6 +156,48 @@ The production reconstruction audit is maintained in the sibling `Prime-TGCloud-
 - Root cause of the immediate “payment session expired” false report: `createPaymentSession` used a deterministic ID and silently skipped consumed rows on conflict while still returning success. Valid sessions/proof are preserved for retries; expired/consumed sessions get a fresh ID. Before validating that retry session, `createOrder` checks for an existing operation under the authenticated customer's idempotency key and recovers that original immutable order snapshot; it rejects prior failed attempts rather than replaying them. Proof uploads return success only when their conditional update actually succeeds. No frontend change is required for this recovery path.
 - Added contract assertions for complete charge-field mapping and payment-session lifecycle. Endpoint syntax checks, `node scripts/check-telegram-serverless-contracts.mjs`, `git diff --check`, and `npm run build:miniapp` pass. Build has existing non-fatal Vite warnings.
 - Deployed narrowly: `getPublicCharges.js` at revision 402; payment retry handlers at r403; explicit payment-session SQL aliases in `uploadPaymentProof.js` and `createOrder.js` at r404. The 14:36 PHT screenshot showed missing receiver details followed by a terminal failure because the corrected retry reused an operation key whose failed state had completed compensation. At r405, `createPaymentSession` issues a fresh server-generated operation key and unique session only for that definitive failed state; in-progress/complete/ambiguous operations retain their original key. `createOrder` scopes the session to the authenticated customer and uses its effective key. Only `createPaymentSession.js` and `createOrder.js` were pushed; webhook is synced and deployed diffs are clean. No frontend/static/schema/media or live order/payment/customer data was modified. Syntax/contracts/diff checks passed. A successful Telegram-device retry remains unverified.
+- Endpoint syntax checks, contract suite, diff check, and Vite builds pass in the updated checkout. No live deployment/device verification occurred.
+
+## Live-linked endpoint parity — 2026-11-06
+
+- TGCloud status reports app `app8830494959`, revision 393, webhook synced, static dist 244 files current, and a modified linked `tgcloud/schema.js`.
+- Historical note: schema and endpoint inventory appeared mismatched at r393. The fresh r406 snapshot above found 68 matching modules and a clean schema diff; no bulk copy/deletion was performed.
+- Checkout Secretary code uses the bot-send 12-hour throttle and does not suppress on human takeover. The linked handler still calls `recordHumanTakeover`, so that deployed behavior remains out of sync.
+- CLI supports scoped pushes, but the governance gate remains until each unmatched handler and dirty schema are reconciled. No deployment was attempted.
+
+## Delivery checkout incident release — 2026-11-06
+
+- The latest customer screenshot showed delivery checkout unable to continue. The previously deployed `getDeliveryQuote` implementation required a courier ID even though the client must first request the available courier list with destination coordinates. This produced the visible “A valid destination and courier are required” error and an empty courier list.
+- Released the committed fix from `Prime-TGCloud-Checkout` with a narrowly scoped `tgcloud push tgcloud/endpoints/getDeliveryQuote.js dist/`. No schema or unrelated backend modules were pushed. TGCloud reports app `app8830494959`, revision 400, webhook in sync, and static up to date (51 files).
+- Live HTML references `index-gxU3U0s4.js` and `index-DNrG5qZe.css`; downloaded live assets match the built assets byte-for-byte (SHA-256 JS `8636ff1adef44c8e04828c9927ad57e38c0b0f77676a474d580344ec3da777c6`; CSS `223097d126b6bfb7d2034fd84270247b8feec75f1ffffe8525cf84bae75d7d21`). The focused Telegram Serverless contract test passed before release.
+- Deployment/build verification is complete, but customer-device verification of courier loading, quote display, and Continue remains outstanding. At r400 the later r406 endpoint/schema parity check had not yet occurred; see the reconciliation above.
+
+## Secretary repeat-welcome incident release — 2026-11-06
+
+- The 12-hour check correctly suppressed the welcome response, but the generic message matcher could select the same welcome flow again when its message trigger was blank (blank message triggers match any customer message). This bypassed the configured welcome cooldown.
+- Commit `dd9d9ff` excludes the configured welcome-flow ID from generic message matching while retaining independent keyword-triggered flows. `node --check tgcloud/lib/telegram-automation.js`, the Telegram Serverless contract suite, and `git diff --check` passed.
+- Pushed only `tgcloud/lib/telegram-automation.js`. TGCloud now reports revision 401, webhook synced, static unchanged/up-to-date. Module SHA-256: `f3ef192b255458e982174c9482eb40f0d78d00dfe2d111924804ee1285b262db`. Actual customer-chat behavior is not yet device-verified.
+
+## Checkout charge and payment-session fixes — deployed — 2026-11-06
+
+- Charge hydration fix deployed alone at revision 402. `tgcloud run getPublicCharges` returned three active rows with compatible values and schedule metadata: Discreet Packaging ₱45 (default), Platform ₱2 (default), Late Night Hazard ₱50 (overnight/non-default). No charge data was modified; the endpoint read configuration only.
+- Payment retry fix promoted from sandbox (`3812aeb`, following initial reviewed charge/session implementation `ac05a40`) as checkout `362d96d` and deployed at revision 403. Scope was only `createPaymentSession.js`, `uploadPaymentProof.js`, and `createOrder.js`; no schema, static bundle, or media endpoints were pushed. Live `createOrder.js` and its `checkout-operations.js` dependency matched the reviewed baseline before deployment.
+- The stable operation key now resolves an existing customer-scoped order operation before a retry's new proof session is validated. A committed order therefore returns/recoveries from its immutable original operation rather than falsely expiring or creating a second order. Expired/consumed payment sessions receive a unique new ID; proof upload verifies its conditional database write before reporting success. Failed prior operations are not replayed with the same key.
+- `tgcloud status` reports revision 403 and webhook in sync. Only unrelated media handlers remain modified relative to the linked snapshot; static bundle remains intentionally undeployed. Contract checks, syntax checks, `git diff --check`, and production Mini App build passed. The connected Telegram device must still test a successful charge display and a same-order retry; no real order/payment was created for verification.
+
+## Payment retry dialog follow-up — revision 404 — 2026-11-06
+
+- A new screenshot taken after r403 still showed `This payment session expired. Start checkout again.` This confirms the earlier retry release had not resolved the visible failure.
+- Removed reliance on implicit key conversion from raw `SELECT *` rows: `uploadPaymentProof` and `createOrder` now explicitly alias `customer_id`, `expires_at`, request snapshot, proof, and method columns to the property names their checks consume.
+- Contract assertions and endpoint syntax checks passed. Deployed only `uploadPaymentProof.js` and `createOrder.js`; TGCloud reports revision 404, webhook in sync, and both handlers match the deployed snapshot (`tgcloud diff`: no changes). No static bundle/schema/media modules or customer/order/payment records changed.
+- Screenshot timestamp is 14:24 PHT, before the r404 push. This is a code-level correction, not yet a device-verified resolution; do not claim the dialog is gone until a Telegram retry confirms it.
+
+## Terminal failed checkout retry — revision 405 — 2026-11-06
+
+- The newer 14:36 PHT screenshot showed `This checkout attempt could not be completed. Start a new checkout to try again.` Earlier screenshot in the same sequence showed missing receiver name/phone. The missing receiver data caused the server operation to fail and complete compensation; subsequent corrected submissions reused the same browser operation key, which is permanently terminal by design.
+- `createPaymentSession` now detects only a definitively `failed` prior customer-scoped operation (written after compensation completes), issues a new server-generated operation key and unique payment-session ID, and records that effective key. In-progress, complete, and ambiguous operations retain the original key for safe recovery/idempotency. `createOrder` scopes the payment-session lookup to the authenticated customer and uses the session's effective key.
+- Contract tests, endpoint syntax checks, and `git diff --check` passed. Deployed only `createPaymentSession.js` and `createOrder.js`; TGCloud reports revision 405, webhook in sync, and both handlers match (`tgcloud diff`: no changes). No static bundle, schema, media handlers, or customer/order/payment records changed. TGCloud's remaining listed local static/media differences were left untouched.
+- The screenshot predates r405. This fixes the identified terminal-key retry path in code; a successful corrected retry on the Telegram device is still unverified.
 
 ## Delivery pricing and whole-peso display — 2026-11-06
 

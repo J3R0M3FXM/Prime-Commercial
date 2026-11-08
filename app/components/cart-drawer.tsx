@@ -1,4 +1,5 @@
 "use client";
+import { readCheckoutDraft, clearCheckoutDraft } from '@/lib/checkout-draft';
 
 import { getServerlessCatalog, callServerless } from "@/lib/telegram-serverless-client";
 
@@ -76,10 +77,20 @@ class CartErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
 }
 
 function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: boolean; onClose: () => void; onCheckoutOpenChange?: (open: boolean) => void }) {
-  const { cart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, cartTotal, cartCount, syncWithServerData } = useCart();
+  const { cart, removeFromCart, updateQuantity, toggleSelection, clearCheckoutItems, cartTotal, cartCount, syncWithServerData } = useCart();
   const [activeCharges, setActiveCharges] = useState<any[]>([]);
   const [loadingCharges, setLoadingCharges] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutItems, setCheckoutItems] = useState<any[]>([]);
+
+  useEffect(() => {
+    const draft = readCheckoutDraft(localStorage.getItem('prime_customer_id') || '');
+    if (draft) {
+      setCheckoutItems(draft.items);
+      setIsCheckoutOpen(true);
+      onCheckoutOpenChange?.(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -198,6 +209,7 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: 
             <button 
               disabled={selectedItems.length === 0}
               onClick={() => {
+                setCheckoutItems(selectedItems);
                 setIsCheckoutOpen(true);
                 onCheckoutOpenChange?.(true);
               }}
@@ -214,13 +226,14 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: 
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => {
+          clearCheckoutDraft(localStorage.getItem('prime_customer_id') || '');
           setIsCheckoutOpen(false);
           onCheckoutOpenChange?.(false);
         }}
-        selectedItems={selectedItems}
+        selectedItems={checkoutItems}
         onOrderSuccess={() => {
-          if (typeof clearSelectedItems === 'function') {
-            clearSelectedItems();
+          if (typeof clearCheckoutItems === 'function') {
+            clearCheckoutItems(checkoutItems);
           }
         }}
       />

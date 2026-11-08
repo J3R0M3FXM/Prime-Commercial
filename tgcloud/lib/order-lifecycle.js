@@ -248,6 +248,12 @@ async function applyMaturedReferral(order) {
     return { credited: false, pending: false, reason: 'referrer_missing' };
   }
   const amount = Math.max(0, Number(order.referralPointsAmount) || 0);
+  if (!referrer.operationId) {
+    const eligible = await db.get(`SELECT id FROM orders
+      WHERE customer_id = :customer_id AND lower(coalesce(status, '')) IN ('completed', 'delivered') LIMIT 1`,
+    { ':customer_id': String(referrer.id) });
+    if (!eligible) return { credited: false, pending: true, reason: 'referrer_delivery_pending' };
+  }
   if (referrer.operationId && referrer.operationId !== operationId) {
     return { credited: false, pending: true, reason: 'referrer_points_busy' };
   }
@@ -258,6 +264,10 @@ async function applyMaturedReferral(order) {
               points_operation_amount = :amount, updated_at = unixepoch()
         WHERE id = :customer_id AND points_operation_id IS NULL
           AND EXISTS (SELECT 1 FROM orders WHERE id = :order_id AND referral_points_status = 'crediting')
+          AND EXISTS (SELECT 1 FROM orders own WHERE own.customer_id = :customer_id
+            AND lower(coalesce(own.status, '')) IN ('completed', 'delivered'))
+          AND EXISTS (SELECT 1 FROM orders referred WHERE referred.id = :order_id
+            AND lower(coalesce(referred.status, '')) IN ('completed', 'delivered'))
         RETURNING id`,
       { ':amount': amount, ':operation_id': operationId, ':customer_id': String(referrer.id), ':order_id': orderId },
     );
@@ -367,6 +377,12 @@ export async function reconcileOrderMilestones({ customerId = '', memberId = '',
        FROM orders o
       WHERE o.referral_points_credit_after <= unixepoch()
         AND lower(coalesce(o.status, '')) IN ('completed', 'delivered')
+        AND EXISTS (SELECT 1 FROM customers ref
+          WHERE ((o.referred_by_user_id <> '' AND ref.id = o.referred_by_user_id)
+            OR (o.referred_by_member_id <> '' AND upper(ref.prime_member_id) = upper(o.referred_by_member_id)))
+          AND (ref.points_operation_id = 'referral-award:' || o.id OR EXISTS (
+            SELECT 1 FROM orders own WHERE own.customer_id = ref.id
+              AND lower(coalesce(own.status, '')) IN ('completed', 'delivered'))))
         AND (o.referral_points_status IN ('pending_30m', 'crediting') OR
              (o.referral_points_status = 'credited' AND EXISTS (
                SELECT 1 FROM customers c

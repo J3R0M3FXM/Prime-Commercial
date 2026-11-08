@@ -2,6 +2,7 @@ import { db, EndpointError } from 'sdk';
 import { desc, eq, or } from 'sdk/db';
 import { customers, orders, pointTransactions } from '../schema.js';
 import { calculateCustomerTier } from '../lib/loyalty.js';
+import { reconcileOrderMilestones } from '../lib/order-lifecycle.js';
 
 function iso(value) {
   if (value == null) return null;
@@ -15,8 +16,10 @@ export default async function (_input, ctx) {
   const telegramId = ctx?.initData?.user?.id == null ? '' : String(ctx.initData.user.id);
   if (!/^[0-9]+$/.test(telegramId)) throw new EndpointError('A verified Telegram user is required.', { code: 'AUTH_REQUIRED' });
 
-  const customer = await db.select().from(customers).where(eq(customers.tgUserId, telegramId)).get();
+  let customer = await db.select().from(customers).where(eq(customers.tgUserId, telegramId)).get();
   if (!customer) throw new EndpointError('Your PRIME account could not be found.', { code: 'ACCOUNT_NOT_FOUND' });
+  await reconcileOrderMilestones({ customerId: customer.id, memberId: customer.primeMemberId, limit: 20 });
+  customer = await db.select().from(customers).where(eq(customers.tgUserId, telegramId)).get();
   const ownership = [eq(orders.tgUserId, telegramId), eq(orders.customerId, customer.id)];
   if (customer.primeMemberId) ownership.push(eq(orders.primeMemberId, customer.primeMemberId));
   const [rows, tierOrders, lifetimeActivity] = await Promise.all([
@@ -50,7 +53,8 @@ export default async function (_input, ctx) {
     .filter(Boolean).sort().at(-1) || null;
   const referralList = referrals.map(ref => {
     const delivered = referralOrders.some(order => (String(order.customerId || '') === String(ref.id) || String(order.tgUserId || '') === String(ref.tgUserId || '')) && ['completed', 'delivered'].includes(String(order.status || '').toLowerCase()));
-    return { id: ref.id, name: ref.tgName || 'PRIME Member', username: ref.tgUsername || '', memberId: ref.primeMemberId || '', enrolledAt: iso(ref.createdAt), hasDeliveredOrder: delivered, rewardStatus: delivered ? 'Delivered' : 'Pending delivery' };
+    const ownDelivered = num(lifetimeActivity?.successfulOrders) > 0;
+    return { id: ref.id, name: ref.tgName || 'PRIME Member', username: ref.tgUsername || '', memberId: ref.primeMemberId || '', enrolledAt: iso(ref.createdAt), hasDeliveredOrder: delivered, rewardStatus: !delivered ? 'Pending delivery' : !ownDelivered ? 'On hold: your completed order required' : 'Delivered' };
   });
   const recentOrders = rows.slice(0, 5).map(order => ({
     id: order.id, orderNumber: order.orderNumber, createdAt: iso(order.createdAt), status: order.status,

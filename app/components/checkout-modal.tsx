@@ -44,6 +44,7 @@ import { getClientFingerprint, getOrCreateSessionToken, getFreshClientLocation }
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import TelegramMediaImage from "./telegram-media-image";
 import SecuredPaymentLink from "./secured-payment-link";
+import { readCheckoutDraft, saveCheckoutDraft, clearCheckoutDraft } from "@/lib/checkout-draft";
 import {
   callServerless,
   clearPendingServerlessCheckoutKey,
@@ -54,6 +55,8 @@ import {
   resolveTelegramMedia,
   downloadTelegramMedia,
   uploadPaymentReceiptDataUrl,
+  resumeServerlessCheckout,
+  preparePaymentProofImage,
 } from "@/lib/telegram-serverless-client";
 
 // Dynamic map import to ensure zero SSR conflicts
@@ -321,6 +324,10 @@ export default function CheckoutModal({
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string>("");
   const [completedOrder, setCompletedOrder] = useState<any>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftSaveFailed, setDraftSaveFailed] = useState(false);
+  const [submissionKey, setSubmissionKey] = useState("");
+  const [submissionSessionId, setSubmissionSessionId] = useState("");
 
   // Promo / Voucher State
   const [promoCodeInput, setPromoCodeInput] = useState<string>("");
@@ -482,7 +489,7 @@ export default function CheckoutModal({
 
   // Fetch the same active charge configuration used by the Serverless order writer.
   useEffect(() => {
-    if (!isOpen || currentStep !== 4) return;
+    if (!isOpen || (currentStep !== 4 && currentStep !== 5)) return;
     const fetchCharges = async () => {
       try {
         setIsLoadingCharges(true);
@@ -514,9 +521,13 @@ export default function CheckoutModal({
         if (!Array.isArray(data)) throw new Error("Payment methods response was invalid.");
         const receiptTypes = new Set(["qr_code", "manual_transfer", "crypto", "secured_payment_link", "api", "webhook"]);
         if (!active) return;
-        setPaymentMethods(data.filter((method) =>
+        const activeMethods = data.filter((method) =>
           receiptTypes.has(String(method?.paymentType || method?.type || "").toLowerCase()) && method?.isActive !== false
-        ));
+        );
+        setPaymentMethods(activeMethods);
+        setSelectedPaymentMethod((previous: any) => previous
+          ? activeMethods.find(method => method.id === previous.id) || null
+          : null);
       } catch (e) {
         console.warn("Could not fetch payment methods:", e);
         if (active) {
@@ -559,6 +570,54 @@ export default function CheckoutModal({
       setSubmitError("");
     }
   }, [isOpen]);
+
+  // Restore only after the shopfront has verified the active Telegram account.
+  useEffect(() => {
+    if (!isOpen) { setDraftReady(false); return; }
+    const draft = readCheckoutDraft(localStorage.getItem("prime_customer_id") || "");
+    if (draft) {
+      const s = draft.state;
+      setCurrentStep(s.currentStep);
+      setReceiverName(s.receiverName || ""); setReceiverPhone(s.receiverPhone || "");
+      setSelectedAddress(s.selectedAddress || ""); setAddressSearch(s.selectedAddress || "");
+      setHasSelectedAddress(Boolean(s.hasSelectedAddress)); setUnitDetails(s.unitDetails || "");
+      if (s.coords) setCoords(s.coords);
+      setAvailableCouriers(Array.isArray(s.availableCouriers) ? s.availableCouriers : []);
+      setSelectedCourierId(s.selectedCourierId || ""); setDeliveryPaymentMethod(s.deliveryPaymentMethod || "");
+      setCalculatedDistance(Number(s.calculatedDistance) || 0);
+      setEstimatedTravelMinutes(s.estimatedTravelMinutes ?? null);
+      setSelectedPaymentMethod(s.selectedPaymentMethod || null);
+      setUploadedProofImage(s.uploadedProofImage || ""); setOcrAnalysis(s.ocrAnalysis || null);
+      setCustomerNotes(s.customerNotes || ""); setUseStoreCredits(Boolean(s.useStoreCredits));
+      setAppliedPromo(s.appliedPromo || null); setAppliedReferral(s.appliedReferral || null);
+      setSubmissionKey(s.submissionKey || "");
+      setSubmissionSessionId(s.submissionSessionId || "");
+      if (s.submissionKey) setSubmitError("Your previous submission may already be saved. Tap Submit to recover it; do not pay again.");
+    } else {
+      setSubmissionKey("");
+      setSubmissionSessionId("");
+    }
+    setDraftReady(true);
+  }, [isOpen]);
+
+  const draftState = {
+    currentStep, receiverName, receiverPhone, selectedAddress, hasSelectedAddress, unitDetails, coords,
+    availableCouriers, selectedCourierId, deliveryPaymentMethod, calculatedDistance, estimatedTravelMinutes,
+    selectedPaymentMethod, uploadedProofImage, ocrAnalysis, customerNotes, useStoreCredits,
+    appliedPromo, appliedReferral, submissionKey, submissionSessionId,
+  };
+  const draftStateJson = JSON.stringify(draftState);
+  useEffect(() => {
+    if (!isOpen || !draftReady || currentStep > 5 || !tgCustomer.id) return;
+    const save = () => setDraftSaveFailed(!saveCheckoutDraft(tgCustomer.id, selectedItems, JSON.parse(draftStateJson)));
+    save();
+    window.addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", save);
+    return () => {
+      window.removeEventListener("pagehide", save);
+      document.removeEventListener("visibilitychange", save);
+    };
+  }, [isOpen, draftReady, currentStep, tgCustomer.id, selectedItems, draftStateJson]);
 
   // Precise GPS is parked. App startup, checkout open, and order submission
   // never request location. Only "Use My Location" below can do so.
@@ -616,16 +675,6 @@ export default function CheckoutModal({
       setMayaCheckoutError("");
         throw new Error("Maya payment links must be opened from the configured secure payment method. This retired payment route is disabled.");
 
-      setCompletedOrder((prev: any) => ({
-        ...prev,
-        paymentMethodId: selectedPaymentMethod.id,
-        paymentMethodName: selectedPaymentMethod.name,
-        paymentStatus: "Awaiting Maya Payment",
-        mayaPaymentId: data.checkoutId || prev?.mayaPaymentId,
-        mayaRequestReferenceNumber: data.orderNumber || prev?.mayaRequestReferenceNumber,
-      }));
-
-      window.location.assign(data.redirectUrl);
     } catch (error: any) {
       console.error("Maya Checkout start failed:", error);
       setMayaCheckoutError(error?.message || "Unable to start Maya Checkout.");
@@ -1127,7 +1176,7 @@ export default function CheckoutModal({
         referrerName: data.referrerName || "Valued Member",
         referrerMemberId: data.referrerMemberId
       });
-      setReferralSuccess(`Referred by ${data.referrerName} (${data.referrerMemberId})`);
+      setReferralSuccess(`Referred by ${data.referrerName} (${data.referrerMemberId}). ${data.message || "Bonus requires completed orders from both members."}`);
     } catch (err: any) {
       setReferralError(err.message || "Failed to validate referral code.");
     } finally {
@@ -1189,7 +1238,37 @@ export default function CheckoutModal({
   };
 
   // Submit Order to API
+  const handleAttachPreSubmitProof = async (file?: File) => {
+    if (!file) return;
+    setIsAnalyzingReceipt(true);
+    try {
+      const value = await preparePaymentProofImage(file);
+      setUploadedProofImage(value); setOcrAnalysis(null); setSubmitError("");
+      await analyzeReceiptImage(value);
+    } catch (error: any) {
+      setSubmitError(error?.message || "This receipt could not be prepared. Choose it again.");
+    } finally { setIsAnalyzingReceipt(false); }
+  };
+
   const handleSubmitOrder = async () => {
+    if (isSubmittingOrder) return;
+    if (submissionKey) {
+      setIsSubmittingOrder(true);
+      try {
+        const result = submissionSessionId
+          ? await callServerless<any>("createOrder", { operationKey: submissionKey, paymentSessionId: submissionSessionId }, 60_000)
+          : await resumeServerlessCheckout<any>(submissionKey);
+        if (!result?.success) throw new Error("Your order could not be recovered yet. Please retry.");
+        clearPendingServerlessCheckoutKey(tgCustomer.id);
+        clearCheckoutDraft(tgCustomer.id);
+        setCurrentStep(6); setCompletedOrder(result); onOrderSuccess(result);
+      } catch (err: any) {
+        const code = String(err?.parameters?.code || err?.code || err?.type || "");
+        if (["OPERATION_FAILED", "CHECKOUT_ATTEMPT_FAILED"].includes(code)) setSubmissionKey("");
+        setSubmitError(err?.message || "Order recovery is pending. Retry without paying again.");
+      } finally { setIsSubmittingOrder(false); }
+      return;
+    }
     if (chargesLoadError || isLoadingCharges) {
       setSubmitError("Wait for the current configured charges to load before submitting your order.");
       return;
@@ -1340,15 +1419,23 @@ export default function CheckoutModal({
         const paymentSession = await createPaymentSession(orderData, String(selectedPaymentMethod.id), operationKey);
         if (!paymentSession?.success || !paymentSession.paymentSessionId) throw new Error("We couldn't start the payment session. Please try again.");
         await uploadPaymentProofDataUrl(uploadedProofImage, paymentSession.paymentSessionId, "image/jpeg", ocrAnalysis);
+        const effectiveKey = paymentSession.operationKey || operationKey;
+        setSubmissionKey(effectiveKey);
+        setSubmissionSessionId(paymentSession.paymentSessionId);
+        if (!saveCheckoutDraft(tgCustomer.id, selectedItems, { ...draftState, submissionKey: effectiveKey, submissionSessionId: paymentSession.paymentSessionId })) {
+          setSubmissionKey("");
+          throw new Error("Checkout recovery could not be saved. Free some device storage before submitting; do not pay again.");
+        }
         orderResult = await callServerless<any>("createOrder", {
           ...orderData,
           paymentSessionId: paymentSession.paymentSessionId,
-          operationKey,
+          operationKey: effectiveKey,
         }, 60_000);
         if (!orderResult || orderResult.success === false) {
           throw new Error(orderResult?.error || "We couldn't submit your order. Please try again.");
         }
         clearPendingServerlessCheckoutKey(String(tgCustomer.id), operationKey);
+        clearCheckoutDraft(tgCustomer.id);
       } else {
         throw new Error("TGCloud checkout is unavailable.");
       }
@@ -1373,6 +1460,8 @@ export default function CheckoutModal({
         clearPendingServerlessCheckoutKey(String(tgCustomer.id), activeOperationKey);
       }
       setSubmitError(err.message || "Order submission failed. Please try again.");
+      const code = String(err?.parameters?.code || err?.code || err?.type || "");
+      if (["OPERATION_FAILED", "CHECKOUT_ATTEMPT_FAILED", "OUT_OF_STOCK", "CHECKOUT_TOTAL_CHANGED", "INVALID_RECEIVER", "INVENTORY_RESERVATION_EXPIRED"].includes(code)) setSubmissionKey("");
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -1381,7 +1470,8 @@ export default function CheckoutModal({
   if (!isOpen) return null;
 
   return (
-    <div ref={overlayRef} className="prime-checkout w-full bg-gray-50 flex justify-center py-0">
+    <div ref={overlayRef} className="prime-checkout w-full max-w-[430px] mx-auto bg-gray-50 flex justify-center py-0">
+      {draftSaveFailed && <p role="alert" className="text-xs font-mono text-red-700">Device storage is unavailable. Keep this page open; checkout cannot be restored after a reload.</p>}
       <div 
         className="prime-checkout__dialog bg-white w-full shadow-sm overflow-hidden flex flex-col"
         role="dialog"
@@ -2309,11 +2399,8 @@ export default function CheckoutModal({
 
                   <input ref={preSubmitProofInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => {
                     const file = event.target.files?.[0];
-                    if (!file) return;
-                    if (file.size > 10 * 1024 * 1024) { setSubmitError("Payment proof must be 10 MB or smaller."); return; }
-                    const reader = new FileReader();
-                    reader.onloadend = () => { const value = String(reader.result || ""); setUploadedProofImage(value); setOcrAnalysis(null); setSubmitError(""); void analyzeReceiptImage(value); };
-                    reader.readAsDataURL(file);
+                    event.target.value = "";
+                    void handleAttachPreSubmitProof(file);
                   }} />
                   <button type="button" onClick={() => preSubmitProofInputRef.current?.click()} disabled={!selectedPaymentMethod?.id || isAnalyzingReceipt} className="w-full bg-slate-900 px-3 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-white disabled:cursor-not-allowed disabled:opacity-50">
                     {!selectedPaymentMethod?.id ? "Select Payment Method First" : uploadedProofImage ? "Replace Payment Proof" : "Attach Payment Proof"}
@@ -2832,9 +2919,8 @@ export default function CheckoutModal({
                         <p className="text-xs font-heading font-bold text-blue-950">Payment proof required before submission</p>
                         <p className="text-[11px] text-blue-900">First select a payment method above and follow the displayed instructions. After paying, attach your screenshot or receipt here. Stock is reserved only after proof-backed submission.</p>
                         <input ref={preSubmitProofInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => {
-                          const file = event.target.files?.[0]; if (!file) return;
-                          if (file.size > 10 * 1024 * 1024) { setSubmitError("Payment proof must be 10 MB or smaller."); return; }
-                          const reader = new FileReader(); reader.onloadend = () => { const value = String(reader.result || ''); setUploadedProofImage(value); setSubmitError(''); void analyzeReceiptImage(value); }; reader.readAsDataURL(file);
+                          const file = event.target.files?.[0]; event.target.value = "";
+                          void handleAttachPreSubmitProof(file);
                         }} />
                         <button type="button" onClick={() => preSubmitProofInputRef.current?.click()} disabled={!selectedPaymentMethod?.id} className="w-full px-3 py-2 bg-slate-900 text-white text-xs font-heading font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed">
                           {!selectedPaymentMethod?.id ? "Select Payment Method First" : uploadedProofImage ? "Replace Payment Proof" : "Attach Payment Proof"}
@@ -2922,14 +3008,14 @@ export default function CheckoutModal({
                     isSubmittingOrder ||
                     isLoadingCharges ||
                     Boolean(chargesLoadError) ||
-                    Boolean(hasTelegramServerlessBridge() && (!selectedPaymentMethod?.id || !uploadedProofImage))
+                    (!submissionKey && (isAnalyzingReceipt || Boolean(hasTelegramServerlessBridge() && (!selectedPaymentMethod?.id || !uploadedProofImage))))
                   }
                   className="prime-checkout__submit px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmittingOrder ? (
                     <span>Submitting...</span>
                   ) : (
-                    <span>Submit Order</span>
+                    <span>{submissionKey ? "Recover Submitted Order" : "Submit Order"}</span>
                   )}
                 </button>
               </div>

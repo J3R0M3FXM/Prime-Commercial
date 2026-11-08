@@ -5,7 +5,7 @@ type ServerlessBridge = {
   call: (name: string, input: Record<string, unknown>, callback: (error: ServerlessError | null, result?: any) => void) => void;
 };
 
-type TelegramWebApp = { Serverless?: ServerlessBridge };
+type TelegramWebApp = { Serverless?: ServerlessBridge; initData?: string };
 
 declare global {
   interface Window {
@@ -113,7 +113,7 @@ export async function resumeServerlessCheckout<T = Record<string, unknown>>(oper
 }
 
 export async function createPaymentSession(request: Record<string, unknown>, paymentMethodId: string, operationKey: string) {
-  return await callServerless<{ success: boolean; paymentSessionId: string; expiresAt: string }>('createPaymentSession', {
+  return await callServerless<{ success: boolean; paymentSessionId: string; operationKey: string; expiresAt: string }>('createPaymentSession', {
     request, paymentMethodId, operationKey,
   }, 60_000);
 }
@@ -403,6 +403,10 @@ export type TelegramServerlessSession = {
 
 export async function getTelegramServerlessSession(options: { heartbeat?: boolean } = {}): Promise<TelegramServerlessSession> {
   if (isVisualPreview) return { authenticated: true, sessionReady: true, isAdmin: true, tgUserId: '999000001', tgName: 'Preview Admin', tgUsername: 'prime_preview', primeMemberId: 'PM-PREVIEW', user: { id: 'preview-admin', name: 'Preview Admin', role: 'admin' } };
+  // Telegram can inject Serverless later than initData after Android resumes.
+  for (let attempt = 0; attempt < 50 && !hasTelegramServerlessBridge(); attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
   const fingerprint = await collectSessionFingerprint();
   return await callServerless<TelegramServerlessSession>('getTelegramSession', {
     ...(fingerprint ? { fingerprint } : {}),
@@ -443,7 +447,7 @@ export async function getServerlessCatalog(options: { resolveMedia?: boolean } =
       : product.bundleConfig && typeof product.bundleConfig === 'object' && Array.isArray((product.bundleConfig as any).variants)
         ? (product.bundleConfig as any).variants
         : [];
-    const variants = await Promise.all(sourceVariants.map(async (variant) => ({
+    const variants = await Promise.all(sourceVariants.map(async (variant: Record<string, any>) => ({
       ...variant,
       imageUrl: resolveMedia
         ? await safeMedia(variant.imageUrl || variant.image_url)
@@ -563,6 +567,14 @@ async function prepareQrUpload(file: File): Promise<{ id: string; data: string; 
   const data = toBase64Url(new Uint8Array(await file.arrayBuffer()));
   const id = 'img-' + (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`);
   return { id, data, contentType: file.type };
+}
+
+/** Fit a phone receipt within both the proof endpoint and local draft limits. */
+export async function preparePaymentProofImage(file: File): Promise<string> {
+  if (file.size > 10 * 1024 * 1024) throw new Error('Payment proof must be 10 MB or smaller.');
+  const prepared = await prepareJpegUpload(file, { maxDimension: 1800, maxBytes: 600_000 });
+  const base64 = prepared.data.replace(/-/g, '+').replace(/_/g, '/');
+  return 'data:' + prepared.contentType + ';base64,' + base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
 }
 
 export type PublicImageBucket = 'product-images' | 'courier-logos' | 'payment-method-logos' | 'payment-qr-codes' | 'media-gallery';

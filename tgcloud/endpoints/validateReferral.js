@@ -29,10 +29,11 @@ export default async function (input, ctx) {
     { ':customer_id': String(referrer.id), ':telegram_id': String(referrer.tgUserId || '') },
   );
   const hasSuccessfulOrder = Boolean(successfulOrder?.id);
-  if (!hasSuccessfulOrder) return fail('This PRIME Member can refer after their first successful completed or delivered order.');
 
   return {
     valid: true,
+    bonusOnHold: !hasSuccessfulOrder,
+    message: hasSuccessfulOrder ? 'Bonus is released after the referred order is completed.' : 'Bonus is on hold until both members have a completed or delivered order.',
     referrerName: referrer.name || 'Valued Member',
     referrerMemberId: referrer.memberId || code,
   };

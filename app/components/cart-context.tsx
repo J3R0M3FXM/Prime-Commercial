@@ -6,6 +6,7 @@ const CartContext = createContext<any>(null);
 
 export default function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<any[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     try {
@@ -22,18 +23,20 @@ export default function CartProvider({ children }: { children: React.ReactNode }
       }
     } catch (e) {
       console.warn("Notice: Local storage unavailable or failed to parse cart", e);
+    } finally {
+      setHydrated(true);
     }
   }, []);
 
   useEffect(() => {
     try {
-      if (typeof window !== 'undefined' && Array.isArray(cart)) {
+      if (hydrated && typeof window !== 'undefined' && Array.isArray(cart)) {
         localStorage.setItem('prime-cart', JSON.stringify(cart));
       }
     } catch (e) {
       // Quietly ignore storage quota or sandbox restrictions
     }
-  }, [cart]);
+  }, [cart, hydrated]);
 
   const addToCart = (product: any, quantity: number) => {
     if (!product || !product.id) return;
@@ -65,6 +68,17 @@ export default function CartProvider({ children }: { children: React.ReactNode }
 
   const clearSelectedItems = () => {
     setCart(prev => (Array.isArray(prev) ? prev.filter(item => item && item.selected === false) : []));
+  };
+
+  // Checkout keeps its paid-for snapshot while the customer visits other tabs.
+  // Remove only submitted quantities; preserve items added in the meantime.
+  const clearCheckoutItems = (submitted: any[]) => {
+    setCart(previous => previous.flatMap(item => {
+      const line = submitted.find(row => String(row.id) === String(item.id));
+      if (!line) return [item];
+      const remaining = Math.max(0, Number(item.quantity) - Number(line.quantity));
+      return remaining > 0 ? [{ ...item, quantity: remaining }] : [];
+    }));
   };
 
   const clearCart = () => {
@@ -200,7 +214,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
   }, [cart]);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, clearCart, cartTotal, cartCount, syncWithServerData, setCart }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, clearCheckoutItems, clearCart, cartTotal, cartCount, syncWithServerData, setCart }}>
       {children}
     </CartContext.Provider>
   );

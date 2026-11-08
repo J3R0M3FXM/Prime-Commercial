@@ -2,6 +2,21 @@ import { db, EndpointError } from 'sdk';
 import { eq } from 'sdk/db';
 import { customers } from '../schema.js';
 
+function isProofImage(data, contentType) {
+  if (data.length < 16 || data.length % 4 === 1 || !/^[A-Za-z0-9_-]+$/.test(data)) return false;
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const bytes = [];
+  let buffer = 0; let bits = 0;
+  for (const character of data.slice(0, 24)) {
+    buffer = (buffer << 6) | alphabet.indexOf(character); bits += 6;
+    if (bits >= 8) { bits -= 8; bytes.push((buffer >> bits) & 255); buffer &= (1 << bits) - 1; }
+  }
+  if (contentType === 'image/jpeg') return bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  if (contentType === 'image/png') return [137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => bytes[index] === value);
+  return contentType === 'image/webp' && [82, 73, 70, 70].every((value, index) => bytes[index] === value) &&
+    [87, 69, 66, 80].every((value, index) => bytes[index + 8] === value);
+}
+
 export default async function (input, ctx) {
   const telegramId = ctx?.initData?.user?.id == null ? '' : String(ctx.initData.user.id);
   if (!/^\d+$/.test(telegramId)) throw new EndpointError('A verified Telegram user is required.', { code: 'AUTH_REQUIRED' });
@@ -9,7 +24,7 @@ export default async function (input, ctx) {
   const sessionId = String(input?.paymentSessionId || '').trim();
   const data = typeof input?.data === 'string' ? input.data : '';
   const contentType = String(input?.contentType || 'image/jpeg');
-  if (!customer || !sessionId || !/^[A-Za-z0-9_-]+$/.test(data) || data.length > 820000 || !['image/jpeg', 'image/png', 'image/webp'].includes(contentType))
+  if (!customer || !sessionId || data.length > 820000 || !isProofImage(data, contentType))
     throw new EndpointError('Choose a supported payment proof image.', { code: 'INVALID_PROOF' });
   const session = await db.get(`SELECT id, customer_id AS customerId, status, expires_at AS expiresAt
     FROM payment_sessions WHERE id=:id`, { ':id': sessionId });
