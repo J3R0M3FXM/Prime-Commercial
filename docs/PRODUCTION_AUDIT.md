@@ -1,5 +1,15 @@
 # Production Reconstruction Audit
 
+## Secretary configurator screenshot-led redesign — 2026-11-09
+
+The expanded full `npm run validate:miniapp` passed, including Secretary UI regressions, strict TypeScript, backend syntax/contracts, checkout/inventory/payment/loyalty/referral/recovery tests, media/offline tests, Worker tests and production build (2,376 modules). Only non-fatal existing Vite warnings remain. Pre-release cloud fetch on retry verified revision434, 71 modules and55 static files clean before promotion. Production code changes are frontend-only; deploy scoped dist without touching the backend or R2 Worker.
+
+Reviewed the three owner screenshots in `/storage/emulated/0/DCIM/Screenshots/` dated07:34:00,07:34:07,07:34:11 and the Secretary tree/editor/buttons/simulator plus shared cards/fields in `/storage/emulated/0/Download/prime_core_admin_v2.html`. Screenshots show joined disclosure title/meta text, unstyled switches and dropdowns, a long header and competing sections. Root cause: shared AdminDisclosure/AdminSwitch styles rely on `.admin-shell`, while this configurator can render as a standalone Manager module. Added Secretary-only styling independent of that ancestor: compact white cards/pale accordions/navy actions, block-separated titles/status/help, real visible switch tracks, consistent42px fields, wrap-safe mobile controls, no nested sticky tab bar beneath the global header, and a 430px portrait cap. No shared-shell behavior or other Admin modules were replaced.
+
+Added Reply Steps/Settings/Preview/Guide navigation with drafts retained across sections, and an explicit Save Welcome Step control. Interface headings/labels/actions use actual Title Case source strings rather than CSS capitalization, with uppercase transforms disabled locally. Customer-authored flow names, message templates, button labels, URLs and automation payload keys remain unchanged. Headings use Roboto Condensed400, text/technical labels Lato Condensed/Lato. The misleading nonfunctional Mono Font display switch is now an honest local Compact Text preview-density control, without changing saved Telegram message formatting.
+
+Corrected stale24-hour welcome UI text to the existing backend12-hour welcome-send cooldown; backend logic/authentication/handlers and live automation records were not changed. DOM regressions cover standalone disclosure/switch layout, section navigation, preserved edits and customer casing through an actual UI save against a test-only bridge, preview/navigation without sends, and width/font/casing contracts. These are not new phone screenshots or proof of actual Telegram message delivery. Owner authorizes build/validation, promotion, then deployment from clean Checkout only.
+
 ## Uploader correction deployed — 2026-11-09
 
 CSS recheck succeeded on retry: live `index-CpE0fmyU.css` matches the validated build byte-for-byte, SHA-256 `9e98c8c698d22410d08f3fc9684f510972b9c0eabf2dfd1e7710ecff4ede3656`.
