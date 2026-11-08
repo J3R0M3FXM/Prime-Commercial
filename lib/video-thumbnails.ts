@@ -15,8 +15,15 @@ export async function inspectVideo(
   video.preload = "auto";
   video.muted = true;
   video.playsInline = true;
+  video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "");
+  video.setAttribute("aria-hidden", "true");
+  // Keep the decoder attached and renderable: display:none/detached video can
+  // suppress frame delivery in embedded mobile browsers.
+  video.style.cssText = "position:fixed;left:-10px;top:0;width:1px;height:1px;opacity:0;pointer-events:none";
+  document.body.appendChild(video);
   const choices: ThumbnailChoice[] = [];
-  const wait = (event: string, start: () => void) =>
+  const wait = (events: string[], start: () => void) =>
     new Promise<void>((resolve, reject) => {
       const done = () => {
         cleanup();
@@ -28,25 +35,33 @@ export async function inspectVideo(
           new Error(
             signal?.aborted
               ? "Thumbnail generation cancelled."
-              : "This video could not be decoded. Choose an MP4 with H.264 video.",
+              : video.error?.code === 3 || video.error?.code === 4
+                ? "This device cannot decode this video. MP4 is a container, not a codec; try an H.264/AAC export, or use a cover image and save as a draft for playback testing."
+                : "The video could not be read on this device. Retry, choose a local file, or use a cover image and save as a draft.",
           ),
         );
       };
-      const timer = setTimeout(fail, 15000);
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error("Thumbnail preparation timed out. Keep Telegram open and retry, or choose a cover image. This does not necessarily mean the video codec is unsupported."));
+      }, 30000);
       const cleanup = () => {
         clearTimeout(timer);
-        video.removeEventListener(event, done);
+        events.forEach((event) => video.removeEventListener(event, done));
         video.removeEventListener("error", fail);
         signal?.removeEventListener("abort", fail);
       };
-      video.addEventListener(event, done, { once: true });
+      events.forEach((event) => video.addEventListener(event, done, { once: true }));
       video.addEventListener("error", fail, { once: true });
       signal?.addEventListener("abort", fail, { once: true });
       if (signal?.aborted) fail();
-      else start();
+      else {
+        try { start(); }
+        catch (error) { cleanup(); reject(error); }
+      }
     });
   try {
-    await wait("loadeddata", () => {
+    await wait(["loadedmetadata", "loadeddata", "canplay"], () => {
       video.src = source;
       video.load();
     });
@@ -64,9 +79,11 @@ export async function inspectVideo(
         Math.min(video.duration - 0.001, video.duration * ratio),
       );
       if (Math.abs(video.currentTime - at) > 0.0001)
-        await wait("seeked", () => {
+        await wait(["seeked"], () => {
           video.currentTime = at;
         });
+      if (!video.videoWidth || !video.videoHeight)
+        throw new Error("A video frame is not available. Retry or choose a cover image.");
       const scale = Math.max(
         canvas.width / video.videoWidth,
         canvas.height / video.videoHeight,
@@ -91,6 +108,7 @@ export async function inspectVideo(
       const image = new File([blob], `thumbnail-${index + 1}.jpg`, {
         type: "image/jpeg",
       });
+      signal?.throwIfAborted();
       choices.push({
         url: URL.createObjectURL(blob),
         file: image,
@@ -110,6 +128,7 @@ export async function inspectVideo(
     video.pause();
     video.removeAttribute("src");
     video.load();
+    video.remove();
     URL.revokeObjectURL(source);
   }
 }

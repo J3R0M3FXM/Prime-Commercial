@@ -71,6 +71,15 @@ export default function TelegramServerlessMediaPanel({
     [choice, setChoice] = useState(0),
     [generating, setGenerating] = useState(false);
   const generation = useRef<AbortController | null>(null);
+  const [cover, setCover] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState("");
+  const [thumbnailError, setThumbnailError] = useState("");
+  useEffect(() => {
+    if (!cover) { setCoverPreview(""); return; }
+    const url = URL.createObjectURL(cover);
+    setCoverPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [cover]);
   useEffect(
     () => () => {
       choices.forEach((item) => URL.revokeObjectURL(item.url));
@@ -173,17 +182,24 @@ export default function TelegramServerlessMediaPanel({
     setChoices([]);
     setGenerating(false);
     setCategoryInput("");
+    setCover(null);
+    setThumbnailError("");
   };
   const pickFile = async (selected?: File) => {
     generation.current?.abort();
     setChoices([]);
     setFile(selected || null);
     setChoice(0);
+    setCover(null);
+    setThumbnailError("");
+    setGenerating(false);
+    setForm((current) => ({ ...current, duration: 0, width: 0, height: 0 }));
     if (!selected) {
       setGenerating(false);
       return;
     }
     if (selected.size > (storage === "r2" ? 150 : 20) * 1024 * 1024) {
+      setFile(null);
       setError(`Choose a video up to ${storage === "r2" ? 150 : 20} MiB.`);
       return;
     }
@@ -205,12 +221,17 @@ export default function TelegramServerlessMediaPanel({
         height: inspected.height,
       }));
     } catch (err: any) {
-      if (!controller.signal.aborted) setError(err.message);
+      if (!controller.signal.aborted) {
+        setThumbnailError(err.message);
+        setForm((current) => ({ ...current, isPublished: false }));
+      }
     } finally {
       if (generation.current === controller) setGenerating(false);
     }
   };
   const edit = (video: ManagedVideo) => {
+    setCover(null);
+    setThumbnailError("");
     generation.current?.abort();
     setChoices([]);
     setFile(null);
@@ -240,11 +261,15 @@ export default function TelegramServerlessMediaPanel({
     try {
       if (!form.title.trim() || !form.categories.length)
         throw new Error("Enter a title and add at least one category.");
-      if (!editing && (!file || choices.length !== 3))
+      if (!editing && (!file || (choices.length !== 3 && !cover)))
         throw new Error(
-          "Choose a decodable MP4 and select a generated thumbnail.",
+          "Choose an MP4 and select a generated thumbnail or a cover image.",
         );
-      const thumbnailUrl = choices[choice]
+      if (thumbnailError && form.isPublished)
+        throw new Error("Save this video as a draft first, then verify playback before publishing.");
+      const thumbnailUrl = cover
+        ? await uploadStaffImage(cover, "media-gallery")
+        : choices[choice]
         ? await uploadStaffImage(choices[choice].file, "media-gallery")
         : form.thumbnailUrl;
       const metadata = {
@@ -363,8 +388,8 @@ export default function TelegramServerlessMediaPanel({
           <ArrowLeft size={16} />
         </button>
         <div className="serverless-panel-header__copy">
-          <h1>Media</h1>
-          <p>R2 and Telegram storage</p>
+          <h1>{formOpen ? (editing ? "Edit media" : "Upload media") : "Media Library"}</h1>
+          <p>Manager · R2 and Telegram storage</p>
         </div>
         <button
           className="serverless-action"
@@ -406,7 +431,11 @@ export default function TelegramServerlessMediaPanel({
           <p className="media-message" role="status">
             {connection}
           </p>
-          <details className="media-storage-settings">
+          <nav className="media-manager-tabs" aria-label="Media sections">
+            <button type="button" aria-current={!formOpen ? "page" : undefined} disabled={busy} onClick={reset}>Library · {videos.length}</button>
+            <button type="button" aria-current={formOpen ? "page" : undefined} disabled={busy} onClick={() => setFormOpen(true)}>{editing ? "Edit media" : "Uploader"}</button>
+          </nav>
+          <details className="media-storage-settings" hidden={formOpen && storage !== "telegram"}>
             <summary>Telegram storage channel</summary>
             <form onSubmit={saveTarget}>
               <label className="serverless-field">
@@ -555,6 +584,29 @@ export default function TelegramServerlessMediaPanel({
                   Generating three thumbnail choices…
                 </p>
               )}
+              {thumbnailError && (
+                <div className="media-thumbnail-warning" role="status">
+                  <p>{thumbnailError}</p>
+                  <button type="button" className="serverless-action" disabled={busy || generating} onClick={() => void pickFile(file || undefined)}>Retry thumbnails</button>
+                  <small>Cover-image uploads are saved as drafts until playback is verified. This does not convert an unsupported codec.</small>
+                </div>
+              )}
+              <label className="serverless-field">
+                Cover image (optional fallback)
+                <input type="file" aria-label="Cover image" accept="image/jpeg,image/png,image/webp" disabled={busy || generating} onChange={(event) => {
+                  const selected = event.target.files?.[0];
+                  if (!selected) { setCover(null); return; }
+                  if (!['image/jpeg', 'image/png', 'image/webp'].includes(selected.type) || selected.size > 10 * 1024 * 1024) {
+                    setError("Choose a JPG, PNG or WebP cover up to 10 MiB.");
+                    event.target.value = "";
+                    return;
+                  }
+                  setCover(selected);
+                  setError("");
+                }} />
+                <small>{cover ? `Selected cover: ${cover.name}` : "Use a cover if this device cannot generate frames."}</small>
+                {coverPreview && <img src={coverPreview} className="media-current-thumbnail" alt="Selected cover preview" />}
+              </label>
               {choices.length === 3 && (
                 <fieldset disabled={busy}>
                   <legend>Select a thumbnail</legend>
@@ -563,8 +615,8 @@ export default function TelegramServerlessMediaPanel({
                       <button
                         type="button"
                         key={item.label}
-                        aria-pressed={choice === index}
-                        onClick={() => setChoice(index)}
+                        aria-pressed={!cover && choice === index}
+                        onClick={() => { setChoice(index); setCover(null); }}
                       >
                         <img src={item.url} alt={`${item.label} frame`} />
                         <span>
@@ -587,7 +639,7 @@ export default function TelegramServerlessMediaPanel({
                 <input
                   type="checkbox"
                   checked={form.isPublished}
-                  disabled={busy}
+                  disabled={busy || Boolean(thumbnailError)}
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
@@ -614,7 +666,7 @@ export default function TelegramServerlessMediaPanel({
               </button>
             </form>
           )}
-          <section aria-label="Media library" className="media-admin-library">
+          <section aria-label="Media library" className="media-admin-library" hidden={formOpen}>
             {loading && <p className="media-message">Loading library…</p>}
             {!loading && !videos.length && (
               <p className="media-message">

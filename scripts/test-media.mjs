@@ -530,7 +530,7 @@ async function bundle(entry, withDefault = true) {
           if (id === "\0bridge")
             return `export const getServerlessVideos=async()=>globalThis.__mediaTest.fixtures.filter(v=>v.storageType==='telegram');export const callServerless=(name,input)=>globalThis.__mediaTest.call(name,input);export const resolveTelegramMedia=async value=>value;export const resolveTelegramVideo=async()=> 'blob:test-video';export const getTelegramServerlessSession=async()=>({authenticated:true,isAdmin:true,tgUserId:'123'});export const uploadStaffImage=async()=> 'tgmedia:img-test1234';export const uploadServerlessGalleryVideo=async(file,metadata)=>{globalThis.__mediaTest.calls.push({name:'telegramUpload',metadata});return{success:true};};`;
           if (id === "\0r2")
-            return `export const listR2Videos=async()=>globalThis.__mediaTest.fixtures.filter(v=>v.storageType==='r2');export const grantR2Playback=async id=>'https://r2.example/stream/'+id;export const checkR2Connection=async()=>({connected:true,multipart:true});export const updateR2Video=async()=>({});export const deleteR2Video=async()=>{};export const uploadR2Video=async()=>({id:'uploaded'});`;
+            return `export const listR2Videos=async()=>globalThis.__mediaTest.fixtures.filter(v=>v.storageType==='r2');export const grantR2Playback=async id=>'https://r2.example/stream/'+id;export const checkR2Connection=async()=>({connected:true,multipart:true});export const updateR2Video=async()=>({});export const deleteR2Video=async()=>{};export const uploadR2Video=async(file,metadata)=>{globalThis.__mediaTest.calls.push({name:'r2Upload',metadata});return{id:'uploaded'};};`;
         },
       },
     ],
@@ -693,6 +693,7 @@ console.log(
 const originalCreate = document.createElement.bind(document);
 let drawn = 0,
   thumbnailPaused = 0;
+let decoderFailure = false;
 document.createElement = function (tag, ...args) {
   const element = originalCreate(tag, ...args);
   if (tag === "video") {
@@ -710,8 +711,11 @@ document.createElement = function (tag, ...args) {
       },
     });
     element.load = () => {
-      if (element.getAttribute("src"))
-        queueMicrotask(() => element.dispatchEvent(new Event("loadeddata")));
+      if (element.getAttribute("src")) {
+        assert.ok(element.isConnected, "Mobile decoder must remain attached");
+        if (decoderFailure) Object.defineProperty(element, "error", { value: { code: 3 }, configurable: true });
+        queueMicrotask(() => element.dispatchEvent(new Event(decoderFailure ? "error" : "loadedmetadata")));
+      }
     };
     element.pause = () => {
       thumbnailPaused++;
@@ -809,6 +813,32 @@ assert.equal(upload.metadata.title, "My media");
 assert.deepEqual(upload.metadata.categories, ["New category", "Tutorials"]);
 assert.equal(upload.metadata.duration, 12);
 assert.equal(upload.metadata.thumbnailUrl, "tgmedia:img-test1234");
+assert.equal(document.querySelectorAll('video[aria-hidden="true"]').length, 0, "Decoder removed after success");
+decoderFailure = true;
+await act(async () => {
+  [...document.querySelectorAll("header button")].find(button => button.textContent.includes("Upload")).click();
+});
+await inputValue('.media-upload-form input[maxlength="180"]', "Manual cover draft");
+await inputValue('[aria-label="New category"]', "Tutorials");
+await act(async () => document.querySelector(".media-category-add button").click());
+await act(async () => {
+  const input = document.querySelector('.media-upload-form input[accept="video/mp4,.mp4"]');
+  Object.defineProperty(input, "files", { value: [new File([bytes], "unsupported.mp4", { type: "video/mp4" })], configurable: true });
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  await new Promise(resolve => setTimeout(resolve, 10));
+});
+assert.match(document.querySelector('.media-thumbnail-warning').textContent, /cannot decode/);
+assert.equal(document.querySelector('input[type=checkbox]').checked, false, "Decoder failure forces draft");
+assert.equal(document.querySelector('input[type=checkbox]').disabled, true);
+assert.equal(document.querySelectorAll('video[aria-hidden="true"]').length, 0, "Decoder removed after error");
+await act(async () => {
+  const input = document.querySelector('[aria-label="Cover image"]');
+  Object.defineProperty(input, "files", { value: [new File([new Uint8Array([255,216,255])], "cover.jpg", { type: "image/jpeg" })], configurable: true });
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+});
+await act(async () => document.querySelector('.media-upload-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+assert.ok(__mediaTest.calls.some(call => call.name === 'r2Upload' && call.metadata.title === 'Manual cover draft' && call.metadata.isPublished === false), 'Manual cover must allow draft upload after decoder failure');
+console.log('PASS: attached metadata-only decoder, error cleanup, manual-cover fallback and forced draft safety.');
 await act(async () => {
   adminRoot.unmount();
 });

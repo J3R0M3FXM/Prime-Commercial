@@ -1,5 +1,17 @@
 # Production Reconstruction Audit
 
+## Media uploader decoder and Manager styling correction — 2026-11-09
+
+The reported H.264 warning was emitted for every decoder error **and every 15-second load/seek timeout**; it was not evidence of the source codec. Thumbnail inspection now attaches a tiny noninteractive inline video to the DOM, proceeds on metadata rather than depending solely on `loadeddata`, seeks to three frames, distinguishes timeouts from native decode failures and releases the decoder/listeners/object URLs on completion, failure or cancellation. MDN documents that mobile data-saver may suppress `loadeddata`: https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/loadeddata_event . No failing customer file or real-device decoder trace was available, so the specific codec/device cause remains unconfirmed.
+
+Added retry and manual JPG/PNG/WebP cover fallback with preview, size/type checks and a draft-only guard after thumbnail inspection fails. Manual covers do not transcode unsupported video. Reset/source changes clear stale inspection metadata and oversize files cannot remain selected for submission. A later deliberate edit can publish after staff verifies playback. Existing server authentication, MP4 bounds and storage contracts remain unchanged.
+
+Reviewed `/storage/emulated/0/Download/prime_core_admin_v2.html` and the real order-management header/control styles. Media now uses compact navy Library/Uploader tabs, white outlined cards, consistent 42px fields/actions, pale file controls, clear selected thumbnails, readable inline warnings and source-specific channel settings. The library is hidden while editing/uploading, preventing two competing workflows in one long screen. Styles are scoped to Media, retain Roboto Condensed 400 / Lato Condensed and the 430px shell, and do not import prototype demo data or change other Admin module behavior. No browser screenshot or real-phone visual acceptance is claimed.
+
+Regression tests exercise an attached metadata-only decoder with no `loadeddata`, actual decoder-error cleanup, a rendered manual-cover draft submission and publication guard, in addition to the existing media/checkout suites. This correction is staged for validated promotion only; revision433 remains the last deployed release until explicitly updated.
+
+The full `npm run validate:miniapp` passed: backend syntax, strict Mini App type-check, contracts/promo/delivery tests, SQLite checkout/payment/inventory/referral and rewards regressions, media DOM/decoder/offline tests, Worker auth/ranges/binding-preservation tests and production Vite build (2,375 modules). Only non-fatal existing build warnings were emitted. Promote this committed source and the exact Sandbox artifacts; do not build in Checkout. No new deployment is claimed for this follow-up.
+
 ## Coordinated media release — 2026-11-09
 
 Release completed from clean Checkout at source commit `d5347f6`. The full Sandbox validation gate passed, including the Worker deployment binding-preservation test and a production build of 2,375 modules. Both trees received identical generated artifacts without building in Checkout. The existing Cloudflare Worker was updated successfully with remote secrets and the private bucket retained; the Pages gateway was unchanged. Post-release gateway catalog returned HTTP200, protected health HTTP403 without authentication, and live-origin OPTIONS HTTP204.
