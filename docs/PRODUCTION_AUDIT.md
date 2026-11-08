@@ -1,5 +1,13 @@
 # Production Reconstruction Audit
 
+## Uploader correction deployed — 2026-11-09
+
+CSS recheck succeeded on retry: live `index-CpE0fmyU.css` matches the validated build byte-for-byte, SHA-256 `9e98c8c698d22410d08f3fc9684f510972b9c0eabf2dfd1e7710ecff4ede3656`.
+
+Owner explicitly authorized deployment after sample inspection. Deployed the previously validated source `8e4f163` and its exact Sandbox-built dist from clean Prime-TGCloud-Checkout using a static-only scoped push. No rebuild in Checkout, backend/schema changes, R2 Worker redeployment, or customer-data writes. Cloud fetch confirms app8830494959 revision **434**, 71 modules, webhook in sync, working directory clean and all **55 static files up to date**. Public root HTML and `index-DHshAEdZ.js` match local artifacts byte-for-byte; JS SHA-256 `4aac85d8140c4eb6a61ff42cb06ae7797458d24bed5e5d109b1bb1f4307b7652`. Public connection checks were intermittent: the first cloud fetch and some static requests timed out, while retrying cloud fetch and root/JS downloads succeeded. Actual Telegram thumbnail generation and phone visual acceptance remain unverified.
+
+Read-only inspection of the two owner-supplied Downloads/Twitter samples confirmed H.264 in both. BorntoutScorpi sample: 5,137,065 bytes, 720x960, High profile Level3.1, 30fps, approximately53.2sec; container/chunk offsets are consistent. Bossbottanan sample: 91,764,561 bytes, but declared media data extends to byte865,575,637; over25,000 chunk offsets per track point beyond EOF, confirming truncation. No source videos were changed or copied into either worktree. This is container inspection, not hardware decoding or a repair/transcode.
+
 ## Media uploader decoder and Manager styling correction — 2026-11-09
 
 The reported H.264 warning was emitted for every decoder error **and every 15-second load/seek timeout**; it was not evidence of the source codec. Thumbnail inspection now attaches a tiny noninteractive inline video to the DOM, proceeds on metadata rather than depending solely on `loadeddata`, seeks to three frames, distinguishes timeouts from native decode failures and releases the decoder/listeners/object URLs on completion, failure or cancellation. MDN documents that mobile data-saver may suppress `loadeddata`: https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/loadeddata_event . No failing customer file or real-device decoder trace was available, so the specific codec/device cause remains unconfirmed.
