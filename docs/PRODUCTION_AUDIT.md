@@ -1,5 +1,15 @@
 # Production Reconstruction Audit
 
+## Owner correction: Silver base rewards and Bronze threshold — 2026-11-09
+
+Supersedes the Member/zero-reward interpretation in the previous audit entry. The owner explicitly confirmed: Silver PHP0-9,999.99 at 5.0%; Bronze PHP10,000-14,999.99 at 5.5%; Gold PHP15,000-19,999.99 at 6.0%; Platinum PHP20,000-24,999.99 at 6.5%; Titanium PHP25,000+ at 7.0%, within the same anchored 30-day completed-order spending cycle.
+
+Corrected the shared Serverless calculator, account display/fallback, tier references, regression tests, and handoff. Silver earns 5 Purchasing Points per PHP100 or 50 per PHP1,000. Once completed cycle spending reaches PHP10,000, subsequent checkout snapshots use Bronze: 5.5 per PHP100 or 55 per PHP1,000, replacing the 5% rate. Fractional rewards are retained to two decimals instead of being truncated to whole points. One reward rate applies; tier and voucher rewards still do not stack. The existing conversion flow continues to convert whole points; any fractional remainder stays in the purchasing balance for later accumulation. Existing credited awards and in-flight canonical snapshots are preserved.
+
+Validation includes all tier bounds down to PHP0.01 before each threshold, the actual Silver-to-Bronze cycle transition, PHP100/PHP1,000 examples for every tier, fractional SQLite balance/ledger credit and idempotent retry, cycle reset to Silver, and the complete production Mini App validation/build gate. No deployment or business-record mutation is part of this correction. Promotion is only after the Sandbox validation passes; Checkout receives the identical committed source and built dist.
+
+Final `npm run validate:miniapp` passed all checks and built 2,368 modules. Corrected production JS: `index-DBDTxRVz.js`, SHA-256 `7a277e00943641e2df659ace4e3e6f91a18c817109be7f93d17722253fa72c79`; CSS remains `index-DhKq8E-y.css`, SHA-256 `265049c5e64523443a795c3eb4d9229211057182675feeb63aa80a20f2a6aae2`. Both source branches and generated dist are synchronized after promotion; no live release is claimed.
+
 ## Checkout safety, rewards, referrals, and reload recovery — 2026-11-09
 
 This entry supersedes historical worktree/release and loyalty statements below for the current source. Implementation and all builds/tests took place in Sandbox. Checkout was initially clean at `cf2d356`; Sandbox was clean at `d2ea637`. Application code matched exactly; only three governance/document files differed. The Checkout branch was merged into Sandbox, preserving the historical audit evidence. Promotion is a fast-forward of the validated final Sandbox commit, so both branches share the exact same source and documentation.

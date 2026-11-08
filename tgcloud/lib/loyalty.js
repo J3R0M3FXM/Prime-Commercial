@@ -6,9 +6,9 @@ export function calculateCustomerTier(completedOrders, now = new Date()) {
     Number.isFinite(orderDate(order.deliveredAt || order.createdAt).getTime())) : [];
   if (!Array.isArray(completedOrders) || completedOrders.length === 0) {
     return {
-      tier: 'Member', currentSpending: 0, cycleStartDate: now.toISOString(),
+      tier: 'Silver', currentSpending: 0, cycleStartDate: now.toISOString(),
       cycleEndDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      daysRemainingInCycle: 30, nextTier: 'Silver', amountNeededForNextTier: 10000,
+      daysRemainingInCycle: 30, nextTier: 'Bronze', amountNeededForNextTier: 10000,
       firstCompletedOrderDate: null, progressPercent: 0,
     };
   }
@@ -30,8 +30,8 @@ export function calculateCustomerTier(completedOrders, now = new Date()) {
       spending += Number.isFinite(amount) ? Math.max(0, amount) : 0;
     }
   }
-  let tier = 'Member';
-  let nextTier = 'Silver';
+  let tier = 'Silver';
+  let nextTier = 'Bronze';
   let amountNeeded = 10000 - spending;
   let progress = Math.min(100, Math.max(0, spending / 10000 * 100));
   if (spending >= 25000) {
@@ -43,7 +43,7 @@ export function calculateCustomerTier(completedOrders, now = new Date()) {
     tier = 'Gold'; nextTier = 'Platinum'; amountNeeded = 20000 - spending;
     progress = Math.min(100, Math.max(0, (spending - 15000) / 5000 * 100));
   } else if (spending >= 10000) {
-    tier = 'Silver'; nextTier = 'Gold'; amountNeeded = 15000 - spending;
+    tier = 'Bronze'; nextTier = 'Gold'; amountNeeded = 15000 - spending;
     progress = Math.min(100, Math.max(0, (spending - 10000) / 5000 * 100));
   }
   return {
@@ -54,9 +54,9 @@ export function calculateCustomerTier(completedOrders, now = new Date()) {
   };
 }
 
-const TIER_POINTS_PER_200 = Object.freeze({ Member: 0, Silver: 11, Gold: 12, Platinum: 13, Titanium: 14 });
+const TIER_POINTS_PER_200 = Object.freeze({ Silver: 10, Bronze: 11, Gold: 12, Platinum: 13, Titanium: 14 });
 
-/** Apply the tier rate to eligible pesos, then floor to whole points once. */
+/** Apply one tier rate to eligible spend; retain fractional points to cents. */
 export function calculateOrderRewardPoints(itemsSubtotal, tier, promoCashbackPoints = 0, itemDiscount = 0, creditsUsed = 0) {
   const subtotal = Number(itemsSubtotal);
   const discount = Number(itemDiscount);
@@ -64,8 +64,8 @@ export function calculateOrderRewardPoints(itemsSubtotal, tier, promoCashbackPoi
   const promoPoints = Number(promoCashbackPoints);
   if (![subtotal, discount, credits, promoPoints].every(Number.isFinite)) return 0;
   const eligibleSpend = Math.max(0, subtotal - Math.max(0, discount) - Math.max(0, credits));
-  const pointsPer200 = TIER_POINTS_PER_200[tier] ?? TIER_POINTS_PER_200.Member;
-  const tierPoints = Math.floor(eligibleSpend * pointsPer200 / 200);
+  const pointsPer200 = TIER_POINTS_PER_200[tier] ?? TIER_POINTS_PER_200.Silver;
+  const tierPoints = Math.round(Math.round(eligibleSpend * 100) * pointsPer200 / 200) / 100;
   // The richer of a voucher or tier reward is credited once through the purchasing ledger.
   return Math.max(tierPoints, Math.max(0, Math.floor(promoPoints)));
 }

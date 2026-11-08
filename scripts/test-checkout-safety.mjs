@@ -140,6 +140,12 @@ if (!isMainThread) {
     await lifecycle.reconcileOrderMilestones({ customerId: 'ref', memberId: 'CODE' });
     assert.equal(ledger.prepare("SELECT referral_points FROM customers WHERE id='ref'").get().referral_points, 50);
     assert.equal(ledger.prepare('SELECT count(*) AS n FROM point_transactions').get().n, 1, 'Retries and concurrent reconciliation award once');
+    ledger.exec(`INSERT INTO orders (id, customer_id, status, purchasing_points_amount, purchasing_points_credit_after)
+      VALUES ('fractional-purchase','friend','Completed',5.5,unixepoch()-1)`);
+    await lifecycle.reconcileOrderMilestones({ customerId: 'friend' });
+    await lifecycle.reconcileOrderMilestones({ customerId: 'friend' });
+    assert.equal(ledger.prepare("SELECT points FROM customers WHERE id='friend'").get().points, 5.5, 'Fractional purchasing reward must survive balance credit and retry');
+    assert.equal(ledger.prepare("SELECT amount FROM point_transactions WHERE order_id='fractional-purchase'").get().amount, 5.5, 'Ledger must conserve fractional points');
     ledger.close();
     console.log('PASS: referral held before own delivery, no award for cancellation, release when both completed, concurrent exactly-once balance and ledger.');
 
@@ -189,15 +195,24 @@ if (!isMainThread) {
 
     const loyalty = load('tgcloud/lib/loyalty.js', {}, ['calculateCustomerTier', 'calculateOrderRewardPoints']);
     const now = new Date('2026-11-09T00:00:00Z');
-    for (const [spending, tier, points] of [[9999, 'Member', 0], [10000, 'Silver', 55], [14999, 'Silver', 55], [15000, 'Gold', 60], [20000, 'Platinum', 65], [25000, 'Titanium', 70]]) {
+    for (const [spending, tier, points] of [[0, 'Silver', 50], [9999.99, 'Silver', 50], [10000, 'Bronze', 55], [14999.99, 'Bronze', 55], [15000, 'Gold', 60], [19999.99, 'Gold', 60], [20000, 'Platinum', 65], [24999.99, 'Platinum', 65], [25000, 'Titanium', 70]]) {
       assert.equal(loyalty.calculateCustomerTier([{ subtotal: spending, status: 'Completed', deliveredAt: now }], now).tier, tier);
       assert.equal(loyalty.calculateOrderRewardPoints(1000, tier), points);
+      assert.equal(loyalty.calculateOrderRewardPoints(100, tier), points / 10);
     }
     assert.equal(loyalty.calculateCustomerTier([{ subtotal: 25000, status: 'Completed', deliveredAt: Math.floor(now.getTime() / 1000) }], now).tier, 'Titanium');
-    assert.equal(loyalty.calculateCustomerTier([{ subtotal: 25000, status: 'Completed', deliveredAt: now }], new Date(now.getTime() + 30 * 86400000)).tier, 'Member');
-    assert.equal(loyalty.calculateCustomerTier([{ subtotal: 25000, status: 'Cancelled', deliveredAt: now }], now).tier, 'Member');
-    assert.equal(loyalty.calculateOrderRewardPoints(299, 'Silver'), 16);
-    assert.equal(loyalty.calculateOrderRewardPoints(1000, 'Silver', 0, 100, 100), 44);
+    assert.equal(loyalty.calculateCustomerTier([], now).tier, 'Silver');
+    assert.equal(loyalty.calculateCustomerTier([{ subtotal: 25000, status: 'Completed', deliveredAt: now }], new Date(now.getTime() + 30 * 86400000)).tier, 'Silver');
+    assert.equal(loyalty.calculateCustomerTier([{ subtotal: 25000, status: 'Cancelled', deliveredAt: now }], now).tier, 'Silver');
+    const cycleOrders = [{ subtotal: 9900, status: 'Completed', deliveredAt: now }];
+    assert.equal(loyalty.calculateOrderRewardPoints(100, loyalty.calculateCustomerTier(cycleOrders, now).tier), 5);
+    cycleOrders.push({ subtotal: 100, status: 'Completed', deliveredAt: now });
+    assert.equal(loyalty.calculateCustomerTier(cycleOrders, now).tier, 'Bronze');
+    assert.equal(loyalty.calculateOrderRewardPoints(100, loyalty.calculateCustomerTier(cycleOrders, now).tier), 5.5, 'Bronze replaces the Silver rate after completed spending reaches 10000 in the same cycle');
+    assert.equal(loyalty.calculateOrderRewardPoints(299, 'Silver'), 14.95);
+    assert.equal(loyalty.calculateOrderRewardPoints(299, 'Bronze'), 16.45);
+    assert.equal(loyalty.calculateOrderRewardPoints(1000, 'Silver', 0, 100, 100), 40);
+    assert.equal(loyalty.calculateOrderRewardPoints(1000, 'Bronze', 0, 100, 100), 44);
     assert.equal(loyalty.calculateOrderRewardPoints(1000, 'Silver', 100), 100, 'Voucher and tier reward must not double-count');
     console.log('PASS: all tier boundaries/rates, cycle reset, cancelled exclusion, epoch dates, discounts, credits, voucher conservation.');
 

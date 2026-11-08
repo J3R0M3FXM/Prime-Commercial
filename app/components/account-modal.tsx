@@ -234,8 +234,8 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
 
   if (!isOpen) return null;
 
-  const activeTier = tier?.tier || 'Member';
-  const tierPointsRate: Record<string, string> = { Member: '0%', Silver: '5.5%', Gold: '6.0%', Platinum: '6.5%', Titanium: '7.0%' };
+  const activeTier = tier?.tier || 'Silver';
+  const tierPointsRate: Record<string, string> = { Silver: '5.0%', Bronze: '5.5%', Gold: '6.0%', Platinum: '6.5%', Titanium: '7.0%' };
 
   return (
     <div id="account-modal-overlay" className="prime-account w-full bg-gray-50 flex justify-center py-[4.8px]">
@@ -323,7 +323,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                   <div className="prime-account__tier flex shrink-0 flex-col items-end justify-center border-l border-gray-200 pl-2">
                     <div className="prime-account__tier-label uppercase">Membership Tier</div>
                     <div className="prime-account__tier-value mt-0.5 uppercase">{activeTier}</div>
-                    <div className="prime-account__tier-rate mt-1">Cashback Rate: {tierPointsRate[activeTier] || '0%'}</div>
+                    <div className="prime-account__tier-rate mt-1">Cashback Rate: {tierPointsRate[activeTier] || '5.0%'}</div>
                   </div>
                 </div>
 
