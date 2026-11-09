@@ -46,7 +46,7 @@ async function collectSessionFingerprint(): Promise<Record<string, unknown> | un
   if (typeof window === 'undefined') return undefined;
   try {
     const { getClientFingerprint } = await import('@/app/components/fingerprint-collector');
-    return await getClientFingerprint() as unknown as Record<string, unknown>;
+    return await getClientFingerprint({ advanced: false }) as unknown as Record<string, unknown>;
   } catch {
     return undefined;
   }
@@ -399,6 +399,26 @@ export type TelegramServerlessSession = {
   error?: string;
 };
 
+type DeviceEnrollment = { deviceId: string; sessionId: string; riskScore: number; reasons: string[]; newInstallation: boolean };
+const deviceEnrollments = new Map<string, { startedAt: number; promise: Promise<DeviceEnrollment> }>();
+
+/** Record recognition after authentication; the fingerprint never grants access. */
+export function recordCurrentDeviceSession(options: { force?: boolean; userId?: string } = {}): Promise<DeviceEnrollment> {
+  let owner = options.userId || '';
+  if (!owner) { try { owner = localStorage.getItem('prime_customer_id') || ''; } catch { /* Account is still verified on the server. */ } }
+  const current = deviceEnrollments.get(owner);
+  if (current && Date.now() - current.startedAt < (options.force ? 4000 : 60_000)) return current.promise;
+  const promise = (async () => {
+    const { getClientFingerprint } = await import('@/app/components/fingerprint-collector');
+    const fingerprint = await getClientFingerprint();
+    return callServerless<DeviceEnrollment>('manageDeviceSecurity', { action: 'record', fingerprint }, 20_000);
+  })();
+  const entry = { startedAt: Date.now(), promise };
+  deviceEnrollments.set(owner, entry);
+  void promise.catch(() => { if (deviceEnrollments.get(owner) === entry) deviceEnrollments.delete(owner); });
+  return promise;
+}
+
 export async function getTelegramServerlessSession(options: { heartbeat?: boolean } = {}): Promise<TelegramServerlessSession> {
   if (isVisualPreview) return { authenticated: true, sessionReady: true, isAdmin: true, tgUserId: '999000001', tgName: 'Preview Admin', tgUsername: 'prime_preview', primeMemberId: 'PM-PREVIEW', user: { id: 'preview-admin', name: 'Preview Admin', role: 'admin' } };
   // Telegram can inject Serverless later than initData after Android resumes.
@@ -410,7 +430,11 @@ export async function getTelegramServerlessSession(options: { heartbeat?: boolea
     ...(fingerprint ? { fingerprint } : {}),
     ...(options.heartbeat ? { heartbeat: true } : {}),
   }, 20_000);
-  if (session.authenticated && session.tgUserId) setMediaOwner(String(session.tgUserId));
+  if (session.authenticated && session.tgUserId) {
+    setMediaOwner(String(session.tgUserId));
+    // The bundled advanced collector runs after the verified session is ready.
+    void recordCurrentDeviceSession({ userId: String(session.tgUserId) }).catch(() => {});
+  }
   return session;
 }
 

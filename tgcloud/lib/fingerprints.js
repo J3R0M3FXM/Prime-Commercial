@@ -45,6 +45,19 @@ export function sanitizeFingerprint(input = {}) {
       languages: Array.isArray(source.languages) ? source.languages.slice(0, 12).map(value => text(value, 40)).filter(Boolean) : [],
       graphics, hardwareConcurrency, deviceMemory: text(source.deviceMemory, 40),
       touchSupport: text(source.touchSupport, 80),
+      installationId: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(source.installationId, 40)) ? source.installationId.toLowerCase() : '',
+      fingerprintId: /^[0-9a-f]{32}$/i.test(text(source.fingerprintId, 40)) ? source.fingerprintId.toLowerCase() : '',
+      fingerprintProvider: text(source.fingerprintProvider, 40), fingerprintVersion: text(source.fingerprintVersion, 24),
+      fingerprintStatus: ['Available', 'Unavailable', 'Pending'].includes(source.fingerprintStatus) ? source.fingerprintStatus : 'Unavailable',
+      storageSource: text(source.storageSource, 40), telegramPlatform: text(source.telegramPlatform, 40),
+      telegramApiVersion: text(source.telegramApiVersion, 24), colorScheme: text(source.colorScheme, 20),
+      osName: text(source.osName, 40), osVersion: text(source.osVersion, 40),
+      browserName: text(source.browserName, 40), browserVersion: text(source.browserVersion, 40),
+      deviceType: text(source.deviceType, 20), colorDepth: number(source.colorDepth, 0, 0, 64),
+      utcOffset: number(source.utcOffset, 0, -840, 840), colorGamut: text(source.colorGamut, 20),
+      cookiesEnabled: source.cookiesEnabled === true, localStorageAvailable: source.localStorageAvailable === true,
+      sessionStorageAvailable: source.sessionStorageAvailable === true, indexedDbAvailable: source.indexedDbAvailable === true,
+      reducedMotion: source.reducedMotion === true, connectionType: text(source.connectionType, 24), online: source.online === true,
     };
   })();
 }
@@ -66,6 +79,10 @@ export async function saveCustomerFingerprint(customer, input = {}, now = new Da
     lastSeen: timestamp,
     enrollmentDate: existing.enrollmentDate || timestamp,
   };
+  // A cheap authentication heartbeat must not erase an earlier advanced result.
+  if (!next.fingerprintId && existing.fingerprintId) {
+    for (const key of ['fingerprintId', 'fingerprintProvider', 'fingerprintVersion', 'fingerprintStatus']) saved[key] = existing[key];
+  }
   if (index >= 0) records.splice(index, 1);
   records.unshift(saved);
   return { fingerprints: records.slice(0, 50), latestFingerprint: saved };

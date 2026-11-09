@@ -7,6 +7,7 @@ const requiredTables = [
   'promoRedemptions', 'warehouses', 'couriers', 'videos', 'charges',
   'pointTransactions', 'systemSettings', 'telegramAutomationFlows',
   'telegramAutomationSettings', 'telegramAutomationChats', 'mayaWebhookEvents',
+  'deviceRegistrations', 'deviceSecuritySessions', 'deviceSecurityEvents',
 ];
 for (const name of requiredTables) {
   assert.match(schema, new RegExp('export\\s+const\\s+' + name + '\\s*=\\s*table\\('), 'Missing schema table export: ' + name);

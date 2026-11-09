@@ -7,6 +7,28 @@
  * in endpoint logic and in migration reconciliation.
  */
 import { table, text, integer, numeric, json, boolean, blob, index, uniqueIndex, sql } from 'sdk/db';
+export const deviceRegistrations = table('device_registrations', {
+  id: text('id').primaryKey(), telegramUserId: text('telegram_user_id').notNull(), installationId: text('installation_id').notNull(),
+  fingerprintId: text('fingerprint_id').notNull().default(''), metadata: json('metadata').notNull().default({}),
+  riskScore: integer('risk_score').notNull().default(0), trustStatus: text('trust_status').notNull().default('observed'),
+  firstSeenAt: integer('first_seen_at').notNull(), lastSeenAt: integer('last_seen_at').notNull(),
+}, (t) => ({
+  ownerInstallation: uniqueIndex('device_registrations_owner_installation_key').on(t.telegramUserId, t.installationId),
+  ownerSeen: index('device_registrations_owner_seen_idx').on(t.telegramUserId, t.lastSeenAt),
+  installation: index('device_registrations_installation_idx').on(t.installationId),
+  fingerprint: index('device_registrations_fingerprint_idx').on(t.fingerprintId),
+}));
+export const deviceSecuritySessions = table('device_security_sessions', {
+  id: text('id').primaryKey(), telegramUserId: text('telegram_user_id').notNull(), deviceRegistrationId: text('device_registration_id').notNull(),
+  firstSeenAt: integer('first_seen_at').notNull(), lastSeenAt: integer('last_seen_at').notNull(),
+  riskScore: integer('risk_score').notNull().default(0), riskReasons: json('risk_reasons').notNull().default([]),
+  reportedIp: text('reported_ip').notNull().default(''), ipSource: text('ip_source').notNull().default('Unavailable'),
+  locationCheckedAt: integer('location_checked_at'), locationAccuracy: numeric('location_accuracy'), locationSource: text('location_source').notNull().default(''),
+}, (t) => ({ ownerSeen: index('device_security_sessions_owner_seen_idx').on(t.telegramUserId, t.lastSeenAt) }));
+export const deviceSecurityEvents = table('device_security_events', {
+  id: text('id').primaryKey(), telegramUserId: text('telegram_user_id').notNull(), deviceRegistrationId: text('device_registration_id').notNull(),
+  sessionId: text('session_id').notNull(), eventType: text('event_type').notNull(), details: json('details').notNull().default({}), createdAt: integer('created_at').notNull(),
+}, (t) => ({ ownerCreated: index('device_security_events_owner_created_idx').on(t.telegramUserId, t.createdAt) }));
 export const supportTickets = table('support_tickets', {
   id: text('id').primaryKey(),
   ownerTelegramId: text('owner_telegram_id').notNull(),

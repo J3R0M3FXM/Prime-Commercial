@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ChevronDown, Loader2, RefreshCw, Search, ShieldCheck, UserRound, Wrench } from "lucide-react";
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { formatPHP } from "@/lib/currency";
+import DeviceSecurityDossier from './device-security-dossier';
 
 type Customer = {
   id: string; tgUserId?: string; tgName?: string; tgUsername?: string; phoneNumber?: string;
@@ -178,13 +179,14 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
         {(selected.orders || []).map((order: any) => <article key={order.id} className="serverless-record p-2"><strong className="text-xs">#{order.orderNumber || order.id} · {order.status}</strong><p className="text-[10px] text-slate-500">{date(order.createdAt)} · {order.paymentStatus} · {formatPHP(Number(order.totalAmount || 0))}</p><p className="mt-1 text-[10px]">{(order.items || []).map((item: any) => `${item.quantity || 1}× ${item.name || "Item"}`).join(", ") || "No item details"}</p></article>)}
         {!selected.orders?.length && <p className="text-xs text-slate-500">No linked orders.</p>}
       </div></details>
-      <details className="serverless-disclosure"><summary>Devices &amp; sessions ({deviceGroups.length} {deviceGroups.length === 1 ? "Device" : "Devices"} · {selected.fingerprints?.length || 0} captures)</summary><div className="serverless-disclosure__body serverless-record-list">
+      <DeviceSecurityDossier key={selected.id} customerId={selected.id} />
+      <details className="serverless-disclosure"><summary>Device Captures ({deviceGroups.length} {deviceGroups.length === 1 ? "Device" : "Devices"} · {selected.fingerprints?.length || 0} Captures)</summary><div className="serverless-disclosure__body serverless-record-list">
         {deviceGroups.map(group => <article key={group.key} className="serverless-device-card">
           <div className="serverless-device-card__header"><div><b>{group.latest.platform || "Device"}</b><small>Telegram Mini App session</small></div><span>{group.sessions.length} {group.sessions.length === 1 ? "capture" : "captures"}</span></div>
           <div className="serverless-device-card__dates"><p><small>First seen</small><b>{compactDate(group.firstSeen)}</b></p><p><small>Last seen</small><b>{compactDate(group.lastSeen)}</b></p></div>
           <details className="serverless-device-card__technical"><summary>Device identifiers &amp; browser details</summary><div>
             <p className="break-all"><b>Device ID</b><br/>{group.latest.deviceId || "—"}</p>
-            <p className="break-all"><b>Hardware ID</b><br/>{group.latest.hardwareId || "—"}</p>
+            <p className="break-all"><b>Legacy Browser Signal</b><br/>{group.latest.hardwareId || "—"}</p>
             <p className="break-all"><b>Device Fingerprint</b><br/>{group.latest.deviceFingerprintId || "—"}</p>
             <p className="break-all"><b>Browser User Agent</b><br/>{group.latest.userAgent || "—"}</p>
           </div></details>
