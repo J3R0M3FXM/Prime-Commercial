@@ -866,7 +866,7 @@ export default function TelegramServerlessOrdersPanel({
         {authorized && !selectedOrder && (
           <div className="space-y-2">
             <div className="serverless-panel-toolbar grid grid-cols-1 sm:grid-cols-2">
-              <label className="relative min-w-0"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order, customer, Telegram ID" className="w-full min-w-0 border border-slate-200 pl-9 pr-3 py-2 text-xs" /></label>
+              <label className="serverless-search"><Search aria-hidden="true" className="w-4 h-4" /><input aria-label="Search orders" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order, customer, Telegram ID" /></label>
               <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setQueueFilter("all"); }} className="w-full min-w-0 border border-slate-200 px-3 py-2 text-xs">
                 <option value="all">All Statuses</option><option value="pending">Pending</option><option value="processing">Processing</option><option value="ready">Ready</option><option value="packed">Packed</option><option value="dispatched">Dispatched</option><option value="completed">Completed</option><option value="expired">Expired</option>
               </select>

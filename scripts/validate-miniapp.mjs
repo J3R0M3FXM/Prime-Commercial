@@ -28,6 +28,7 @@ console.log('PASS: all backend module syntax');
 run('npm', ['run', 'typecheck:miniapp'], 'production Mini App type-check');
 run('node', ['scripts/check-telegram-serverless-contracts.mjs'], 'Serverless contracts');
 run('node', ['scripts/test-promo-codec.mjs'], 'promo regressions');
+run('node', ['scripts/test-voucher-generator.mjs'], 'voucher generation and PNG export');
 run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
 run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
 run('node', ['scripts/test-account-staff-view.mjs'], 'staff account view authorization and customer parity');

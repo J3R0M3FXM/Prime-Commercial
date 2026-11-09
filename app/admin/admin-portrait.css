@@ -151,3 +151,42 @@ body:has(#mobile-portrait-viewport.admin-viewport) { background: #020617 !import
   #mobile-portrait-viewport.admin-viewport .serverless-panel-header { gap: 5px; }
   #mobile-portrait-viewport.admin-viewport .serverless-fields { gap: 6px; }
 }
+
+/* Flat, full-width Admin rows and disclosures; native details remain collapsible. */
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel :is(.serverless-record,.serverless-disclosure,section.border.bg-white,.media-storage-settings,.media-upload-form),
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .secretary-configurator :is(.admin-disclosure,.secretary-steps-section,.secretary-display-option,.secretary-status,.secretary-step-card,.secretary-button-card) {
+  margin-inline: 0; border: 0 !important; border-bottom: 1px solid #d7e1ed !important;
+  border-radius: 0 !important; background: transparent !important; box-shadow: none !important;
+}
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .serverless-record { padding: 8px 3px !important; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel :is(section.border.bg-white,.media-storage-settings,.media-upload-form),
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .secretary-configurator :is(.secretary-steps-section,.secretary-button-card) { padding-inline: 4px !important; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .serverless-disclosure > summary {
+  min-height: 40px; padding: 9px 5px !important; border: 0; border-radius: 0; background: #edf4fb;
+}
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .serverless-disclosure__body,
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .secretary-configurator .admin-disclosure__content {
+  padding: 8px 3px !important; border-top: 1px solid #e1e9f2;
+}
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .secretary-configurator.secretary-configurator .admin-disclosure__trigger { padding: 9px 5px; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app :is(.serverless-panel-header,.secretary-configurator__header) {
+  padding-inline: 5px !important; border: 0 !important; border-bottom: 1px solid #d7e1ed !important;
+  border-radius: 0 !important; box-shadow: none !important;
+}
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .prime-admin-tool-list > button,
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .media-admin-library article {
+  padding-inline: 5px; border: 0; border-bottom: 1px solid #d7e1ed; border-radius: 0; box-shadow: none;
+}
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-order-detail { padding-inline: 2px; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-order-detail :is(.prime-order-summary,.prime-order-progress) {
+  padding-inline: 5px; border: 0; border-bottom: 1px solid #d7e1ed; border-radius: 0; box-shadow: none;
+}
+#mobile-portrait-viewport.admin-viewport .serverless-order-dispatch { display: grid; min-width: 0; gap: 6px; }
+#mobile-portrait-viewport.admin-viewport .serverless-order-dispatch :is(input,button) { width: 100%; min-width: 0; }
+#mobile-portrait-viewport.admin-viewport .serverless-order-dispatch input { min-height: 40px; padding: 8px; border: 1px solid #cbd4df; border-radius: 6px; background: #fff; }
+#mobile-portrait-viewport.admin-viewport .admin-customer-account .prime-account__balance-label { align-items: flex-start; gap: 4px; padding-right: 12px; }
+#mobile-portrait-viewport.admin-viewport .admin-customer-account .prime-account__balance-label svg { width: 19px; height: 19px; }
+#mobile-portrait-viewport.admin-viewport .admin-customer-account .prime-account__balance-label,
+#mobile-portrait-viewport.admin-viewport .admin-customer-account .prime-account__balance-label span {
+  min-width: 0; font-size: 11px !important; line-height: 1.1 !important; overflow-wrap: anywhere;
+}

@@ -11,7 +11,8 @@ for (const name of ['window','document','navigator','HTMLElement','HTMLInputElem
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const calls=[];
 const charge={id:'charge-1',name:'Existing Customer Charge',type:'fixed',rate:37,isActive:true,schedules:{isDefault:false,isTemporal:false,isRecurring:true,isOvernight:false,date:'',time:'09:30',days:[1,3]}};
-globalThis.__adminPortrait = async (name,input) => { calls.push({name,input}); if(input.action==='list')return name==='manageProducts'?[]:[charge]; return {success:true}; };
+const promo={id:'promo-1',code:'PRIME-SAVED',title:'Existing Voucher',voucherType:'shop_voucher',discountType:'fixed',isActive:true};
+globalThis.__adminPortrait = async (name,input) => { calls.push({name,input}); if(input.action==='list')return name==='manageProducts'?[]:name==='managePromos'?[promo]:[charge]; return {success:true}; };
 const require=createRequire(import.meta.url);
 async function bundle(entry) {
   const output=await build({input:resolve(entry),platform:'node',write:false,tsconfig:false,transform:{jsx:{runtime:'automatic'}},resolve:{alias:{'@':process.cwd()}},onLog(level,log,handler){if(log.code!=='MODULE_LEVEL_DIRECTIVE')handler(level,log);},plugins:[{name:'admin-portrait-fixtures',resolveId(id){if(id==='react'||id.startsWith('react/')||id==='lucide-react'||id==='motion/react')return {id:pathToFileURL(require.resolve(id)).href,external:true};if(id.includes('telegram-serverless-client'))return '\0bridge';if(id.endsWith('.css'))return '\0css';},load(id){if(id==='\0css')return '';if(id==='\0bridge')return 'export const callServerless=(name,input)=>globalThis.__adminPortrait(name,input);export const getTelegramServerlessSession=async()=>({authenticated:true,isAdmin:true});export const uploadProductImage=async()=>"tgmedia:fixture123";export const resolveTelegramMedia=async value=>value;';},transform(code,id){if(id.endsWith('/account-modal.tsx'))return code.replaceAll('import.meta.env.VITE_UI_PREVIEW', '"0"');}}],output:{format:'esm'}});
@@ -44,6 +45,13 @@ await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelabl
 const save=calls.find(c=>c.input.action==='update');assert.ok(save);
 assert.equal(save.input.name,charge.name);assert.equal(save.input.rate,37);
 const schedule=JSON.parse(save.input.description);assert.deepEqual(schedule.days,[1,3]);assert.equal(schedule.time,'09:30');assert.equal(schedule.isRecurring,true);assert.equal(schedule.isDefault,false);
+
+await act(async()=>root.render(createElement(rules,{key:'promos',mode:'promos',onBack(){}})));
+assert.ok([...document.querySelectorAll('button')].some(button=>button.textContent.trim()==='Voucher'),'Saved promotions expose a voucher preview');
+await act(async()=>[...document.querySelectorAll('header button')].find(button=>button.textContent.trim()==='Add').click());
+await act(async()=>[...document.querySelectorAll('button')].find(button=>button.textContent.trim()==='Generate Voucher Code').click());
+assert.match(document.querySelector('.rules-dialog input[maxlength="80"]').value,/^PRIME-[0-9A-F]{16}$/);
+assert.equal(calls.filter(call=>call.name==='managePromos'&&call.input.action!=='list').length,0,'Generating a draft code must not save or alter a promotion');
 
 await act(async()=>root.render(createElement(catalog,{inventoryMode:false,onBack(){}})));
 const addProduct=[...document.querySelectorAll('header button')].find(button=>button.textContent.trim()==='Add');assert.ok(addProduct);
