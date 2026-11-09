@@ -17,7 +17,7 @@ function run(command, args, label, summarize = false) {
 }
 
 run('git', ['diff', '--check'], 'diff whitespace');
-for (const directory of ['tgcloud/lib', 'tgcloud/endpoints', 'tgcloud/handlers']) {
+for (const directory of ['tgcloud/lib', 'tgcloud/endpoints', 'tgcloud/handlers','automation']) {
   for (const file of readdirSync(directory).filter(file => file.endsWith('.js'))) {
     const path = join(directory, file);
     const result = spawnSync('node', ['--check', path], { encoding: 'utf8' });

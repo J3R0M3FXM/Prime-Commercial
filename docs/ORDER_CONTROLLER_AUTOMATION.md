@@ -42,15 +42,20 @@ typed schema. `ensureOrderWorkflow()` adds missing columns only; existing values
 not overwritten. It creates three sidecar tables, a ledger lookup index and guarded
 triggers using metadata checks. Existing trigger/table DDL is not rerun as a no-op.
 
-After Sandbox validation and promotion, run from Checkout before the scoped release:
+TGCloud only accepts its reserved Telegram handler names. The two owner-only
+runner templates live outside the deployable `tgcloud/` tree, under `automation/`.
+They are never published as public endpoints. After Sandbox validation and promotion,
+temporarily copy the readiness template into Checkout's `tgcloud/endpoints/`, run it
+with the authenticated owner CLI, and immediately remove that temporary copy:
 
 ```sh
-npm exec --yes --package=@tgcloud/cli -- tgcloud run handlers/orderWorkflowReadiness '{prepare:true}'
+npm exec --yes --package=@tgcloud/cli -- tgcloud run endpoints/orderWorkflowReadiness '{prepare:true}'
 ```
 
 The preparation handler reports schema names only and does not enroll or mutate
 customer orders. It must return `ready: true`. Deploy the changed schema, order
-libraries/endpoints, both order handlers and the exact validated `dist/` from Checkout.
+libraries/endpoints and the exact validated `dist/` from Checkout. Do not push the
+temporary readiness or milestone entry points.
 
 ## GitHub Activation
 
@@ -60,9 +65,11 @@ endpoint and not fabricated Telegram init data.
 
 Scheduled workflows must exist on the default branch, `main`. Publish only
 `.github/workflows/prime-order-milestones.yml` there, without merging unrelated local
-history. Publish `automation/order-milestones.sha256` in the same commit; it pins the
+history. Publish `automation/order-milestones.js` and
+`automation/order-milestones.sha256` in the same commit; the latter pins the
 six backend files in the scheduler's dependency closure. No application source or
-local history needs to be published for the scheduler. Then set:
+local history needs to be published for the scheduler, only this small owner runner
+and its workflow/manifest. Then set:
 
 - `PRIME_AUTOMATION_REF`: the full validated/deployed source commit SHA.
 - `PRIME_ORDER_AUTOMATION_ENABLED`: `true` only after the matching backend is live.
@@ -71,7 +78,9 @@ The workflow checks out its manifest, downloads deployed backend modules into a
 fresh ephemeral directory using `tgcloud pull`, and verifies their SHA-256 hashes.
 It refuses changed/unvalidated code or a token targeting any app other than
 `app8830494959`. Every five minutes, at minute 2/7/12/etc., it runs
-`handlers/orderMilestones`, sharing the same bounded reconciler as existing refreshes.
+the temporary, non-deployed `endpoints/orderMilestones`, sharing the same bounded
+reconciler as existing refreshes. The runner is copied into the ephemeral pull only
+after checking that no deployed endpoint has the same name. No `push` is ever used.
 Concurrency prevents overlapping GitHub jobs; database guards also protect retries.
 One invocation processes at most five batches of twenty records per work category.
 

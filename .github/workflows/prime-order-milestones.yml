@@ -35,5 +35,7 @@ jobs:
           automation_dir=$(mktemp -d "$RUNNER_TEMP/prime-order-milestones.XXXXXX")
           cd "$automation_dir"
           npm exec --yes --package=@tgcloud/cli -- tgcloud pull
+          test ! -e tgcloud/endpoints/orderMilestones.js
+          cp "$GITHUB_WORKSPACE/automation/order-milestones.js" tgcloud/endpoints/orderMilestones.js
           sha256sum --check --strict "$GITHUB_WORKSPACE/automation/order-milestones.sha256"
-          npm exec --yes --package=@tgcloud/cli -- tgcloud run handlers/orderMilestones
+          npm exec --yes --package=@tgcloud/cli -- tgcloud run endpoints/orderMilestones

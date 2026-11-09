@@ -1,7 +1,7 @@
 import { db } from 'sdk';
 import { ensureOrderWorkflow,orderWorkflowColumns,customerWorkflowColumns,workflowDefinitions } from '../lib/order-workflow.js';
 
-/** Owner-only CLI preparation. Reports schema names only, never customer or order records. */
+/** Owner CLI template, never deployed. Reports schema names only, never customer or order records. */
 export default async function(input={}) {
   if(input.prepare===true)await ensureOrderWorkflow();
   const orderColumns=new Set((await db.all("SELECT name FROM pragma_table_info('orders')")).map(row=>row.name));

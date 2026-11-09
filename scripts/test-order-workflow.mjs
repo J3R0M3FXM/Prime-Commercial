@@ -23,7 +23,7 @@ function sql(strings,...values){const params={};let text=strings[0];values.forEa
 function load(file,names,deps={}){return new Function('db','EndpointError',...Object.keys(deps),readFileSync(file,'utf8').replace(/^import[^\n]*\n/gm,'').replace(/export default async function/,'async function handler').replace(/export /g,'')+'\nreturn {'+names.join(',')+'};')(db,EndpointError,...Object.values(deps));}
 const workflow=load('tgcloud/lib/order-workflow.js',['ensureOrderWorkflow','workflowFor','applyWorkflowAction','attachWorkflow','expireReceiptResubmissions','workflowActions','orderWorkflowColumns','customerWorkflowColumns','workflowDefinitions']);
 await workflow.ensureOrderWorkflow();
-const readiness=load('tgcloud/handlers/orderWorkflowReadiness.js',['handler'],workflow).handler;
+const readiness=load('automation/order-workflow-readiness.js',['handler'],workflow).handler;
 assert.equal((await readiness()).ready,true);
 const lifecycle=load('tgcloud/lib/order-lifecycle.js',['markOrderReady','markOrderDispatched','markOrderCompleted','reconcileOrderMilestones'],{sql,expireReceiptResubmissions:workflow.expireReceiptResubmissions,notifyOrderStatusChanged:async()=>{}});
 const row=id=>{const data=sqlite.prepare('SELECT * FROM orders WHERE id=?').get(id);return Object.fromEntries(Object.entries(data).map(([key,value])=>[key.replace(/_([a-z])/g,(_,letter)=>letter.toUpperCase()),value]));};

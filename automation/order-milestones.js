@@ -1,6 +1,6 @@
 import { reconcileOrderMilestones } from '../lib/order-lifecycle.js';
 
-/** Owner CLI handler only; no public endpoint and no fabricated Telegram context. */
+/** Owner CLI template: copy temporarily into tgcloud/endpoints; never deploy this entry point. */
 export default async function () {
   const totals={autoCompleted:0,deferredCompletions:0,receiptExpired:0,credited:0,purchasingAwarded:0,pending:0,batches:0};
   for(let batch=0;batch<5;batch++) {
