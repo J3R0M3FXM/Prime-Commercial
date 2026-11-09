@@ -379,7 +379,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
       </AdminDisclosure>
       </div>
 
-      <div hidden={section !== "settings"}>
+      <div hidden={section !== "preview"}>
       <section className="secretary-display-option" aria-label="Text Display Options">
         <div><strong>Preview Formatting</strong><span>Adjust preview density without changing saved messages or their formatting in Telegram.</span></div>
         <AdminSwitch checked={monoMode} onChange={setMonoMode} label="Compact Text" description={monoMode ? "Compact preview is on" : "Compact preview is off"} />
@@ -391,7 +391,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
 
       <section className={`secretary-status ${settings.businessConnectionId ? "is-connected" : "is-disconnected"}`} role="status">
         <span className="secretary-status__dot" />
-        <p>{settings.businessConnectionId ? "Business account connected · reply permission active. Incoming messages receive a matching step or fallback." : "Telegram Business is not connected. Connect an account and grant reply permission to activate automatic replies."}</p>
+        <p>{settings.businessConnectionId ? `Business Account Connected · Auto Replies ${settings.enabled ? "On" : "Off"}` : "Business Account Not Connected · Connect Telegram Business And Grant Reply Permission"}</p>
         <button type="button" onClick={() => window.location.reload()}>Refresh Status</button>
       </section>
 
@@ -400,7 +400,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
         <section className="secretary-panel secretary-panel--inside">
         <p className="secretary-help">Choose a recent conversation to preview how a reply will look. Previewing does not send a message.</p>
         <label className="secretary-check-row"><input type="checkbox" checked={testMode} onChange={(event) => setTestMode(event.target.checked)} /><span>Preview replies for the selected account</span></label>
-        <label className="block"><span className="label-mini">Test Account · Choose A Recent Customer Chat</span><span className="secretary-help">Select a conversation that has already messaged the business. Previewing does not send to them.</span>
+        <label className="block" hidden={!testMode}><span className="label-mini">Test Account · Choose A Recent Customer Chat</span><span className="secretary-help">Select a conversation that has already messaged the business. Previewing does not send to them.</span>
           <select value={testChatId} onChange={(event) => setTestChatId(event.target.value)} className="control-mini w-full"><option value="">Choose A Recent Chat</option>{chats.map((chat) => <option key={chat.business_connection_id + ":" + chat.chat_id} value={String(chat.chat_id)}>{chat.first_name || chat.username || "Customer"} · {chat.chat_id}</option>)}</select>
         </label>
         <p>Test mode previews the selected chat in the customer preview below. Previewing does not bypass the server’s welcome cooldown.</p>
@@ -409,15 +409,13 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
       </div>
 
       <div hidden={section !== "settings"}>
-      <AdminDisclosure title="Auto Reply Settings" meta={settings.enabled ? "Enabled" : "Disabled"}>
+      <AdminDisclosure title="Auto Reply Settings" meta={settings.enabled ? "Enabled" : "Disabled"} defaultOpen>
         <section className="secretary-panel secretary-panel--inside">
         <p className="secretary-help">These options control whether saved steps can reply automatically and what to say when no step matches.</p>
         <div className="secretary-panel__heading"><h2>Auto Reply</h2></div>
-        <label className="block"><span className="label-mini">Fallback Reply</span><span className="secretary-help">Optional message sent when an incoming customer message does not match any active reply step.</span><textarea value={settings.fallbackResponse} onChange={(event) => setSettings((current) => ({ ...current, fallbackResponse: event.target.value }))} className="control-mini min-h-[92px] w-full resize-y" placeholder="Thanks for your message. How can I help you?" /></label>
-        <label className="block"><span className="label-mini">Fallback Photo · Optional</span><span className="secretary-help">Photo fallback is not supported by the current automation API, so this field is unavailable.</span><input disabled className="control-mini w-full bg-slate-50" placeholder="Photo upload is not available yet" /></label>
-        <p className="secretary-muted">Fallback buttons and photo upload are not supported by the current automation API.</p>
         <AdminSwitch checked={settings.enabled} onChange={(enabled) => setSettings((current) => ({ ...current, enabled }))} label="Secretary Enabled" description="Welcome messages have a 12-hour cooldown from the last welcome sent, regardless of staff replies." />
-        <label className="block"><span className="label-mini">Fallback Behavior</span><span className="secretary-help">Turn on the fallback reply above for messages with no matching step.</span><select value={settings.fallbackEnabled ? "enabled" : "disabled"} onChange={(event) => setSettings((current) => ({ ...current, fallbackEnabled: event.target.value === "enabled" }))} className="control-mini w-full"><option value="disabled">Disabled</option><option value="enabled">Enabled</option></select></label>
+        <label className="block"><span className="label-mini">Fallback Behavior</span><span className="secretary-help">Enable an optional reply when no active step matches.</span><select value={settings.fallbackEnabled ? "enabled" : "disabled"} onChange={(event) => setSettings((current) => ({ ...current, fallbackEnabled: event.target.value === "enabled" }))} className="control-mini w-full"><option value="disabled">Disabled</option><option value="enabled">Enabled</option></select></label>
+        <label className="block" hidden={!settings.fallbackEnabled}><span className="label-mini">Fallback Reply</span><span className="secretary-help">Message sent when no active reply step matches. Disabling fallback preserves this message.</span><textarea value={settings.fallbackResponse} onChange={(event) => setSettings((current) => ({ ...current, fallbackResponse: event.target.value }))} className="control-mini min-h-[92px] w-full resize-y" placeholder="Thanks for your message. How can I help you?" /></label>
         <div className="flex justify-end border-t border-slate-200 pt-2"><button type="button" onClick={() => void saveSettings()} disabled={busy} className="h-9 px-3 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest disabled:opacity-50">{busy ? "Saving…" : "Save Auto Reply Settings"}</button></div>
         </section>
       </AdminDisclosure>

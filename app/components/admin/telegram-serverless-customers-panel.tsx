@@ -193,7 +193,8 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
         </article>)}
         {!selected.fingerprints?.length && <p className="text-xs text-slate-500">No saved fingerprint history.</p>}
       </div></details>
-      <details className="serverless-disclosure"><summary>Linked accounts ({selected.sharedAccounts?.length || 0})</summary><div className="serverless-disclosure__body serverless-record-list">
+      <details className="serverless-disclosure"><summary>Shared Installation Signals ({selected.sharedAccounts?.length || 0})</summary><div className="serverless-disclosure__body serverless-record-list">
+        <p className="text-xs">Shared installation identifiers are review signals, not proof of the same person. Hardware and browser fingerprints alone do not link customers.</p>
         {(selected.sharedAccounts || []).map((account: any) => <article key={account.id} className="serverless-record p-2 text-xs"><b>{account.tgName || "Telegram customer"}{account.tgUsername ? ` · @${account.tgUsername}` : ""}</b><p>{account.primeMemberId || account.id} · {account.matchCount} identifier matches ({(account.matchTypes || []).join(", ")})</p></article>)}
         {!selected.sharedAccounts?.length && <p className="text-xs text-slate-500">No matching device identifiers found in Serverless session history. Fingerprint matches are review signals, not verified identity.</p>}
       </div></details>

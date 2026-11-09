@@ -610,7 +610,7 @@ export default function CheckoutModal({
       setSelectedPaymentMethod(s.selectedPaymentMethod || null);
       setUploadedProofImage(s.uploadedProofImage || ""); setOcrAnalysis(s.ocrAnalysis || null);
       setCustomerNotes(s.customerNotes || ""); setUseStoreCredits(Boolean(s.useStoreCredits));
-      setCreditAmountInput(typeof s.creditAmountInput === "string" ? s.creditAmountInput : s.useStoreCredits ? "max" : "");
+      setCreditAmountInput(typeof s.creditAmountInput === "string" && s.creditAmountInput !== "max" ? s.creditAmountInput : "");
       setAppliedPromo(s.appliedPromo || null); setAppliedReferral(s.appliedReferral || null);
       setPromoCodeInput(s.promoCodeInput || s.appliedPromo?.code || "");
       setReferralCodeInput(s.referralCodeInput || s.appliedReferral?.code || "");
@@ -2120,7 +2120,6 @@ export default function CheckoutModal({
                 <label className="prime-credit-toggle"><span>Use Store Credits</span><input type="checkbox" role="switch" checked={useStoreCredits} onChange={(event) => {
                   const enabled = event.target.checked;
                   setUseStoreCredits(enabled);
-                  if (enabled && !creditAmountInput) setCreditAmountInput(Math.min(availableStoreCredits, payableBeforeCredits).toFixed(2));
                 }} /><span className="prime-credit-switch" aria-hidden="true" /></label>
                 {useStoreCredits && <div className="prime-credit-details">
                   <p>Available: {formatPHP(availableStoreCredits)}</p>

@@ -6,6 +6,38 @@ import { DatabaseSync } from 'node:sqlite';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import ts from 'typescript';
 
+// Run the actual credit-toggle handler: enabling credits must not select an amount.
+{
+  const source = readFileSync('app/components/checkout-modal.tsx', 'utf8');
+  const tree = ts.createSourceFile('checkout.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let toggle;
+  function visit(node) {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(tree) === 'input') {
+      const attributes = node.attributes.properties;
+      if (attributes.some(attribute => attribute.name?.getText(tree) === 'checked' && attribute.initializer?.expression?.getText(tree) === 'useStoreCredits')) {
+        toggle = attributes.find(attribute => attribute.name?.getText(tree) === 'onChange').initializer.expression;
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  assert.ok(toggle, 'Store Credit toggle handler exists');
+  let enabled = false, amount = '';
+  const handler = new Function('setUseStoreCredits', 'setCreditAmountInput', 'creditAmountInput', 'availableStoreCredits', 'payableBeforeCredits',
+    ts.transpileModule('return (' + toggle.getText(tree) + ');', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText)(
+    value => { enabled = value; }, value => { amount = value; }, '', 500, 300);
+  handler({ target: { checked: true } });
+  assert.equal(enabled, true);
+  assert.equal(amount, '', 'Enabling credits leaves amount blank, not maximum or zero');
+  handler({ target: { checked: false } });
+  assert.equal(enabled, false);
+  assert.equal(amount, '');
+  assert.doesNotMatch(source, /s\.useStoreCredits\s*\?\s*"max"/, 'Legacy drafts must not implicitly select MAX');
+  const profile = readFileSync('app/components/account-modal.tsx', 'utf8');
+  assert.doesNotMatch(profile, /DeviceSecurityPanel|DeviceSecurityHistory|manageDeviceSecurity/, 'Customer profile excludes staff device diagnostics');
+  console.log('PASS: Store Credit toggle leaves amount blank and customer profile excludes device diagnostics.');
+}
+
 // Exercise production functions with SQLite, substituting only the hosted SDK.
 function load(file, dependencies, names) {
   const source = readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\n/gm, '')

@@ -27,7 +27,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { callServerless } from '@/lib/telegram-serverless-client';
 import './account-modal.css';
-import DeviceSecurityPanel from './device-security-panel';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -657,7 +656,6 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
           )}
         </div>
 
-        <div className="px-2.5 pb-2.5"><DeviceSecurityPanel /></div>
         {/* Modal Footer */}
         <div className="prime-account__footer p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between font-mono text-xs">
           <Award aria-hidden="true" className="prime-account__footer-icon" />

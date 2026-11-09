@@ -23,9 +23,10 @@ export async function inspectVideo(
   video.style.cssText = "position:fixed;left:-10px;top:0;width:1px;height:1px;opacity:0;pointer-events:none";
   document.body.appendChild(video);
   const choices: ThumbnailChoice[] = [];
-  const wait = (events: string[], start: () => void) =>
+  const wait = (events: string[], start: () => void, ready: () => boolean = () => true) =>
     new Promise<void>((resolve, reject) => {
       const done = () => {
+        if (!ready()) return;
         cleanup();
         resolve();
       };
@@ -36,7 +37,7 @@ export async function inspectVideo(
             signal?.aborted
               ? "Thumbnail generation cancelled."
               : video.error?.code === 3 || video.error?.code === 4
-                ? "This device cannot decode this video. MP4 is a container, not a codec; try an H.264/AAC export, or use a cover image and save as a draft for playback testing."
+                ? "This device cannot decode a preview right now. This can be a temporary decoder, file-access, or video-format problem; it does not prove the codec is unsupported. Retry with Telegram open, choose a local file, or use a cover image and save as a draft for playback testing."
                 : "The video could not be read on this device. Retry, choose a local file, or use a cover image and save as a draft.",
           ),
         );
@@ -51,7 +52,7 @@ export async function inspectVideo(
         video.removeEventListener("error", fail);
         signal?.removeEventListener("abort", fail);
       };
-      events.forEach((event) => video.addEventListener(event, done, { once: true }));
+      events.forEach((event) => video.addEventListener(event, done));
       video.addEventListener("error", fail, { once: true });
       signal?.addEventListener("abort", fail, { once: true });
       if (signal?.aborted) fail();
@@ -82,6 +83,8 @@ export async function inspectVideo(
         await wait(["seeked"], () => {
           video.currentTime = at;
         });
+      if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)
+        await wait(["loadeddata", "canplay", "seeked"], () => {}, () => video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA);
       if (!video.videoWidth || !video.videoHeight)
         throw new Error("A video frame is not available. Retry or choose a cover image.");
       const scale = Math.max(

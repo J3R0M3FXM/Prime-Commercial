@@ -147,7 +147,7 @@ export async function readDeviceSecurity(telegramId) {
 export async function sharedDeviceAccounts(telegramId) {
   return db.all(`SELECT DISTINCT c.id AS customerId,c.tg_name AS name,c.tg_username AS username,c.prime_member_id AS memberId
     FROM device_registrations own JOIN device_registrations other
-      ON (own.installation_id=other.installation_id OR (own.fingerprint_id<>'' AND own.fingerprint_id=other.fingerprint_id))
+      ON own.installation_id=other.installation_id
     JOIN customers c ON c.tg_user_id=other.telegram_user_id
     WHERE own.telegram_user_id=:owner AND other.telegram_user_id<>:owner
       AND own.last_seen_at>=:cutoff AND other.last_seen_at>=:cutoff LIMIT 30`,

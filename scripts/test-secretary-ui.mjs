@@ -46,7 +46,8 @@ assert.equal(document.querySelector('[aria-current=page]').textContent,'Reply St
 assert.equal(visible(document.querySelector('.secretary-steps-section')),true);
 assert.equal(visible(document.querySelector('.secretary-display-option')),false);
 await click('Settings');
-await click('Auto Reply SettingsEnabled');
+assert.equal(visible(document.querySelector('.secretary-display-option')),false,'Preview controls do not belong in automation settings');
+await click('Preview');
 const trigger=document.querySelector('.secretary-display-option .admin-switch-row');
 assert.equal(window.getComputedStyle(trigger).display,'flex','Standalone module switches must not depend on .admin-shell');
 await act(async()=>trigger.click());

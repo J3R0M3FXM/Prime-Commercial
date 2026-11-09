@@ -185,7 +185,12 @@ export default function TelegramServerlessMediaPanel({
     setCover(null);
     setThumbnailError("");
   };
-  const pickFile = async (selected?: File) => {
+  const pickFile = async (selected?: File, force = false) => {
+    // Android pickers may emit another change for the same selected file.
+    // Keep its prepared frames instead of unnecessarily restarting the decoder.
+    if (!force && selected && file && choices.length === 3 &&
+      selected.name === file.name && selected.size === file.size &&
+      selected.lastModified === file.lastModified && selected.type === file.type) return;
     generation.current?.abort();
     setChoices([]);
     setFile(selected || null);
@@ -587,7 +592,7 @@ export default function TelegramServerlessMediaPanel({
               {thumbnailError && (
                 <div className="media-thumbnail-warning" role="status">
                   <p>{thumbnailError}</p>
-                  <button type="button" className="serverless-action" disabled={busy || generating} onClick={() => void pickFile(file || undefined)}>Retry Thumbnails</button>
+                  <button type="button" className="serverless-action" disabled={busy || generating} onClick={() => void pickFile(file || undefined, true)}>Retry Thumbnails</button>
                   <small>Cover-image uploads are saved as drafts until playback is verified. This does not convert an unsupported codec.</small>
                 </div>
               )}

@@ -28,9 +28,9 @@ function fingerprintList(value) {
 function identifiers(fp) {
   return [
     ['deviceId', fp?.deviceId || fp?.device_id],
-    ['hardwareId', fp?.hardwareId || fp?.hardware_id],
-    ['deviceFingerprintId', fp?.deviceFingerprintId || fp?.device_fingerprint_id],
-  ].filter(([, value]) => value).map(([type, value]) => ({ type, value: String(value).trim() }));
+    ['installationId', fp?.installationId || fp?.installation_id],
+  ].filter(([, value]) => typeof value === 'string' && /^(?:DEV_[A-Za-z0-9_-]{10,}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i.test(value.trim()))
+    .map(([type, value]) => ({ type, value: value.trim() }));
 }
 function formatOrderNumber(seconds) {
   const pht = new Date((Number(seconds) + 8 * 60 * 60) * 1000);
@@ -146,6 +146,7 @@ function normalizedCustomer(row, customerOrders) {
     fingerprints: fingerprintList(row.fingerprints).map(fp => ({
       deviceId: fp?.deviceId || fp?.device_id || '', hardwareId: fp?.hardwareId || fp?.hardware_id || '',
       deviceFingerprintId: fp?.deviceFingerprintId || fp?.device_fingerprint_id || '',
+      installationId: fp?.installationId || fp?.installation_id || '',
       sessionToken: fp?.sessionToken || fp?.session_token || '',
       userAgent: fp?.userAgent || fp?.user_agent || '', platform: fp?.platform || '',
       browser: fp?.browser || '', screenResolution: fp?.screenResolution || fp?.screen_resolution || '',
@@ -234,8 +235,8 @@ export default async function (input = {}, ctx) {
   if (keys.size) {
     const others = await db.select().from(customers).orderBy(desc(customers.createdAt)).limit(500).all();
     dossier.sharedAccounts = others.filter(other => other.id !== row.id).flatMap(other => {
-      const matches = fingerprintList(other.fingerprints).flatMap(fp => identifiers(fp)
-        .filter(item => keys.has(`${item.type}:${item.value}`)));
+      const matches = [...new Map(fingerprintList(other.fingerprints).flatMap(fp => identifiers(fp)
+        .filter(item => keys.has(`${item.type}:${item.value}`))).map(item => [`${item.type}:${item.value}`, item])).values()];
       const matchTypes = [...new Set(matches.map(item => item.type))];
       return matches.length ? [{ id: other.id, tgName: other.tgName || '', tgUsername: other.tgUsername || '', primeMemberId: other.primeMemberId || '', matchCount: matches.length, matchTypes }] : [];
     });

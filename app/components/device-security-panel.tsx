@@ -35,7 +35,7 @@ export function DeviceSecurityHistory({ data, staff = false }: { data: DeviceSec
       {data.sessions.length > 20 && <p>Showing the 20 most recently active sessions.</p>}
     </div></details>
     <details><summary>Recent Security Events ({data.events.length})</summary><div className="prime-device-security__list">{data.events.map(event => <article key={event.id}><h4>{event.eventType}</h4><p>{date(event.createdAt)}</p></article>)}</div></details>
-    {staff && <details><summary>Accounts With Shared Signals ({data.sharedAccounts?.length || 0})</summary><div className="prime-device-security__list">{data.sharedAccounts?.map(account => <article key={account.customerId}><h4>{account.name || 'Telegram Customer'}</h4><p>{account.memberId || account.customerId}{account.username ? ` · @${account.username}` : ''}</p></article>)}</div><p>Shared browser signals do not prove that the accounts belong to the same person.</p></details>}
+    {staff && <details><summary>Shared Installation Signals ({data.sharedAccounts?.length || 0})</summary><div className="prime-device-security__list">{data.sharedAccounts?.map(account => <article key={account.customerId}><h4>{account.name || 'Telegram Customer'}</h4><p>{account.memberId || account.customerId}{account.username ? ` · @${account.username}` : ''}</p></article>)}</div><p>Shared installations are review signals, not proof of the same person. Browser fingerprints alone do not link customers.</p></details>}
     <p>Session and event history is retained for up to {data.retentionDays} days. Precise location coordinates are not retained. Recognition signals can change or be shared.</p>
   </div>;
 }

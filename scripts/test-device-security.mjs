@@ -9,6 +9,12 @@ function load(file, dependencies, names) {
     .replace(/export default async function\s*\(/, 'async function handler(').replace(/export /g, '');
   return new Function(...Object.keys(dependencies), source + '\nreturn {' + names.join(',') + '};')(...Object.values(dependencies));
 }
+const legacyIdentifiers = load('tgcloud/endpoints/manageCustomers.js', {}, ['identifiers']).identifiers;
+assert.deepEqual(legacyIdentifiers({ hardwareId: 'same-phone-profile', deviceFingerprintId: 'same-browser-profile' }), []);
+assert.deepEqual(legacyIdentifiers({ deviceId: 'unknown' }), []);
+assert.deepEqual(legacyIdentifiers({ deviceId: 'DEV_abc123456789' }), [{ type: 'deviceId', value: 'DEV_abc123456789' }]);
+const sampleInstallation = crypto.randomUUID();
+assert.deepEqual(legacyIdentifiers({ installationId: sampleInstallation }), [{ type: 'installationId', value: sampleInstallation }]);
 const database = new DatabaseSync(':memory:');
 const people = [ { id: 'alice', tgUserId: '11', isBanned: false }, { id: 'bob', tgUserId: '22', isBanned: false }, { id: 'banned', tgUserId: '33', isBanned: true } ];
 const db = {
@@ -53,6 +59,9 @@ assert.ok(bob.reasons.includes('Signals Shared With Another Account'));
 assert.equal((await handler({ action: 'list' }, context(11))).devices.length, 1);
 assert.equal((await handler({ action: 'staffDetail', customerId: 'bob' }, context(99))).devices.length, 1);
 assert.equal((await handler({ action: 'staffDetail', customerId: 'bob' }, context(99))).sharedAccounts[0].customerId, 'alice');
+database.prepare('UPDATE device_registrations SET installation_id=? WHERE telegram_user_id=?').run(crypto.randomUUID(), '22');
+assert.deepEqual((await handler({ action: 'staffDetail', customerId: 'bob' }, context(99))).sharedAccounts, [], 'Identical browser fingerprints on different installations do not link customers');
+database.prepare('UPDATE device_registrations SET installation_id=? WHERE telegram_user_id=?').run(installationId, '22');
 assert.equal((await handler({ action: 'list' }, context(22))).sharedAccounts, undefined);
 const changed = await handler({ action: 'record', fingerprint: { ...fingerprint, fingerprintId: 'b'.repeat(32) } }, context(11));
 assert.ok(changed.reasons.includes('Browser Fingerprint Changed'));

@@ -697,17 +697,23 @@ let decoderFailure = false;
 document.createElement = function (tag, ...args) {
   const element = originalCreate(tag, ...args);
   if (tag === "video") {
+    let readiness = 1;
     Object.defineProperties(element, {
       duration: { value: 12 },
       videoWidth: { value: 640 },
       videoHeight: { value: 360 },
+      readyState: { get: () => readiness },
     });
     let time = 0;
     Object.defineProperty(element, "currentTime", {
       get: () => time,
       set(value) {
         time = value;
-        queueMicrotask(() => element.dispatchEvent(new Event("seeked")));
+        readiness = 1;
+        queueMicrotask(() => {
+          element.dispatchEvent(new Event("seeked"));
+          queueMicrotask(() => { readiness = 2; element.dispatchEvent(new Event("loadeddata")); });
+        });
       },
     });
     element.load = () => {
@@ -723,7 +729,8 @@ document.createElement = function (tag, ...args) {
   }
   if (tag === "canvas") {
     element.getContext = () => ({
-      drawImage() {
+      drawImage(video) {
+        assert.equal(video.readyState, 2, 'Wait for a decoded frame, not only metadata or seek completion');
         drawn++;
       },
     });
@@ -794,6 +801,14 @@ assert.equal(
 );
 assert.equal(drawn, 3);
 assert.equal(thumbnailPaused, 1);
+decoderFailure = true;
+await act(async () => {
+  const input = document.querySelector('.media-upload-form input[type=file]');
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+});
+assert.equal(document.querySelectorAll('.media-thumbnail-choices button').length, 3, 'Duplicate picker event retains prepared thumbnails');
+assert.equal(thumbnailPaused, 1, 'Duplicate picker event must not start another decoder');
+decoderFailure = false;
 await act(async () => {
   document.querySelectorAll(".media-thumbnail-choices button")[1].click();
 });
