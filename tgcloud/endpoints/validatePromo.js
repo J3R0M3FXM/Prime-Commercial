@@ -76,6 +76,15 @@ export default async function (input, ctx) {
   const customerTier = String(tierInfo.tier || 'Silver');
   const tierForComparison = customerTier.toUpperCase();
 
+  if (promo.customerEligibility === 'specific_customer') {
+    const eligible = String(promo.eligibleCustomerId || '').trim().toUpperCase();
+    const customerIdentifiers = [customer.id, customer.primeMemberId, telegramId]
+      .map(value => String(value || '').trim().toUpperCase()).filter(Boolean);
+    if (!eligible || !customerIdentifiers.includes(eligible)) {
+      return fail('This voucher is reserved for a different customer.');
+    }
+  }
+
   if (promo.customerEligibility === 'new_customer' && completedCount > 0) {
     return fail('This voucher is exclusive to new customers on their first completed order.');
   }

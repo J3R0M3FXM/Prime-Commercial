@@ -24,6 +24,6 @@ export default async function () {
       (ends === null || ends >= now) && underUsageLimit;
   });
 
-  // Do not expose global usage counters or limits to public callers.
-  return valid.map(({ totalUsageLimit, usageCount, ...promo }) => promo);
+  // Keep usage counters and customer-specific identifiers out of public data.
+  return valid.map(({ totalUsageLimit, usageCount, eligibleCustomerId, ...promo }) => promo);
 }

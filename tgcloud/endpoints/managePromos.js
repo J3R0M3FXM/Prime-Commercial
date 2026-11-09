@@ -7,12 +7,12 @@ import { promoRedemptions, promos } from '../schema.js';
 const fields = new Set([
   'code', 'title', 'description', 'voucherType', 'discountType', 'discountValue',
   'maxDiscountAmount', 'cappedShippingDiscount', 'cashbackPercentage', 'minSpend',
-  'minItemQuantity', 'customerEligibility', 'minPreviousOrders', 'eligibleTiers',
+  'minItemQuantity', 'customerEligibility', 'eligibleCustomerId', 'minPreviousOrders', 'eligibleTiers',
   'allowedPaymentMethods', 'allowedCourierIds', 'activeDaysOfWeek', 'isPaydayOnly',
   'flashHourStart', 'flashHourEnd', 'totalUsageLimit', 'usageCount',
   'usageLimitPerCustomer', 'isActive', 'startDate', 'endDate',
 ]);
-const stringFields = new Set(['code', 'title', 'description', 'voucherType', 'discountType', 'customerEligibility']);
+const stringFields = new Set(['code', 'title', 'description', 'voucherType', 'discountType', 'customerEligibility', 'eligibleCustomerId']);
 const arrayFields = new Set(['eligibleTiers', 'allowedPaymentMethods', 'allowedCourierIds', 'activeDaysOfWeek']);
 
 function numberValue(value, field, { integer = false, nullable = false, min = 0, max = Infinity } = {}) {
@@ -79,7 +79,11 @@ function normalize(input, current = {}) {
       values[key] = dateValue(value, key);
     }
   }
-  return { ...current, ...values };
+  const promo = { ...current, ...values };
+  if (promo.isActive !== false && promo.customerEligibility === 'specific_customer' && !String(promo.eligibleCustomerId || '').trim()) {
+    throw new EndpointError('Enter the eligible customer’s PRIME Member ID or Telegram ID.', { code: 'INVALID_INPUT' });
+  }
+  return promo;
 }
 
 function toDatabaseRow(promo, id, creating, existingDescription = '') {
