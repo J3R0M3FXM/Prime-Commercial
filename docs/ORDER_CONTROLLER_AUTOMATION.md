@@ -81,7 +81,10 @@ It refuses changed/unvalidated code or a token targeting any app other than
 the temporary, non-deployed `endpoints/orderMilestones`, sharing the same bounded
 reconciler as existing refreshes. The runner is copied into the ephemeral pull only
 after checking that no deployed endpoint has the same name. No `push` is ever used.
-Concurrency prevents overlapping GitHub jobs; database guards also protect retries.
+Runtime output is captured only in the ephemeral runner, not printed or uploaded as
+an artifact, because the repository is public. Actions report success/failure without
+publishing customer-related notification errors. Concurrency prevents overlapping
+GitHub jobs; database guards also protect retries.
 One invocation processes at most five batches of twenty records per work category.
 
 GitHub schedules can be delayed. Upload eligibility stops at exactly one hour;
@@ -91,6 +94,7 @@ provides recovery. The first enabled run will also reconcile existing overdue pa
 Dispatched orders and eligible pending rewards; it never verifies a payment itself.
 
 Disable with `PRIME_ORDER_AUTOMATION_ENABLED=false`. Do not change the pinned ref to
-unvalidated or undeployed source. Verify a manual workflow run and its aggregate
-counts before reporting the scheduler as active. Actual customer interactions and
+unvalidated or undeployed source. Verify a successful manual workflow run before
+reporting the scheduler as active. Aggregate counts may be inspected privately with
+the owner CLI. Actual customer interactions and
 provider refunds still require phone/provider checks; local fixtures are not live sales.

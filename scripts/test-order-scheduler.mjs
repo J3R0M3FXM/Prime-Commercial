@@ -21,6 +21,8 @@ assert.equal(step.env.TGCLOUD_TOKEN,'${{ secrets.TGCLOUD_TOKEN }}');
 assert.match(step.run,/app8830494959/);assert.match(step.run,/tgcloud run endpoints\/orderMilestones/);
 assert.match(step.run,/test ! -e tgcloud\/endpoints\/orderMilestones\.js/);
 assert.match(step.run,/tgcloud pull/);assert.match(step.run,/sha256sum --check --strict/);
+assert.match(step.run,/private-runtime\.log.*2>&1/,'Public Actions logs must not expose customer-related runtime warnings');
+assert.doesNotMatch(step.run,/cat.*private-runtime|upload-artifact/);
 const pinned=new Set();
 const localPath=file=>file==='tgcloud/endpoints/orderMilestones.js'?'automation/order-milestones.js':file;
 for(const line of readFileSync('automation/order-milestones.sha256','utf8').trim().split('\n')) {
