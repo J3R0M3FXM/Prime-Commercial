@@ -49,7 +49,14 @@ export default async function (input = {}, ctx) {
   if (String(sender.id) === String(recipient.id)) throw new EndpointError('Choose another PRIME member.', { code: 'SELF_TRANSFER' });
   const transferId = `sc-transfer-${sender.id}-${operationId}`;
   const installed = await db.get("SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_store_credit_transfer_v1'");
-  if (!installed) await db.run(ENSURE_TRANSFER_TRIGGER);
+  if (!installed) {
+    try { await db.run(ENSURE_TRANSFER_TRIGGER); }
+    catch (error) {
+      if (!await db.get("SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_store_credit_transfer_v1'")) {
+        throw new EndpointError('Credit transfers are temporarily unavailable. Please try again later.', { code: 'TRANSFER_NOT_CONFIGURED' });
+      }
+    }
+  }
   let existing = await db.select().from(storeCreditTransfers).where(eq(storeCreditTransfers.id, transferId)).get();
   if (!existing) {
     try {

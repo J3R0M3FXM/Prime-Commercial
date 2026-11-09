@@ -81,10 +81,16 @@ export default async function (input = {}, ctx) {
   const ledgerType = pointsType === 'referral' ? 'conversion_referral' : 'conversion_purchasing';
   const transactionId = `tx-conv-${customerId}-${operationId}`;
 
-  // Existing installations must not rerun DDL on every conversion. New installs
-  // use a write-only body compatible with the runtime SQL mode classifier.
+  // IF NOT EXISTS becomes a read-only no-op when installed; db.run rejects it.
   const installed = await db.get("SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_convert_points_to_credits_v1'");
-  if (!installed) await db.run(ENSURE_CONVERSION_TRIGGER);
+  if (!installed) {
+    try { await db.run(ENSURE_CONVERSION_TRIGGER); }
+    catch (error) {
+      if (!await db.get("SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_convert_points_to_credits_v1'")) {
+        throw new EndpointError('Point conversion is temporarily unavailable. Please try again later.', { code: 'CONVERSION_NOT_CONFIGURED' });
+      }
+    }
+  }
 
   const existing = await db.select().from(pointTransactions)
     .where(eq(pointTransactions.id, transactionId)).get();

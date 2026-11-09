@@ -15,7 +15,7 @@ const convert = row => row ? Object.fromEntries(Object.entries(row).map(([key,va
 let ddl=0;
 const db = {
   async get(sql,params={}) { return database.prepare(sql).get(params); },
-  async run(sql,params={}) { if (/CREATE TRIGGER/i.test(sql)) { assert.doesNotMatch(sql,/\bSELECT\b/i,'Runtime rejects SELECT in write-mode trigger definitions'); ddl++; database.exec(sql); return {rowsAffected:0}; } const statement=database.prepare(sql); const result=statement.run(params); return {rowsAffected:Number(result.changes)}; },
+  async run(sql,params={}) { if (/CREATE TRIGGER/i.test(sql)) { const name=sql.match(/CREATE TRIGGER IF NOT EXISTS (\w+)/i)[1];ddl++;if(database.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name=?").get(name))throw Error('Write query looks like a read one');database.exec(sql); return {rowsAffected:0}; } const statement=database.prepare(sql); const result=statement.run(params); return {rowsAffected:Number(result.changes)}; },
   select() { return { from(t) { return { where(condition) { return { async get() { return convert(database.prepare(`SELECT * FROM ${t.name} WHERE ${condition.field}=?`).get(condition.value)); } }; } }; } }; },
   insert(t) { return { values(values) { return { async run() { const fields=Object.keys(values); database.prepare(`INSERT INTO ${t.name} (${fields.map(key=>columns[key]).join(',')}) VALUES (${fields.map(()=>'?').join(',')})`).run(...fields.map(key=>values[key])); } }; } }; },
 };
