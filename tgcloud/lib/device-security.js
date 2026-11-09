@@ -159,9 +159,3 @@ export function runtimeCapabilities(ctx) {
   return { contextKeys: names(ctx), requestKeys: names(ctx?.request), metadataKeys: names(ctx?.metadata),
     serverIpAvailable: false, ipStatus: 'No documented trusted client-IP field. Context names are diagnostic only.' };
 }
-
-// Deployment initializer: run by the authenticated CLI, without impersonating a Mini App user.
-export default async function () {
-  await ensureDeviceSecurityTables();
-  return { initialized: true, tables: ['device_registrations', 'device_security_sessions', 'device_security_events'] };
-}

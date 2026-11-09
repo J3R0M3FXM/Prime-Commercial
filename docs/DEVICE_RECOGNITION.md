@@ -13,7 +13,7 @@ The Telegram Serverless app recognizes an account, an installation and a browser
 
 ## Registry and Review Events
 
-`device_registrations`, `device_security_sessions` and `device_security_events` are additive tables declared in `tgcloud/schema.js`. `ensureDeviceSecurityTables` creates only those tables/indexes idempotently, matching the application's existing lazy table initialization pattern. The module's default export is a deployment initializer for authenticated CLI execution from Checkout (`tgcloud run lib/device-security '{}'`); feature calls also initialize idempotently. No existing tables or configuration values are migrated or removed. Do not use a broad schema migration to apply unrelated existing drift.
+`device_registrations`, `device_security_sessions` and `device_security_events` are additive tables declared in `tgcloud/schema.js`. `ensureDeviceSecurityTables` creates only those tables/indexes idempotently on the first verified feature call, matching the application's existing lazy table initialization pattern. Automatic enrollment after verified login triggers this setup; no separate staff action is required. The CLI can run endpoints and handlers, not shared library modules. No existing tables or configuration values are migrated or removed. Do not use a broad schema migration to apply unrelated existing drift.
 
 Registration IDs are SHA-256 identifiers derived on the server from the verified account and installation. Session IDs also include the client session identifier. Repeated calls upsert the same registration/session. Security-event IDs are deterministic to suppress retry duplicates. First/last-seen timestamps come from the server.
 
