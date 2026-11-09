@@ -63,7 +63,7 @@ assert.match(proofUpload, /customer_id AS customerId[\s\S]*expires_at AS expires
 const publicPayments = readFileSync('tgcloud/endpoints/getPublicPaymentMethods.js', 'utf8');
 assert.match(publicPayments, /paymentLinkUrl: row\.paymentType === 'secured_payment_link' \? String\(row\.publicKey \|\| ''\)/, 'Public payment methods must return the customer-facing HTTPS link from the existing public_key column');
 const paymentAdmin = readFileSync('tgcloud/endpoints/managePaymentMethods.js', 'utf8');
-assert.match(paymentAdmin, /key === 'paymentLinkUrl'[\s\S]*parsed\.protocol !== 'https:'/,'Admin payment links must be validated as HTTPS before saving');
+assert.match(paymentAdmin, /key === 'paymentLinkUrl'[\s\S]*!validPaymentLink\(normalized\)/,'Admin payment links must be validated as HTTPS before saving');
 
 console.log('Telegram Serverless contracts OK: ' + requiredTables.length + ' tables, ' + requiredEndpoints.length + ' endpoint modules, public-field safeguards.');
 

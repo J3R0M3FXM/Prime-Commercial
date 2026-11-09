@@ -491,6 +491,8 @@ export default function Shopfront() {
 
       {(activeTab === "cart" || isCheckoutActive) && (
         <CartDrawer
+          liveQueue={publicOrderQueue}
+          onViewOrder={(order) => { setInitialOrderIdFromLink(String(order.id || order.orderNumber)); setActiveTab('orders'); }}
           isOpen={activeTab === "cart"}
           onClose={() => { setIsCheckoutActive(false); setIsCartOpen(false); setActiveTab("shop"); }}
           onCheckoutOpenChange={(open) => {

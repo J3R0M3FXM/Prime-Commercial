@@ -271,13 +271,7 @@ export default function OrderHistoryModal({
       if (Array.isArray(serverOrders)) {
         const authoritativeOrders = serverOrders
           .map(normalizeOrder)
-          .filter(Boolean)
-          .sort((a: any, b: any) => {
-            const aTime = Date.parse(String(a.createdAt || ""));
-            const bTime = Date.parse(String(b.createdAt || ""));
-            if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) return bTime - aTime;
-            return String(b.orderNumber || b.id || "").localeCompare(String(a.orderNumber || a.id || ""));
-          });
+          .filter(Boolean);
         setOrders(authoritativeOrders);
       } else {
         throw new Error("Order history response was invalid.");
@@ -642,7 +636,10 @@ export default function OrderHistoryModal({
   // Filtered orders for compact list
   const filteredOrders = useMemo(() => {
     return [...orders]
-      .sort((a, b) => (timestampMs(b.createdAt || b.updatedAt) || 0) - (timestampMs(a.createdAt || a.updatedAt) || 0))
+      .sort((a, b) => {
+        const left = timestampMs(a.createdAt), right = timestampMs(b.createdAt);
+        return left !== null && right !== null ? right - left : 0;
+      })
       .filter(order => {
       const status = String(order.status || "Pending").toLowerCase();
       const paymentStatus = String(order.paymentStatus || "").toLowerCase();
@@ -738,15 +735,16 @@ export default function OrderHistoryModal({
           {!selectedOrderId || !selectedOrder ? (
             <div className="space-y-4">
               {/* Search and Status Tab Filters */}
-              <div className="space-y-2.5">
-                <div className="relative">
+              <div className="order-history__filters">
+                <div className="relative min-w-0">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="SEARCH BY ORDER #, ITEM, OR RECEIVER..."
-                    className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-900 placeholder:text-gray-400 uppercase focus:outline-none focus:ring-1 focus:ring-black"
+                    aria-label="Search Order History"
+                    placeholder="Order, Item, Receiver"
+                    className="w-full min-w-0 h-10 pl-8 pr-10 py-2 bg-white border border-gray-200 rounded-md text-xs font-mono text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
                   />
                   {searchTerm && (
                     <button
@@ -759,28 +757,15 @@ export default function OrderHistoryModal({
                   )}
                 </div>
 
-                {/* Filter Pills */}
-                <div className="grid grid-cols-3 gap-1.5 text-xs font-mono">
+                <select aria-label="Order Category" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="min-w-0 w-full h-10 rounded-md border border-gray-200 bg-white px-2 text-xs font-mono">
                   {([
                     ["ALL", "All"], ["ACTION", "Action needed"], ["PROGRESS", "In progress"],
                     ["COMPLETED", "Completed"], ["CLOSED", "Closed"],
                   ] as const).map(([tab, label]) => (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => setStatusFilter(tab)}
-                      aria-pressed={statusFilter === tab}
-                      className={`min-h-9 rounded-md border px-2 py-1.5 font-bold uppercase tracking-wide text-[9px] leading-tight transition-colors cursor-pointer ${
-                        statusFilter === tab
-                          ? "border-slate-900 bg-slate-900 text-white"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      {label}
-                    </button>
+                    <option key={tab} value={tab}>{label}</option>
                   ))}
-                </div>
-                <p aria-live="polite" className="text-right text-[10px] font-mono text-slate-500">
+                </select>
+                <p aria-live="polite" className="col-span-2 text-right text-[10px] font-mono text-slate-500">
                   {filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"}
                 </p>
               </div>

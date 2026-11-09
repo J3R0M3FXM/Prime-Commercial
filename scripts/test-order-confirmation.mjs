@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import { build } from 'rolldown';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+
+const require = createRequire(import.meta.url);
+const bundle = await build({ input: resolve('app/components/order-submission-confirmation.tsx'), write: false, platform: 'node', tsconfig: false, resolve: { alias: { '@': process.cwd() } }, transform: { jsx: { runtime: 'automatic' } }, plugins: [{ name: 'react-runtime', resolveId(id) { if (id === 'react' || id.startsWith('react/') || id === 'lucide-react') return { id: pathToFileURL(require.resolve(id)).href, external: true }; } }], onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log); }, output: { format: 'esm' } });
+const Component = (await import('data:text/javascript;base64,' + Buffer.from(bundle.output[0].code).toString('base64'))).default;
+const order = { id: 'real-order', orderNumber: '091126190829', paymentStatus: 'Pending Review', payableNow: 1000, payableOnDelivery: 306, deliveryFeePaymentMethod: 'upon_delivery' };
+const render = overrides => renderToStaticMarkup(React.createElement(Component, { order, createdAt: 1794222509, wait: 162, position: 2, onViewOrder() {}, onContinueShopping() {}, ...overrides }));
+const html = render();
+assert.equal((html.match(/<svg/g) || []).length, 1, 'Only the submission success check is graphical');
+assert.equal((html.match(/<table/g) || []).length, 2);
+assert.match(html, /091126190829/); assert.match(html, /162 minutes/); assert.match(html, /306\.00/);
+assert.match(html, /Pending Verification/); assert.match(html, /Payment is not confirmed until verification is completed/);
+assert.match(html, /View Order/); assert.match(html, /Continue Shopping/);
+assert.match(render({ wait: 0 }), /0 minutes/);
+assert.match(render({ wait: null, position: null, createdAt: null }), /Unavailable/);
+assert.match(render({ order: { ...order, paymentStatus: 'Paid' } }), /Payment has been verified/);
+const zero = render({ order: { ...order, payableNow: 0, paymentStatus: 'Unpaid' } });
+assert.match(zero, /No Upfront Payment Due/); assert.doesNotMatch(zero, /Payment has been verified/);
+assert.doesNotMatch(render({ order: { ...order, deliveryFeePaymentMethod: 'upon_checkout' } }), /Courier Payment/);
+console.log('PASS: receipt confirmation uses real amounts, semantic tables, one checkmark and truthful payment states.');

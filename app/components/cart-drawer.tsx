@@ -77,7 +77,8 @@ class CartErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
   }
 }
 
-function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: boolean; onClose: () => void; onCheckoutOpenChange?: (open: boolean) => void }) {
+type CartDrawerProps = { isOpen: boolean; onClose: () => void; onCheckoutOpenChange?: (open: boolean) => void; liveQueue?: { averageReadyMinutes: number | null; ordersInQueue: number; ordersInProcessing: number } | null; onViewOrder?: (order: any) => void };
+function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange, liveQueue, onViewOrder }: CartDrawerProps) {
   const { cart, removeFromCart, updateQuantity, toggleSelection, clearCheckoutItems, cartTotal, cartCount, syncWithServerData } = useCart();
   const [activeCharges, setActiveCharges] = useState<any[]>([]);
   const [loadingCharges, setLoadingCharges] = useState(false);
@@ -225,6 +226,9 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: 
 
       {/* Multi-Step Checkout Modal replaces the cart panel while checkout is open */}
       <CheckoutModal
+        liveQueue={liveQueue}
+        onViewOrder={onViewOrder}
+        onContinueShopping={onClose}
         isOpen={isCheckoutOpen}
         onClose={() => {
           clearCheckoutDraft(localStorage.getItem('prime_customer_id') || '');
@@ -242,7 +246,7 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: 
   );
 }
 
-export default function CartDrawer(props: { isOpen: boolean; onClose: () => void; onCheckoutOpenChange?: (open: boolean) => void }) {
+export default function CartDrawer(props: CartDrawerProps) {
   return (
     <CartErrorBoundary onClose={props.onClose}>
       <CartDrawerContent {...props} />

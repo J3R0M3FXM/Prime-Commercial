@@ -36,6 +36,9 @@ run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/re
 run('node', ['scripts/test-account-staff-view.mjs'], 'staff account view authorization and customer parity');
 run('node', ['scripts/test-shopfront-queue.mjs'], 'shopfront queue ownership and ordering');
 run('node', ['scripts/test-shopfront-payment-link.mjs'], 'shopfront secure payment link');
+run('node', ['scripts/test-payment-method-links.mjs'], 'Admin payment link runtime and persistence');
+run('node', ['scripts/test-order-history-dates.mjs'], 'customer order history dates and ordering');
+run('node', ['scripts/test-order-confirmation.mjs'], 'order confirmation display and payment states');
 run('node', ['scripts/test-device-security.mjs'], 'device recognition ownership, privacy and persistence');
 run('node', ['scripts/test-device-security-ui.mjs'], 'device security customer and staff controls');
 run('node', ['scripts/test-media.mjs'], 'media upload/gallery/offline/playlist safety');

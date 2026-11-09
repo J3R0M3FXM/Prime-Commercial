@@ -6,6 +6,17 @@ import { requireAdmin } from '../lib/auth.js';
 const stringFields = new Set(['name', 'logo', 'paymentType', 'qrCodeImage', 'webhookUrl', 'publicKey', 'secretKey', 'walletAddress', 'accountName', 'accountNumber']);
 const writable = new Set([...stringFields, 'paymentLinkUrl', 'sortOrder', 'isActive']);
 
+// Serverless endpoints cannot assume the browser URL constructor is available.
+function validPaymentLink(value) {
+  if (/[\u0000-\u0020\u007f\\]/.test(value)) return false;
+  const match = /^https:\/\/([^/?#]+)(?:[/?#].*)?$/i.exec(value);
+  if (!match) return false;
+  const authority = /^([^:@]+)(?::([0-9]{1,5}))?$/.exec(match[1]);
+  if (!authority || (authority[2] && (Number(authority[2]) < 1 || Number(authority[2]) > 65535))) return false;
+  const host = authority[1].replace(/\.$/, '');
+  return host.length <= 253 && host.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
+}
+
 function normalize(input, creating) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new EndpointError('Invalid payment method payload.', { code: 'INVALID_INPUT' });
   const output = {};
@@ -15,14 +26,10 @@ function normalize(input, creating) {
     if (key === 'paymentLinkUrl') {
       const normalized = value == null ? '' : String(value).trim();
       if (normalized.length > 4000) throw new EndpointError('Payment link is too long.', { code: 'INVALID_INPUT' });
-      if (normalized) {
-        let parsed;
-        try { parsed = new URL(normalized); } catch { throw new EndpointError('Payment link must be a valid HTTPS URL.', { code: 'INVALID_PAYMENT_LINK' }); }
-        if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) throw new EndpointError('Payment link must be a valid HTTPS URL.', { code: 'INVALID_PAYMENT_LINK' });
-      }
+      if (normalized && !validPaymentLink(normalized)) throw new EndpointError('Payment link must be a valid HTTPS URL.', { code: 'INVALID_PAYMENT_LINK' });
       // payment_methods has no payment_link_url column in the deployed schema.
       // The existing public_key slot is repurposed only for this link method.
-      output.publicKey = normalized;
+      if (input.paymentType !== 'api' || normalized) output.publicKey = normalized;
       continue;
     }
     if (stringFields.has(key)) {
@@ -41,6 +48,8 @@ function normalize(input, creating) {
       output.isActive = value;
     }
   }
+  // The explicit link wins regardless of JSON field order; it shares public_key.
+  if (input.paymentType !== 'api' && Object.prototype.hasOwnProperty.call(input, 'paymentLinkUrl')) output.publicKey = input.paymentLinkUrl == null ? '' : String(input.paymentLinkUrl).trim();
   if (creating && (!output.name || !output.paymentType)) throw new EndpointError('name and paymentType are required.', { code: 'INVALID_INPUT' });
   if (!creating && Object.keys(output).length === 0) throw new EndpointError('No editable fields supplied.', { code: 'INVALID_INPUT' });
   output.updatedAt = new Date();

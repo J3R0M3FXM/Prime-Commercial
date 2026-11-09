@@ -68,11 +68,16 @@ const AddressPickerMap = dynamic(() => import("./address-picker-map"), {
   )
 });
 
+import OrderSubmissionConfirmation from './order-submission-confirmation';
+
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedItems: any[];
   onOrderSuccess: (orderData: any) => void;
+  liveQueue?: { averageReadyMinutes: number | null; ordersInQueue: number; ordersInProcessing: number } | null;
+  onViewOrder?: (order: any) => void;
+  onContinueShopping?: () => void;
 }
 
 // Auto-format phone to 0919 123 4567
@@ -133,6 +138,9 @@ export default function CheckoutModal({
   onClose,
   selectedItems = [],
   onOrderSuccess,
+  liveQueue,
+  onViewOrder,
+  onContinueShopping,
 }: CheckoutModalProps) {
   // Step state: 1 = Contact, 2 = Address, 3 = Courier, 4 = Review, 5 = Payment, 6 = Confirmation
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -1231,20 +1239,17 @@ export default function CheckoutModal({
   useEffect(() => {
     if (!isOpen || currentStep !== 6 || !completedOrder?.id) return;
     let active = true;
-    setConfirmationQueue({});
     void Promise.allSettled([
       callServerless<any>("getMyOrderQueuePosition", { orderId: completedOrder.id }),
-      callServerless<any>("getPublicOrderQueue", {}),
-    ]).then(([own, queue]) => {
+    ]).then(([own]) => {
       if (!active) return;
       setConfirmationQueue({
         position: own.status === "fulfilled" ? own.value?.position : null,
         createdAt: own.status === "fulfilled" ? own.value?.createdAt : null,
-        wait: queue.status === "fulfilled" ? queue.value?.averageReadyMinutes : null,
       });
     });
     return () => { active = false; };
-  }, [isOpen, currentStep, completedOrder?.id]);
+  }, [isOpen, currentStep, completedOrder?.id, liveQueue]);
 
   // Step Navigations & Validations
   const handleNextFromStep1 = () => {
@@ -1550,7 +1555,6 @@ export default function CheckoutModal({
                   {currentStep === 3 && <Truck className="h-4 w-4 shrink-0" aria-hidden="true" />}
                   {currentStep === 4 && <Receipt className="h-4 w-4 shrink-0" aria-hidden="true" />}
                   {currentStep === 5 && <CreditCard className="h-4 w-4 shrink-0" aria-hidden="true" />}
-                  {currentStep === 6 && <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />}
                   <span className="truncate">
                     {currentStep === 1 && "Customer & Receiver Details"}
                     {currentStep === 2 && "Delivery Details"}
@@ -2292,51 +2296,9 @@ export default function CheckoutModal({
           {/* ================= STEP 6: ORDER CONFIRMATION ================= */}
           {currentStep === 6 && completedOrder && (
             <div className="py-2.5 px-1 space-y-3">
-              {/* Live Courier Tracking Interactive Card */}
-              {completedOrder.trackingUrl && (
-                <div className="bg-blue-50/80 border border-blue-200 rounded-none p-2.5 w-full space-y-3 shadow-xs">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                      <Truck className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="font-heading font-bold text-xs uppercase tracking-wider text-blue-950">
-                        Shipment &amp; Courier Tracking
-                      </h4>
-                      <p className="text-[10px] font-mono text-blue-700">
-                        Live tracking URL provided by administrator
-                      </p>
-                    </div>
-                  </div>
-
-                  <a
-                    href={completedOrder.trackingUrl.startsWith("http") ? completedOrder.trackingUrl : `https://${completedOrder.trackingUrl}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-none flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Track Shipment</span>
-                  </a>
-                </div>
-              )}
-
               {/* Proof is already stored before this confirmation is reachable. */}
               {true ? (
-                <div>
-                  <div className="space-y-3 border border-emerald-200 bg-emerald-50 p-4 text-center" role="status">
-                    <CheckCircle2 className="prime-success-check mx-auto h-12 w-12 text-emerald-600" aria-hidden="true" />
-                    <h3 className="font-heading font-semibold uppercase">Order Successfully Submitted</h3>
-                    <dl className="grid grid-cols-2 gap-2 text-left text-xs">
-                      <dt>ORDER NO.</dt><dd className="text-right">{completedOrder.orderNumber || completedOrder.id}</dd>
-                      <dt>ORDER DATE &amp; TIME</dt><dd className="text-right">{confirmationQueue.createdAt ? formatPaymentDeadline(confirmationQueue.createdAt * 1000) : "Unavailable"}</dd>
-                      <dt>ESTIMATED WAIT</dt><dd className="text-right">{confirmationQueue.wait ? `${confirmationQueue.wait} minutes` : "Unavailable"}</dd>
-                      <dt>POSITION ON QUEUE</dt><dd className="text-right">{confirmationQueue.position ?? "Unavailable"}</dd>
-                    </dl>
-                    <p className="text-xs">Staff will review the receipt. Payment is not confirmed until verified. Queue position is an estimate.</p>
-                    {completedOrder.deliveryFeePaymentMethod === "upon_delivery" && <p className="text-xs">Please prepare {formatPHP(Number(completedOrder.payableOnDelivery) || 0)} upon courier's arrival as payment for the Delivery Fee.</p>}
-                  </div>
-                </div>
+                <OrderSubmissionConfirmation order={completedOrder} position={confirmationQueue.position} createdAt={confirmationQueue.createdAt} wait={liveQueue?.averageReadyMinutes} onViewOrder={onViewOrder ? () => { onClose(); onViewOrder(completedOrder); } : undefined} onContinueShopping={() => { onClose(); onContinueShopping?.(); }} />
               ) : (
                 <div className="prime-checkout__payment-section border-t border-gray-200 pt-3 space-y-2.5">
                 <div className="prime-checkout__payment-reminder border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-950">

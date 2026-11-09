@@ -24,6 +24,11 @@ export default async function (_input, ctx) {
     .limit(100)
     .all();
 
+  // Read timestamp columns as scalar values: SDK Date wrappers can serialize as {}.
+  const params = {};
+  const placeholders = rows.map((row, index) => { const key = ':id' + index; params[key] = row.id; return key; });
+  const dates = rows.length ? await db.all(`SELECT id, created_at AS placedAt FROM orders WHERE id IN (${placeholders.join(',')})`, params) : [];
+  const placedDates = new Map(dates.map(row => [String(row.id), row.placedAt]));
   return await Promise.all(rows.map(async (order) => {
     const receiptAsset = order.paymentProofImage ? await findMediaAsset(order.paymentProofImage) : null;
     const receiptAssetId = receiptAsset && receiptAsset.visibility === 'private' &&
@@ -57,7 +62,7 @@ export default async function (_input, ctx) {
     subTotal: Number(order.subtotal || 0),
     promoDiscount: Number(order.discountAmount || order.promoDiscount || 0),
     storeCreditsUsed: Number(order.storeCreditsUsed || 0),
-    createdAt: order.createdAt,
+    createdAt: placedDates.get(String(order.id)) ?? order.createdAt,
     deliveredAt: order.deliveredAt,
     referredByUserId: order.referredByUserId,
     referredByMemberId: order.referredByMemberId,
