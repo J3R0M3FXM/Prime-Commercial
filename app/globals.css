@@ -943,22 +943,20 @@ body.splash-active #system-wide-proprietary-footer {
 
 /* Light network handoff animation used by the web app and the APK shell. */
 .prime-splash-network { width: min(100%, 340px); margin: 0 auto 18px; }
-.prime-splash-globe-art { display: block; width: 100%; height: auto; overflow: visible; }
-.prime-splash-halo { fill: none; stroke: #b6ddec; stroke-width: 1; opacity: .65; }
-.prime-splash-halo-outer { stroke-dasharray: 3 7; opacity: .6; }
-.prime-splash-globe-outline { fill: none; stroke: #2680a4; stroke-width: 1.5; }
-.prime-splash-globe-rotation { animation: prime-splash-globe-rotation 16s linear infinite; }
-.prime-splash-meridians, .prime-splash-parallels { fill: none; stroke: #e0f6fb; stroke-width: 1; opacity: .5; }
-.prime-splash-highways { stroke: #3b9fbe; stroke-width: 1.6; stroke-linecap: round; opacity: .72; }
-.prime-splash-highways path:nth-child(2) { stroke: #10a477; }
-.prime-splash-highways path:nth-child(3) { stroke: #6596d1; }
-.prime-splash-points { fill: #168b9c; }
-.prime-splash-packets { fill: #10b981; filter: drop-shadow(0 0 4px rgb(16 185 129 / 70%)); }
-.prime-splash-packet-blue { fill: #0284c7; }
-@keyframes prime-splash-globe-rotation { to { transform: translateX(-200px); } }
+#mobile-portrait-viewport .prime-splash-copyright, #mobile-portrait-viewport .prime-splash-copyright div { font-family: 'Lato', sans-serif !important; font-weight: 400 !important; }
+.prime-splash-server-art { display: block; width: 100%; height: auto; overflow: visible; }
+.prime-splash-cloud { animation: prime-splash-cloud-drift 6s ease-in-out infinite alternate; }
+.prime-splash-cloud--right { animation-delay: -2s; animation-direction: alternate-reverse; }
+.prime-splash-cloud--front { animation-delay: -4s; }
+.prime-splash-light { animation: prime-splash-light-blink 1.8s ease-in-out infinite; }
+.prime-splash-light--green { fill: #21ec76; }
+.prime-splash-light--red { fill: #ff3a45; }
+.prime-splash-light--yellow { fill: #ffd73c; }
+.prime-splash-light--blue { fill: #38bdf8; }
+@keyframes prime-splash-cloud-drift { from { transform: translate(0, 0); } to { transform: translate(2px, -2px); } }
+@keyframes prime-splash-light-blink { 0%, 100% { opacity: .3; } 45% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .prime-splash-globe-rotation { animation: none; }
-  .prime-splash-packets { display: none; }
+  .prime-splash-cloud, .prime-splash-light { animation: none; }
 }
 
 
