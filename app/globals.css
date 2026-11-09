@@ -2482,6 +2482,17 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   font-weight: 600 !important;
   text-transform: uppercase !important;
 }
+
+/* Payment methods: full-width compact rows and correctly contained provider marks. */
+#mobile-portrait-viewport .prime-payments-list { gap: 0; }
+#mobile-portrait-viewport .prime-payment-method { margin: 0; border: 0; border-bottom: 1px solid #dce3ea; border-radius: 0; box-shadow: none; }
+#mobile-portrait-viewport .prime-payment-method__summary { gap: 8px; padding: 8px 4px 4px; }
+#mobile-portrait-viewport .prime-payment-method__controls { gap: 8px; padding: 2px 4px 6px; }
+#mobile-portrait-viewport .prime-payment-method .serverless-disclosure { margin: 0; }
+#mobile-portrait-viewport .prime-payment-preview { display: flex; flex: 0 0 auto; width: 112px; height: 64px; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #dce3ea; border-radius: 4px; background: #fff; color: #64748b; }
+#mobile-portrait-viewport .prime-payment-preview--compact { width: 76px; height: 42px; }
+#mobile-portrait-viewport .prime-payment-preview img { display: block; width: 100%; height: 100%; padding: 3px; object-fit: contain; }
+#mobile-portrait-viewport .prime-payment-editor-status { margin: 0; color: #64748b; font-size: 11px; }
 #mobile-portrait-viewport .prime-checkout__payment-section > .prime-checkout__notice .prime-checkout__notice-title { font-size: 14px !important; }
 #mobile-portrait-viewport .prime-checkout__payment-section > .prime-checkout__notice .prime-checkout__notice-copy { font-size: 13px !important; }
 #mobile-portrait-viewport .prime-checkout__payment-section .prime-checkout__payment-total > span:first-child { font-size: 13px !important; }
