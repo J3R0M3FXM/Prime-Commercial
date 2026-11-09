@@ -6,7 +6,7 @@ const database = new DatabaseSync(':memory:');
 const db = {
   async run(sql, params = {}) { const statement = database.prepare(sql); if (/\bRETURNING\b/i.test(sql)) { const rows = statement.all(params); return { rows, rowsAffected: rows.length }; } return { rowsAffected: Number(statement.run(params).changes) }; },
   async get(sql, params = {}) { return database.prepare(sql).get(params); },
-  async all(sql, params = {}) { return database.prepare(sql).all(params); },
+  async all(sql, params = {}) { if (/voucher_export_parts/i.test(sql)) throw Error('Bulk voucher reads exceed fixture response limit'); return database.prepare(sql).all(params); },
 };
 class EndpointError extends Error { constructor(message, options) { super(message); this.code = options?.code; } }
 class InputFile { constructor(bytes, name, options) { this.bytes = bytes; this.name = name; this.options = options; } }

@@ -151,6 +151,17 @@ export default function VoucherGenerator({ code, active, onClose }: { code: stri
     } catch (err: any) { setError(err?.message || "Could not send the voucher to Telegram."); }
     finally { setBusy(false); }
   };
+  const shareFile = async () => {
+    setError(""); setNotice("");
+    try {
+      const file = exportFile();
+      if (!navigator.share || !navigator.canShare?.({ files: [file] })) throw new Error("File sharing is not available in this Telegram view. Try opening PRIME in another supported browser or use Send to Telegram.");
+      await navigator.share({ files: [file], title: "PRIME Voucher" });
+      setNotice("Share sheet closed. Check your selected app to confirm delivery.");
+    } catch (err: any) {
+      if (err?.name !== "AbortError") setError(err?.message || "Could not open the file share sheet.");
+    }
+  };
 
   return <div className="serverless-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !busy) onClose(); }}>
     <section className="serverless-dialog voucher-generator" role="dialog" aria-modal="true" aria-labelledby="voucher-generator-title">
@@ -162,10 +173,10 @@ export default function VoucherGenerator({ code, active, onClose }: { code: stri
         {!ready && !error && <p role="status">Preparing voucher…</p>}
         {error && <p role="alert" className="voucher-generator__error">{error}</p>}
         {notice && <p role="status">{notice}</p>}
-        <p>Send the PNG to your PRIME bot chat to save or forward it. You can also try holding the image to save it. The QR contains the voucher code.</p>
+        <p>Send the PNG to your PRIME bot chat, or use the device share sheet when available. You can also try holding the image to save it. The QR contains the voucher code.</p>
         {!active && <p className="voucher-generator__error">This promotion is disabled. Enable it before sharing the voucher.</p>}
       </div>
-      <footer className="serverless-dialog__footer"><button type="button" className="serverless-action" onClick={() => void download()} disabled={!ready || busy}><Download size={16}/>Download PNG</button><button type="button" className="serverless-action serverless-action--primary" onClick={() => void sendToTelegram()} disabled={!ready || busy}><Send size={16}/>Send to Telegram</button></footer>
+      <footer className="serverless-dialog__footer"><button type="button" className="serverless-action" onClick={() => void download()} disabled={!ready || busy}><Download size={16}/>Download PNG</button><button type="button" className="serverless-action" onClick={() => void shareFile()} disabled={!ready || busy}>Share File</button><button type="button" className="serverless-action serverless-action--primary" onClick={() => void sendToTelegram()} disabled={!ready || busy}><Send size={16}/>Send to Telegram</button></footer>
     </section>
   </div>;
 }

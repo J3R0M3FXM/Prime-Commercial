@@ -61,13 +61,16 @@ export default async function (input, ctx) {
   if (action !== 'send') fail('Unsupported voucher delivery action.');
   if (session.status === 'complete') return { success: true, messageId: session.message_id };
   if (session.status !== 'uploading') fail('Check your Telegram chat before trying again.', 'VOUCHER_DELIVERY_UNCERTAIN');
-  const parts = await db.all(`SELECT part_index,data FROM voucher_export_parts WHERE upload_id=:id ORDER BY part_index`, { ':id': uploadId });
-  if (parts.length !== Number(session.chunk_count)) fail('Some voucher image parts are missing.');
   const bytes = new Uint8Array(Number(session.file_size));
-  parts.forEach((part, index) => {
-    if (Number(part.part_index) !== index) fail('Some voucher image parts are missing.');
-    bytes.set(decode(part.data), index * CHUNK_SIZE);
-  });
+  // Read each part separately: the complete base64 representation can exceed
+  // the Serverless database response limit even though each upload succeeded.
+  for (let index = 0; index < Number(session.chunk_count); index++) {
+    const part = await db.get(`SELECT data FROM voucher_export_parts WHERE upload_id=:id AND part_index=:index`, { ':id': uploadId, ':index': index });
+    if (!part) fail('Some voucher image parts are missing.');
+    const decoded = decode(part.data);
+    if (decoded.length !== Math.min(CHUNK_SIZE, bytes.length - index * CHUNK_SIZE)) fail('Voucher image part size does not match.');
+    bytes.set(decoded, index * CHUNK_SIZE);
+  }
   if (![137,80,78,71,13,10,26,10].every((byte, index) => bytes[index] === byte)) fail('The voucher image is not a PNG.');
   const claimed = await db.run(`UPDATE voucher_export_sessions SET status='sending' WHERE id=:id AND owner=:owner AND status='uploading' RETURNING id`, { ':id': uploadId, ':owner': owner });
   if (!Number(claimed?.rowsAffected)) fail('Voucher delivery is already in progress.', 'VOUCHER_DELIVERY_UNCERTAIN');
