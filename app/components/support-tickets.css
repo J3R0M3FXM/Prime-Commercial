@@ -39,3 +39,10 @@
 #mobile-portrait-viewport .prime-support .support-alert { display: grid; gap: 6px; padding: 10px; border: 1px solid #efcfd1; border-radius: 5px; background: #fff5f5; color: #ab3441; font-size: 13px; }
 #mobile-portrait-viewport .prime-support .support-alert button { justify-self: start; background: white; border: 1px solid #efcfd1; padding: 4px 7px; border-radius: 4px; }
 #mobile-portrait-viewport .prime-support .support-notice { padding: 8px; border: 1px solid #cbe5d7; border-radius: 5px; background: #f0f8f4; color: #24634b; font-size: 13px; }
+/* Customers and staff use the same two-section Support navigation. */
+#mobile-portrait-viewport .prime-support nav[aria-label="Support Sections"] { padding:8px 12px; border-bottom:1px solid #dce2e9; }
+#mobile-portrait-viewport .prime-support nav[aria-label="Support Sections"] button[aria-pressed="true"] { background:#edf3fa; border-color:#1254b5; color:#1254b5; }
+.support-faqs { min-width:0; padding-top:12px; border-top:1px solid #dce2e9; }
+.support-faq { padding:10px 2px; border-bottom:1px solid #dce2e9; }
+.support-faq summary { cursor:pointer; font-weight:600; overflow-wrap:anywhere; }
+.support-faq p { margin:8px 0; white-space:pre-wrap; overflow-wrap:anywhere; }

@@ -1,0 +1,23 @@
+"use client";
+import { useEffect, useState } from 'react';
+import { callServerless } from '@/lib/telegram-serverless-client';
+import { newSupportRequestId } from '@/lib/support-client';
+
+type Faq={id:string;question:string;answer:string};
+export default function SupportFaqs({admin=false}:{admin?:boolean}) {
+  const [rows,setRows]=useState<Faq[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
+  const [editing,setEditing]=useState<Faq|null>(null);
+  const load=async()=>{setError('');try{const data=await callServerless<Faq[]>(admin?'manageSupportFaqs':'getPublicSupportFaqs',{action:'list'});setRows(Array.isArray(data)?data:[]);}catch(error:any){setError(error?.message||'FAQs could not be loaded.');}finally{setLoading(false);}};
+  useEffect(()=>{void load();},[admin]);
+  const save=async()=>{if(!editing||busy)return;setBusy(true);setError('');try{await callServerless('manageSupportFaqs',{...editing,action:rows.some(row=>row.id===editing.id)?'update':'create'});setEditing(null);await load();}catch(error:any){setError(error?.message||'FAQ could not be saved.');}finally{setBusy(false);}};
+  const remove=async(id:string)=>{if(busy||!window.confirm('Remove this FAQ?'))return;setBusy(true);try{await callServerless('manageSupportFaqs',{action:'delete',id});await load();}catch(error:any){setError(error?.message||'FAQ could not be removed.');}finally{setBusy(false);}};
+  return <section className="support-faqs" aria-label="Frequently Asked Questions">
+    <div className="support-toolbar"><h3>Frequently Asked Questions</h3>{admin&&<button type="button" className="support-secondary" disabled={busy||rows.length>=500} onClick={()=>setEditing({id:newSupportRequestId(),question:'',answer:''})}>Add FAQ</button>}</div>
+    {admin&&<p className="support-hint">{rows.length}/500 FAQs · Visible In The Customer FAQ Tab</p>}
+    {error&&<p role="alert" className="support-alert">{error}<button type="button" onClick={()=>void load()}>Retry</button></p>}
+    {loading&&<p>Loading FAQs…</p>}
+    {editing&&<form className="support-form" onSubmit={event=>{event.preventDefault();void save();}}><label className="support-field">Question<input required maxLength={500} value={editing.question} disabled={busy} onChange={event=>setEditing({...editing,question:event.target.value})}/></label><label className="support-field">Answer<textarea required rows={5} maxLength={10000} value={editing.answer} disabled={busy} onChange={event=>setEditing({...editing,answer:event.target.value})}/></label><div className="support-actions"><button type="button" className="support-secondary" disabled={busy} onClick={()=>setEditing(null)}>Cancel</button><button type="submit" className="support-primary" disabled={busy||!editing.question.trim()||!editing.answer.trim()}>Save FAQ</button></div></form>}
+    {!loading&&!rows.length&&!error&&<p className="support-hint">No FAQs Have Been Added Yet.</p>}
+    {rows.map(row=><details key={row.id} className="support-faq"><summary>{row.question}</summary><p>{row.answer}</p>{admin&&<div className="support-actions"><button type="button" className="support-secondary" disabled={busy} onClick={()=>setEditing({...row})}>Edit</button><button type="button" className="support-secondary" disabled={busy} onClick={()=>void remove(row.id)}>Remove</button></div>}</details>)}
+  </section>;
+}

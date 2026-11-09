@@ -6,6 +6,7 @@ import PrimePageHeading from "./prime-page-heading";
 import { callServerless } from "@/lib/telegram-serverless-client";
 import { newSupportRequestId, requestSupport, supportPreview, ticketStatusLabels, type SupportTicket, type TicketPage, type TicketStatus } from "@/lib/support-client";
 import "./support-tickets.css";
+import SupportFaqs from './support-faqs';
 
 const categories = ["general", "order", "payment", "delivery", "product", "account"];
 function stamp(value: number) {
@@ -26,6 +27,7 @@ export default function SupportTickets({ admin = false, onBack }: { admin?: bool
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [adminTab,setAdminTab]=useState<'tickets'|'faqs'>('tickets');
   const [notice, setNotice] = useState("");
   const [orderError, setOrderError] = useState("");
   const mutation = useRef<{ signature: string; id: string } | null>(null);
@@ -47,10 +49,11 @@ export default function SupportTickets({ admin = false, onBack }: { admin?: bool
   }, [admin, selectedId, creating, filter]);
 
   useEffect(() => {
+    if (adminTab !== 'tickets') return;
     void load();
     const timer = window.setInterval(() => { if (!busyRef.current && !creating && !document.hidden) void load(undefined, true); }, 15_000);
     return () => { generation.current++; window.clearInterval(timer); };
-  }, [load, creating]);
+  }, [load, creating, adminTab]);
   useEffect(() => {
     if (!creating) return;
     let current = true;
@@ -84,7 +87,8 @@ export default function SupportTickets({ admin = false, onBack }: { admin?: bool
       {(selectedId || creating || onBack) && <button type="button" aria-label="Back" disabled={busy} onClick={() => selectedId || creating ? back() : onBack?.()}><ArrowLeft /></button>}
       <button type="button" aria-label="Refresh support" disabled={busy || loading} onClick={() => void load()}><RefreshCw className={loading ? "animate-spin" : ""} /></button>
     </>} />
-    <div className="support-body">
+    <nav className="support-two-fields" aria-label="Support Sections"><button type="button" className="support-secondary" disabled={busy} aria-pressed={adminTab==='faqs'} onClick={()=>setAdminTab('faqs')}>FAQ</button><button type="button" className="support-secondary" disabled={busy} aria-pressed={adminTab==='tickets'} onClick={()=>setAdminTab('tickets')}>Tickets</button></nav>
+    {adminTab==='faqs'?<div className="support-body"><SupportFaqs admin={admin}/></div>:<div className="support-body">
       {supportPreview() && <p className="support-preview-note">Preview · sample tickets shared between customer and admin views</p>}
       {error && <div role="alert" className="support-alert">{error}<button type="button" disabled={busy} onClick={() => void load()}>Retry Loading</button></div>}
       {notice && <p role="status" className="support-notice">{notice}</p>}
@@ -115,6 +119,6 @@ export default function SupportTickets({ admin = false, onBack }: { admin?: bool
         {ticket.status !== "closed" ? <form className="support-form" onSubmit={(event) => { event.preventDefault(); void mutate("reply", { body: reply }); }}><label className="support-field">{admin ? "Reply to Customer" : "Your Reply"}<textarea required rows={3} maxLength={4000} value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Write your reply…" disabled={busy} /></label><div className="support-actions"><span className="support-hint">{reply.length}/4000</span><button type="submit" className="support-primary" disabled={busy || !reply.trim()}>{busy ? <Loader2 className="animate-spin" /> : <Send />}Send Reply</button></div></form> : <p className="support-hint">This ticket is closed. Reopen it if you need more help.</p>}
         <div className="support-ticket-actions">{admin ? <label className="support-field">Ticket Status<select disabled={busy} value={ticket.status} onChange={(event) => void mutate("status", { status: event.target.value })}>{(Object.keys(ticketStatusLabels) as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label> : <button type="button" className="support-secondary" disabled={busy} onClick={() => void mutate("status", { status: ticket.status === "closed" || ticket.status === "resolved" ? "open" : "closed" })}>{ticket.status === "closed" || ticket.status === "resolved" ? "Reopen Ticket" : "Close Ticket"}</button>}</div>
       </>}
-    </div>
+    </div>}
   </section>;
 }

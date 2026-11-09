@@ -27,6 +27,9 @@ for (const directory of ['tgcloud/lib', 'tgcloud/endpoints', 'tgcloud/handlers']
 console.log('PASS: all backend module syntax');
 run('npm', ['run', 'typecheck:miniapp'], 'production Mini App type-check');
 run('node', ['scripts/check-telegram-serverless-contracts.mjs'], 'Serverless contracts');
+run('node', ['scripts/test-receipt-deadlines.mjs'], 'staff-requested receipt expiry');
+run('node', ['scripts/test-support-tabs.mjs'], 'customer and staff Support sub-tabs');
+run('node', ['scripts/test-support-backend.mjs'], 'Support ownership, replies and FAQ capacity');
 run('node', ['scripts/test-promo-codec.mjs'], 'promo regressions');
 run('node', ['scripts/test-customer-promo.mjs'], 'customer-specific promo enforcement');
 run('node', ['scripts/test-voucher-generator.mjs'], 'voucher generation and PNG export');

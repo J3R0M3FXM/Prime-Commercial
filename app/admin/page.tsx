@@ -17,11 +17,13 @@ import TelegramSecretaryConfigurator from "@/app/components/admin/telegram-secre
 import SplashScreen from "@/app/components/splash-screen";
 import PrimeIdentityHeader from "@/app/components/prime-identity-header";
 import PrimeOrderQueue, { type PublicOrderQueue } from "@/app/components/prime-order-queue";
+import SupportTickets from '@/app/components/support-tickets';
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 
-type ModuleId = "orders" | "pos" | "customers" | "visitors" | "inventory" | "products" | "warehouse" | "couriers" | "payments" | "charges" | "promos" | "media" | "broadcast" | "system";
+type ModuleId = "orders" | "pos" | "customers" | "visitors" | "inventory" | "products" | "warehouse" | "couriers" | "payments" | "charges" | "promos" | "media" | "broadcast" | "system" | "support";
 type Screen = { module: ModuleId; orderId?: string } | null;
 const modules: Array<{ id: ModuleId; name: string; icon: any; accent: string; description: string }> = [
+  {id:'support',name:'Support',icon:Users,accent:'#357c9d',description:'Customer Tickets and FAQs'},
   { id: "orders", name: "Orders", icon: ClipboardList, accent: "#b67935", description: "Payment proofs and order flow" }, { id: "pos", name: "POS", icon: ShoppingBag, accent: "#12805c", description: "Store and delivery sales" }, { id: "customers", name: "Customers", icon: Users, accent: "#27385f", description: "Accounts, credits and tiers" }, { id: "visitors", name: "Visitors", icon: User, accent: "#8a704c", description: "Enrolled app visitors" }, { id: "inventory", name: "Inventory", icon: Boxes, accent: "#384e6d", description: "Stock and reservations" }, { id: "products", name: "Products", icon: Package, accent: "#248078", description: "Live product catalog" }, { id: "warehouse", name: "Warehouse", icon: Layers, accent: "#ad7942", description: "Warehouse configuration" }, { id: "couriers", name: "Couriers", icon: Truck, accent: "#d2615e", description: "Delivery options and rates" }, { id: "payments", name: "Payments", icon: CreditCard, accent: "#357c9d", description: "Methods and receipts" }, { id: "charges", name: "Charges", icon: Receipt, accent: "#4e5965", description: "Checkout fee rules" }, { id: "promos", name: "Promos", icon: Tag, accent: "#51859b", description: "Vouchers and rules" }, { id: "media", name: "Media", icon: Film, accent: "#1d7b66", description: "R2-backed assets" }, { id: "broadcast", name: "Secretary", icon: Send, accent: "#3978a0", description: "Telegram automation" }, { id: "system", name: "System", icon: Sliders, accent: "#43556a", description: "Diagnostics and settings" },
 ];
 
@@ -84,6 +86,7 @@ export default function AdminPage() {
   if (screen?.module === "media") return withAdminShell(<TelegramServerlessMediaPanel onBack={back} />);
   if (screen?.module === "broadcast") return withAdminShell(<TelegramSecretaryConfigurator serverless onBack={back} />);
   if (screen?.module === "system") return withAdminShell(<TelegramServerlessSystemPanel onBack={back} />);
+  if (screen?.module === 'support') return withAdminShell(<div className="serverless-admin-panel"><SupportTickets admin onBack={back}/></div>);
   if (screen?.module === "pos") return withAdminShell(<TelegramServerlessPosPanel onBack={back} />);
 
   const activeOrders = (dashboardOrders || []).filter((order) => !["completed", "cancelled", "expired"].includes(String(order.status || "").toLowerCase()));
@@ -92,7 +95,7 @@ export default function AdminPage() {
   const moduleGroups: Array<{ title: string; ids: ModuleId[] }> = [
     { title: "Commerce", ids: ["orders", "pos", "products", "inventory"] },
     { title: "Fulfillment", ids: ["warehouse", "couriers"] },
-    { title: "Customers & Content", ids: ["customers", "visitors", "media", "broadcast"] },
+    { title: "Customers & Content", ids: ["customers", "visitors", "media", "broadcast", "support"] },
     { title: "Rules & System", ids: ["payments", "charges", "promos", "system"] },
   ];
   const dashboard = <main className="admin-shell mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-slate-50 text-slate-900"><section className="admin-content admin-command-home flex-1"><div className="admin-module-launcher__heading"><div><div className="admin-eyebrow">Command Center</div><h1>Admin Operations</h1><p>Live operational signals and workspaces.</p></div><span className="admin-module-launcher__count">Live</span></div><div className="prime-admin-kpis" aria-label="Live operations"><button type="button" onClick={() => open("orders")}><span>Payment Review</span><strong>{dashboardOrders === null ? "—" : paymentReviewCount}</strong><small>Open orders · server data</small></button><button type="button" onClick={() => open("orders")}><span>Ready to Dispatch</span><strong>{dashboardOrders === null ? "—" : readyCount}</strong><small>Open orders · server data</small></button><button type="button" onClick={() => open("inventory")}><span>Low stock ≤5</span><strong>{lowStockCount ?? "—"}</strong><small>Active products · server data</small></button></div>{moduleGroups.map((group) => <section className="prime-admin-tool-group" key={group.title}><h2>{group.title}</h2><div className="prime-admin-tool-list">{group.ids.map((id) => { const item = modules.find((module) => module.id === id); if (!item) return null; const Icon = item.icon; return <button key={id} type="button" onClick={() => open(id)}><span className="prime-admin-tool-icon" style={{ color: item.accent }}><Icon aria-hidden="true" /></span><span><strong>{item.name}</strong><small>{item.description}</small></span><ChevronRight aria-hidden="true" /></button>; })}</div></section>)}</section></main>;
