@@ -1,7 +1,8 @@
 import { db, EndpointError } from 'sdk';
-import { and, eq, isNull, sql } from 'sdk/db';
+import { eq } from 'sdk/db';
 import { customers, mediaAssetContents, mediaAssets, orders, paymentMethods } from '../schema.js';
 import { notifyPaymentProofSubmitted } from '../lib/order-notifications.js';
+import { attachWorkflow, expireReceiptResubmissions,ensureOrderWorkflow } from '../lib/order-workflow.js';
 
 function decodeBase64Url(value) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
@@ -77,29 +78,34 @@ export default async function (input, ctx) {
   if (!/^[a-zA-Z0-9_-]{8,64}$/.test(mediaId)) throw new EndpointError('Invalid receipt upload ID.', { code: 'INVALID_INPUT' });
   if (input?.contentType !== 'image/jpeg') throw new EndpointError('Upload the receipt as a JPEG image.', { code: 'INVALID_IMAGE_TYPE' });
 
+  await ensureOrderWorkflow();
   const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
   if (!order) throw new EndpointError('Order not found.', { code: 'NOT_FOUND' });
   const customer = await db.select({ id: customers.id }).from(customers).where(eq(customers.tgUserId, userId)).get();
   const ownsOrder = String(order.tgUserId || '') === userId || Boolean(customer && String(order.customerId || '') === String(customer.id));
   if (!ownsOrder) throw new EndpointError('Order not found.', { code: 'NOT_FOUND' });
+  if(input?.adjustment)throw new EndpointError('Bill increases require a new order.',{code:'NEW_ORDER_REQUIRED'});
+  const workflow=await attachWorkflow(order);
+  const alreadyStored=String(order.paymentProofImage||'')==='tgmedia:'+mediaId;
+  if(alreadyStored)return {success:true,orderId:order.id,paymentStatus:order.paymentStatus,reference:order.paymentProofImage};
 
   const pendingStatus = String(order.status || '').toLowerCase() === 'pending';
   const paymentStatus = String(order.paymentStatus || '').toLowerCase();
-  const replacingUnverifiedProof = paymentStatus === 'pending review' && Boolean(String(order.paymentProofImage || '').trim());
-  if (!pendingStatus || !(paymentStatus === 'unpaid' || replacingUnverifiedProof)) {
+  const replacingUnverifiedProof = paymentStatus === 'failed' && workflow.canResubmit;
+  if (!pendingStatus || !replacingUnverifiedProof) {
+    await expireReceiptResubmissions({customerId:order.customerId});
     throw new EndpointError('This order is no longer awaiting payment proof.', { code: 'ORDER_NOT_AWAITING_PAYMENT' });
-  }
-  if (Number(order.payableNow ?? order.totalAmount) <= 0) {
-    throw new EndpointError('No pre-dispatch payment is due for this order; staff review is required instead of a receipt.', { code: 'NO_PRE_DISPATCH_PAYMENT_DUE' });
   }
   if (order.expiredAt || (String(order.paymentProofImage || '').trim() && !replacingUnverifiedProof)) {
     throw new EndpointError('This order is expired or already has a payment receipt.', { code: 'ORDER_NOT_AWAITING_PAYMENT' });
   }
   const paymentMethodId = String(input?.paymentMethodId || order.paymentMethodId || '').trim();
-  const paymentMethod = paymentMethodId
+  const originalMethod=paymentMethodId===String(order.paymentMethodId||'');
+  const loadedMethod = paymentMethodId
     ? await db.select().from(paymentMethods).where(eq(paymentMethods.id, paymentMethodId)).get()
     : null;
-  if (!paymentMethod || paymentMethod.isActive === false || !['qr_code', 'manual_transfer', 'crypto', 'secured_payment_link'].includes(String(paymentMethod.paymentType || '').toLowerCase())) {
+  const paymentMethod=loadedMethod||(originalMethod&&paymentMethodId?{id:paymentMethodId,name:order.paymentMethodName,paymentType:'manual_transfer'}:null);
+  if (!paymentMethod || (paymentMethod.isActive === false&&!originalMethod) || !['qr_code', 'manual_transfer', 'crypto', 'secured_payment_link'].includes(String(paymentMethod.paymentType || '').toLowerCase())) {
     throw new EndpointError('Choose an active manual payment method for this receipt.', { code: 'INVALID_PAYMENT_METHOD' });
   }
 
@@ -189,52 +195,14 @@ export default async function (input, ctx) {
   }
 
   const reference = 'tgmedia:' + mediaId;
-  const adjustment = input?.adjustment === true;
-  if (adjustment) {
-    if (String(order.status || '').toLowerCase() !== 'processing' ||
-        String(order.paymentStatus || '').toLowerCase() !== 'paid' || Number(order.adjustmentDue || 0) <= 0 ||
-        String(order.adjustmentStatus || '').toLowerCase() !== 'awaiting_payment' || String(order.adjustmentProofImage || '').trim()) {
-      await removeUnlinkedMedia(mediaId);
-      throw new EndpointError('This order is not accepting an adjustment receipt.', { code: 'ADJUSTMENT_NOT_AWAITING_PAYMENT' });
-    }
-    const updated = await db.run(
-      `UPDATE orders SET adjustment_payment_method_id = :method_id,
-              adjustment_payment_method_name = :method_name, adjustment_proof_image = :proof,
-              adjustment_proof_submitted_at = unixepoch(), adjustment_status = 'pending_review', updated_at = unixepoch()
-        WHERE id = :order_id AND lower(coalesce(payment_status, '')) = 'paid'
-          AND lower(coalesce(status, '')) = 'processing'
-          AND coalesce(adjustment_due, 0) > 0 AND lower(coalesce(adjustment_status, '')) = 'awaiting_payment'
-          AND trim(coalesce(adjustment_proof_image, '')) = '' RETURNING id`,
-      { ':method_id': paymentMethod.id, ':method_name': paymentMethod.name, ':proof': reference, ':order_id': order.id },
-    );
-    if (!Number(updated?.rowsAffected)) {
-      await removeUnlinkedMedia(mediaId);
-      throw new EndpointError('The adjustment changed or already has a receipt. Refresh the order and try again.', { code: 'ADJUSTMENT_NOT_AWAITING_PAYMENT' });
-    }
-    return { success: true, orderId: order.id, paymentStatus: order.paymentStatus, adjustmentStatus: 'pending_review', reference };
-  }
-
-  const updated = await db.update(orders).set({
-    paymentMethodId: paymentMethod.id,
-    paymentMethodName: paymentMethod.name,
-    paymentProofImage: reference,
-    paymentProofSubmittedAt: now,
-    paymentStatus: 'Pending Review',
-    reviewStatus: uniqueForensicsFlags.length ? 'Flagged for Forensics Review' : 'Pending Manual Review',
-    requiresManualReview: true,
-    ocrAnalysis: persistedOcrAnalysis,
-    updatedAt: now,
-  }).where(and(
-    eq(orders.id, order.id),
-    eq(orders.status, 'Pending'),
-    isNull(orders.expiredAt),
-    sql`coalesce(${orders.paymentDeadlineAt}, ${orders.createdAt} + 3600) > unixepoch()`,
-    replacingUnverifiedProof
-      ? sql`lower(coalesce(${orders.paymentStatus}, '')) = 'pending review' AND trim(coalesce(${orders.paymentProofImage}, '')) <> ''`
-      : and(eq(orders.paymentStatus, 'Unpaid'), sql`trim(coalesce(${orders.paymentProofImage}, '')) = ''`),
-  )).returning({ id: orders.id }).run();
-
-  if (!updated.length) {
+  let updated;
+  try {updated=await db.run(`UPDATE orders SET payment_method_id=:method,payment_method_name=:name,payment_proof_image=:proof,
+    payment_proof_submitted_at=unixepoch(),payment_status='Pending Review',requires_manual_review=1,ocr_analysis=:analysis,updated_at=unixepoch()
+    WHERE id=:id AND lower(status)='pending' AND lower(payment_status)='failed' AND control_state='held'
+      AND payment_proof_image=:old AND EXISTS(SELECT 1 FROM order_receipt_deadlines WHERE order_id=:id AND expires_at>unixepoch()) RETURNING id`,
+    {':id':order.id,':method':paymentMethod.id,':name':paymentMethod.name,':proof':reference,':analysis':JSON.stringify(persistedOcrAnalysis),':old':order.paymentProofImage});}
+  catch(error){await removeUnlinkedMedia(mediaId);throw error;}
+  if (!Number(updated?.rowsAffected)) {
     await removeUnlinkedMedia(mediaId);
     throw new EndpointError('This order has expired or is no longer awaiting payment proof.', { code: 'ORDER_NOT_AWAITING_PAYMENT' });
   }

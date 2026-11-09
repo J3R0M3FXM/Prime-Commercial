@@ -648,6 +648,10 @@ export async function uploadPaymentImage(file: File, bucket: 'payment-method-log
 export async function uploadPaymentReceipt(file: File, orderId: string, paymentMethodId: string, adjustment = false, ocrAnalysis?: Record<string, unknown> | null): Promise<string> {
   if (!String(orderId || '').trim()) throw new Error('Order ID is required to attach a receipt.');
   const upload = await prepareJpegUpload(file);
+  if(globalThis.crypto?.subtle) {
+    const digest=await globalThis.crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify({orderId,paymentMethodId,adjustment,data:upload.data})));
+    upload.id='receipt-'+Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('').slice(0,48);
+  }
   const result = await callServerless<{ success: boolean; reference: string }>('uploadPaymentReceipt', {
     id: upload.id, orderId, paymentMethodId, adjustment, contentType: 'image/jpeg', data: upload.data,
     ...(ocrAnalysis && !adjustment ? { ocrAnalysis } : {}),

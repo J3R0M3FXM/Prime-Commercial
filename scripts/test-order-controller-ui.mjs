@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import { build } from 'rolldown';
+import { JSDOM } from 'jsdom';
+import ts from 'typescript';
+const require=createRequire(import.meta.url),dom=new JSDOM('<div id="root"></div>',{url:'https://local.example/'});
+for(const key of ['window','document','navigator','HTMLElement','Event','MouseEvent'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const output=await build({input:'app/components/admin/order-workflow-controller.tsx',write:false,platform:'node',tsconfig:false,resolve:{alias:{'@':process.cwd()}},transform:{jsx:{runtime:'automatic'}},plugins:[{name:'react-singleton',resolveId(id){if(id==='react'||id.startsWith('react/'))return {id:pathToFileURL(require.resolve(id)).href,external:true};}}],output:{format:'esm'}});
+const Component=(await import('data:text/javascript;base64,'+Buffer.from(output.output[0].code).toString('base64'))).default;
+const {createElement,act}=await import('react'),{createRoot}=await import('react-dom/client');
+const root=createRoot(document.getElementById('root')),calls=[];
+const workflowSource=readFileSync('tgcloud/lib/order-workflow.js','utf8').replace(/^import[^\n]*\n/gm,'').replace(/export /g,'');
+const workflowActions=new Function(workflowSource+'\nreturn workflowActions;')();
+const expected={Pending:['review','modify','cancel'],Confirmed:['processing','modify','cancel'],Failed:['hold','cancel'],Held:['resubmit','review','cancel'],Processing:['ready','cancel'],Ready:['dispatch','cancel'],Dispatched:['complete'],Cancelled:['revalidate']};
+const button=label=>[...document.querySelectorAll('button')].find(node=>node.textContent===label);
+async function render(stage,extra={}) {
+  const order={id:'order-'+stage,status:['Failed','Held'].includes(stage)?'Pending':stage,controlState:stage.toLowerCase(),paymentStatus:['Confirmed','Processing','Ready','Dispatched'].includes(stage)?'Paid':'Pending Review',payableNow:100,paymentProofImage:'proof',workflow:{stage,actions:expected[stage],receiptFailures:stage==='Held'?1:0,resubmitExpiresAt:null,editState:'',refundedCredits:0,...extra}};
+  assert.deepEqual(workflowActions(order),expected[stage]);
+  await act(async()=>root.render(createElement(Component,{key:stage,order,busy:false,onModify:()=>calls.push({action:'modify'}),onAction:async(action,input)=>{calls.push({action,input});return true;}})));
+  return order;
+}
+for(const stage of Object.keys(expected)) {
+  await render(stage);
+  for(const [label,action] of [['Review','review'],['Hold','hold'],['Modify','modify'],['Cancel','cancel']])assert.equal(button(label).disabled,!expected[stage].includes(action),stage+' '+label);
+  assert.equal(Boolean(document.querySelector('input[type="url"]')),stage==='Ready','Tracking is entered only at dispatch');
+  assert.equal(document.querySelectorAll('table').length,0);
+}
+await render('Pending');await act(async()=>button('Review').click());
+assert.equal(button('Confirm Payment').disabled,true,'Provider verification and amount entry are mandatory');
+assert.equal(document.querySelector('input[type="checkbox"]').checked,false);
+await render('Held');await act(async()=>button('Request Resubmit · One Hour').click());assert.equal(calls.at(-1).action,'resubmitOrder');
+await render('Held',{resubmitExpiresAt:Date.now()+3600000});assert.equal(button('Request Resubmit · One Hour').disabled,true);
+await render('Dispatched');await act(async()=>button('Completed').click());assert.equal(calls.at(-1).action,'complete');
+await render('Confirmed',{editState:'pending',editRequest:{receiverName:'<script>Not HTML</script>',receiverPhone:'09123456789',deliveryAddress:{unitDetails:'Unit 1'}}});
+assert.equal(button('Processing').disabled,true);assert.equal(document.querySelectorAll('script').length,0);
+await act(async()=>button('Approve Edit').click());assert.equal(calls.at(-1).action,'approveCustomerEdit');
+const panel=readFileSync('app/components/admin/telegram-serverless-orders-panel.tsx','utf8');
+assert.ok(panel.indexOf('<OrderWorkflowController')>panel.indexOf('hidden={orderDetailTab !== "fulfillment"}'));
+assert.doesNotMatch(panel,/NEXT Action/,'The duplicate global controller was removed');
+const checkout=readFileSync('app/components/checkout-modal.tsx','utf8'),tree=ts.createSourceFile('checkout.tsx',checkout,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+let scanGuard;
+function visit(node){if(ts.isIfStatement(node)&&node.thenStatement.getText(tree).includes('Complete the receipt image analysis before submitting your order.'))scanGuard=node.expression;ts.forEachChild(node,visit);}visit(tree);
+assert.ok(scanGuard);
+const blocked=new Function('isAnalyzingReceipt','ocrError','ocrAnalysis','return ('+scanGuard.getText(tree)+');');
+assert.equal(blocked(true,'',{}),true);assert.equal(blocked(false,'',null),true);
+assert.equal(blocked(false,'',{matchStatus:'FAILED'}),false,'An adverse analysis result must not block order submission');
+assert.equal(blocked(false,'Scan Unavailable',null),false,'A scan error must not prevent receipt submission for staff review');
+await act(async()=>root.unmount());dom.window.close();
+console.log('Order controller UI: all status-specific locks, fulfillment placement, one-hour request, provider checks, tracking and approval actions passed.');

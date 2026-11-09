@@ -1,7 +1,7 @@
 import { db, EndpointError } from 'sdk';
 import { eq } from 'sdk/db';
 import { customers, orders } from '../schema.js';
-import { requestOrderCancellation } from '../lib/order-cancellation.js';
+import { applyWorkflowAction,ensureOrderWorkflow } from '../lib/order-workflow.js';
 
 const clean = (value, max) => String(value ?? '').trim().slice(0, max);
 
@@ -10,6 +10,7 @@ export default async function (input = {}, ctx) {
   if (!/^[0-9]{1,24}$/.test(telegramId)) throw new EndpointError('A verified Telegram user is required.', { code: 'AUTH_REQUIRED' });
   const orderId = clean(input?.orderId, 100);
   if (!orderId) throw new EndpointError('Order ID is required.', { code: 'INVALID_INPUT' });
+  await ensureOrderWorkflow();
   const [customer, order] = await Promise.all([
     db.select().from(customers).where(eq(customers.tgUserId, telegramId)).get(),
     db.select().from(orders).where(eq(orders.id, orderId)).get(),
@@ -18,9 +19,9 @@ export default async function (input = {}, ctx) {
     throw new EndpointError('Order not found.', { code: 'NOT_FOUND' });
   }
   const action = clean(input?.action, 40);
-  if (action === 'cancel') return requestOrderCancellation(order, 'cancel');
+  if (action === 'cancel') return applyWorkflowAction(order, 'requestCancel');
   if (action !== 'edit') throw new EndpointError('Unsupported order action.', { code: 'INVALID_ACTION' });
-  if (String(order.status || '').toLowerCase() !== 'pending' || String(order.paymentStatus || '').toLowerCase() === 'paid') {
+  if (!['pending','confirmed'].includes(String(order.status || '').toLowerCase())) {
     throw new EndpointError('This order can no longer be edited after payment approval.', { code: 'ORDER_NOT_EDITABLE' });
   }
   const version = Number(order.staffEditVersion || 0);
@@ -36,16 +37,5 @@ export default async function (input = {}, ctx) {
     throw new EndpointError('Enter a valid receiver name and phone number.', { code: 'INVALID_RECEIVER' });
   }
   const address = { ...oldAddress, receiverName, receiverPhone, unitDetails, deliveryNotes };
-  const saved = await db.run(
-    `UPDATE orders SET delivery_address = :address, customer_name = :receiver_name,
-      customer_phone = :receiver_phone, staff_edit_version = :next_version, updated_at = unixepoch()
-     WHERE id = :order_id AND (tg_user_id = :telegram_id OR customer_id = :customer_id)
-       AND lower(status) = 'pending' AND lower(coalesce(payment_status, '')) <> 'paid'
-       AND coalesce(staff_edit_version, 0) = :expected_version RETURNING id`,
-    { ':address': JSON.stringify(address), ':receiver_name': receiverName, ':receiver_phone': receiverPhone,
-      ':next_version': version + 1, ':order_id': orderId, ':telegram_id': telegramId,
-      ':customer_id': String(customer?.id || ''), ':expected_version': version },
-  );
-  if (!Number(saved?.rowsAffected)) throw new EndpointError('The order changed. Refresh it before editing.', { code: 'ORDER_CHANGED' });
-  return { success: true, orderId, staffEditVersion: version + 1, deliveryAddress: address };
+  return applyWorkflowAction(order,'requestEdit',{expectedVersion:version,edit:{deliveryAddress:address,receiverName,receiverPhone,expectedVersion:version}});
 }

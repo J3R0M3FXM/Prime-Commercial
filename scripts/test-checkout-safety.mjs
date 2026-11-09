@@ -148,7 +148,7 @@ if (!isMainThread) {
     ledger.exec(`
       CREATE TABLE customers (id TEXT PRIMARY KEY, prime_member_id TEXT, points REAL DEFAULT 0, referral_points REAL DEFAULT 0,
         points_operation_id TEXT, points_operation_amount REAL, updated_at INTEGER);
-      CREATE TABLE orders (id TEXT PRIMARY KEY, customer_id TEXT, order_number TEXT, status TEXT,
+      CREATE TABLE orders (id TEXT PRIMARY KEY, customer_id TEXT, order_number TEXT, status TEXT,payment_status TEXT,delivery_fallback_at INTEGER,dispatched_at INTEGER,
         referred_by_user_id TEXT, referred_by_member_id TEXT, referral_points_amount REAL DEFAULT 0,
         referral_points_status TEXT, referral_points_credit_after INTEGER, referral_points_credited_at INTEGER,
         purchasing_points_amount REAL DEFAULT 0, purchasing_points_credit_after INTEGER, purchasing_points_awarded_at INTEGER, updated_at INTEGER);
@@ -157,7 +157,7 @@ if (!isMainThread) {
       INSERT INTO orders (id,customer_id,status,referred_by_user_id,referred_by_member_id,referral_points_amount,referral_points_status,referral_points_credit_after)
         VALUES ('referred','friend','Completed','ref','CODE',50,'pending_30m',unixepoch()-1);
     `);
-    const lifecycle = load('tgcloud/lib/order-lifecycle.js', { db: adapter(ledger), sql, notifyOrderStatusChanged: async () => {} }, ['reconcileOrderMilestones']);
+    const lifecycle = load('tgcloud/lib/order-lifecycle.js', { db: adapter(ledger), sql, expireReceiptResubmissions:async()=>({cancelled:0}),notifyOrderStatusChanged: async () => {} }, ['reconcileOrderMilestones']);
     await lifecycle.reconcileOrderMilestones({ customerId: 'ref', memberId: 'CODE' });
     assert.equal(ledger.prepare("SELECT referral_points FROM customers WHERE id='ref'").get().referral_points, 0);
     assert.equal(ledger.prepare("SELECT referral_points_status FROM orders WHERE id='referred'").get().referral_points_status, 'pending_30m');

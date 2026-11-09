@@ -1,8 +1,8 @@
 import { db } from 'sdk';
 import { sql } from 'sdk/db';
 import { notifyOrderStatusChanged } from './order-notifications.js';
+import { expireReceiptResubmissions } from './order-workflow.js';
 
-const THIRTY_MINUTES = 30 * 60;
 const SIX_HOURS = 6 * 60 * 60;
 const idText = (value) => String(value || '').trim();
 
@@ -20,7 +20,7 @@ async function completeDispatchedOrder(orderId, completedAt) {
   const params = {
     ':order_id': idText(orderId),
     ':completed_at': Number(completedAt),
-    ':credit_after': Number(completedAt) + THIRTY_MINUTES,
+    ':credit_after': Number(completedAt),
   };
   const result = await db.run(
     `UPDATE orders
@@ -34,7 +34,7 @@ async function completeDispatchedOrder(orderId, completedAt) {
             purchasing_points_credit_after = CASE WHEN coalesce(purchasing_points_amount, 0) > 0
                 THEN :credit_after ELSE NULL END,
             updated_at = unixepoch()
-      WHERE id = :order_id AND lower(coalesce(status, '')) = 'dispatched'
+      WHERE id = :order_id AND lower(coalesce(status, '')) = 'dispatched' AND lower(coalesce(payment_status,''))='paid'
       RETURNING id`,
     params,
   );
@@ -101,94 +101,20 @@ export async function markOrderDispatched(orderId, trackingUrl) {
   return result?.rows?.[0] || null;
 }
 
-/** Final pre-dispatch gate. Store Credit refunds from Processing edits vest here. */
+/** Paid Processing is the only Ready transition; refunds share the atomic workflow ledger. */
 export async function markOrderReady(orderId) {
-  const current = await db.get(
-    `SELECT id, order_number AS orderNumber, customer_id AS customerId, status, payment_status AS paymentStatus,
-            adjustment_due AS adjustmentDue, adjustment_status AS adjustmentStatus,
-            ready_credit_due AS readyCreditDue, ready_credit_issued_amount AS readyCreditIssuedAmount,
-            staff_edit_version AS staffEditVersion
-       FROM orders WHERE id=:order_id`,
-    { ':order_id': idText(orderId) },
-  );
-  if (!current) return { ready: false, reason: 'order_missing' };
-  if (['ready', 'packed'].includes(String(current.status || '').toLowerCase())) {
-    const priorOperation = 'order-ready:' + idText(orderId) + ':' + (Number(current.staffEditVersion) || 0);
-    const issuedAmount = Math.max(0, Math.round((Number(current.readyCreditIssuedAmount) || 0) * 100));
-    if (issuedAmount > 0 && current.customerId) await db.run(
-      `INSERT INTO point_transactions (id, user_id, type, amount, order_id, description, created_at)
-       VALUES (:id, :user_id, 'store_credit_received', :amount, :order_id, :description, unixepoch())
-       ON CONFLICT(id) DO NOTHING`,
-      { ':id': 'credit-ready-' + idText(orderId) + '-' + (Number(current.staffEditVersion) || 0),
-        ':user_id': String(current.customerId), ':amount': issuedAmount / 100, ':order_id': idText(orderId),
-        ':description': 'Store Credit refund for paid order edit #' + String(current.orderNumber || orderId) },
-    );
-    if (Number(current.readyCreditIssuedAmount) > 0 && current.customerId) await db.run(
-      `UPDATE customers SET store_credits_operation_id=NULL, store_credits_operation_amount=0, updated_at=unixepoch()
-        WHERE id=:customer_id AND store_credits_operation_id=:operation_id`,
-      { ':customer_id': String(current.customerId), ':operation_id': priorOperation },
-    );
-    return { ready: true, alreadyReady: true };
-  }
-  if (String(current.status || '').toLowerCase() !== 'processing' || String(current.paymentStatus || '').toLowerCase() !== 'paid')
-    return { ready: false, reason: 'order_not_paid_processing' };
-  if (Number(current.adjustmentDue || 0) > 0 && String(current.adjustmentStatus || '').toLowerCase() !== 'paid')
-    return { ready: false, reason: 'adjustment_unpaid' };
-
-  const refund = Math.round((Number(current.readyCreditDue) || 0) * 100) / 100;
-  const operationId = 'order-ready:' + idText(orderId) + ':' + (Number(current.staffEditVersion) || 0);
-  if (refund > 0) {
-    if (!current.customerId) return { ready: false, reason: 'customer_missing' };
-    const customer = await db.get(
-      `SELECT store_credits_operation_id AS operationId FROM customers WHERE id=:customer_id`,
-      { ':customer_id': String(current.customerId) },
-    );
-    if (customer?.operationId && customer.operationId !== operationId) return { ready: false, reason: 'credits_busy' };
-    if (customer?.operationId !== operationId) {
-      const credit = await db.run(
-        `UPDATE customers SET store_credits=coalesce(store_credits,0)+:amount,
-                store_credits_operation_id=:operation_id, store_credits_operation_amount=:amount,
-                updated_at=unixepoch()
-          WHERE id=:customer_id AND (store_credits_operation_id IS NULL OR trim(store_credits_operation_id)='')
-          RETURNING id`,
-        { ':customer_id': String(current.customerId), ':amount': refund, ':operation_id': operationId },
-      );
-      if (!Number(credit?.rowsAffected)) return { ready: false, reason: 'credits_busy' };
-    }
-  }
-
-  const changed = await db.run(
-    `UPDATE orders SET status='Ready', ready_at=coalesce(ready_at, unixepoch()), ready_credit_due=0,
-            ready_credit_issued_amount=coalesce(ready_credit_issued_amount,0)+:refund,
-            updated_at=unixepoch()
-      WHERE id=:order_id AND lower(coalesce(status,''))='processing'
-        AND lower(coalesce(payment_status,''))='paid'
-        AND (coalesce(adjustment_due,0)<=0 OR lower(coalesce(adjustment_status,''))='paid')
-        AND coalesce(staff_edit_version,0)=:edit_version
-      RETURNING id`,
-    { ':order_id': idText(orderId), ':refund': refund, ':edit_version': Number(current.staffEditVersion) || 0 },
-  );
-  if (!Number(changed?.rowsAffected)) return { ready: false, reason: 'order_changed' };
-  if (refund > 0) await db.run(
-    `INSERT INTO point_transactions (id, user_id, type, amount, order_id, description, created_at)
-     VALUES (:id, :user_id, 'store_credit_received', :amount, :order_id, :description, unixepoch())
-     ON CONFLICT(id) DO NOTHING`,
-    { ':id': 'credit-ready-' + idText(orderId) + '-' + (Number(current.staffEditVersion) || 0),
-      ':user_id': String(current.customerId), ':amount': refund, ':order_id': idText(orderId),
-      ':description': 'Store Credit refund for paid order edit #' + String(current.orderNumber || orderId) },
-  );
-  if (refund > 0) await db.run(
-    `UPDATE customers SET store_credits_operation_id=NULL, store_credits_operation_amount=0, updated_at=unixepoch()
-      WHERE id=:customer_id AND store_credits_operation_id=:operation_id`,
-    { ':customer_id': String(current.customerId), ':operation_id': operationId },
-  );
-  return { ready: true, alreadyReady: false, storeCreditIssued: refund };
+  const current=await db.get('SELECT status,payment_status AS paymentStatus FROM orders WHERE id=:id',{':id':idText(orderId)});
+  if(current&&['ready','packed'].includes(String(current.status).toLowerCase()))return {ready:true,alreadyReady:true};
+  const result=await db.run(`UPDATE orders SET status='Ready',ready_at=coalesce(ready_at,unixepoch()),ready_credit_due=0,updated_at=unixepoch()
+    WHERE id=:id AND lower(status)='processing' AND lower(payment_status)='paid'
+      AND (coalesce(adjustment_due,0)<=0 OR lower(coalesce(adjustment_status,''))='paid') RETURNING id`,{':id':idText(orderId)});
+  return Number(result?.rowsAffected)>0?{ready:true,alreadyReady:false}:{ready:false,reason:'order_not_paid_processing'};
 }
 
-/** Customer receipt or staff completion starts the 30-minute rewards delay. */
+/** Customer receipt or staff completion immediately makes earned rewards eligible. */
 export async function markOrderCompleted(orderId, completedAt = Math.floor(Date.now() / 1000)) {
   const changed = await completeDispatchedOrder(orderId, completedAt);
-  if (changed) return { completed: true, alreadyCompleted: false };
+  if (changed) { await reconcileOrderMilestones({limit:20}); return { completed: true, alreadyCompleted: false }; }
   const current = await db.get(
     `SELECT status, delivered_at AS deliveredAt FROM orders WHERE id = :order_id`,
     { ':order_id': idText(orderId) },
@@ -357,12 +283,20 @@ async function applyMaturedPurchasingPoints(order) {
   return { awarded: true, pending: false };
 }
 
-/** Bounded, request-driven 30-minute loyalty maturity reconciliation. */
+/** Shared bounded reconciliation for scheduler ticks and existing request refreshes. */
 export async function reconcileOrderMilestones({ customerId = '', memberId = '', limit = 10 } = {}) {
   const customer = idText(customerId);
   const member = idText(memberId);
   const maxRows = Math.max(1, Math.min(20, Number(limit) || 10));
-  const autoCompleted = 0;
+  const expiry=await expireReceiptResubmissions({customerId:customer,limit:maxRows});
+  const due=await db.all(`SELECT id FROM orders WHERE lower(status)='dispatched' AND lower(payment_status)='paid'
+    AND coalesce(delivery_fallback_at,dispatched_at+21600)<=unixepoch()
+    AND (:customer='' OR customer_id=:customer) ORDER BY coalesce(delivery_fallback_at,dispatched_at+21600),id LIMIT :limit`,{':customer':customer,':limit':maxRows});
+  let autoCompleted=0,deferredCompletions=0;
+  for(const order of due) {
+    try {if(await completeDispatchedOrder(order.id,Math.floor(Date.now()/1000)))autoCompleted++;}
+    catch {deferredCompletions++;}
+  }
 
   const referrerFilter = customer || member
     ? sql`AND ((${customer} <> '' AND o.referred_by_user_id = ${customer})
@@ -423,5 +357,5 @@ export async function reconcileOrderMilestones({ customerId = '', memberId = '',
     if (result.awarded) purchasingAwarded += 1;
     if (result.pending) pending += 1;
   }
-  return { autoCompleted, credited, purchasingAwarded, pending };
+  return { autoCompleted, deferredCompletions, receiptExpired:expiry.cancelled, credited, purchasingAwarded, pending };
 }

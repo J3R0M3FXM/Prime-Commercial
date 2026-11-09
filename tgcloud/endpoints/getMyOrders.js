@@ -2,6 +2,7 @@ import { db, EndpointError } from 'sdk';
 import { asc, desc, eq, or } from 'sdk/db';
 import { customers, orders } from '../schema.js';
 import { findMediaAsset } from '../lib/media.js';
+import { attachWorkflow,expireReceiptResubmissions,ensureOrderWorkflow } from '../lib/order-workflow.js';
 
 export default async function (_input, ctx) {
   const telegramId = ctx?.initData?.user?.id == null ? '' : String(ctx.initData.user.id);
@@ -13,8 +14,10 @@ export default async function (_input, ctx) {
     id: customers.id,
     primeMemberId: customers.primeMemberId,
   }).from(customers).where(eq(customers.tgUserId, telegramId)).get();
+  await ensureOrderWorkflow();
 
   const ownership = [eq(orders.tgUserId, telegramId)];
+  if(customer?.id)await expireReceiptResubmissions({customerId:customer.id});
   if (customer?.id) ownership.push(eq(orders.customerId, customer.id));
   if (customer?.primeMemberId) ownership.push(eq(orders.primeMemberId, customer.primeMemberId));
 
@@ -37,9 +40,11 @@ export default async function (_input, ctx) {
     id: order.id,
     orderNumber: order.orderNumber,
     status: order.status,
+    workflow: await attachWorkflow(order),
     controlState: order.controlState || 'normal',
     staffEditVersion: Number(order.staffEditVersion || 0),
     paymentStatus: order.paymentStatus,
+    paymentMethodId: order.paymentMethodId,
     paymentMethodName: order.paymentMethodName,
     payableNow: Number(order.payableNow || 0),
     payableOnDelivery: Number(order.payableOnDelivery || 0),

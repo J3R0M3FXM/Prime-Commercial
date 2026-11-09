@@ -1347,7 +1347,7 @@ export default function CheckoutModal({
       setSubmitError("Choose a payment method and upload your payment proof before submitting the order.");
       return;
     }
-    if (isAnalyzingReceipt || ocrAnalysis?.matchStatus !== "ANALYSIS_COMPLETED") {
+    if (isAnalyzingReceipt || (!ocrError && !ocrAnalysis)) {
       setSubmitError("Complete the receipt image analysis before submitting your order.");
       return;
     }
@@ -2714,7 +2714,7 @@ export default function CheckoutModal({
                                 
                                 <button
                                   type="button"
-                                  disabled={isSubmittingProof || isAnalyzingReceipt || !ocrAnalysis || !selectedPaymentMethod?.id}
+                                  disabled={isSubmittingProof || isAnalyzingReceipt || (!ocrAnalysis&&!ocrError) || !selectedPaymentMethod?.id}
                                   onClick={async () => {
                                     try {
                                       setIsSubmittingProof(true);
@@ -2850,7 +2850,7 @@ export default function CheckoutModal({
                     isSubmittingOrder ||
                     isLoadingCharges ||
                     Boolean(chargesLoadError) ||
-                    (!submissionKey && (isAnalyzingReceipt || ocrAnalysis?.matchStatus !== "ANALYSIS_COMPLETED" || !selectedPaymentMethod?.id || !uploadedProofImage))
+                    (!submissionKey && (isAnalyzingReceipt || (!ocrError && !ocrAnalysis) || !selectedPaymentMethod?.id || !uploadedProofImage))
                   }
                   className="prime-checkout__submit px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

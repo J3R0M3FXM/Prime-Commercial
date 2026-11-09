@@ -4,11 +4,13 @@ import { DatabaseSync } from 'node:sqlite';
 
 const sqlite=new DatabaseSync(':memory:');
 sqlite.exec(`CREATE TABLE orders(id TEXT PRIMARY KEY,customer_id TEXT,status TEXT,payment_status TEXT,control_state TEXT,review_status TEXT,payment_proof_image TEXT,updated_at INTEGER,total_amount REAL,subtotal REAL,staff_discount_amount REAL,discount_amount REAL,points_discount REAL,charges_breakdown TEXT,delivery_fee REAL,promo_shipping_subsidy REAL,payable_on_delivery REAL,store_credits_used REAL,payment_received_amount REAL,confirmed_paid_amount REAL,order_number TEXT,tracking_url TEXT,referral_points_status TEXT);
-CREATE TABLE customers(id TEXT PRIMARY KEY,store_credits REAL,store_credits_operation_id TEXT,updated_at INTEGER);
+CREATE TABLE customers(id TEXT PRIMARY KEY,store_credits REAL,store_credits_operation_id TEXT,received_transfer_balance REAL,updated_at INTEGER);
 CREATE TABLE point_transactions(id TEXT PRIMARY KEY,user_id TEXT,type TEXT,amount REAL,order_id TEXT,description TEXT,created_at INTEGER);
 CREATE TABLE inventory_reservations(order_id TEXT,status TEXT,updated_at INTEGER);
 CREATE TABLE promo_claims(order_id TEXT,status TEXT,updated_at INTEGER);`);
+sqlite.exec('ALTER TABLE orders ADD COLUMN received_transfer_used REAL');
 const db={
+  async all(sql,params={}) { return sqlite.prepare(sql).all(params); },
   async get(sql,params={}) { return sqlite.prepare(sql).get(params); },
   async run(sql,params={}) {
     if(/^CREATE /i.test(sql.trim())) { sqlite.exec(sql); return {rowsAffected:0}; }

@@ -11,7 +11,7 @@ const db = {
 };
 class EndpointError extends Error { constructor(message, options) { super(message); this.code = options?.code; } }
 const source = readFileSync('tgcloud/endpoints/getMyOrders.js', 'utf8').replace(/^import[^\n]*\n/gm, '').replace('export default async function', 'async function handler');
-const handler = new Function('db','EndpointError','asc','desc','eq','or','customers','orders','findMediaAsset', source + '\nreturn handler;')(db,EndpointError,x=>x,x=>x,()=>true,()=>true,{}, {}, async()=>null);
+const handler = new Function('db','EndpointError','asc','desc','eq','or','customers','orders','findMediaAsset','ensureOrderWorkflow','attachWorkflow','expireReceiptResubmissions', source + '\nreturn handler;')(db,EndpointError,x=>x,x=>x,()=>true,()=>true,{}, {}, async()=>null,async()=>{},async()=>({}),async()=>({cancelled:0}));
 await assert.rejects(handler({},{}), error => error.code === 'AUTH_REQUIRED');
 const result = await handler({}, { initData: { user: { id: 123 } } });
 assert.deepEqual(result.map(row=>row.id), ['new','old'], 'Preserve placement order instead of comparing day-first order numbers');

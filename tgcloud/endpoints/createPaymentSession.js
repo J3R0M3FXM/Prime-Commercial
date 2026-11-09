@@ -11,18 +11,24 @@ export default async function (input, ctx) {
   const customer = await db.select().from(customers).where(eq(customers.tgUserId, telegramId)).get();
   if (!customer) throw new EndpointError('Customer account was not found.', { code: 'CUSTOMER_MISSING' });
   if (customer.isBanned === true) throw new EndpointError('This account cannot place orders.', { code: 'CUSTOMER_BANNED' });
-  await db.run(`CREATE TABLE IF NOT EXISTS payment_sessions (
+  if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='payment_sessions'")) {
+  try {await db.run(`CREATE TABLE IF NOT EXISTS payment_sessions (
     id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, request_snapshot TEXT NOT NULL DEFAULT '{}',
     payment_method_id TEXT NOT NULL DEFAULT '', proof_data TEXT, proof_content_type TEXT,
     proof_ocr_analysis TEXT, status TEXT NOT NULL DEFAULT 'awaiting_proof', expires_at INTEGER NOT NULL,
     consumed_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
     operation_key TEXT NOT NULL DEFAULT ''
-  )`);
-  for (const statement of [
-    `ALTER TABLE payment_sessions ADD COLUMN operation_key TEXT NOT NULL DEFAULT ''`,
-    `ALTER TABLE orders ADD COLUMN payment_proof_data TEXT`,
-    `ALTER TABLE orders ADD COLUMN payment_proof_content_type TEXT`,
-  ]) { try { await db.run(statement); } catch {} }
+  )`);}catch(error){if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='payment_sessions'"))throw error;}
+  }
+  for (const [table,column,type] of [
+    ['payment_sessions','operation_key',"TEXT NOT NULL DEFAULT ''"],
+    ['orders','payment_proof_data','TEXT'],['orders','payment_proof_content_type','TEXT'],
+  ]) {
+    if(!await db.get(`SELECT name FROM pragma_table_info('${table}') WHERE name=:column`,{':column':column})) {
+      try{await db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);}
+      catch(error){if(!await db.get(`SELECT name FROM pragma_table_info('${table}') WHERE name=:column`,{':column':column}))throw error;}
+    }
+  }
   const request = input?.request && typeof input.request === 'object' ? input.request : null;
   const paymentMethodId = text(input?.paymentMethodId, 120);
   const operationKey = text(input?.operationKey, 128);

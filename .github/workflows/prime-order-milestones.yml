@@ -1,0 +1,39 @@
+name: PRIME Order Milestones
+on:
+  schedule:
+    - cron: '2-57/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: prime-order-milestones
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    # Enable only after the matching validated backend release is deployed.
+    if: vars.PRIME_ORDER_AUTOMATION_ENABLED == 'true' && vars.PRIME_AUTOMATION_REF != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Reconcile Due Orders And Rewards
+        env:
+          TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_TOKEN }}
+          VALIDATED_SOURCE: ${{ vars.PRIME_AUTOMATION_REF }}
+        run: |
+          test -n "$TGCLOUD_TOKEN"
+          case "$TGCLOUD_TOKEN" in
+            app8830494959:*) ;;
+            *) echo 'Refusing to run against an unexpected TGCloud app.' >&2; exit 1 ;;
+          esac
+          printf 'Validated Source: %s\n' "$VALIDATED_SOURCE"
+          automation_dir=$(mktemp -d "$RUNNER_TEMP/prime-order-milestones.XXXXXX")
+          cd "$automation_dir"
+          npm exec --yes --package=@tgcloud/cli -- tgcloud pull
+          sha256sum --check --strict "$GITHUB_WORKSPACE/automation/order-milestones.sha256"
+          npm exec --yes --package=@tgcloud/cli -- tgcloud run handlers/orderMilestones

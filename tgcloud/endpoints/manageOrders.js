@@ -1,11 +1,11 @@
 import { db, EndpointError } from 'sdk';
-import { desc, inArray, eq, and, isNull, sql } from 'sdk/db';
-import { customers, orders, products, inventoryReservations } from '../schema.js';
+import { desc, inArray, eq } from 'sdk/db';
+import { customers, orders, products } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
 import { markOrderCompleted, markOrderDispatched, markOrderReady, reconcileOrderMilestones } from '../lib/order-lifecycle.js';
-import { notifyOrderStatusChanged, notifyPaymentUpdated } from '../lib/order-notifications.js';
-import { requestOrderCancellation } from '../lib/order-cancellation.js';
-import { applyOrderControl } from '../lib/order-controls.js';
+import { notifyOrderStatusChanged } from '../lib/order-notifications.js';
+import { attachWorkflow, applyWorkflowAction, workflowFor,ensureOrderWorkflow } from '../lib/order-workflow.js';
+import { calculateCustomerTier,calculateOrderRewardPoints } from '../lib/loyalty.js';
 
 function timestampMs(value, depth = 0) {
   if (depth > 3 || value == null) return null;
@@ -53,11 +53,13 @@ function normalizeHttpsTrackingUrl(value) {
 
 export default async function (input, ctx) {
   const staff = await requireAdmin(ctx);
+  await ensureOrderWorkflow();
   const action = String(input?.action || 'list');
   if (action === 'list') {
     let reconciliationWarning = '';
     try {
-      await reconcileOrderMilestones({ limit: 20 });
+      const reconciliation=await reconcileOrderMilestones({ limit: 20 });
+      if(reconciliation.deferredCompletions)reconciliationWarning='Some overdue completions were deferred. Review locked credit ledgers or unresolved order data.';
     } catch (error) {
       // Listing orders must remain available even if request-driven milestone recovery fails.
       const detail = String(error?.message || '').replace(/[\r\n\t]+/g, ' ').slice(0, 180);
@@ -72,8 +74,9 @@ export default async function (input, ctx) {
         .from(customers).where(inArray(customers.tgUserId, telegramIds)).all()
       : [];
     const profileByTelegramId = new Map(profiles.map((profile) => [String(profile.tgUserId), profile]));
-    return { orders: rows.map((order) => ({
+    return { orders: await Promise.all(rows.map(async (order) => ({
       ...order,
+      workflow: await attachWorkflow(order,true),
       telegramName: profileByTelegramId.get(String(order.tgUserId || ''))?.tgName || '',
       telegramUsername: profileByTelegramId.get(String(order.tgUserId || ''))?.tgUsername || '',
       createdAt: timestampIso(order.createdAt),
@@ -83,39 +86,26 @@ export default async function (input, ctx) {
       expiredAt: timestampIso(order.expiredAt),
       dispatchedAt: timestampIso(order.dispatchedAt),
       deliveredAt: timestampIso(order.deliveredAt),
-    })), reconciliationWarning };
+    }))), reconciliationWarning };
   }
 
   const orderId = String(input?.orderId || input?.id || '').trim();
   if (!orderId) throw new EndpointError('Order ID is required.', { code: 'INVALID_INPUT' });
-
-  if (action === 'holdOrder' || action === 'resubmitOrder' || action === 'dispatchOverride') {
-    const controlAction = action === 'holdOrder' ? 'hold' : action === 'resubmitOrder' ? 'resubmit' : 'dispatch_override';
-    const result = await applyOrderControl({ orderId, actorTelegramId: staff.id, action: controlAction,
-      reason: input?.reason, operationId: input?.operationId });
-    const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
-    if (order) await notifyOrderStatusChanged({ chatId: order.tgUserId, orderNumber: order.orderNumber || order.id,
-      status: controlAction === 'hold' ? 'On Hold' : controlAction === 'resubmit' ? 'Resubmitted' : 'Dispatched',
-      paymentStatus: order.paymentStatus, totalAmount: Number(order.totalAmount) || 0,
-      courierName: order.courierName, trackingNumber: order.trackingNumber,
-      trackingOverridden: controlAction === 'dispatch_override',
-      controlEventId: result.eventId });
+  const currentOrder=await db.select().from(orders).where(eq(orders.id,orderId)).get();
+  if(!currentOrder)throw new EndpointError('Order not found.',{code:'NOT_FOUND'});
+  await workflowFor(currentOrder);
+  const workflowAction=({markPaid:'confirmPayment',approveZeroDue:'confirmPayment',failReceipt:'failReceipt',holdOrder:'hold',resubmitOrder:'resubmit',startProcessing:'processing',cancelOrder:'cancel',rejectOrder:'cancel',approveCustomerEdit:'approveCustomerEdit',rejectCustomerEdit:'rejectCustomerEdit',rejectCancellation:'rejectCancellation',revalidatePayment:'revalidatePayment',recordOriginalRefund:'recordOriginalRefund'})[action];
+  if(workflowAction) {
+    const result=await applyWorkflowAction(currentOrder,workflowAction,{...input,...(action==='approveZeroDue'?{confirmedAmount:0}:{})});
+    const saved=await db.select().from(orders).where(eq(orders.id,orderId)).get();
+    await notifyOrderStatusChanged({chatId:saved.tgUserId,orderNumber:saved.orderNumber||saved.id,status:action==='resubmitOrder'?'Replacement Receipt Requested — Upload Within One Hour':saved.status,paymentStatus:saved.paymentStatus,totalAmount:Number(saved.totalAmount)||0});
     return result;
   }
+  if(action==='dispatchOverride'||action==='approveAdjustmentPayment')throw new EndpointError('Tracking is required for dispatch; bill increases require a new order.',{code:'LEGACY_WORKFLOW_RETIRED'});
 
   if (action === 'expireUnpaid' || action === 'cancelUnpaid' || action === 'rejectUnpaid') {
     throw new EndpointError('The unpaid-order expiry workflow is retired. Use the current payment review and cancellation flow.', { code: 'LEGACY_WORKFLOW_RETIRED' });
   }
-  if (action === 'cancelOrder' || action === 'rejectOrder') {
-    const current = await db.select().from(orders).where(eq(orders.id, orderId)).get();
-    if (!current) throw new EndpointError('Order not found.', { code: 'NOT_FOUND' });
-    return requestOrderCancellation(current, action === 'rejectOrder' ? 'reject' : 'cancel', {
-      staffOverride: true,
-      actorTelegramId: staff.id,
-      reason: input?.reason,
-    });
-  }
-
   const notifyStatus = async (status, trackingUrl) => {
     const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
     if (!order) return;
@@ -129,26 +119,13 @@ export default async function (input, ctx) {
       paymentStatus: order.paymentStatus,
     });
   };
-  const notifyPayment = async () => {
-    const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
-    if (!order) return;
-    await notifyPaymentUpdated({
-      chatId: order.tgUserId, orderNumber: order.orderNumber || order.id,
-      primeMemberId: order.primeMemberId, customerName: order.customerName,
-      status: order.status, totalAmount: Number(order.totalAmount) || 0,
-      paymentStatus: order.paymentStatus,
-    });
-  };
-
   if (action === 'edit') {
     const current = await db.select().from(orders).where(eq(orders.id, orderId)).get();
     const expectedVersion = Number(input?.expectedVersion);
     const version = Number(current?.staffEditVersion || 0);
     const currentStatus = String(current?.status || '').toLowerCase();
-    const currentPayment = String(current?.paymentStatus || '').toLowerCase();
-    const paidDownwardEdit = currentPayment === 'paid' && ['processing', 'ready', 'packed'].includes(currentStatus);
-    if (!current || (!((currentStatus === 'pending' && currentPayment !== 'paid') || paidDownwardEdit)))
-      throw new EndpointError('Only unpaid Pending orders or paid in-house orders can be edited.', { code: 'ORDER_NOT_EDITABLE' });
+    if (!current || !['pending','confirmed'].includes(currentStatus) || ['held','failed'].includes(String(current.controlState||'').toLowerCase()))
+      throw new EndpointError('Modify is available only before Processing and outside failed/held review.', { code: 'ORDER_NOT_EDITABLE' });
     if (!Number.isSafeInteger(expectedVersion) || expectedVersion !== version)
       throw new EndpointError('This order was updated elsewhere. Refresh it and reapply your changes.', { code: 'ORDER_CHANGED' });
     if (Number(current.adjustmentDue || 0) > 0 && String(current.adjustmentStatus || '').toLowerCase() !== 'paid')
@@ -162,6 +139,7 @@ export default async function (input, ctx) {
     const heldBySku = new Map((heldRows || []).map((row) => [String(row.productId) + '_' + String(row.variantId || 'default'), Number(row.quantity) || 0]));
     const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
     const items = [];
+    const seenSkus=new Set();
     for (const line of lines) {
       const rawId = String(line?.id || '').trim();
       const productId = String(line?.productId || (rawId.includes('_') ? rawId.slice(0, rawId.indexOf('_')) : rawId)).trim();
@@ -175,6 +153,9 @@ export default async function (input, ctx) {
           !Number.isFinite(value) || value < 0 || (mode === 'percent' && value > 100))
         throw new EndpointError('Check each item price, quantity, and offer.', { code: 'INVALID_ITEMS' });
       if (quantity === 0) continue;
+      const sku=productId+'_'+variantId;
+      if(seenSkus.has(sku))throw new EndpointError('Combine duplicate item lines before saving.',{code:'DUPLICATE_ITEM'});
+      seenSkus.add(sku);
       if (!heldBySku.has(productId + '_' + variantId) || quantity > heldBySku.get(productId + '_' + variantId))
         throw new EndpointError('This change increases reserved stock or adds an unreserved item. Reduce quantities here; stock increases and new items need a fresh inventory reservation flow.', { code: 'INVENTORY_RESERVATION_REQUIRED' });
       const product = await db.select().from(products).where(eq(products.id, productId)).get();
@@ -216,181 +197,29 @@ export default async function (input, ctx) {
     const oldDeliveryDue = Number(current.payableOnDelivery || 0);
     const deliveryIsCod = oldDeliveryDue > 0;
     const total = money(Math.max(0, subtotal - staffDiscount - Number(current.discountAmount || 0) - Number(current.pointsDiscount || 0)) + chargeTotal + deliveryFee - Number(current.promoShippingSubsidy || 0));
-    const payableOnDelivery = deliveryIsCod ? deliveryFee : 0;
+    const payableOnDelivery = deliveryIsCod ? money(Math.max(0,deliveryFee-Number(current.promoShippingSubsidy||0))) : 0;
     const payableNow = money(Math.max(0, total - payableOnDelivery - Number(current.storeCreditsUsed || 0)));
-    const reconcileReducedHolds = async () => {
-      for (const [sku, heldQuantity] of heldBySku) {
-        const line = items.find((item) => item.productId + '_' + item.variantId === sku);
-        if (!line) {
-          await db.run(`UPDATE inventory_reservations SET quantity=0,status='released',updated_at=unixepoch() WHERE order_id=:order_id AND product_id=:product_id AND variant_id=:variant_id`,
-            { ':order_id': orderId, ':product_id': sku.slice(0, sku.lastIndexOf('_')), ':variant_id': sku.slice(sku.lastIndexOf('_') + 1) });
-        } else if (line.quantity < heldQuantity) {
-          await db.run(`UPDATE inventory_reservations SET quantity=:quantity,updated_at=unixepoch() WHERE order_id=:order_id AND product_id=:product_id AND variant_id=:variant_id AND status<>'released'`,
-            { ':order_id': orderId, ':product_id': line.productId, ':variant_id': line.variantId, ':quantity': line.quantity });
-        }
-      }
-    };
-    if (paidDownwardEdit && total > Number(current.totalAmount || 0) + 0.005)
+    const netTotal=money(payableNow+payableOnDelivery);
+    const canonical=await db.get("SELECT json_extract(canonical_snapshot,'$.rewardTier') AS tier,json_extract(canonical_snapshot,'$.promo.cashbackPoints') AS cashback FROM checkout_operations WHERE order_id=:id LIMIT 1",{':id':orderId});
+    const completedOrders=canonical?.tier?[]:await db.all("SELECT subtotal,delivered_at AS deliveredAt,created_at AS createdAt,status FROM orders WHERE customer_id=:customer AND lower(status) IN ('completed','delivered')",{':customer':current.customerId});
+    const reward=calculateOrderRewardPoints(subtotal,canonical?.tier||calculateCustomerTier(completedOrders).tier,Number(canonical?.cashback||0),staffDiscount+Number(current.discountAmount||0)+Number(current.pointsDiscount||0),Number(current.storeCreditsUsed||0));
+    if (netTotal > Number(current.totalAmount || 0) + 0.005)
       throw new EndpointError('A paid order can only be reduced. Use a new transaction for any increase.', { code: 'PAID_ORDER_INCREASE' });
     const changed = await db.run(`UPDATE orders SET items=:items, subtotal=:subtotal, delivery_fee=:delivery_fee,
         charges_breakdown=:charges, staff_discount_amount=:discount, staff_discount_mode=:discount_mode,
         staff_discount_value=:discount_value, total_amount=:total, payable_now=:payable_now,
         payable_on_delivery=:payable_on_delivery, staff_edit_version=:next_version,
-        ready_credit_due=0,
+        ready_credit_due=0,purchasing_points_amount=min(coalesce(purchasing_points_amount,0),:reward),
         updated_at=unixepoch()
-      WHERE id=:id AND staff_edit_version=:expected_version
-        AND ((lower(status)='pending' AND lower(payment_status)<>'paid')
-          OR (lower(payment_status)='paid' AND lower(status) IN ('processing','ready','packed')))
+      WHERE id=:id AND coalesce(staff_edit_version,0)=:expected_version
+        AND lower(status) IN ('pending','confirmed') AND lower(coalesce(control_state,'')) NOT IN ('held','failed')
         AND :new_total <= total_amount + 0.005 RETURNING id`,
       { ':items': JSON.stringify(items), ':subtotal': subtotal, ':delivery_fee': money(deliveryFee), ':charges': JSON.stringify(charges), ':discount': staffDiscount,
-        ':discount_mode': discountMode, ':discount_value': money(discountValue), ':total': total, ':payable_now': payableNow,
+        ':discount_mode': discountMode, ':discount_value': money(discountValue), ':total': netTotal, ':payable_now': payableNow,
         ':payable_on_delivery': payableOnDelivery,
-        ':next_version': version + 1, ':expected_version': version, ':id': orderId, ':new_total': total });
+        ':next_version': version + 1, ':expected_version': version, ':id': orderId, ':new_total': netTotal,':reward':reward });
     if (!Number(changed?.rowsAffected)) throw new EndpointError('The order changed; refresh and try again.', { code: 'ORDER_CHANGED' });
-    await reconcileReducedHolds();
-    return { success: true, orderId, totalAmount: total, payableNow };
-  }
-
-  if (action === 'markPaid') {
-    const confirmedAmount = Number(input?.confirmedAmount);
-    if (!Number.isFinite(confirmedAmount) || confirmedAmount < 0) {
-      throw new EndpointError('Enter the amount verified in the payment provider.', { code: 'INVALID_INPUT' });
-    }
-    const pending = await db.select().from(orders).where(eq(orders.id, orderId)).get();
-    if (pending && ['processing', 'ready', 'packed'].includes(String(pending.status || '').toLowerCase()) && String(pending.paymentStatus || '').toLowerCase() === 'paid') {
-      const priorVersion = Number(pending.staffEditVersion) || 0;
-      const priorReceivedCents = Math.max(0, Math.round((Number(pending.paymentReceivedAmount ?? pending.confirmedPaidAmount) || 0) * 100));
-      const priorDueCents = Math.max(0, Math.round((Number(pending.confirmedPaidAmount ?? pending.payableNow ?? pending.totalAmount) || 0) * 100));
-      const priorExcessCents = Math.max(0, priorReceivedCents - priorDueCents);
-      if (priorExcessCents > 0 && pending.customerId) await db.run(
-        `INSERT INTO point_transactions (id, user_id, type, amount, order_id, description, created_at)
-         VALUES (:id, :user_id, 'store_credit_received', :amount, :order_id, :description, unixepoch())
-         ON CONFLICT(id) DO NOTHING`,
-        { ':id': 'credit-received-' + orderId + '-' + priorReceivedCents,
-          ':user_id': String(pending.customerId), ':amount': priorExcessCents / 100, ':order_id': orderId,
-          ':description': 'Store Credit received from verified overpayment for Order #' + String(pending.orderNumber || orderId) },
-      );
-      const priorCreditOperation = 'order-paid:' + orderId + ':' + (Number(pending.staffEditVersion) || 0) + ':' + confirmedAmount.toFixed(2);
-      if (pending.customerId) await db.run(`UPDATE customers SET store_credits_operation_id=NULL, store_credits_operation_amount=0, updated_at=unixepoch() WHERE id=:id AND store_credits_operation_id=:operation`, { ':id': pending.customerId, ':operation': priorCreditOperation });
-      return { success: true, orderId, status: pending.status, paymentStatus: pending.paymentStatus, alreadyApproved: true };
-    }
-    const pendingPaymentStatus = String(pending?.paymentStatus || '').toLowerCase();
-    const hasSubmittedProof = Boolean(String(pending?.paymentProofImage || '').trim());
-    // Initial checkout may attach a payment-session receipt before the order exists.
-    // That path historically persisted the order as Unpaid; allow the same manual
-    // provider verification used for Pending Review receipts without trusting the image.
-    const awaitingProofReview = pendingPaymentStatus === 'pending review' || (pendingPaymentStatus === 'unpaid' && hasSubmittedProof);
-    if (!pending || String(pending.status || '').toLowerCase() !== 'pending' || !awaitingProofReview || !hasSubmittedProof || String(pending.controlState || 'normal').toLowerCase() === 'held')
-      throw new EndpointError('Only a Pending order with a submitted receipt can be approved.', { code: 'ORDER_NOT_AWAITING_REVIEW' });
-    const amountDueCents = Math.max(0, Math.round((Number(pending.payableNow ?? pending.totalAmount) || 0) * 100));
-    const receivedCents = Math.max(0, Math.round(confirmedAmount * 100));
-    if (receivedCents < amountDueCents) throw new EndpointError('The provider-confirmed amount must match the amount payable now.', { code: 'PAYMENT_SHORT' });
-    if (receivedCents > amountDueCents) throw new EndpointError('The provider-confirmed amount exceeds the amount payable now. Verify that the delivery fee payable on delivery was not included, then approve only the exact amount paid to the shop.', { code: 'PAYMENT_OVERAGE_REVIEW' });
-    const amountDue = amountDueCents / 100;
-    const receivedAmount = receivedCents / 100;
-    const excess = (receivedCents - amountDueCents) / 100;
-    const editVersion = Number(pending.staffEditVersion) || 0;
-    const creditOperationId = 'order-paid:' + orderId + ':' + editVersion + ':' + receivedAmount.toFixed(2);
-    // Payment approval never creates Store Credit. A payment above payable_now
-    // is ambiguous when delivery is payable on delivery and must be reviewed.
-    const rollbackStagedCredit = async () => {
-      if (excess <= 0) return;
-      await db.run(`UPDATE customers SET store_credits=coalesce(store_credits,0)-:amount,
-          store_credits_operation_id=NULL, store_credits_operation_amount=0, updated_at=unixepoch()
-        WHERE id=:id AND store_credits_operation_id=:operation AND store_credits_operation_amount=:amount`,
-        { ':id': pending.customerId, ':amount': excess, ':operation': creditOperationId });
-    };
-    // The amount was checked against the just-read due in integer cents above.
-    // The edit-version predicate below makes that comparison safe against a
-    // concurrent staff edit; avoid repeating the money comparison in SQLite SQL,
-    // where NUMERIC/REAL storage and ROUND result typing can reject valid cents.
-    const editVersionGuard = pending.staffEditVersion == null
-      ? isNull(orders.staffEditVersion)
-      : eq(orders.staffEditVersion, editVersion);
-    const result = await db.update(orders).set({
-      paymentStatus: 'Paid', confirmedPaidAmount: amountDue, paymentReceivedAmount: receivedAmount,
-      status: 'Processing', reviewStatus: 'Approved', requiresManualReview: false, updatedAt: new Date(),
-    }).where(and(
-      eq(orders.id, orderId),
-      eq(orders.status, pending.status),
-      eq(orders.paymentStatus, pending.paymentStatus),
-      eq(orders.paymentProofImage, pending.paymentProofImage),
-      sql`coalesce(${orders.controlState}, 'normal') <> 'held'`,
-      editVersionGuard,
-    )).returning({ id: orders.id }).run();
-    let approvalSaved = (Array.isArray(result) && result.length > 0) ||
-      Number(result?.rowsAffected) > 0 || (Array.isArray(result?.rows) && result.rows.length > 0);
-    // Some Serverless SQLite adapters return no row metadata for a successful
-    // UPDATE ... RETURNING. Read the order before treating that as a failed write.
-    let latest = null;
-    if (!approvalSaved) {
-      latest = await db.select().from(orders).where(eq(orders.id, orderId)).get();
-      approvalSaved = String(latest?.status || '').toLowerCase() === 'processing' &&
-        String(latest?.paymentStatus || '').toLowerCase() === 'paid' &&
-        Number(latest?.staffEditVersion || 0) === editVersion &&
-        Math.round((Number(latest?.paymentReceivedAmount || 0) || 0) * 100) === receivedCents;
-    }
-    if (!approvalSaved) {
-      latest ||= await db.select().from(orders).where(eq(orders.id, orderId)).get();
-      const latestPaymentStatus = String(latest?.paymentStatus || '').toLowerCase();
-      const latestHasSubmittedProof = Boolean(String(latest?.paymentProofImage || '').trim());
-      if (!latest || String(latest.status || '').toLowerCase() !== 'pending' || !(latestPaymentStatus === 'pending review' || (latestPaymentStatus === 'unpaid' && latestHasSubmittedProof)) || !latestHasSubmittedProof) {
-        if (String(latest?.status || '').toLowerCase() === 'pending') await rollbackStagedCredit();
-        throw new EndpointError('Payment was not approved because the order is no longer awaiting receipt review. Refresh the order to see its current status.', { code: 'ORDER_NOT_AWAITING_REVIEW' });
-      }
-      if (Number(latest.staffEditVersion || 0) !== editVersion) {
-        await rollbackStagedCredit();
-        throw new EndpointError('The order was edited during payment review, so nothing was approved. Refresh the order, review the attached receipt and revised total, then try again.', { code: 'ORDER_CHANGED' });
-      }
-      const latestDueCents = Math.max(0, Math.round((Number(latest.payableNow ?? latest.totalAmount) || 0) * 100));
-      if (receivedCents < latestDueCents) {
-        await rollbackStagedCredit();
-        throw new EndpointError('The verified payment is below the revised amount due. Do not approve yet; collect and verify the remaining amount first.', { code: 'PAYMENT_SHORT' });
-      }
-      await rollbackStagedCredit();
-      throw new EndpointError('Payment approval was not saved. Refresh the order and try again.', { code: 'ORDER_CHANGED' });
-    }
-    await notifyStatus('Processing');
-    await notifyPayment();
-    return { success: true, orderId, status: 'Processing', paymentStatus: 'Paid' };
-  }
-
-  if (action === 'approveAdjustmentPayment') {
-    const result = await db.run(
-      `UPDATE orders SET adjustment_status = 'paid',
-              confirmed_paid_amount = coalesce(confirmed_paid_amount, 0) + coalesce(adjustment_due, 0),
-              payment_received_amount = coalesce(payment_received_amount, confirmed_paid_amount, 0) + coalesce(adjustment_due, 0),
-              adjustment_verified_at = unixepoch(), updated_at = unixepoch()
-        WHERE id = :order_id AND lower(coalesce(status, '')) = 'processing'
-          AND lower(coalesce(payment_status, '')) = 'paid'
-          AND coalesce(adjustment_due, 0) > 0
-          AND lower(coalesce(adjustment_status, '')) = 'pending_review'
-          AND trim(coalesce(adjustment_proof_image, '')) <> ''
-        RETURNING id`,
-      { ':order_id': orderId },
-    );
-    if (!Number(result?.rowsAffected)) throw new EndpointError('No adjustment receipt is awaiting manual verification.', { code: 'ADJUSTMENT_NOT_AWAITING_REVIEW' });
-    await notifyPayment();
-    return { success: true, orderId, adjustmentStatus: 'paid' };
-  }
-
-  if (action === 'approveZeroDue') {
-    const result = await db.run(
-      `UPDATE orders SET status = 'Processing', payment_status='Paid', confirmed_paid_amount=0, payment_received_amount=0,
-              review_status = 'Approved - zero pre-dispatch due',
-              requires_manual_review = 0, updated_at = unixepoch()
-        WHERE id = :order_id AND lower(coalesce(status, '')) = 'pending'
-          AND lower(coalesce(payment_status, '')) = 'unpaid'
-          AND coalesce(payable_now, total_amount, 0) <= 0
-          AND trim(coalesce(payment_proof_image, '')) = ''
-          AND expired_at IS NULL
-          AND lower(coalesce(control_state, 'normal')) <> 'held'
-        RETURNING id`,
-      { ':order_id': orderId },
-    );
-    if (!Number(result?.rowsAffected)) throw new EndpointError('Only an active order with no pre-dispatch amount due can be approved without a receipt.', { code: 'ORDER_ZERO_DUE_NOT_ELIGIBLE' });
-    await notifyStatus('Processing');
-    return { success: true, orderId, status: 'Processing', paymentStatus: 'Paid', reviewStatus: 'Approved - zero pre-dispatch due' };
+    return { success: true, orderId, totalAmount: netTotal, payableNow };
   }
 
   if (action === 'markReady') {

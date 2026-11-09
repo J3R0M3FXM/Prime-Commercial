@@ -575,7 +575,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
                       <h4 className="text-xs font-mono uppercase text-gray-500">
                         Friends Referred ({c?.referrals?.length || 0})
                       </h4>
-                      <span className="text-[11px] font-mono text-gray-400">50 pts credited 30m post-delivery</span>
+                      <span className="text-[11px] font-mono text-gray-400">50 Points After Both Customers Have Completed Orders</span>
                     </div>
 
                     {(!c?.referrals || c.referrals.length === 0) ? (

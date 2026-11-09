@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Clock3, Download, ExternalLink, Eye, Loader2, Minus, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, Truck, X } from "lucide-react";
 import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import { callServerless, getTelegramServerlessSession, resolveTelegramMedia } from "@/lib/telegram-serverless-client";
+import OrderWorkflowController,{type OrderWorkflow} from './order-workflow-controller';
 
 type ServerlessOrder = {
+  workflow?: OrderWorkflow;
   id: string;
   orderNumber: string;
   customerName: string;
@@ -75,6 +77,7 @@ function normalizeOrder(row: RawOrder): ServerlessOrder {
   let fingerprintSnapshot = field(row, "fingerprintSnapshot", "fingerprint_snapshot", {});
   if (typeof fingerprintSnapshot === "string") { try { fingerprintSnapshot = JSON.parse(fingerprintSnapshot); } catch { fingerprintSnapshot = {}; } }
   return {
+    workflow:row.workflow,
     id: String(field(row, "id", "id")),
     orderNumber: String(field(row, "orderNumber", "order_number")),
     customerName: String(field(row, "customerName", "customer_name", "Customer")),
@@ -270,8 +273,6 @@ export default function TelegramServerlessOrdersPanel({
   const [receiptUrl, setReceiptUrl] = useState("");
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptZoom, setReceiptZoom] = useState(1);
-  const [trackingUrl, setTrackingUrl] = useState("");
-  const [verifiedPaidAmount, setVerifiedPaidAmount] = useState("");
   const [copiedKey, setCopiedKey] = useState("");
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<any[]>([]);
@@ -348,21 +349,11 @@ export default function TelegramServerlessOrdersPanel({
   }, [initialOrderId]);
 
   useEffect(() => {
-    setTrackingUrl("");
-    setVerifiedPaidAmount("");
     setReceiptOpen(false);
     setOrderDetailTab("overview");
   }, [selectedId]);
 
   const selectedOrder = orders.find((order) => order.id === selectedId || order.orderNumber === selectedId) || null;
-
-  useEffect(() => {
-    if (selectedOrder?.trackingUrl) setTrackingUrl(selectedOrder.trackingUrl);
-  }, [selectedOrder?.id, selectedOrder?.trackingUrl]);
-
-  useEffect(() => {
-    if (selectedOrder) setVerifiedPaidAmount(selectedOrder.confirmedPaidAmount == null ? "" : String(selectedOrder.confirmedPaidAmount));
-  }, [selectedOrder?.id, selectedOrder?.confirmedPaidAmount, selectedOrder?.payableNow]);
 
   useEffect(() => {
     let current = true;
@@ -409,14 +400,14 @@ export default function TelegramServerlessOrdersPanel({
   const filteredOrders = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return orders.filter((order) => {
-      const matchesStatus = statusFilter === "all" || order.status.toLowerCase() === statusFilter;
+      const matchesStatus = statusFilter === "all" || (order.workflow?.stage||order.status).toLowerCase() === statusFilter;
       const status = order.status.toLowerCase();
       const payment = order.paymentStatus.toLowerCase();
       const matchesQueue = queueFilter === "all"
-        || (queueFilter === "queue" && status === "pending" && ["unpaid", "pending review"].includes(payment))
+        || (queueFilter === "queue" && ((status === "pending" && ["unpaid", "pending review"].includes(payment))||(status==='confirmed'&&payment==='paid')))
         || (queueFilter === "review" && status === "pending" && (payment === "pending review" || order.payableNow <= 0))
         || (queueFilter === "awaiting_payment" && status === "pending" && payment === "unpaid" && order.payableNow > 0 && !order.paymentProofImage)
-        || (queueFilter === "fulfillment" && ["processing", "ready", "packed"].includes(status))
+        || (queueFilter === "fulfillment" && ["confirmed","processing", "ready", "packed"].includes(status))
         || (queueFilter === "courier" && status === "dispatched")
         || (queueFilter === "completed" && ["completed", "delivered"].includes(status));
       const matchesSearch = !needle || [order.orderNumber, order.telegramName, order.telegramUsername, order.customerName, order.customerPhone,
@@ -426,7 +417,7 @@ export default function TelegramServerlessOrdersPanel({
     });
   }, [orders, search, statusFilter, queueFilter]);
 
-  const runAction = async (order: ServerlessOrder, action: "markPaid" | "approveZeroDue" | "markReady" | "dispatch" | "complete" | "approveAdjustmentPayment" | "edit", extra: Record<string, any> = {}) => {
+  const runAction = async (order: ServerlessOrder, action: string, extra: Record<string, any> = {}) => {
     setBusyAction(`${order.id}:${action}`);
     setError("");
     try {
@@ -619,19 +610,6 @@ export default function TelegramServerlessOrdersPanel({
               })}
             </ol></div>}
             {["cancelled", "expired"].includes(status) && <div className="prime-order-closed-state">This order is {status}. The normal fulfillment sequence is closed.</div>}
-            {(canVerifyPayment || canApproveZeroDue || canReady || canDispatch || canComplete) && <details open className="serverless-disclosure prime-order-next-action">
-              <summary>{canVerifyPayment ? "NEXT Action · Verify Payment" : canApproveZeroDue ? "NEXT Action · Confirm Payment Due" : canReady ? "NEXT Action · Mark Ready" : canDispatch ? "NEXT Action · Dispatch" : canComplete ? "NEXT Action · Complete Delivery" : "NEXT Action"}</summary>
-              <div className="serverless-disclosure__body"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {canVerifyPayment && <div className="space-y-2"><label className="block text-xs text-emerald-900">Exact Amount Paid to the Store<input type="number" min={selectedOrder.payableNow} step="0.01" placeholder={formatPHP(selectedOrder.payableNow)} value={verifiedPaidAmount} onChange={(event) => setVerifiedPaidAmount(event.target.value)} className="mt-1 w-full border px-3 py-2 text-sm" /></label><p className="text-xs text-slate-600">Verify this exact amount in the provider account. Exclude any delivery fee payable to the courier.</p><button type="button" disabled={busyAction !== "" || !verifiedPaidAmount || Math.round(Number(verifiedPaidAmount) * 100) !== Math.round(selectedOrder.payableNow * 100)} onClick={() => void runAction(selectedOrder, "markPaid", { confirmedAmount: verifiedPaidAmount })} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markPaid") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Confirm Verified Payment</button></div>}
-                {canApproveZeroDue && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "approveZeroDue")} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":approveZeroDue") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Approve Zero Upfront Due · Mark Paid</button>}
-                {canReady && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "markReady")} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markReady") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark Ready{selectedOrder.readyCreditDue > 0 ? ` · issue ${formatPHP(selectedOrder.readyCreditDue)} Store Credits` : ""}</button>}
-                {canDispatch && <div className="serverless-order-dispatch"><label htmlFor="order-tracking-url">Live Tracking URL <span>Required</span></label><input id="order-tracking-url" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" placeholder="https://courier.example/track/..." value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} /><small>This URL will appear as “Track Location” in the customer’s order details.</small><button type="button" disabled={busyAction !== "" || !/^https:\/\//i.test(trackingUrl.trim())} onClick={() => void runAction(selectedOrder, "dispatch", { trackingUrl: trackingUrl.trim() })} className="px-3 py-2 bg-sky-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":dispatch") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Truck className="inline w-3 h-3 mr-1" />} Save tracking &amp; mark dispatched</button></div>}
-                {canComplete && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "complete")} className="px-3 py-2 bg-indigo-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":complete") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark Delivered / Completed</button>}
-              </div>
-              {canVerifyPayment && <p className="mt-2 text-xs text-amber-700">Payment approval is recorded only when the provider-confirmed amount matches the payable-to-store total.</p>}
-              {canApproveZeroDue && <p className="mt-2 text-xs text-amber-700">Confirm no upfront amount is due. The order will be marked Paid for processing; any pay-on-delivery amount remains due to the courier.</p>}
-              </div>
-            </details>}
             <nav className="prime-order-tabs" role="tablist" aria-label="Order details">
               {(["overview", "fulfillment", "payment", "evidence"] as const).map((tab) => <button key={tab} type="button" role="tab"
                 aria-selected={orderDetailTab === tab} onClick={() => setOrderDetailTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}
@@ -643,7 +621,7 @@ export default function TelegramServerlessOrdersPanel({
             </section>}
             </section>
             <section hidden={orderDetailTab !== "overview"}>
-            {(["pending", "processing"].includes(status)) && <details className="serverless-disclosure">
+            {(["pending", "confirmed"].includes(status)) && <details className="serverless-disclosure">
               <summary>Change order items, discount, or delivery fee</summary>
               <div className="serverless-disclosure__body space-y-2">
                 <strong className="text-xs uppercase">Staff Changes · {selectedOrder.status} / {selectedOrder.paymentStatus}</strong>
@@ -737,6 +715,7 @@ export default function TelegramServerlessOrdersPanel({
             </section>
 
             <section hidden={orderDetailTab !== "fulfillment"}>
+            <OrderWorkflowController key={selectedOrder.id} order={selectedOrder} busy={busyAction!==''} onAction={(action,extra)=>runAction(selectedOrder,action,extra)} onModify={()=>{beginEdit(selectedOrder);setOrderDetailTab('overview');}}/>
             <details className="serverless-disclosure">
               <summary>Dispatch Details</summary>
               <div className="serverless-disclosure__body"><div className="serverless-fields text-xs">
@@ -868,7 +847,7 @@ export default function TelegramServerlessOrdersPanel({
             <div className="serverless-panel-toolbar grid grid-cols-1 sm:grid-cols-2">
               <label className="serverless-search"><Search aria-hidden="true" className="w-4 h-4" /><input aria-label="Search orders" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order, customer, Telegram ID" /></label>
               <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setQueueFilter("all"); }} className="w-full min-w-0 border border-slate-200 px-3 py-2 text-xs">
-                <option value="all">All Statuses</option><option value="pending">Pending</option><option value="processing">Processing</option><option value="ready">Ready</option><option value="packed">Packed</option><option value="dispatched">Dispatched</option><option value="completed">Completed</option><option value="expired">Expired</option>
+                <option value="all">All Statuses</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="failed">Failed</option><option value="held">Held</option><option value="processing">Processing</option><option value="ready">Ready</option><option value="packed">Packed</option><option value="dispatched">Dispatched</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="expired">Expired</option>
               </select>
             </div>
             {filteredOrders.length === 0 && !loading ? (
