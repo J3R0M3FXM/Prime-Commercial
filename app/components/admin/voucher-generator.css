@@ -1,5 +1,6 @@
 .voucher-generator__qr { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.voucher-generator__preview { display: block; width: 100%; height: auto; border: 1px solid #d7e3ec; border-radius: 6px; }
+.voucher-generator__render { display: none; }
+.voucher-generator__preview { display: block; width: 100%; height: auto; border: 1px solid #d7e3ec; border-radius: 6px; -webkit-touch-callout: default; }
 .voucher-generator .serverless-dialog__body p { margin: 8px 0 0; color: #52677d; font-size: 12px; line-height: 1.35; }
 .voucher-generator .serverless-dialog__body .voucher-generator__error { color: #b42318; }
 .voucher-code-entry { display: flex; min-width: 0; gap: 4px; }

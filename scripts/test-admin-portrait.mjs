@@ -24,7 +24,17 @@ const rules=(await bundle('app/components/admin/telegram-serverless-rules-panel.
 const print=(await bundle('app/components/admin/order-print-view.tsx')).default;
 const catalog=(await bundle('app/components/admin/telegram-serverless-catalog-panel.tsx')).default;
 const account=(await bundle('app/components/account-modal.tsx')).default;
+const splash=(await bundle('app/components/splash-screen.tsx')).default;
 const root=createRoot(document.getElementById('root'));
+await act(async()=>root.render(createElement(splash,{title:'ADMIN ACCESS',subtitle:'VERIFYING TELEGRAM ADMIN SESSION...'})));
+assert.ok(document.body.classList.contains('splash-active'));
+assert.match(document.querySelector('[role="img"]').getAttribute('aria-label'),/rotating globe/i);
+assert.equal(document.querySelectorAll('animateMotion').length,4,'Data lights follow the network paths');
+assert.match(document.body.textContent,/ADMIN ACCESS/);
+await act(async()=>root.render(createElement(splash,{title:'CONNECTING TO PRIME PRIVATE SERVERS',subtitle:'Please wait'})));
+assert.match(document.body.textContent,/CONNECTING TO PRIME PRIVATE SERVERS/);
+await act(async()=>root.render(createElement('div')));
+assert.equal(document.body.classList.contains('splash-active'),false,'Leaving the splash restores the footer');
 await act(async()=>root.render(createElement(rules,{mode:'charges',onBack(){}})));
 const edit=document.querySelector('[aria-label="Edit configuration"]');assert.ok(edit);
 await act(async()=>edit.click());

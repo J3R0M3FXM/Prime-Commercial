@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 import { build } from 'rolldown';
 
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'https://local.example/admin' });
-for (const key of ['window','document','navigator','HTMLElement','HTMLCanvasElement','HTMLAnchorElement','Event','MouseEvent','File','Blob']) Object.defineProperty(globalThis, key, { value: dom.window[key], configurable: true });
+for (const key of ['window','document','navigator','HTMLElement','HTMLCanvasElement','HTMLAnchorElement','Event','MouseEvent','File','Blob','FileReader']) Object.defineProperty(globalThis, key, { value: dom.window[key], configurable: true });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 Object.defineProperty(document, 'fonts', { value: { load: async () => [{}] }, configurable: true });
 globalThis.Image = class { set src(value) { this.url = value; queueMicrotask(() => this.onload?.()); } };
@@ -18,20 +18,21 @@ HTMLCanvasElement.prototype.getContext = function () {
   }
   return contexts.get(this);
 };
-HTMLCanvasElement.prototype.toBlob = function (callback) { callback(new Blob(['png'], { type: 'image/png' })); };
-let download, blobFile, shared;
+HTMLCanvasElement.prototype.toBlob = function (callback) { callback(new Blob([new Uint8Array([137,80,78,71,13,10,26,10,1,2,3])], { type: 'image/png' })); };
+let download, blobFile;
 HTMLAnchorElement.prototype.click = function () { download = { href: this.href, filename: this.download }; };
 URL.createObjectURL = file => { blobFile = file; return 'blob:fixture-voucher'; };
 URL.revokeObjectURL = () => {};
-Object.defineProperty(navigator, 'canShare', { value: payload => Boolean(payload.files?.length), configurable: true });
-Object.defineProperty(navigator, 'share', { value: async payload => { shared = payload; }, configurable: true });
+const calls = [];
+globalThis.__voucherBridge = async (name, input) => { calls.push({name,input}); return input.action === 'send' ? {success:true,messageId:42} : {success:true}; };
 const require = createRequire(import.meta.url);
 const result = await build({ input: resolve('app/components/admin/voucher-generator.tsx'), platform: 'node', write: false, tsconfig: false,
   transform: { jsx: { runtime: 'automatic' } },
   plugins: [{ name: 'fixture', resolveId(id) {
     if (id === 'react' || id.startsWith('react/') || id === 'lucide-react') return { id: pathToFileURL(require.resolve(id)).href, external: true };
+    if (id.includes('telegram-serverless-client')) return '\0bridge';
     if (id.endsWith('.css')) return '\0css';
-  }, load(id) { if (id === '\0css') return ''; } }], output: { format: 'esm' } });
+  }, load(id) { if (id === '\0css') return ''; if (id === '\0bridge') return 'export const callServerless=(name,input)=>globalThis.__voucherBridge(name,input);'; } }], output: { format: 'esm' } });
 const { default: VoucherGenerator, makeVoucherCode, drawVoucher } = await import('data:text/javascript;base64,' + Buffer.from(result.output[0].code).toString('base64'));
 const codes = new Set(Array.from({ length: 100 }, makeVoucherCode));
 assert.equal(codes.size, 100); assert.ok([...codes].every(code => /^PRIME-[0-9A-F]{16}$/.test(code)));
@@ -39,7 +40,8 @@ const { createElement, act } = await import('react');
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 await act(async () => root.render(createElement(VoucherGenerator, { code: 'PRIME-TEST2026', active: true, onClose() {} })));
-const preview = document.querySelector('.voucher-generator__preview');
+const preview = document.querySelector('.voucher-generator__render');
+assert.ok(document.querySelector('img.voucher-generator__preview'), 'The generated image can be long-pressed where the browser supports it');
 const qr = document.querySelector('.voucher-generator__qr');
 const paint = contexts.get(preview).operations;
 assert.deepEqual([preview.width,preview.height],[1836,857]);
@@ -54,6 +56,11 @@ window.setTimeout = () => 1;
 const click = async text => { const button = [...document.querySelectorAll('button')].find(node => node.textContent.includes(text)); assert.ok(button && !button.disabled, text); await act(async () => button.click()); };
 await click('Download PNG');
 assert.equal(download.filename, 'PRIME-Voucher-PRIME-TEST2026.png'); assert.equal(blobFile.type, 'image/png');
-await click('Share'); assert.equal(shared.files[0].name, download.filename);
+const send = [...document.querySelectorAll('button')].find(node => node.textContent.includes('Send to Telegram'));
+await act(async () => { send.click(); await new Promise(resolve => setTimeout(resolve, 50)); });
+assert.deepEqual(calls.map(call => call.input.action), ['start','chunk','send']);
+assert.equal(calls[0].input.fileName, download.filename);
+assert.equal(calls[2].name, 'sendVoucherToTelegram');
+assert.match(document.body.textContent, /Voucher sent to your PRIME bot chat/);
 await act(async () => root.unmount()); dom.window.close();
-console.log('PASS: secure code generation, official voucher composition, QR placement, long codes, PNG download and file sharing.');
+console.log('PASS: voucher composition, QR placement, long codes, PNG download and confirmed Telegram delivery flow.');

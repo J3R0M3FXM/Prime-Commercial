@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Download, Share2, X } from "lucide-react";
+import { Download, Send, X } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
+import { callServerless } from "@/lib/telegram-serverless-client";
 import "@fontsource/ibm-plex-mono/700.css";
 import "./voucher-generator.css";
 
@@ -13,6 +14,41 @@ export function makeVoucherCode(): string {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
   return `PRIME-${Array.from(bytes, byte => byte.toString(16).padStart(2, "0").toUpperCase()).join("")}`;
+}
+
+export async function sendVoucherFile(file: File, onProgress?: (completed: number, total: number) => void) {
+  if (!window.crypto?.getRandomValues) throw new Error("Secure voucher delivery is unavailable on this device.");
+  const bytes = typeof file.arrayBuffer === "function" ? new Uint8Array(await file.arrayBuffer()) : await new Promise<Uint8Array>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => reader.result instanceof ArrayBuffer ? resolve(new Uint8Array(reader.result)) : reject(new Error("Could not read the voucher image."));
+    reader.onerror = () => reject(new Error("Could not read the voucher image."));
+    reader.readAsArrayBuffer(file);
+  });
+  if (bytes.length < 8 || bytes.length > 8 * 1024 * 1024) throw new Error("The voucher image is too large to send.");
+  const id = Array.from(window.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
+  const chunkSize = 256 * 1024, count = Math.ceil(bytes.length / chunkSize);
+  let started = false, sending = false;
+  try {
+    const start = await callServerless<{ success: boolean }>("sendVoucherToTelegram", { action: "start", uploadId: id, fileName: file.name, fileSize: bytes.length, chunkCount: count }, 30_000);
+    if (!start?.success) throw new Error("Could not start voucher delivery.");
+    started = true;
+    for (let index = 0; index < count; index++) {
+      const part = bytes.subarray(index * chunkSize, Math.min((index + 1) * chunkSize, bytes.length));
+      let binary = "";
+      for (let offset = 0; offset < part.length; offset += 0x8000) binary += String.fromCharCode(...part.subarray(offset, Math.min(offset + 0x8000, part.length)));
+      const data = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      const result = await callServerless<{ success: boolean }>("sendVoucherToTelegram", { action: "chunk", uploadId: id, index, data }, 30_000);
+      if (!result?.success) throw new Error("A voucher image part was not confirmed.");
+      onProgress?.(index + 1, count);
+    }
+    sending = true;
+    const result = await callServerless<{ success: boolean; messageId?: number }>("sendVoucherToTelegram", { action: "send", uploadId: id }, 120_000);
+    if (!result?.success || !result.messageId) throw new Error("Telegram did not confirm voucher delivery.");
+  } catch (error: any) {
+    if (started && !sending) { try { await callServerless("sendVoucherToTelegram", { action: "cancel", uploadId: id }, 15_000); } catch { /* Preserve the original failure. */ } }
+    if (sending) throw new Error("Delivery could not be confirmed. Check your PRIME bot chat before retrying. If needed, open the bot and press Start.");
+    throw error;
+  }
 }
 
 export function drawVoucher(ctx: CanvasRenderingContext2D, template: CanvasImageSource, qr: CanvasImageSource, code: string) {
@@ -58,10 +94,11 @@ export default function VoucherGenerator({ code, active, onClose }: { code: stri
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
 
   useEffect(() => {
-    let current = true;
-    setReady(false); setError(""); imageBlob.current = null;
+    let current = true, objectUrl = "";
+    setReady(false); setError(""); setPreviewUrl(""); imageBlob.current = null;
     const image = new Image();
     const imageReady = new Promise<void>((resolve, reject) => {
       image.onload = () => resolve();
@@ -80,10 +117,12 @@ export default function VoucherGenerator({ code, active, onClose }: { code: stri
       const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error("Could not create the voucher image.")), "image/png"));
       if (!current) return;
       imageBlob.current = blob;
+      objectUrl = URL.createObjectURL(blob);
+      setPreviewUrl(objectUrl);
       setReady(true);
     };
     void prepare().catch(err => { if (current) setError(err?.message || "Could not generate the voucher."); });
-    return () => { current = false; image.onload = null; image.onerror = null; };
+    return () => { current = false; image.onload = null; image.onerror = null; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [code]);
 
   const filename = `PRIME-Voucher-${code.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 80)}.png`;
@@ -100,17 +139,16 @@ export default function VoucherGenerator({ code, active, onClose }: { code: stri
       link.href = url; link.download = filename; link.style.display = "none";
       document.body.appendChild(link); link.click(); link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      setNotice("Download started. If your Telegram app does not save it, use Share to save the image.");
+      setNotice("Download requested. If no file appears, use Send to Telegram.");
     } catch (err: any) { setError(err?.message || "Could not download the voucher."); }
     finally { setBusy(false); }
   };
-  const share = async () => {
+  const sendToTelegram = async () => {
     setBusy(true); setError(""); setNotice("");
     try {
-      const file = exportFile();
-      if (!navigator.share || !navigator.canShare?.({ files: [file] })) throw new Error("Sharing files is unavailable on this device. Try Download instead.");
-      await navigator.share({ files: [file], title: "PRIME Voucher" });
-    } catch (err: any) { if (err?.name !== "AbortError") setError(err?.message || "Could not share the voucher."); }
+      await sendVoucherFile(exportFile(), (completed, total) => setNotice(`Sending voucher: ${completed}/${total}`));
+      setNotice("Voucher sent to your PRIME bot chat. Open the chat to save or forward the PNG file.");
+    } catch (err: any) { setError(err?.message || "Could not send the voucher to Telegram."); }
     finally { setBusy(false); }
   };
 
@@ -119,14 +157,15 @@ export default function VoucherGenerator({ code, active, onClose }: { code: stri
       <header className="serverless-dialog__header"><h2 id="voucher-generator-title">Voucher Preview</h2><button type="button" className="serverless-action" aria-label="Close voucher preview" onClick={onClose} disabled={busy}><X size={16}/></button></header>
       <div className="serverless-dialog__body">
         <QRCodeCanvas ref={qr} value={code} size={184} level="M" marginSize={4} className="voucher-generator__qr" aria-hidden="true" />
-        <canvas ref={output} width={WIDTH} height={HEIGHT} className="voucher-generator__preview" aria-label={`Voucher for ${code}`} />
+        <canvas ref={output} width={WIDTH} height={HEIGHT} className="voucher-generator__render" aria-hidden="true" />
+        {previewUrl && <img src={previewUrl} className="voucher-generator__preview" alt={`Voucher for ${code}`} />}
         {!ready && !error && <p role="status">Preparing voucher…</p>}
         {error && <p role="alert" className="voucher-generator__error">{error}</p>}
         {notice && <p role="status">{notice}</p>}
-        <p>The QR code contains the voucher code. The customer can scan it and enter the code at checkout.</p>
+        <p>Send the PNG to your PRIME bot chat to save or forward it. You can also try holding the image to save it. The QR contains the voucher code.</p>
         {!active && <p className="voucher-generator__error">This promotion is disabled. Enable it before sharing the voucher.</p>}
       </div>
-      <footer className="serverless-dialog__footer"><button type="button" className="serverless-action" onClick={() => void share()} disabled={!ready || busy}><Share2 size={16}/>Share</button><button type="button" className="serverless-action serverless-action--primary" onClick={() => void download()} disabled={!ready || busy}><Download size={16}/>Download PNG</button></footer>
+      <footer className="serverless-dialog__footer"><button type="button" className="serverless-action" onClick={() => void download()} disabled={!ready || busy}><Download size={16}/>Download PNG</button><button type="button" className="serverless-action serverless-action--primary" onClick={() => void sendToTelegram()} disabled={!ready || busy}><Send size={16}/>Send to Telegram</button></footer>
     </section>
   </div>;
 }
