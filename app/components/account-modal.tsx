@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { beginCreditOperation, finishCreditOperation, hasPendingCreditOperation, isDefinitiveCreditFailure } from '@/lib/credit-operation';
 import { 
   User, 
   X, 
@@ -48,7 +49,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
   const [conversionBusy, setConversionBusy] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
   const [conversionSuccess, setConversionSuccess] = useState<string | null>(null);
-  const [conversionOperationId, setConversionOperationId] = useState('');
+  const [, setConversionOperationId] = useState('');
   const [pointsHelp, setPointsHelp] = useState<'credits' | 'purchasing' | 'referral' | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferMemberId, setTransferMemberId] = useState('');
@@ -56,6 +57,8 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
   const [transferError, setTransferError] = useState('');
   const [transferSuccess, setTransferSuccess] = useState('');
   const [transferBusy, setTransferBusy] = useState(false);
+  const conversionBusyRef = useRef(false);
+  const transferBusyRef = useRef(false);
   const [telegramPhoto, setTelegramPhoto] = useState('');
   const [photoChecked, setPhotoChecked] = useState(false);
   const photoKeyRef = useRef('');
@@ -153,21 +156,22 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
     : Number(c?.purchasingPoints || 0);
 
   const submitPointsConversion = async () => {
-    const amount = Math.floor(Number(conversionAmount));
-    if (!conversionType || !Number.isSafeInteger(amount) || amount < 1 || amount > availableConversionPoints) return;
+    if (conversionBusyRef.current) return;
+    const amount = Number(conversionAmount);
+    if (!conversionType || !Number.isSafeInteger(amount) || amount < 1) return;
+    conversionBusyRef.current = true;
     setConversionBusy(true);
     setConversionError(null);
     setConversionSuccess(null);
+    let pending: ReturnType<typeof beginCreditOperation> | undefined;
     try {
       if (import.meta.env.VITE_UI_PREVIEW === '1') {
         setConversionError('Visual preview only. No points or Store Credits were changed.');
         return;
       }
 
-      const operationId = conversionOperationId || Array.from(
-        window.crypto.getRandomValues(new Uint8Array(16)),
-        byte => byte.toString(16).padStart(2, '0'),
-      ).join('');
+      pending = beginCreditOperation(String(c?.id || ''), 'conversion', { pointsType: conversionType, amount });
+      const operationId = pending.operationId;
       setConversionOperationId(operationId);
       const result = await callServerless<any>('convertPointsToCredits', {
         pointsType: conversionType,
@@ -175,6 +179,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
         operationId,
       }, 30_000);
       if (!result?.success) throw new Error(result?.error || 'Conversion could not be completed.');
+      finishCreditOperation(pending);
       setData((current: any) => ({
         ...current,
         customer: {
@@ -192,43 +197,49 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
       setConversionAmount('');
       setConversionOperationId('');
     } catch (err: any) {
+      if (pending && isDefinitiveCreditFailure(err)) finishCreditOperation(pending);
       setConversionError(err?.message || 'Conversion could not be completed.');
     } finally {
+      conversionBusyRef.current = false;
       setConversionBusy(false);
     }
   };
 
   const submitCreditTransfer = async () => {
+    if (transferBusyRef.current) return;
     const amount = Number(transferAmount);
     const recipientMemberId = transferMemberId.trim().toUpperCase();
-    if (!Number.isFinite(amount) || Math.round(amount * 100) !== amount * 100 || amount < 0.01) {
+    if (!Number.isFinite(amount) || Math.abs(Math.round(amount * 100) - amount * 100) > 0.000001 || amount < 0.01) {
       setTransferError('Enter an amount in pesos and centavos.');
-      return;
-    }
-    if (amount > Number(c?.transferableCredits ?? c?.storeCredits ?? 0)) {
-      setTransferError('Only earned or converted credits can be transferred. Received credits cannot be transferred again.');
       return;
     }
     if (!/^[A-Z0-9]{6,24}$/.test(recipientMemberId) || recipientMemberId === String(c?.primeMemberId || '').toUpperCase()) {
       setTransferError('Enter another member’s valid PRIME Member ID.');
       return;
     }
+    transferBusyRef.current = true;
     setTransferBusy(true);
     setTransferError('');
     setTransferSuccess('');
+    let pending: ReturnType<typeof beginCreditOperation> | undefined;
     try {
       if (import.meta.env.VITE_UI_PREVIEW === '1') {
         setTransferSuccess('Preview only. No credits were transferred.');
         return;
       }
-      const operationId = Array.from(window.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
+      pending = beginCreditOperation(String(c?.id || ''), 'transfer', { recipientMemberId, amount });
+      const operationId = pending.operationId;
       const result = await callServerless<any>('transferStoreCredits', { recipientMemberId, amount, operationId }, 30_000);
       if (!result?.success) throw new Error(result?.error || 'Transfer was not confirmed.');
+      finishCreditOperation(pending);
       setTransferSuccess(`₱${amount.toFixed(2)} sent to ${recipientMemberId}.`);
+      setTransferAmount('');
       await fetchAccount();
     } catch (error: any) {
+      if (pending && isDefinitiveCreditFailure(error)) finishCreditOperation(pending);
       setTransferError(error?.message || 'Transfer could not be completed.');
     } finally {
+      transferBusyRef.current = false;
       setTransferBusy(false);
     }
   };
@@ -479,7 +490,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
                       <div className="prime-account__balance-value">
                         {c?.purchasingPoints || 0}
                       </div>
-                      {!staffCustomerId && <button type="button" disabled={Number(c?.purchasingPoints || 0) <= 0} onClick={() => { setConversionType('purchasing'); setConversionAmount(''); setConversionError(null); setConversionSuccess(null); setConversionOperationId(''); }} className="prime-account__balance-action">Convert</button>}
+                      {!staffCustomerId && <button type="button" disabled={Number(c?.purchasingPoints || 0) <= 0 && !hasPendingCreditOperation(String(c?.id || ''), 'conversion')} onClick={() => { setConversionType('purchasing'); setConversionAmount(''); setConversionError(null); setConversionSuccess(null); setConversionOperationId(''); }} className="prime-account__balance-action">Convert</button>}
                     </div>
 
                     {/* Referral Points */}
@@ -492,7 +503,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
                       <div className="prime-account__balance-value">
                         {c?.referralPoints || 0}
                       </div>
-                      {!staffCustomerId && <button type="button" disabled={Number(c?.referralPoints || 0) <= 0} onClick={() => { setConversionType('referral'); setConversionAmount(''); setConversionError(null); setConversionSuccess(null); setConversionOperationId(''); }} className="prime-account__balance-action">Convert</button>}
+                      {!staffCustomerId && <button type="button" disabled={Number(c?.referralPoints || 0) <= 0 && !hasPendingCreditOperation(String(c?.id || ''), 'conversion')} onClick={() => { setConversionType('referral'); setConversionAmount(''); setConversionError(null); setConversionSuccess(null); setConversionOperationId(''); }} className="prime-account__balance-action">Convert</button>}
                     </div>
                   </div>
 
@@ -695,7 +706,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
               {conversionSuccess && <p role="status" className="mt-3 rounded border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-800">{conversionSuccess}</p>}
               <div className="mt-4 flex gap-2">
                 <button type="button" disabled={conversionBusy} onClick={() => setConversionType(null)} className="min-h-10 flex-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold uppercase text-slate-700 hover:bg-slate-50">{conversionSuccess ? 'Done' : 'Cancel'}</button>
-                {!conversionSuccess && <button type="button" disabled={conversionBusy || !Number.isInteger(Number(conversionAmount)) || Number(conversionAmount) < 1 || Number(conversionAmount) > availableConversionPoints} onClick={submitPointsConversion} className="min-h-10 flex-1 rounded-md bg-emerald-700 px-3 text-xs font-bold uppercase text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300">{conversionBusy ? 'Converting…' : 'Confirm conversion'}</button>}
+                {!conversionSuccess && <button type="button" disabled={conversionBusy || !Number.isInteger(Number(conversionAmount)) || Number(conversionAmount) < 1} onClick={submitPointsConversion} className="min-h-10 flex-1 rounded-md bg-emerald-700 px-3 text-xs font-bold uppercase text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300">{conversionBusy ? 'Converting…' : 'Confirm conversion'}</button>}
               </div>
             </motion.section>
           </motion.div>

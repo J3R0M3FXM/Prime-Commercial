@@ -9,23 +9,9 @@ const ENSURE_CONVERSION_TRIGGER = `
   AFTER INSERT ON point_transactions
   WHEN NEW.type IN ('conversion_purchasing', 'conversion_referral')
   BEGIN
-    SELECT CASE
+    UPDATE point_transactions SET amount = CASE
       WHEN NEW.amount IS NULL OR NEW.amount <= 0 OR NEW.amount != CAST(NEW.amount AS INTEGER)
-      THEN RAISE(ABORT, 'Please specify a valid whole number of points')
-    END;
-
-    SELECT CASE
-      WHEN NOT EXISTS (
-        SELECT 1 FROM customers c
-        WHERE c.id = NEW.user_id
-          AND (CASE WHEN NEW.type = 'conversion_referral'
-            THEN COALESCE(c.referral_points, 0)
-            ELSE COALESCE(c.points, 0)
-          END) >= NEW.amount
-      )
-      THEN RAISE(ABORT, 'Insufficient Points')
-    END;
-
+      THEN RAISE(ABORT, 'Please specify a valid whole number of points') ELSE amount END WHERE id = NEW.id;
     UPDATE customers
     SET points = CASE WHEN NEW.type = 'conversion_purchasing'
           THEN COALESCE(points, 0) - NEW.amount ELSE points END,
@@ -33,7 +19,10 @@ const ENSURE_CONVERSION_TRIGGER = `
           THEN COALESCE(referral_points, 0) - NEW.amount ELSE referral_points END,
         store_credits = COALESCE(store_credits, 0) + NEW.amount,
         updated_at = unixepoch()
-    WHERE id = NEW.user_id;
+    WHERE id = NEW.user_id AND (CASE WHEN NEW.type = 'conversion_referral'
+      THEN COALESCE(referral_points, 0) ELSE COALESCE(points, 0) END) >= NEW.amount;
+    UPDATE point_transactions SET amount = CASE WHEN changes() <> 1
+      THEN RAISE(ABORT, 'Insufficient Points') ELSE amount END WHERE id = NEW.id;
   END;
 `;
 
@@ -92,9 +81,10 @@ export default async function (input = {}, ctx) {
   const ledgerType = pointsType === 'referral' ? 'conversion_referral' : 'conversion_purchasing';
   const transactionId = `tx-conv-${customerId}-${operationId}`;
 
-  // Safe to repeat on calls: the trigger only applies to the two conversion
-  // ledger types, and IF NOT EXISTS leaves the installed invariant unchanged.
-  await db.run(ENSURE_CONVERSION_TRIGGER);
+  // Existing installations must not rerun DDL on every conversion. New installs
+  // use a write-only body compatible with the runtime SQL mode classifier.
+  const installed = await db.get("SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_convert_points_to_credits_v1'");
+  if (!installed) await db.run(ENSURE_CONVERSION_TRIGGER);
 
   const existing = await db.select().from(pointTransactions)
     .where(eq(pointTransactions.id, transactionId)).get();

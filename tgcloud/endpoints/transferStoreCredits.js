@@ -8,20 +8,19 @@ const ENSURE_TRANSFER_TRIGGER = `
   CREATE TRIGGER IF NOT EXISTS trg_store_credit_transfer_v1
   AFTER INSERT ON store_credit_transfers
   BEGIN
-    SELECT CASE WHEN NEW.amount_cents < 1 OR NEW.sender_id = NEW.recipient_id
-      THEN RAISE(ABORT, 'Invalid Store Credits transfer') END;
-    SELECT CASE WHEN NOT EXISTS (
-      SELECT 1 FROM customers WHERE id = NEW.sender_id
-        AND store_credits_operation_id IS NULL
-        AND round((coalesce(store_credits, 0) - coalesce(received_transfer_balance, 0)) * 100) >= NEW.amount_cents
-    ) THEN RAISE(ABORT, 'Insufficient transferable Store Credits') END;
-    SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM customers WHERE id = NEW.recipient_id)
-      THEN RAISE(ABORT, 'Recipient PRIME Member ID was not found') END;
+    UPDATE store_credit_transfers SET amount_cents = CASE
+      WHEN NEW.amount_cents < 1 OR NEW.amount_cents <> CAST(NEW.amount_cents AS INTEGER) OR NEW.sender_id = NEW.recipient_id
+      THEN RAISE(ABORT, 'Invalid Store Credits transfer') ELSE amount_cents END WHERE id = NEW.id;
     UPDATE customers SET store_credits = round((coalesce(store_credits, 0) * 100 - NEW.amount_cents)) / 100.0,
-      updated_at = unixepoch() WHERE id = NEW.sender_id;
+      updated_at = unixepoch() WHERE id = NEW.sender_id AND store_credits_operation_id IS NULL
+      AND round((coalesce(store_credits, 0) - coalesce(received_transfer_balance, 0)) * 100) >= NEW.amount_cents;
+    UPDATE store_credit_transfers SET amount_cents = CASE WHEN changes() <> 1
+      THEN RAISE(ABORT, 'Insufficient transferable Store Credits') ELSE amount_cents END WHERE id = NEW.id;
     UPDATE customers SET store_credits = round((coalesce(store_credits, 0) * 100 + NEW.amount_cents)) / 100.0,
       received_transfer_balance = round((coalesce(received_transfer_balance, 0) * 100 + NEW.amount_cents)) / 100.0,
       updated_at = unixepoch() WHERE id = NEW.recipient_id;
+    UPDATE store_credit_transfers SET amount_cents = CASE WHEN changes() <> 1
+      THEN RAISE(ABORT, 'Recipient PRIME Member ID was not found') ELSE amount_cents END WHERE id = NEW.id;
     INSERT INTO point_transactions (id, user_id, type, amount, description, created_at)
       VALUES ('transfer-out-' || NEW.id, NEW.sender_id, 'store_credit_transfer_out', -NEW.amount_cents / 100.0,
         'Store Credits transferred to another PRIME member', unixepoch());
@@ -49,7 +48,8 @@ export default async function (input = {}, ctx) {
   if (!recipient) throw new EndpointError('Recipient PRIME Member ID was not found.', { code: 'RECIPIENT_NOT_FOUND' });
   if (String(sender.id) === String(recipient.id)) throw new EndpointError('Choose another PRIME member.', { code: 'SELF_TRANSFER' });
   const transferId = `sc-transfer-${sender.id}-${operationId}`;
-  await db.run(ENSURE_TRANSFER_TRIGGER);
+  const installed = await db.get("SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_store_credit_transfer_v1'");
+  if (!installed) await db.run(ENSURE_TRANSFER_TRIGGER);
   let existing = await db.select().from(storeCreditTransfers).where(eq(storeCreditTransfers.id, transferId)).get();
   if (!existing) {
     try {
