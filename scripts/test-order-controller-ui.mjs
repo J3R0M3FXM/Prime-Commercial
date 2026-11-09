@@ -25,6 +25,7 @@ async function render(stage,extra={}) {
 for(const stage of Object.keys(expected)) {
   await render(stage);
   for(const [label,action] of [['Review','review'],['Hold','hold'],['Modify','modify'],['Cancel','cancel']])assert.equal(button(label).disabled,!expected[stage].includes(action),stage+' '+label);
+  for(const node of document.querySelectorAll('section[aria-label="Order Controller"] button')) assert.ok(node.classList.contains('prime-workflow-button'),'All controller buttons share the progression style');
   assert.equal(Boolean(document.querySelector('input[type="url"]')),stage==='Ready','Tracking is entered only at dispatch');
   assert.equal(document.querySelectorAll('table').length,0);
 }
@@ -38,6 +39,9 @@ await render('Confirmed',{editState:'pending',editRequest:{receiverName:'<script
 assert.equal(button('Processing').disabled,true);assert.equal(document.querySelectorAll('script').length,0);
 await act(async()=>button('Approve Edit').click());assert.equal(calls.at(-1).action,'approveCustomerEdit');
 const panel=readFileSync('app/components/admin/telegram-serverless-orders-panel.tsx','utf8');
+const style=readFileSync('app/admin/admin-portrait.css','utf8');
+assert.match(style,/prime-workflow-button[\s\S]*?font-family:\s*'Roboto Condensed'[\s\S]*?font-weight:\s*600[\s\S]*?text-transform:\s*uppercase/);
+assert.match(style,/prime-workflow-button:disabled/);
 assert.ok(panel.indexOf('<OrderWorkflowController')>panel.indexOf('hidden={orderDetailTab !== "fulfillment"}'));
 assert.doesNotMatch(panel,/NEXT Action/,'The duplicate global controller was removed');
 const checkout=readFileSync('app/components/checkout-modal.tsx','utf8'),tree=ts.createSourceFile('checkout.tsx',checkout,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);

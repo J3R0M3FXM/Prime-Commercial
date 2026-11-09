@@ -183,6 +183,25 @@ body:has(#mobile-portrait-viewport.admin-viewport) { background: #020617 !import
 }
 #mobile-portrait-viewport.admin-viewport .serverless-order-dispatch { display: grid; min-width: 0; gap: 6px; }
 #mobile-portrait-viewport.admin-viewport .serverless-order-dispatch :is(input,button) { width: 100%; min-width: 0; }
+
+/* Solid, compact order progression controls; locked actions remain legible. */
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .prime-order-workflow button.prime-workflow-button {
+  border: 1px solid #155aa1;
+  border-radius: 5px;
+  background: #176dc2;
+  color: #fff;
+  font-family: 'Roboto Condensed', sans-serif !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  line-height: 1.2;
+  cursor: pointer;
+}
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .prime-order-workflow button.prime-workflow-button--hold { background: #895000; border-color: #754300; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .prime-order-workflow button.prime-workflow-button--modify { background: #086c73; border-color: #07575d; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .prime-order-workflow button.prime-workflow-button--danger { background: #b3262d; border-color: #911e24; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .prime-order-workflow button.prime-workflow-button--success { background: #087b4d; border-color: #06673f; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .prime-order-workflow button.prime-workflow-button:disabled { background: #e3e8ee; border-color: #cbd5df; color: #536274; cursor: not-allowed; opacity: 1; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .prime-order-workflow button.prime-workflow-button:focus-visible { outline: 2px solid #102a56; outline-offset: 2px; }
 #mobile-portrait-viewport.admin-viewport .serverless-order-dispatch input { min-height: 40px; padding: 8px; border: 1px solid #cbd4df; border-radius: 6px; background: #fff; }
 #mobile-portrait-viewport.admin-viewport .admin-customer-account .prime-account__balance-label { align-items: flex-start; gap: 4px; padding-right: 12px; }
 #mobile-portrait-viewport.admin-viewport .admin-customer-account .prime-account__balance-label svg { width: 19px; height: 19px; }
