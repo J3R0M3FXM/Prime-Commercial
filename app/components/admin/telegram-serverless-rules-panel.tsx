@@ -113,7 +113,7 @@ export default function TelegramServerlessRulesPanel({ mode, onBack }: Props) {
       </article>)}</div>}
     </>}
 
-    {formOpen&&<div className="serverless-dialog-backdrop" onMouseDown={(e)=>{if(e.target===e.currentTarget&&!busy)reset();}}><section role="dialog" aria-modal="true" aria-labelledby="rules-dialog-title" className="serverless-dialog">
+    {formOpen&&<div className="serverless-dialog-backdrop" onMouseDown={(e)=>{if(e.target===e.currentTarget&&!busy)reset();}}><section role="dialog" aria-modal="true" aria-labelledby="rules-dialog-title" className="serverless-dialog rules-dialog">
       <header className="serverless-dialog__header"><h2 id="rules-dialog-title">{editingId?"Edit":"Add"} {isCharge?"Charge":"Promotion"}</h2><button type="button" disabled={busy} onClick={reset} className="serverless-action" aria-label="Close"><X className="h-4 w-4"/></button></header>
       <form onSubmit={save} className="serverless-dialog__form"><div className="serverless-dialog__body space-y-2">
         {error&&<div role="alert" className="border border-red-300 bg-red-50 p-2 text-xs text-red-800">{error}</div>}

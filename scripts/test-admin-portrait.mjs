@@ -14,7 +14,7 @@ const charge={id:'charge-1',name:'Existing Customer Charge',type:'fixed',rate:37
 globalThis.__adminPortrait = async (name,input) => { calls.push({name,input}); if(input.action==='list')return name==='manageProducts'?[]:[charge]; return {success:true}; };
 const require=createRequire(import.meta.url);
 async function bundle(entry) {
-  const output=await build({input:resolve(entry),platform:'node',write:false,tsconfig:false,transform:{jsx:{runtime:'automatic'}},resolve:{alias:{'@':process.cwd()}},onLog(level,log,handler){if(log.code!=='MODULE_LEVEL_DIRECTIVE')handler(level,log);},plugins:[{name:'admin-portrait-fixtures',resolveId(id){if(id==='react'||id.startsWith('react/')||id==='lucide-react')return {id:pathToFileURL(require.resolve(id)).href,external:true};if(id.includes('telegram-serverless-client'))return '\0bridge';if(id.endsWith('.css'))return '\0css';},load(id){if(id==='\0css')return '';if(id==='\0bridge')return 'export const callServerless=(name,input)=>globalThis.__adminPortrait(name,input);export const getTelegramServerlessSession=async()=>({authenticated:true,isAdmin:true});export const uploadProductImage=async()=>"tgmedia:fixture123";export const resolveTelegramMedia=async value=>value;';}}],output:{format:'esm'}});
+  const output=await build({input:resolve(entry),platform:'node',write:false,tsconfig:false,transform:{jsx:{runtime:'automatic'}},resolve:{alias:{'@':process.cwd()}},onLog(level,log,handler){if(log.code!=='MODULE_LEVEL_DIRECTIVE')handler(level,log);},plugins:[{name:'admin-portrait-fixtures',resolveId(id){if(id==='react'||id.startsWith('react/')||id==='lucide-react'||id==='motion/react')return {id:pathToFileURL(require.resolve(id)).href,external:true};if(id.includes('telegram-serverless-client'))return '\0bridge';if(id.endsWith('.css'))return '\0css';},load(id){if(id==='\0css')return '';if(id==='\0bridge')return 'export const callServerless=(name,input)=>globalThis.__adminPortrait(name,input);export const getTelegramServerlessSession=async()=>({authenticated:true,isAdmin:true});export const uploadProductImage=async()=>"tgmedia:fixture123";export const resolveTelegramMedia=async value=>value;';},transform(code,id){if(id.endsWith('/account-modal.tsx'))return code.replaceAll('import.meta.env.VITE_UI_PREVIEW', '"0"');}}],output:{format:'esm'}});
   return import('data:text/javascript;base64,'+Buffer.from(output.output[0].code).toString('base64'));
 }
 const {createElement,act}=await import('react');
@@ -22,6 +22,7 @@ const {createRoot}=await import('react-dom/client');
 const rules=(await bundle('app/components/admin/telegram-serverless-rules-panel.tsx')).default;
 const print=(await bundle('app/components/admin/order-print-view.tsx')).default;
 const catalog=(await bundle('app/components/admin/telegram-serverless-catalog-panel.tsx')).default;
+const account=(await bundle('app/components/account-modal.tsx')).default;
 const root=createRoot(document.getElementById('root'));
 await act(async()=>root.render(createElement(rules,{mode:'charges',onBack(){}})));
 const edit=document.querySelector('[aria-label="Edit configuration"]');assert.ok(edit);
@@ -58,6 +59,15 @@ await act(async()=>root.render(createElement(print,{order:{orderNumber:'P-1',ite
 assert.equal(document.querySelectorAll('table').length,0);
 const items=[...document.querySelectorAll('.order-print-item')];assert.equal(items.length,2);
 assert.match(items[0].textContent,/Original Case/);assert.match(items[0].textContent,/Quantity/);assert.match(items[0].textContent,/Unit Price/);assert.match(items[0].textContent,/Line Total/);assert.match(items[1].textContent,/FREE/);
+
+globalThis.__adminPortrait=async(name,input)=>{calls.push({name,input});if(name==='getMyAccount')return {customer:{id:'customer-1',tgName:'Selected Customer',primeMemberId:'C123',tierInfo:{tier:'Gold',currentSpending:15000},purchasingPoints:23,referralPoints:4,storeCredits:55},pointTransactions:[],recentOrders:[]};throw Error('Unexpected account action '+name);};
+await act(async()=>root.render(createElement(account,{isOpen:true,onClose(){},staffCustomerId:'customer-1'})));
+assert.match(document.body.textContent,/Selected Customer/);assert.match(document.body.textContent,/Gold/);
+assert.deepEqual(calls.find(c=>c.name==='getMyAccount').input,{customerId:'customer-1'});
+assert.equal(calls.some(c=>c.name==='getMyTelegramPhoto'),false,'Staff view must not fetch the staff member photo');
+await act(async()=>[...document.querySelectorAll('.prime-account__tab')].find(button=>button.textContent.includes('Points & Credits')).click());
+assert.match(document.body.textContent,/23/);assert.match(document.body.textContent,/55/);
+assert.equal([...document.querySelectorAll('button')].some(button=>['Transfer','Convert'].includes(button.textContent.trim())),false,'Staff view must not expose customer balance actions');
 
 const css=readFileSync('app/admin/admin-portrait.css','utf8');
 assert.match(css,/prime-admin-global-header\s*\{[^}]*position:\s*relative/s);

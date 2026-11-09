@@ -30,6 +30,7 @@ run('node', ['scripts/check-telegram-serverless-contracts.mjs'], 'Serverless con
 run('node', ['scripts/test-promo-codec.mjs'], 'promo regressions');
 run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
 run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
+run('node', ['scripts/test-account-staff-view.mjs'], 'staff account view authorization and customer parity');
 run('node', ['scripts/test-shopfront-queue.mjs'], 'shopfront queue ownership and ordering');
 run('node', ['scripts/test-shopfront-payment-link.mjs'], 'shopfront secure payment link');
 run('node', ['scripts/test-device-security.mjs'], 'device recognition ownership, privacy and persistence');

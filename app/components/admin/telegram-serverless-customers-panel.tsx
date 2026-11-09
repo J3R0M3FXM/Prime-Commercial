@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronDown, Loader2, RefreshCw, Search, ShieldCheck, UserRo
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { formatPHP } from "@/lib/currency";
 import DeviceSecurityDossier from './device-security-dossier';
+import AccountModal from '../account-modal';
 
 type Customer = {
   id: string; tgUserId?: string; tgName?: string; tgUsername?: string; phoneNumber?: string;
@@ -113,7 +114,8 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
   const deviceGroups = useMemo(() => {
     const groups = new Map<string, { key: string; sessions: any[] }>();
     (Array.isArray(selected?.fingerprints) ? selected.fingerprints : []).forEach((fingerprint: any, index: number) => {
-      const stableId = fingerprint.deviceId || fingerprint.deviceFingerprintId || fingerprint.hardwareId;
+      const legacyId = String(fingerprint.deviceId || "");
+      const stableId = fingerprint.installationId || (/^DEV_[A-Za-z0-9_-]{10,}$/i.test(legacyId) ? legacyId : "");
       const key = stableId ? `device:${stableId}` : `session:${fingerprint.sessionToken || index}`;
       const group = groups.get(key) || { key, sessions: [] };
       group.sessions.push(fingerprint);
@@ -150,14 +152,8 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
       </div>
     </>}
     {authorized && selected && <div className="serverless-record-list">
-      <section className="serverless-record p-3"><h2 className="text-sm font-bold">{selected.tgName || "Telegram customer"}{selected.tgUsername ? ` · @${selected.tgUsername}` : ""}</h2><p className="mt-1 text-xs text-slate-500">{selected.primeMemberId || selected.tgUserId || selected.id}</p>
-        <div className="serverless-fields mt-3 text-xs">
-          <div><b>Phone</b><p>{selected.phoneNumber || "—"}</p></div><div><b>Joined</b><p>{date(selected.createdAt)}</p></div>
-          <div><b>Orders</b><p>{selected.totalOrders || 0} ({selected.successfulOrders || 0} completed)</p></div><div><b>Lifetime Spend</b><p>{formatPHP(Number(selected.lifetimeSpent || 0))}</p></div>
-          <div><b>Purchasing Points</b><p>{Number(selected.points || 0).toLocaleString()}</p></div><div><b>Referral Points</b><p>{Number(selected.referralPoints || 0).toLocaleString()}</p></div>
-          <div><b>Store Credits</b><p>{formatPHP(Number(selected.storeCredits || 0))}</p></div><div><b>Account Status</b><p>{selected.isBanned ? "Restricted" : "Active"}</p></div>
-        </div>
-      </section>
+      <div className="admin-customer-account"><AccountModal key={selected.id} isOpen onClose={() => setSelected(null)} staffCustomerId={selected.id} /></div>
+      <details className="serverless-disclosure"><summary>Staff Account Records</summary><div className="serverless-disclosure__body serverless-record-list">
       <details className="serverless-disclosure" open><summary>Store Credit history ({selected.storeCreditTransactions?.length || 0})</summary><div className="serverless-disclosure__body serverless-record-list">
         {(selected.storeCreditTransactions || []).map((transaction: any) => {
           const amount = Number(transaction.amount || 0);
@@ -179,6 +175,8 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
         {(selected.orders || []).map((order: any) => <article key={order.id} className="serverless-record p-2"><strong className="text-xs">#{order.orderNumber || order.id} · {order.status}</strong><p className="text-[10px] text-slate-500">{date(order.createdAt)} · {order.paymentStatus} · {formatPHP(Number(order.totalAmount || 0))}</p><p className="mt-1 text-[10px]">{(order.items || []).map((item: any) => `${item.quantity || 1}× ${item.name || "Item"}`).join(", ") || "No item details"}</p></article>)}
         {!selected.orders?.length && <p className="text-xs text-slate-500">No linked orders.</p>}
       </div></details>
+      </div></details>
+      <details className="serverless-disclosure"><summary>Device Evidence &amp; Security Signals</summary><div className="serverless-disclosure__body serverless-record-list">
       <DeviceSecurityDossier key={selected.id} customerId={selected.id} />
       <details className="serverless-disclosure"><summary>Device Captures ({deviceGroups.length} {deviceGroups.length === 1 ? "Device" : "Devices"} · {selected.fingerprints?.length || 0} Captures)</summary><div className="serverless-disclosure__body serverless-record-list">
         {deviceGroups.map(group => <article key={group.key} className="serverless-device-card">
@@ -199,6 +197,7 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
         {!selected.sharedAccounts?.length && <p className="text-xs text-slate-500">No matching device identifiers found in Serverless session history. Fingerprint matches are review signals, not verified identity.</p>}
       </div></details>
       <p className="px-1 text-[10px] text-slate-500">Device fingerprint matches can be spoofed and should only guide staff review.</p>
+      </div></details>
     </div>}
   </main>;
 }

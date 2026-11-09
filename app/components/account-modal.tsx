@@ -32,9 +32,10 @@ interface AccountModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectOrder?: (order: any) => void;
+  staffCustomerId?: string;
 }
 
-export default function AccountModal({ isOpen, onClose, onSelectOrder }: AccountModalProps) {
+export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCustomerId }: AccountModalProps) {
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +68,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
       setLoading(true);
       setError(null);
 
-      if (import.meta.env.VITE_UI_PREVIEW === '1') {
+      if (import.meta.env.VITE_UI_PREVIEW === '1' && !staffCustomerId) {
         setData({
           customer: {
             tgName: 'nexus', tgUsername: 'nexus_member', primeMemberId: 'A25A23A8E95F', tierInfo: { tier: 'Titanium', currentSpending: 27732, progressPercent: 100, cycleEndDate: '2026-11-24', daysRemainingInCycle: 21 },
@@ -92,7 +93,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
         return;
       }
 
-      const resData = await callServerless<any>('getMyAccount');
+      const resData = await callServerless<any>('getMyAccount', staffCustomerId ? { customerId: staffCustomerId } : {});
       setData(resData);
     } catch (err: any) {
       setError(err.message || 'Error loading account details');
@@ -105,10 +106,10 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
     if (isOpen) {
       fetchAccount();
     }
-  }, [isOpen]);
+  }, [isOpen, staffCustomerId]);
 
   useEffect(() => {
-    if (!isOpen || import.meta.env.VITE_UI_PREVIEW === '1') return;
+    if (!isOpen || staffCustomerId || import.meta.env.VITE_UI_PREVIEW === '1') return;
     let active = true;
     let inFlight = false;
     const refreshPhoto = async () => {
@@ -131,7 +132,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
     document.addEventListener('visibilitychange', onVisible);
     webApp?.onEvent?.('activated', onVisible);
     return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); webApp?.offEvent?.('activated', onVisible); };
-  }, [isOpen]);
+  }, [isOpen, staffCustomerId]);
 
   const handleCopyCode = () => {
     if (!data?.customer?.primeMemberId) return;
@@ -245,7 +246,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-gray-900" />
             <h2 className="text-base font-normal uppercase text-gray-900 tracking-wide">
-              Your Account
+              {staffCustomerId ? 'Customer Account' : 'Your Account'}
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -465,7 +466,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                       <div className="prime-account__balance-value">
                         ₱{Number(c?.storeCredits || 0).toLocaleString()}
                       </div>
-                      <button type="button" className="prime-account__balance-action" onClick={() => setTransferOpen(true)}>Transfer</button>
+                      {!staffCustomerId && <button type="button" className="prime-account__balance-action" onClick={() => setTransferOpen(true)}>Transfer</button>}
                     </div>
 
                     {/* Purchasing Points */}
@@ -478,7 +479,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                       <div className="prime-account__balance-value">
                         {c?.purchasingPoints || 0}
                       </div>
-                      <button type="button" disabled={Number(c?.purchasingPoints || 0) <= 0} onClick={() => { setConversionType('purchasing'); setConversionAmount(''); setConversionError(null); setConversionSuccess(null); setConversionOperationId(''); }} className="prime-account__balance-action">Convert</button>
+                      {!staffCustomerId && <button type="button" disabled={Number(c?.purchasingPoints || 0) <= 0} onClick={() => { setConversionType('purchasing'); setConversionAmount(''); setConversionError(null); setConversionSuccess(null); setConversionOperationId(''); }} className="prime-account__balance-action">Convert</button>}
                     </div>
 
                     {/* Referral Points */}
@@ -491,7 +492,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                       <div className="prime-account__balance-value">
                         {c?.referralPoints || 0}
                       </div>
-                      <button type="button" disabled={Number(c?.referralPoints || 0) <= 0} onClick={() => { setConversionType('referral'); setConversionAmount(''); setConversionError(null); setConversionSuccess(null); setConversionOperationId(''); }} className="prime-account__balance-action">Convert</button>
+                      {!staffCustomerId && <button type="button" disabled={Number(c?.referralPoints || 0) <= 0} onClick={() => { setConversionType('referral'); setConversionAmount(''); setConversionError(null); setConversionSuccess(null); setConversionOperationId(''); }} className="prime-account__balance-action">Convert</button>}
                     </div>
                   </div>
 
@@ -547,13 +548,13 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder }: Account
                         {copiedCode ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                         {copiedCode ? 'Copied' : 'Copy'}
                       </button>
-                      <button
+                      {!staffCustomerId && <button
                         onClick={handleShareReferral}
                         className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white transition-colors flex items-center gap-1.5"
                       >
                         <Share2 className="w-4 h-4" />
                         Share
-                      </button>
+                      </button>}
                     </div>
                   </div>
 

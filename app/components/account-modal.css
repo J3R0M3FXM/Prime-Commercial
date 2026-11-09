@@ -137,12 +137,12 @@
   margin-bottom: 7px !important;
 }
 
-#mobile-portrait-viewport .prime-shopfront-shell .prime-account .prime-account__stat-grid {
+#mobile-portrait-viewport :is(.prime-shopfront-shell, .admin-customer-account) .prime-account .prime-account__stat-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   gap: 6px !important;
 }
-#mobile-portrait-viewport .prime-shopfront-shell .prime-account .prime-account__stat {
+#mobile-portrait-viewport :is(.prime-shopfront-shell, .admin-customer-account) .prime-account .prime-account__stat {
   min-height: 61px;
   padding: 7px !important;
   border: 1px solid #d7e2f0;

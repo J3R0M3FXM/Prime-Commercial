@@ -3,6 +3,7 @@ import { desc, eq, or } from 'sdk/db';
 import { customers, orders, pointTransactions } from '../schema.js';
 import { calculateCustomerTier } from '../lib/loyalty.js';
 import { reconcileOrderMilestones } from '../lib/order-lifecycle.js';
+import { requireAdmin } from '../lib/auth.js';
 
 function iso(value) {
   if (value == null) return null;
@@ -12,14 +13,18 @@ function iso(value) {
 
 function num(value) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; }
 
-export default async function (_input, ctx) {
-  const telegramId = ctx?.initData?.user?.id == null ? '' : String(ctx.initData.user.id);
-  if (!/^[0-9]+$/.test(telegramId)) throw new EndpointError('A verified Telegram user is required.', { code: 'AUTH_REQUIRED' });
-
-  let customer = await db.select().from(customers).where(eq(customers.tgUserId, telegramId)).get();
+export default async function (input = {}, ctx) {
+  const actorId = ctx?.initData?.user?.id == null ? '' : String(ctx.initData.user.id);
+  if (!/^[0-9]+$/.test(actorId)) throw new EndpointError('A verified Telegram user is required.', { code: 'AUTH_REQUIRED' });
+  const targetId = typeof input?.customerId === 'string' ? input.customerId.trim() : '';
+  if (targetId) await requireAdmin(ctx);
+  let customer = await db.select().from(customers).where(targetId ? eq(customers.id, targetId) : eq(customers.tgUserId, actorId)).get();
   if (!customer) throw new EndpointError('Your PRIME account could not be found.', { code: 'ACCOUNT_NOT_FOUND' });
-  await reconcileOrderMilestones({ customerId: customer.id, memberId: customer.primeMemberId, limit: 20 });
-  customer = await db.select().from(customers).where(eq(customers.tgUserId, telegramId)).get();
+  if (!targetId) {
+    await reconcileOrderMilestones({ customerId: customer.id, memberId: customer.primeMemberId, limit: 20 });
+    customer = await db.select().from(customers).where(eq(customers.tgUserId, actorId)).get();
+  }
+  const telegramId = customer.tgUserId ? String(customer.tgUserId) : '__no_telegram_account__';
   const ownership = [eq(orders.tgUserId, telegramId), eq(orders.customerId, customer.id)];
   if (customer.primeMemberId) ownership.push(eq(orders.primeMemberId, customer.primeMemberId));
   const [rows, tierOrders, lifetimeActivity] = await Promise.all([
@@ -65,7 +70,7 @@ export default async function (_input, ctx) {
   const referralsPending = referralOrders.reduce((sum, order) =>
     sum + (String(order.referredByUserId || '') === String(customer.id) && String(order.referralPointsStatus || '').startsWith('pending') ? num(order.referralPointsAmount) : 0), 0);
   const customerData = {
-    id: customer.id, tgUserId: telegramId, tgName: customer.tgName || '', tgUsername: customer.tgUsername || '',
+    id: customer.id, tgUserId: customer.tgUserId || '', tgName: customer.tgName || '', tgUsername: customer.tgUsername || '',
     primeMemberId: customer.primeMemberId || '', phone: customer.phoneNumber || '', photoUrl: customer.photoUrl || '', telegramPhotoUrl: customer.telegramPhotoUrl || '', hasCustomPhoto: customer.hasCustomPhoto === true || customer.hasCustomPhoto === 1,
     enrollmentDate: iso(customer.createdAt), firstOrderDate: iso(lifetimeActivity?.firstCompletedAt),
     latestOrderDate: iso(lifetimeActivity?.latestOrderAt), latestVisitDate: lastFingerprint,
