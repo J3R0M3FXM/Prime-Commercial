@@ -4,6 +4,7 @@ import "@fontsource/roboto-condensed/600.css";
 import "@fontsource/roboto-condensed/400.css";
 import "@fontsource/lato/400.css";
 import "./globals.css";
+import "./admin/admin-portrait.css";
 import CartProvider from "./components/cart-context";
 import SystemFooter from "./components/system-footer";
 import Shopfront from "./page";
@@ -91,7 +92,7 @@ function MiniApp() {
   return (
     <div
       id="mobile-portrait-viewport"
-      className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-gray-50 shadow-2xl sm:border-x sm:border-slate-800/80"
+      className={`mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-gray-50 shadow-2xl sm:border-x sm:border-slate-800/80${!offlineMedia && path.startsWith("/admin") ? " admin-viewport" : ""}`}
     >
       {offlineMedia ? screen : <CartProvider>{screen}</CartProvider>}
       <SystemFooter />

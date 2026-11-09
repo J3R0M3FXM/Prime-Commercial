@@ -68,7 +68,7 @@ export default function TelegramServerlessVisitorsPanel({ onBack }: { onBack: ()
   return <main className="serverless-admin-panel" aria-label="Telegram Serverless visitor management">
     <header className="serverless-panel-header">
       <button type="button" onClick={selected ? () => setSelected(null) : onBack} className="serverless-action" aria-label={selected ? "Back to visitors" : "Back to Admin modules"}><ArrowLeft className="h-4 w-4"/></button>
-      <div className="serverless-panel-header__copy"><h1>{selected ? "Visitor dossier" : "Visitors"}</h1><p><ShieldCheck className="mr-1 inline h-3 w-3 text-emerald-700"/>Verified Telegram staff</p></div>
+      <div className="serverless-panel-header__copy"><h1>{selected ? "Visitor Dossier" : "Visitors"}</h1><p><ShieldCheck className="mr-1 inline h-3 w-3 text-emerald-700"/>Verified Telegram staff</p></div>
       {!selected && <div className="flex gap-1"><button type="button" onClick={() => void loadVisitors()} disabled={!authorized || loading} className="serverless-action" aria-label="Refresh visitors"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}/></button></div>}
     </header>
     {error && <div role="alert" className="my-2 border border-red-200 bg-red-50 p-2 text-xs text-red-800">{error}</div>}

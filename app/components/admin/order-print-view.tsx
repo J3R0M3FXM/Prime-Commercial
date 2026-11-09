@@ -422,50 +422,37 @@ export default function OrderPrintView({
         </div>
       </div>
 
-      {/* Itemized Table */}
+      {/* Itemized cards fit the mobile review and printed receipt. */}
       <div className="mb-6 print-break-inside-avoid">
         <h2 className="font-heading font-bold text-xs uppercase tracking-wider text-slate-900 mb-2">
           Order Line Items
         </h2>
-        <table className="w-full border-collapse border border-slate-300 text-xs font-mono">
-          <thead>
-            <tr className="bg-slate-100 border-b border-slate-300 text-slate-700">
-              <th className="py-2 px-3 text-left w-8">#</th>
-              <th className="py-2 px-3 text-left">Item Description</th>
-              <th className="py-2 px-3 text-center w-16">Qty</th>
-              <th className="py-2 px-3 text-right w-24">Unit Price</th>
-              <th className="py-2 px-3 text-right w-28">Line Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
+        <div className="order-print-items">
             {order.items?.map((item: any, idx: number) => {
               const itemPrice = Number(item.price) || 0;
               const itemQty = Number(item.quantity) || 1;
               const lineTotal = item.isFree ? 0 : itemPrice * itemQty;
 
               return (
-                <tr key={idx} className="hover:bg-slate-50">
-                  <td className="py-2 px-3 text-slate-500">{idx + 1}</td>
-                  <td className="py-2 px-3 font-bold text-slate-900">
+                <article key={idx} className="order-print-item print-break-inside-avoid">
+                  <div className="order-print-item__name">
+                    <span className="text-slate-500">{idx + 1}. </span>
                     {item.name || item.title || `Item #${idx + 1}`}
                     {item.isFree && (
                       <span className="ml-2 inline-block px-1.5 py-0.2 text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 rounded">
                         FREE PROMO
                       </span>
                     )}
-                  </td>
-                  <td className="py-2 px-3 text-center font-bold text-slate-900">{itemQty}</td>
-                  <td className="py-2 px-3 text-right text-slate-700">
-                    {item.isFree ? "₱0.00" : formatPHP(itemPrice)}
-                  </td>
-                  <td className="py-2 px-3 text-right font-bold text-slate-900">
-                    {item.isFree ? "FREE" : formatPHP(lineTotal)}
-                  </td>
-                </tr>
+                  </div>
+                  <dl className="order-print-item__facts">
+                    <div><dt>Quantity</dt><dd>{itemQty}</dd></div>
+                    <div><dt>Unit Price</dt><dd>{item.isFree ? "₱0.00" : formatPHP(itemPrice)}</dd></div>
+                    <div><dt>Line Total</dt><dd>{item.isFree ? "FREE" : formatPHP(lineTotal)}</dd></div>
+                  </dl>
+                </article>
               );
             })}
-          </tbody>
-        </table>
+        </div>
       </div>
 
       {/* Financials & Sign-off Footer */}

@@ -1,0 +1,70 @@
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { JSDOM } from 'jsdom';
+import { build } from 'rolldown';
+
+const dom = new JSDOM('<!doctype html><html><head></head><body><div id="mobile-portrait-viewport" class="admin-viewport"><div class="prime-admin-app"><header class="prime-admin-global-header">Header and queue</header><div id="root"></div></div></div></body></html>', { url:'https://local.example/admin' });
+for (const name of ['window','document','navigator','HTMLElement','HTMLInputElement','Event','MouseEvent']) Object.defineProperty(globalThis,name,{value:dom.window[name],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+const calls=[];
+const charge={id:'charge-1',name:'Existing Customer Charge',type:'fixed',rate:37,isActive:true,schedules:{isDefault:false,isTemporal:false,isRecurring:true,isOvernight:false,date:'',time:'09:30',days:[1,3]}};
+globalThis.__adminPortrait = async (name,input) => { calls.push({name,input}); if(input.action==='list')return name==='manageProducts'?[]:[charge]; return {success:true}; };
+const require=createRequire(import.meta.url);
+async function bundle(entry) {
+  const output=await build({input:resolve(entry),platform:'node',write:false,tsconfig:false,transform:{jsx:{runtime:'automatic'}},resolve:{alias:{'@':process.cwd()}},onLog(level,log,handler){if(log.code!=='MODULE_LEVEL_DIRECTIVE')handler(level,log);},plugins:[{name:'admin-portrait-fixtures',resolveId(id){if(id==='react'||id.startsWith('react/')||id==='lucide-react')return {id:pathToFileURL(require.resolve(id)).href,external:true};if(id.includes('telegram-serverless-client'))return '\0bridge';if(id.endsWith('.css'))return '\0css';},load(id){if(id==='\0css')return '';if(id==='\0bridge')return 'export const callServerless=(name,input)=>globalThis.__adminPortrait(name,input);export const getTelegramServerlessSession=async()=>({authenticated:true,isAdmin:true});export const uploadProductImage=async()=>"tgmedia:fixture123";export const resolveTelegramMedia=async value=>value;';}}],output:{format:'esm'}});
+  return import('data:text/javascript;base64,'+Buffer.from(output.output[0].code).toString('base64'));
+}
+const {createElement,act}=await import('react');
+const {createRoot}=await import('react-dom/client');
+const rules=(await bundle('app/components/admin/telegram-serverless-rules-panel.tsx')).default;
+const print=(await bundle('app/components/admin/order-print-view.tsx')).default;
+const catalog=(await bundle('app/components/admin/telegram-serverless-catalog-panel.tsx')).default;
+const root=createRoot(document.getElementById('root'));
+await act(async()=>root.render(createElement(rules,{mode:'charges',onBack(){}})));
+const edit=document.querySelector('[aria-label="Edit configuration"]');assert.ok(edit);
+await act(async()=>edit.click());
+const form=document.querySelector('.serverless-dialog form');assert.ok(form);
+const label=fragment=>[...form.querySelectorAll('label')].find(item=>item.textContent.includes(fragment));
+assert.equal(form.querySelector('input[type=date]'),null,'Non-temporal schedules must not show a date input');
+assert.equal(label('Mon').querySelector('input').checked,true);
+assert.equal(label('Wed').querySelector('input').checked,true);
+assert.equal(form.querySelector('input[type=time]').value,'09:30');
+const always=label('Always Add to Bill').querySelector('input');
+await act(async()=>always.click());
+assert.equal(form.querySelector('input[type=time]'),null,'Always-on hides schedule options');
+await act(async()=>always.click());
+assert.equal(form.querySelector('input[type=time]').value,'09:30','Collapsing settings preserves the draft');
+assert.equal(label('Mon').querySelector('input').checked,true);
+assert.equal(calls.filter(c=>c.input.action!=='list').length,0,'Opening and collapsing controls must not save');
+await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+const save=calls.find(c=>c.input.action==='update');assert.ok(save);
+assert.equal(save.input.name,charge.name);assert.equal(save.input.rate,37);
+const schedule=JSON.parse(save.input.description);assert.deepEqual(schedule.days,[1,3]);assert.equal(schedule.time,'09:30');assert.equal(schedule.isRecurring,true);assert.equal(schedule.isDefault,false);
+
+await act(async()=>root.render(createElement(catalog,{inventoryMode:false,onBack(){}})));
+const addProduct=[...document.querySelectorAll('header button')].find(button=>button.textContent.trim()==='Add');assert.ok(addProduct);
+await act(async()=>addProduct.click());
+const variantHeading=[...document.querySelectorAll('strong')].find(element=>element.textContent.includes('Variants'));
+assert.ok(variantHeading);await act(async()=>variantHeading.parentElement.querySelector('button').click());
+const tagSelect=[...document.querySelectorAll('select')].find(select=>[...select.options].some(option=>option.value==='NONE'));
+assert.ok(tagSelect);assert.equal(tagSelect.value,'NONE');assert.equal(tagSelect.querySelector('option[value="NONE"]').textContent,'None');assert.equal(tagSelect.querySelector('option[value="BEST SELLER"]').textContent,'Best Seller');
+await act(async()=>{tagSelect.value='BEST SELLER';tagSelect.dispatchEvent(new Event('change',{bubbles:true}));});
+assert.equal(tagSelect.value,'BEST SELLER','Presentation changes must preserve the persisted tag value');
+
+await act(async()=>root.render(createElement(print,{order:{orderNumber:'P-1',items:[{name:'Original Case',quantity:2,price:25},{name:'Gift',quantity:1,price:99,isFree:true}]},deliveryAddressText:'',gpsStreetAddressText:'',format:'standard',isModalPreview:true})));
+assert.equal(document.querySelectorAll('table').length,0);
+const items=[...document.querySelectorAll('.order-print-item')];assert.equal(items.length,2);
+assert.match(items[0].textContent,/Original Case/);assert.match(items[0].textContent,/Quantity/);assert.match(items[0].textContent,/Unit Price/);assert.match(items[0].textContent,/Line Total/);assert.match(items[1].textContent,/FREE/);
+
+const css=readFileSync('app/admin/admin-portrait.css','utf8');
+assert.match(css,/prime-admin-global-header\s*\{[^}]*position:\s*relative/s);
+assert.match(css,/secretary-configurator\)\s*\{[^}]*overflow-y:\s*auto/s);
+assert.match(css,/serverless-fields\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/s);
+assert.match(css,/max-width:\s*430px/);
+assert.match(readFileSync('app/telegram-entry.tsx','utf8'),/path\.startsWith\("\/admin"\)\s*\?\s*" admin-viewport"/);
+for(const file of readdirSync('app/components/admin').filter(f=>f.endsWith('.tsx')))assert.doesNotMatch(readFileSync('app/components/admin/'+file,'utf8'),/<table\b/i,`${file} contains an Admin table`);
+await act(async()=>root.unmount());
+console.log('PASS: Admin route and portrait layout contracts, table-free order cards, and conditional charge editor preserves and saves existing values.');

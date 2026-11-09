@@ -388,7 +388,7 @@ export default function TelegramServerlessMediaPanel({
           <ArrowLeft size={16} />
         </button>
         <div className="serverless-panel-header__copy">
-          <h1>{formOpen ? (editing ? "Edit media" : "Upload media") : "Media Library"}</h1>
+          <h1>{formOpen ? (editing ? "Edit Media" : "Upload Media") : "Media Library"}</h1>
           <p>Manager · R2 and Telegram storage</p>
         </div>
         <button
@@ -433,13 +433,13 @@ export default function TelegramServerlessMediaPanel({
           </p>
           <nav className="media-manager-tabs" aria-label="Media sections">
             <button type="button" aria-current={!formOpen ? "page" : undefined} disabled={busy} onClick={reset}>Library · {videos.length}</button>
-            <button type="button" aria-current={formOpen ? "page" : undefined} disabled={busy} onClick={() => setFormOpen(true)}>{editing ? "Edit media" : "Uploader"}</button>
+            <button type="button" aria-current={formOpen ? "page" : undefined} disabled={busy} onClick={() => setFormOpen(true)}>{editing ? "Edit Media" : "Uploader"}</button>
           </nav>
           <details className="media-storage-settings" hidden={formOpen && storage !== "telegram"}>
-            <summary>Telegram storage channel</summary>
+            <summary>Telegram Storage Channel</summary>
             <form onSubmit={saveTarget}>
               <label className="serverless-field">
-                Private channel ID or username
+                Private Channel ID or Username
                 <input
                   value={storageChat}
                   onChange={(event) => setStorageChat(event.target.value)}
@@ -450,7 +450,7 @@ export default function TelegramServerlessMediaPanel({
                 className="serverless-action"
                 disabled={busy || storageChat.trim() === savedChat}
               >
-                Save channel
+                Save Channel
               </button>
             </form>
             <p>The bot must be an administrator in this channel.</p>
@@ -458,7 +458,7 @@ export default function TelegramServerlessMediaPanel({
           {formOpen && (
             <form className="media-upload-form" onSubmit={save}>
               <div className="media-form-title">
-                <h2>{editing ? "Edit media" : "Upload media"}</h2>
+                <h2>{editing ? "Edit Media" : "Upload Media"}</h2>
                 <button
                   type="button"
                   disabled={busy}
@@ -519,7 +519,7 @@ export default function TelegramServerlessMediaPanel({
                   value=""
                   onChange={(event) => addCategory(event.target.value)}
                 >
-                  <option value="">Choose an existing category</option>
+                  <option value="">Choose an Existing Category</option>
                   {categories.map((category) => (
                     <option key={category}>{category}</option>
                   ))}
@@ -555,15 +555,15 @@ export default function TelegramServerlessMediaPanel({
                     void pickFile();
                   }}
                 >
-                  <option value="r2">Cloudflare R2 · up to 150 MiB</option>
-                  <option value="telegram">Telegram · up to 20 MiB</option>
+                  <option value="r2">Cloudflare R2 · Up to 150 MiB</option>
+                  <option value="telegram">Telegram · Up to 20 MiB</option>
                 </select>
               </label>
               {
                 <label className="serverless-field">
                   {editing
                     ? "Choose the original MP4 to replace its thumbnail"
-                    : "MP4 video"}
+                    : "MP4 Video"}
                   <input
                     type="file"
                     required={!editing}
@@ -587,12 +587,12 @@ export default function TelegramServerlessMediaPanel({
               {thumbnailError && (
                 <div className="media-thumbnail-warning" role="status">
                   <p>{thumbnailError}</p>
-                  <button type="button" className="serverless-action" disabled={busy || generating} onClick={() => void pickFile(file || undefined)}>Retry thumbnails</button>
+                  <button type="button" className="serverless-action" disabled={busy || generating} onClick={() => void pickFile(file || undefined)}>Retry Thumbnails</button>
                   <small>Cover-image uploads are saved as drafts until playback is verified. This does not convert an unsupported codec.</small>
                 </div>
               )}
               <label className="serverless-field">
-                Cover image (optional fallback)
+                Cover Image (Optional Fallback)
                 <input type="file" aria-label="Cover image" accept="image/jpeg,image/png,image/webp" disabled={busy || generating} onChange={(event) => {
                   const selected = event.target.files?.[0];
                   if (!selected) { setCover(null); return; }
@@ -609,7 +609,7 @@ export default function TelegramServerlessMediaPanel({
               </label>
               {choices.length === 3 && (
                 <fieldset disabled={busy}>
-                  <legend>Select a thumbnail</legend>
+                  <legend>Select a Thumbnail</legend>
                   <div className="media-thumbnail-choices">
                     {choices.map((item, index) => (
                       <button
@@ -647,7 +647,7 @@ export default function TelegramServerlessMediaPanel({
                     }))
                   }
                 />
-                Published in customer gallery
+                Published in Customer Gallery
               </label>
               <button
                 className="serverless-action serverless-action--primary"
@@ -662,7 +662,7 @@ export default function TelegramServerlessMediaPanel({
                 ) : (
                   <Upload size={16} />
                 )}{" "}
-                {busy ? "Saving…" : editing ? "Save changes" : "Upload media"}
+                {busy ? "Saving…" : editing ? "Save Changes" : "Upload Media"}
               </button>
             </form>
           )}
@@ -703,7 +703,7 @@ export default function TelegramServerlessMediaPanel({
                     >
                       {video.isPublished === false
                         ? "Publish"
-                        : "Hide / unpublish"}
+                        : "Hide / Unpublish"}
                     </button>
                     <button
                       className="serverless-action serverless-action--danger"

@@ -568,7 +568,7 @@ export default function TelegramServerlessOrdersPanel({
         </header>
 
         {authorized && !selectedOrder && <section aria-label="Orders needing staff attention" className="border-b border-slate-200 bg-slate-50 p-2">
-          <h2 className="mb-1.5 font-heading text-xs font-bold uppercase tracking-wider text-slate-700">Work queue</h2>
+          <h2 className="mb-1.5 font-heading text-xs font-bold uppercase tracking-wider text-slate-700">Work Queue</h2>
           <div className="grid grid-cols-2 gap-1.5">
             {[
               { key: "review", label: "Check payment", count: queueCounts.review, description: "Receipt or no upfront payment" },
@@ -599,7 +599,7 @@ export default function TelegramServerlessOrdersPanel({
           <div className="serverless-record-list serverless-order-detail">
             <section className="prime-order-summary" aria-label="Order summary">
               <div className="prime-order-summary__top">
-                <div><span>Order total</span><strong>{formatPHP(selectedOrder.totalAmount ?? selectedOrder.subtotal)}</strong></div>
+                <div><span>Order Total</span><strong>{formatPHP(selectedOrder.totalAmount ?? selectedOrder.subtotal)}</strong></div>
                 <div className="prime-order-summary__badges"><span data-tone={status}>{selectedOrder.status}</span><span data-tone={payment}>{selectedOrder.paymentStatus}</span></div>
               </div>
               <div className="prime-order-summary__facts">
@@ -620,13 +620,13 @@ export default function TelegramServerlessOrdersPanel({
             </ol></div>}
             {["cancelled", "expired"].includes(status) && <div className="prime-order-closed-state">This order is {status}. The normal fulfillment sequence is closed.</div>}
             {(canVerifyPayment || canApproveZeroDue || canReady || canDispatch || canComplete) && <details open className="serverless-disclosure prime-order-next-action">
-              <summary>{canVerifyPayment ? "NEXT ACTION · verify payment" : canApproveZeroDue ? "NEXT ACTION · confirm payment due" : canReady ? "NEXT ACTION · mark ready" : canDispatch ? "NEXT ACTION · dispatch" : canComplete ? "NEXT ACTION · complete delivery" : "NEXT ACTION"}</summary>
+              <summary>{canVerifyPayment ? "NEXT Action · Verify Payment" : canApproveZeroDue ? "NEXT Action · Confirm Payment Due" : canReady ? "NEXT Action · Mark Ready" : canDispatch ? "NEXT Action · Dispatch" : canComplete ? "NEXT Action · Complete Delivery" : "NEXT Action"}</summary>
               <div className="serverless-disclosure__body"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {canVerifyPayment && <div className="space-y-2"><label className="block text-xs text-emerald-900">Exact amount paid to the store<input type="number" min={selectedOrder.payableNow} step="0.01" placeholder={formatPHP(selectedOrder.payableNow)} value={verifiedPaidAmount} onChange={(event) => setVerifiedPaidAmount(event.target.value)} className="mt-1 w-full border px-3 py-2 text-sm" /></label><p className="text-xs text-slate-600">Verify this exact amount in the provider account. Exclude any delivery fee payable to the courier.</p><button type="button" disabled={busyAction !== "" || !verifiedPaidAmount || Math.round(Number(verifiedPaidAmount) * 100) !== Math.round(selectedOrder.payableNow * 100)} onClick={() => void runAction(selectedOrder, "markPaid", { confirmedAmount: verifiedPaidAmount })} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markPaid") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Confirm verified payment</button></div>}
-                {canApproveZeroDue && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "approveZeroDue")} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":approveZeroDue") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Approve zero upfront due · mark Paid</button>}
+                {canVerifyPayment && <div className="space-y-2"><label className="block text-xs text-emerald-900">Exact Amount Paid to the Store<input type="number" min={selectedOrder.payableNow} step="0.01" placeholder={formatPHP(selectedOrder.payableNow)} value={verifiedPaidAmount} onChange={(event) => setVerifiedPaidAmount(event.target.value)} className="mt-1 w-full border px-3 py-2 text-sm" /></label><p className="text-xs text-slate-600">Verify this exact amount in the provider account. Exclude any delivery fee payable to the courier.</p><button type="button" disabled={busyAction !== "" || !verifiedPaidAmount || Math.round(Number(verifiedPaidAmount) * 100) !== Math.round(selectedOrder.payableNow * 100)} onClick={() => void runAction(selectedOrder, "markPaid", { confirmedAmount: verifiedPaidAmount })} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markPaid") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Confirm Verified Payment</button></div>}
+                {canApproveZeroDue && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "approveZeroDue")} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":approveZeroDue") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Approve Zero Upfront Due · Mark Paid</button>}
                 {canReady && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "markReady")} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":markReady") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark Ready{selectedOrder.readyCreditDue > 0 ? ` · issue ${formatPHP(selectedOrder.readyCreditDue)} Store Credits` : ""}</button>}
-                {canDispatch && <div className="serverless-order-dispatch"><label htmlFor="order-tracking-url">Live tracking URL <span>Required</span></label><input id="order-tracking-url" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" placeholder="https://courier.example/track/..." value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} /><small>This URL will appear as “Track Location” in the customer’s order details.</small><button type="button" disabled={busyAction !== "" || !/^https:\/\//i.test(trackingUrl.trim())} onClick={() => void runAction(selectedOrder, "dispatch", { trackingUrl: trackingUrl.trim() })} className="px-3 py-2 bg-sky-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":dispatch") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Truck className="inline w-3 h-3 mr-1" />} Save tracking &amp; mark dispatched</button></div>}
-                {canComplete && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "complete")} className="px-3 py-2 bg-indigo-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":complete") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark delivered / completed</button>}
+                {canDispatch && <div className="serverless-order-dispatch"><label htmlFor="order-tracking-url">Live Tracking URL <span>Required</span></label><input id="order-tracking-url" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" placeholder="https://courier.example/track/..." value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} /><small>This URL will appear as “Track Location” in the customer’s order details.</small><button type="button" disabled={busyAction !== "" || !/^https:\/\//i.test(trackingUrl.trim())} onClick={() => void runAction(selectedOrder, "dispatch", { trackingUrl: trackingUrl.trim() })} className="px-3 py-2 bg-sky-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":dispatch") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Truck className="inline w-3 h-3 mr-1" />} Save tracking &amp; mark dispatched</button></div>}
+                {canComplete && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "complete")} className="px-3 py-2 bg-indigo-700 text-white text-xs font-bold uppercase disabled:opacity-50">{busyAction.endsWith(":complete") ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> : <Check className="inline w-3 h-3 mr-1" />} Mark Delivered / Completed</button>}
               </div>
               {canVerifyPayment && <p className="mt-2 text-xs text-amber-700">Payment approval is recorded only when the provider-confirmed amount matches the payable-to-store total.</p>}
               {canApproveZeroDue && <p className="mt-2 text-xs text-amber-700">Confirm no upfront amount is due. The order will be marked Paid for processing; any pay-on-delivery amount remains due to the courier.</p>}
@@ -638,7 +638,7 @@ export default function TelegramServerlessOrdersPanel({
             </nav>
             <section hidden={orderDetailTab !== "evidence"}>
             {(selectedOrder.reviewStatus === "Flagged for Forensics Review" || (Array.isArray(selectedOrder.ocrAnalysis?.forensicsFlags) && selectedOrder.ocrAnalysis.forensicsFlags.length > 0)) && <section role="alert" className="border border-rose-300 bg-rose-50 p-3 text-xs text-rose-950">
-              <b className="block uppercase tracking-wide">Extra receipt checks needed</b>
+              <b className="block uppercase tracking-wide">Extra Receipt Checks Needed</b>
               <span>A receipt image may have been reused or changed. This is a review signal, not proof of fraud. Check the payment in the provider account before approving it.</span>
             </section>}
             </section>
@@ -646,8 +646,8 @@ export default function TelegramServerlessOrdersPanel({
             {(["pending", "processing"].includes(status)) && <details className="serverless-disclosure">
               <summary>Change order items, discount, or delivery fee</summary>
               <div className="serverless-disclosure__body space-y-2">
-                <strong className="text-xs uppercase">Staff changes · {selectedOrder.status} / {selectedOrder.paymentStatus}</strong>
-                {!editing ? <button type="button" onClick={() => beginEdit(selectedOrder)} className="px-3 py-2 bg-slate-900 text-white text-xs font-bold uppercase">Edit items and charges</button> : <div className="space-y-3">
+                <strong className="text-xs uppercase">Staff Changes · {selectedOrder.status} / {selectedOrder.paymentStatus}</strong>
+                {!editing ? <button type="button" onClick={() => beginEdit(selectedOrder)} className="px-3 py-2 bg-slate-900 text-white text-xs font-bold uppercase">Edit Items and Charges</button> : <div className="space-y-3">
                   <p className="text-[11px] text-slate-600">Tap the edit button beside an item to change its unit price, reserved quantity, or offer. Item edits stay in this draft until you save the order.</p>
                   <div className="divide-y border border-slate-200 bg-white">
                     {editItems.map((item, index) => {
@@ -663,11 +663,11 @@ export default function TelegramServerlessOrdersPanel({
                     })}
                   </div>
                   {editItems.length === 0 && <p className="border border-red-200 bg-red-50 p-2 text-xs text-red-800">An order needs at least one item. Cancel or keep an item before saving.</p>}
-                  <div className="border-l-4 border-sky-600 bg-sky-50 p-3"><b className="text-xs uppercase">Revised total preview</b><dl className="mt-2 space-y-1 text-xs"><div className="flex justify-between"><dt>Items after item offers</dt><dd>{formatPHP(editItemSubtotal)}</dd></div>{editOrderDiscount > 0 && <div className="flex justify-between"><dt>Order discount</dt><dd>−{formatPHP(editOrderDiscount)}</dd></div>}<div className="flex justify-between"><dt>Charges and delivery</dt><dd>{formatPHP(editChargesTotal + (Number(editDeliveryFee) || 0))}</dd></div><div className="flex justify-between border-t pt-1 font-bold"><dt>Revised order total</dt><dd>{formatPHP(editGrandTotal)}</dd></div><div className="flex justify-between font-bold"><dt>Due before delivery</dt><dd>{formatPHP(editPayableNow)}</dd></div></dl></div>
-                  <div className="grid grid-cols-2 gap-2"><label className="text-[11px]">Order discount<select className="w-full border p-2" value={editDiscountMode} onChange={(e) => setEditDiscountMode(e.target.value)}><option value="none">No discount</option><option value="fixed">Fixed PHP</option><option value="percent">Percent</option></select></label>{editDiscountMode !== "none" && <label className="text-[11px]">Discount value<input className="w-full border p-2" type="number" min="0" step="0.01" value={editDiscountValue} onChange={(e) => setEditDiscountValue(e.target.value)} /></label>}<label className="text-[11px]">Delivery fee<input className="w-full border p-2" type="number" min="0" step="0.01" value={editDeliveryFee} onChange={(e) => setEditDeliveryFee(e.target.value)} /></label></div>
-                  <div className="space-y-2"><b className="text-xs">Current and additional charges</b><p className="text-[11px] text-slate-600">The saved charge lines are prefilled below. Edit their name/amount, remove a line, or add tax and other charges.</p>{editCharges.map((charge, index) => <div key={index} className="grid grid-cols-[1fr_100px_90px_32px] gap-1"><input aria-label="Charge name" className="border p-2 text-xs" value={charge.name} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, name: e.target.value } : row))} /><select aria-label="Charge type" className="border p-1 text-xs" value={charge.type} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, type: e.target.value } : row))}><option value="fixed">Fixed PHP</option><option value="percentage">Percent</option></select><input aria-label="Charge amount" className="border p-2 text-xs" type="number" min="0" step="0.01" value={charge.value} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, value: e.target.value } : row))} /><button type="button" aria-label="Remove charge" onClick={() => setEditCharges((rows) => rows.filter((_, i) => i !== index))}>×</button></div>)}<button type="button" className="border px-2 py-1 text-xs" onClick={() => setEditCharges((rows) => [...rows, { name: "", type: "fixed", value: "0" }])}>+ Add a charge</button></div>
+                  <div className="border-l-4 border-sky-600 bg-sky-50 p-3"><b className="text-xs uppercase">Revised Total Preview</b><dl className="mt-2 space-y-1 text-xs"><div className="flex justify-between"><dt>Items After Item Offers</dt><dd>{formatPHP(editItemSubtotal)}</dd></div>{editOrderDiscount > 0 && <div className="flex justify-between"><dt>Order Discount</dt><dd>−{formatPHP(editOrderDiscount)}</dd></div>}<div className="flex justify-between"><dt>Charges and Delivery</dt><dd>{formatPHP(editChargesTotal + (Number(editDeliveryFee) || 0))}</dd></div><div className="flex justify-between border-t pt-1 font-bold"><dt>Revised Order Total</dt><dd>{formatPHP(editGrandTotal)}</dd></div><div className="flex justify-between font-bold"><dt>Due Before Delivery</dt><dd>{formatPHP(editPayableNow)}</dd></div></dl></div>
+                  <div className="grid grid-cols-2 gap-2"><label className="text-[11px]">Order Discount<select className="w-full border p-2" value={editDiscountMode} onChange={(e) => setEditDiscountMode(e.target.value)}><option value="none">No Discount</option><option value="fixed">Fixed PHP</option><option value="percent">Percent</option></select></label>{editDiscountMode !== "none" && <label className="text-[11px]">Discount Value<input className="w-full border p-2" type="number" min="0" step="0.01" value={editDiscountValue} onChange={(e) => setEditDiscountValue(e.target.value)} /></label>}<label className="text-[11px]">Delivery Fee<input className="w-full border p-2" type="number" min="0" step="0.01" value={editDeliveryFee} onChange={(e) => setEditDeliveryFee(e.target.value)} /></label></div>
+                  <div className="space-y-2"><b className="text-xs">Current and Additional Charges</b><p className="text-[11px] text-slate-600">The saved charge lines are prefilled below. Edit their name/amount, remove a line, or add tax and other charges.</p>{editCharges.map((charge, index) => <div key={index} className="admin-charge-editor"><input aria-label="Charge name" className="border p-2 text-xs" value={charge.name} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, name: e.target.value } : row))} /><select aria-label="Charge type" className="border p-1 text-xs" value={charge.type} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, type: e.target.value } : row))}><option value="fixed">Fixed PHP</option><option value="percentage">Percent</option></select><input aria-label="Charge amount" className="border p-2 text-xs" type="number" min="0" step="0.01" value={charge.value} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, value: e.target.value } : row))} /><button type="button" aria-label="Remove charge" onClick={() => setEditCharges((rows) => rows.filter((_, i) => i !== index))}>×</button></div>)}<button type="button" className="border px-2 py-1 text-xs" onClick={() => setEditCharges((rows) => [...rows, { name: "", type: "fixed", value: "0" }])}>+ Add a charge</button></div>
                   <p className="text-[11px] text-amber-900">Pending: customer must pay the revised due and staff approves it. Processing: verify any top-up before Ready; refund a lower total as Store Credits at Ready.</p>
-                  <div className="flex gap-2"><button type="button" disabled={busyAction !== "" || editItems.length === 0} onClick={() => void runAction(selectedOrder, "edit", { expectedVersion: selectedOrder.staffEditVersion, items: editItems, discountMode: editDiscountMode, discountValue: editDiscountValue, deliveryFee: editDeliveryFee, charges: editCharges }).then((saved) => { if (saved) setEditing(false); })} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">Save order changes</button><button type="button" onClick={() => setEditing(false)} className="px-3 py-2 border text-xs font-bold uppercase">Cancel</button></div>
+                  <div className="flex gap-2"><button type="button" disabled={busyAction !== "" || editItems.length === 0} onClick={() => void runAction(selectedOrder, "edit", { expectedVersion: selectedOrder.staffEditVersion, items: editItems, discountMode: editDiscountMode, discountValue: editDiscountValue, deliveryFee: editDeliveryFee, charges: editCharges }).then((saved) => { if (saved) setEditing(false); })} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">Save Order Changes</button><button type="button" onClick={() => setEditing(false)} className="px-3 py-2 border text-xs font-bold uppercase">Cancel</button></div>
                 </div>}
               </div>
             </details>}
@@ -676,7 +676,7 @@ export default function TelegramServerlessOrdersPanel({
 
             <section hidden={orderDetailTab !== "evidence"}>
             <details className="serverless-disclosure">
-              <summary>Optional technical details · device and location</summary>
+              <summary>Optional Technical Details · Device and Location</summary>
               <div className="serverless-disclosure__body space-y-3 text-xs">
                 <p className="text-slate-600">Use these details only when an order needs extra review. Device and location signals can be incomplete or inaccurate; they do not prove fraud.</p>
                 {(() => {
@@ -689,11 +689,11 @@ export default function TelegramServerlessOrdersPanel({
                   const flags = Object.entries(privacy).filter(([, active]) => active === true).map(([name]) => name.replace(/^is/, "").replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`).trim());
                   const coords = (lat: unknown, lon: unknown) => Number.isFinite(Number(lat)) && Number.isFinite(Number(lon)) ? `${Number(lat).toFixed(6)}, ${Number(lon).toFixed(6)}` : "Not captured";
                   return <>
-                    <div><b className="block uppercase text-slate-700">Device fingerprint</b><div className="mt-1 grid grid-cols-2 gap-2"><div><span>Fingerprint ID</span><strong className="block break-all">{fp.deviceFingerprintId || "Not captured"}</strong></div><div><span>Device / hardware ID</span><strong className="block break-all">{[fp.deviceId, fp.hardwareId].filter(Boolean).join(" · ") || "Not captured"}</strong></div><div><span>Platform / browser</span><strong className="block break-words">{[fp.platform, fp.browser || fp.userAgent].filter(Boolean).join(" · ") || "Not captured"}</strong></div><div><span>Screen / timezone</span><strong className="block break-words">{[fp.screenResolution, fp.timezone].filter(Boolean).join(" · ") || "Not captured"}</strong></div></div></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">IP and approximate network location</b><p className="mt-1 break-all"><b>Browser-observed IP:</b> {ip.ip || fp.clientObservedIp || "Not captured"}</p><p className="mt-0.5 text-[10px] text-amber-800">Client-reported IP; network location is approximate and not independently verified.</p><p className="mt-1 break-words"><b>Provider / precision:</b> {[ip.provider, ip.precision].filter(Boolean).join(" · ") || ip.status || "Not available"}</p><p className="break-words"><b>Approximate IP area:</b> {[ip.city, ip.subdivision, ip.country, ip.postalCode].filter(Boolean).join(", ") || "Not available"}</p><p className="break-words"><b>Network:</b> {[ip.isp, ip.asn, ip.ispDomain].filter(Boolean).join(" · ") || "Not available"}</p><p><b>IP coordinates:</b> {coords(ip.latitude, ip.longitude)} · approximate</p><p><b>Privacy flags:</b> {flags.length ? flags.join(", ") : ip.status === "complete" ? "No flags reported" : ip.status || "Not available"}</p></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">App-open device location · client-reported</b><p className="mt-1"><b>Coordinates:</b> {coords(observation.lat, observation.lon)}</p><p><b>Accuracy:</b> {Number.isFinite(Number(observation.accuracy)) ? `±${Math.round(Number(observation.accuracy))} m` : "Not captured"} · <b>Captured:</b> {observation.capturedAt ? displayDate(observation.capturedAt) : "Not recorded"}</p><p className="break-words"><b>Geoapify reverse-geocoded result:</b> {observation.reverseGeocodedAddress || "Not available"}</p><p><b>Geoapify result level:</b> {observationGeo.resultType || "Not reported"} · <b>House-level:</b> {observationGeo.houseLevelResult === true ? "Building + house number found" : "Not confirmed"}</p><p><b>Building confidence:</b> {Number.isFinite(Number(observationGeo.buildingConfidence)) ? `${Math.round(Number(observationGeo.buildingConfidence) * 100)}%` : "Not reported"}</p><p className="text-[10px] text-amber-800">The app requests permission at launch and attaches a fresh reading to an order if available. Location and address are client-reported evidence; neither proves who placed the order or guarantees house-level accuracy.</p></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Checkout-selected device GPS</b><p className="mt-1"><b>Coordinates:</b> {coords(gps.lat, gps.lon)}</p><p><b>Accuracy:</b> {Number.isFinite(Number(gps.accuracy)) ? `±${Math.round(Number(gps.accuracy))} m` : "Not captured"} · <b>Captured:</b> {gps.capturedAt ? displayDate(gps.capturedAt) : "Not recorded"}</p><p className="break-words"><b>Geoapify reverse-geocoded result:</b> {gps.reverseGeocodedAddress || "Not available"}</p></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Delivery pin address</b><p className="mt-1 break-words">{selectedOrder.deliveryAddress?.geocodedAddress || selectedOrder.deliveryAddress?.formatted || "Not available"}</p><p className="break-words text-slate-500">{selectedOrder.deliveryAddress?.unitDetails || "No unit or landmark details"}</p></div>
+                    <div><b className="block uppercase text-slate-700">Device Fingerprint</b><div className="mt-1 grid grid-cols-2 gap-2"><div><span>Fingerprint ID</span><strong className="block break-all">{fp.deviceFingerprintId || "Not captured"}</strong></div><div><span>Device / Hardware ID</span><strong className="block break-all">{[fp.deviceId, fp.hardwareId].filter(Boolean).join(" · ") || "Not captured"}</strong></div><div><span>Platform / Browser</span><strong className="block break-words">{[fp.platform, fp.browser || fp.userAgent].filter(Boolean).join(" · ") || "Not captured"}</strong></div><div><span>Screen / Timezone</span><strong className="block break-words">{[fp.screenResolution, fp.timezone].filter(Boolean).join(" · ") || "Not captured"}</strong></div></div></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">IP and Approximate Network Location</b><p className="mt-1 break-all"><b>Browser-Observed IP:</b> {ip.ip || fp.clientObservedIp || "Not captured"}</p><p className="mt-0.5 text-[10px] text-amber-800">Client-reported IP; network location is approximate and not independently verified.</p><p className="mt-1 break-words"><b>Provider / Precision:</b> {[ip.provider, ip.precision].filter(Boolean).join(" · ") || ip.status || "Not available"}</p><p className="break-words"><b>Approximate IP Area:</b> {[ip.city, ip.subdivision, ip.country, ip.postalCode].filter(Boolean).join(", ") || "Not available"}</p><p className="break-words"><b>Network:</b> {[ip.isp, ip.asn, ip.ispDomain].filter(Boolean).join(" · ") || "Not available"}</p><p><b>IP Coordinates:</b> {coords(ip.latitude, ip.longitude)} · approximate</p><p><b>Privacy Flags:</b> {flags.length ? flags.join(", ") : ip.status === "complete" ? "No flags reported" : ip.status || "Not available"}</p></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">App-Open Device Location · Client-Reported</b><p className="mt-1"><b>Coordinates:</b> {coords(observation.lat, observation.lon)}</p><p><b>Accuracy:</b> {Number.isFinite(Number(observation.accuracy)) ? `±${Math.round(Number(observation.accuracy))} m` : "Not captured"} · <b>Captured:</b> {observation.capturedAt ? displayDate(observation.capturedAt) : "Not recorded"}</p><p className="break-words"><b>Geoapify Reverse-Geocoded Result:</b> {observation.reverseGeocodedAddress || "Not available"}</p><p><b>Geoapify Result Level:</b> {observationGeo.resultType || "Not reported"} · <b>House-Level:</b> {observationGeo.houseLevelResult === true ? "Building + house number found" : "Not confirmed"}</p><p><b>Building Confidence:</b> {Number.isFinite(Number(observationGeo.buildingConfidence)) ? `${Math.round(Number(observationGeo.buildingConfidence) * 100)}%` : "Not reported"}</p><p className="text-[10px] text-amber-800">The app requests permission at launch and attaches a fresh reading to an order if available. Location and address are client-reported evidence; neither proves who placed the order or guarantees house-level accuracy.</p></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Checkout-Selected Device GPS</b><p className="mt-1"><b>Coordinates:</b> {coords(gps.lat, gps.lon)}</p><p><b>Accuracy:</b> {Number.isFinite(Number(gps.accuracy)) ? `±${Math.round(Number(gps.accuracy))} m` : "Not captured"} · <b>Captured:</b> {gps.capturedAt ? displayDate(gps.capturedAt) : "Not recorded"}</p><p className="break-words"><b>Geoapify Reverse-Geocoded Result:</b> {gps.reverseGeocodedAddress || "Not available"}</p></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Delivery Pin Address</b><p className="mt-1 break-words">{selectedOrder.deliveryAddress?.geocodedAddress || selectedOrder.deliveryAddress?.formatted || "Not available"}</p><p className="break-words text-slate-500">{selectedOrder.deliveryAddress?.unitDetails || "No unit or landmark details"}</p></div>
                   </>;
                 })()}
               </div>
@@ -702,32 +702,32 @@ export default function TelegramServerlessOrdersPanel({
 
             <section hidden={orderDetailTab !== "payment"}>
             <details className="serverless-disclosure">
-              <summary>Customer and payment details</summary>
+              <summary>Customer and Payment Details</summary>
               <div className="serverless-disclosure__body"><div className="serverless-fields text-xs">
-                <div><span>Telegram name</span><strong>{selectedOrder.telegramName || "Name unavailable"}</strong></div>
-                <div><span>Telegram handle</span>{/^[A-Za-z0-9_]{5,32}$/.test(selectedOrder.telegramUsername) ? <a href={`https://t.me/${encodeURIComponent(selectedOrder.telegramUsername)}`} target="_blank" rel="noreferrer" className="font-bold text-sky-700 underline">@{selectedOrder.telegramUsername}</a> : <strong>No public handle</strong>}</div>
+                <div><span>Telegram Name</span><strong>{selectedOrder.telegramName || "Name unavailable"}</strong></div>
+                <div><span>Telegram Handle</span>{/^[A-Za-z0-9_]{5,32}$/.test(selectedOrder.telegramUsername) ? <a href={`https://t.me/${encodeURIComponent(selectedOrder.telegramUsername)}`} target="_blank" rel="noreferrer" className="font-bold text-sky-700 underline">@{selectedOrder.telegramUsername}</a> : <strong>No Public Handle</strong>}</div>
                 <div><span>Telegram ID</span><strong>{selectedOrder.tgUserId || "—"}</strong></div>
                 <div><span>PRIME ID</span><strong>{selectedOrder.primeMemberId || "—"}</strong></div>
-                <div><span>Order status</span><strong>{selectedOrder.status}</strong></div>
-                <div><span>Payment status</span><strong>{selectedOrder.paymentStatus}</strong></div>
-                {selectedOrder.paymentReceivedAmount != null && <div><span>Provider verified</span><strong>{formatPHP(selectedOrder.paymentReceivedAmount)}</strong></div>}
-                {selectedOrder.confirmedPaidAmount != null && <div><span>Applied to order</span><strong>{formatPHP(selectedOrder.confirmedPaidAmount)}</strong></div>}
+                <div><span>Order Status</span><strong>{selectedOrder.status}</strong></div>
+                <div><span>Payment Status</span><strong>{selectedOrder.paymentStatus}</strong></div>
+                {selectedOrder.paymentReceivedAmount != null && <div><span>Provider Verified</span><strong>{formatPHP(selectedOrder.paymentReceivedAmount)}</strong></div>}
+                {selectedOrder.confirmedPaidAmount != null && <div><span>Applied to Order</span><strong>{formatPHP(selectedOrder.confirmedPaidAmount)}</strong></div>}
                 <div><span>Placed</span><strong>{displayDate(selectedOrder.createdAt)}</strong></div>
-                <div><span>Payment method</span><strong>{selectedOrder.paymentMethodName || "—"}</strong></div>
-                {status === "pending" && selectedOrder.payableNow > 0 && paymentDeadlineMs(selectedOrder) !== null && <div><span>Payment deadline</span><strong className="text-amber-700">{displayDate(paymentDeadlineMs(selectedOrder))}</strong></div>}
-                {status === "expired" && <div><span>Payment window ended</span><strong>{paymentDeadlineMs(selectedOrder) === null ? "time unavailable" : displayDate(paymentDeadlineMs(selectedOrder))}</strong></div>}
+                <div><span>Payment Method</span><strong>{selectedOrder.paymentMethodName || "—"}</strong></div>
+                {status === "pending" && selectedOrder.payableNow > 0 && paymentDeadlineMs(selectedOrder) !== null && <div><span>Payment Deadline</span><strong className="text-amber-700">{displayDate(paymentDeadlineMs(selectedOrder))}</strong></div>}
+                {status === "expired" && <div><span>Payment Window Ended</span><strong>{paymentDeadlineMs(selectedOrder) === null ? "time unavailable" : displayDate(paymentDeadlineMs(selectedOrder))}</strong></div>}
               </div></div>
             </details>
 
             {selectedOrder.paymentStatus.toLowerCase() === "paid" && status === "processing" && <section className="serverless-disclosure">
               <div className="serverless-disclosure__body space-y-2">
-                <strong className="text-xs uppercase">Payment adjustment</strong>
+                <strong className="text-xs uppercase">Payment Adjustment</strong>
                 {selectedOrder.adjustmentDue > 0 ? <>
                   <p className="text-xs">Additional amount: {formatPHP(selectedOrder.adjustmentDue)} · {selectedOrder.adjustmentStatus.replace(/_/g, " ")}</p>
                   {selectedOrder.adjustmentRevisedTotal != null && <p className="text-xs">Revised total: {formatPHP(selectedOrder.adjustmentRevisedTotal)}</p>}
                   {selectedOrder.adjustmentPaymentMethodName && <p className="text-xs">Customer payment method: {selectedOrder.adjustmentPaymentMethodName}</p>}
-                  {selectedOrder.adjustmentProofImage && <button type="button" className="px-3 py-2 border text-xs font-bold" onClick={async () => { try { setReceiptUrl(await resolveTelegramMedia(selectedOrder.adjustmentProofImage)); setReceiptOpen(true); } catch (err: any) { setError(err?.message || "Could not open the adjustment receipt."); } }}>View adjustment receipt</button>}
-                  {selectedOrder.adjustmentStatus.toLowerCase() === "pending_review" && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "approveAdjustmentPayment")} className="block px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">Approve verified extra payment</button>}
+                  {selectedOrder.adjustmentProofImage && <button type="button" className="px-3 py-2 border text-xs font-bold" onClick={async () => { try { setReceiptUrl(await resolveTelegramMedia(selectedOrder.adjustmentProofImage)); setReceiptOpen(true); } catch (err: any) { setError(err?.message || "Could not open the adjustment receipt."); } }}>View Adjustment Receipt</button>}
+                  {selectedOrder.adjustmentStatus.toLowerCase() === "pending_review" && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "approveAdjustmentPayment")} className="block px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">Approve Verified Extra Payment</button>}
                 </> : <>
                   <p className="text-xs">Edit the order and save it to recalculate any top-up from the updated items and charges. Verify the customer’s separate receipt before marking the order Ready.</p>
                 </>}
@@ -738,15 +738,15 @@ export default function TelegramServerlessOrdersPanel({
 
             <section hidden={orderDetailTab !== "fulfillment"}>
             <details className="serverless-disclosure">
-              <summary>DISPATCH DETAILS</summary>
+              <summary>Dispatch Details</summary>
               <div className="serverless-disclosure__body"><div className="serverless-fields text-xs">
                 {copyField("Receiver name", receiverName, "receiver-name")}
                 {copyField("Receiver phone", receiverPhone, "receiver-phone")}
                 {copyField("Delivery address", [addressText(selectedOrder.deliveryAddress), selectedOrder.deliveryAddress?.unitDetails].filter(Boolean).join(" · "), "delivery-address")}
                 {copyField("Delivery notes / instructions", deliveryNotes, "delivery-notes")}
                 <div><span>Courier</span><strong>{selectedOrder.courierName || "—"}</strong></div>
-                <div><span>Tracking number</span><strong>{selectedOrder.trackingNumber || "—"}</strong></div>
-                {selectedOrder.trackingUrl && <div className="serverless-order-tracking"><span>Customer tracking link</span><a href={selectedOrder.trackingUrl} target="_blank" rel="noreferrer"><ExternalLink /> Open tracking URL</a></div>}
+                <div><span>Tracking Number</span><strong>{selectedOrder.trackingNumber || "—"}</strong></div>
+                {selectedOrder.trackingUrl && <div className="serverless-order-tracking"><span>Customer Tracking Link</span><a href={selectedOrder.trackingUrl} target="_blank" rel="noreferrer"><ExternalLink /> Open tracking URL</a></div>}
                 <div><span>Dispatched</span><strong>{displayDate(selectedOrder.dispatchedAt)}</strong></div>
                 <div><span>Completed</span><strong>{displayDate(selectedOrder.deliveredAt)}</strong></div>
               </div></div>
@@ -755,7 +755,7 @@ export default function TelegramServerlessOrdersPanel({
 
             <section hidden={orderDetailTab !== "overview"}>
             <details className="serverless-disclosure" open>
-              <summary>Items and totals</summary>
+              <summary>Items and Totals</summary>
               <div className="serverless-disclosure__body">
                 <div className="serverless-order-items">
                   {selectedOrder.items.map((item: any, index) => (
@@ -767,25 +767,25 @@ export default function TelegramServerlessOrdersPanel({
                 </div>
                 {selectedOrder.items.length === 0 && <p className="text-xs text-slate-500">No item details saved.</p>}
                 <dl className="serverless-order-totals">
-                  <div><dt>Items subtotal</dt><dd>{formatPHP(itemSubtotal)}</dd></div>
+                  <div><dt>Items Subtotal</dt><dd>{formatPHP(itemSubtotal)}</dd></div>
                   {discountsTotal > 0 && <div><dt>Discounts</dt><dd>−{formatPHP(discountsTotal)}</dd></div>}
-                  {selectedOrder.storeCreditsUsed > 0 && <div><dt>Store Credits used</dt><dd>−{formatPHP(selectedOrder.storeCreditsUsed)}</dd></div>}
+                  {selectedOrder.storeCreditsUsed > 0 && <div><dt>Store Credits Used</dt><dd>−{formatPHP(selectedOrder.storeCreditsUsed)}</dd></div>}
                   {(chargesTotal + selectedOrder.deliveryFee) > 0 && <div><dt>Fees &amp; delivery</dt><dd>{formatPHP(chargesTotal + selectedOrder.deliveryFee)}</dd></div>}
-                  <div className="is-total"><dt>Order total</dt><dd>{formatPHP(selectedOrder.totalAmount ?? selectedOrder.subtotal)}</dd></div>
-                  <div><dt>Payable now</dt><dd>{formatPHP(selectedOrder.payableNow)}</dd></div>
-                  {selectedOrder.payableOnDelivery > 0 && <div><dt>Due on delivery</dt><dd>{formatPHP(selectedOrder.payableOnDelivery)}</dd></div>}
+                  <div className="is-total"><dt>Order Total</dt><dd>{formatPHP(selectedOrder.totalAmount ?? selectedOrder.subtotal)}</dd></div>
+                  <div><dt>Payable Now</dt><dd>{formatPHP(selectedOrder.payableNow)}</dd></div>
+                  {selectedOrder.payableOnDelivery > 0 && <div><dt>Due on Delivery</dt><dd>{formatPHP(selectedOrder.payableOnDelivery)}</dd></div>}
                   {selectedOrder.readyCreditDue > 0 && <div><dt>Store Credits at Ready</dt><dd>{formatPHP(selectedOrder.readyCreditDue)}</dd></div>}
                 </dl>
                 {(selectedOrder.chargesBreakdown.length > 0 || selectedOrder.deliveryFee > 0 || discountsTotal > 0 || selectedOrder.storeCreditsUsed > 0) && <details className="serverless-order-breakdown">
-                  <summary>View fee and discount breakdown</summary>
+                  <summary>View Fee and Discount Breakdown</summary>
                   <div>
                     {selectedOrder.chargesBreakdown.map((charge: any, index) => <p key={`${charge.id || charge.name || "charge"}-${index}`}><span>{charge.name || "Additional charge"}</span><b>{formatPHP(Number(charge.computedAmount ?? charge.amount) || 0)}</b></p>)}
-                    {selectedOrder.deliveryFee > 0 && <p><span>Delivery fee</span><b>{formatPHPWhole(selectedOrder.deliveryFee)}</b></p>}
-                    {selectedOrder.discountAmount > 0 && <p><span>Promo discount{selectedOrder.appliedPromoCode ? ` · ${selectedOrder.appliedPromoCode}` : ""}</span><b>−{formatPHP(selectedOrder.discountAmount)}</b></p>}
-                    {selectedOrder.staffDiscountAmount > 0 && <p><span>Staff discount · {selectedOrder.staffDiscountMode === "percent" ? `${selectedOrder.staffDiscountValue}%` : selectedOrder.staffDiscountMode === "fixed" ? formatPHP(selectedOrder.staffDiscountValue) : "manual"}</span><b>−{formatPHP(selectedOrder.staffDiscountAmount)}</b></p>}
-                    {selectedOrder.pointsDiscount > 0 && <p><span>Points discount</span><b>−{formatPHP(selectedOrder.pointsDiscount)}</b></p>}
-                    {selectedOrder.promoShippingSubsidy > 0 && <p><span>Shipping promo</span><b>−{formatPHP(selectedOrder.promoShippingSubsidy)}</b></p>}
-                    {selectedOrder.storeCreditsUsed > 0 && <p><span>Store Credits used</span><b>−{formatPHP(selectedOrder.storeCreditsUsed)}</b></p>}
+                    {selectedOrder.deliveryFee > 0 && <p><span>Delivery Fee</span><b>{formatPHPWhole(selectedOrder.deliveryFee)}</b></p>}
+                    {selectedOrder.discountAmount > 0 && <p><span>Promo Discount{selectedOrder.appliedPromoCode ? ` · ${selectedOrder.appliedPromoCode}` : ""}</span><b>−{formatPHP(selectedOrder.discountAmount)}</b></p>}
+                    {selectedOrder.staffDiscountAmount > 0 && <p><span>Staff Discount · {selectedOrder.staffDiscountMode === "percent" ? `${selectedOrder.staffDiscountValue}%` : selectedOrder.staffDiscountMode === "fixed" ? formatPHP(selectedOrder.staffDiscountValue) : "manual"}</span><b>−{formatPHP(selectedOrder.staffDiscountAmount)}</b></p>}
+                    {selectedOrder.pointsDiscount > 0 && <p><span>Points Discount</span><b>−{formatPHP(selectedOrder.pointsDiscount)}</b></p>}
+                    {selectedOrder.promoShippingSubsidy > 0 && <p><span>Shipping Promo</span><b>−{formatPHP(selectedOrder.promoShippingSubsidy)}</b></p>}
+                    {selectedOrder.storeCreditsUsed > 0 && <p><span>Store Credits Used</span><b>−{formatPHP(selectedOrder.storeCreditsUsed)}</b></p>}
                   </div>
                 </details>}
               </div>
@@ -795,24 +795,24 @@ export default function TelegramServerlessOrdersPanel({
             <section hidden={orderDetailTab !== "payment"}>
             {selectedOrder.paymentProofImage && (
               <section className="serverless-disclosure"><div className="serverless-disclosure__body serverless-order-receipt-row">
-                <div><b>Payment receipt attached</b><small>Open only when you need to inspect the proof.</small></div>
-                <button type="button" disabled={!receiptUrl} onClick={() => { setReceiptZoom(1); setReceiptOpen(true); }}><Eye /> View receipt</button>
+                <div><b>Payment Receipt Attached</b><small>Open only when you need to inspect the proof.</small></div>
+                <button type="button" disabled={!receiptUrl} onClick={() => { setReceiptZoom(1); setReceiptOpen(true); }}><Eye /> View Receipt</button>
               </div></section>
             )}
             </section>
             <section hidden={orderDetailTab !== "evidence"}>
-            {selectedOrder.ocrAnalysis && <details className="serverless-disclosure"><summary>Receipt check details</summary><div className="serverless-disclosure__body space-y-1 text-xs">
+            {selectedOrder.ocrAnalysis && <details className="serverless-disclosure"><summary>Receipt Check Details</summary><div className="serverless-disclosure__body space-y-1 text-xs">
               <b>Automated image checks · staff payment verification still required</b>
               {selectedOrder.ocrAnalysis.forensicsResult && <p>{selectedOrder.ocrAnalysis.forensicsResult}</p>}
-              {Array.isArray(selectedOrder.ocrAnalysis.forensicsFlags) && selectedOrder.ocrAnalysis.forensicsFlags.length > 0 && <div className="rounded border border-rose-200 bg-rose-50 p-2 text-rose-950"><b>Reuse indicators</b><ul className="mt-1 list-disc pl-4">{selectedOrder.ocrAnalysis.forensicsFlags.map((flag: any, index: number) => <li key={`${flag.kind}-${flag.orderId || index}`}>{flag.kind === "REFERENCE_REUSE" ? "Reference number seen on another order" : flag.kind === "EXACT_SCAN_IMAGE_REUSE" || flag.kind === "EXACT_UPLOADED_IMAGE_REUSE" ? "Exact image fingerprint seen on another order" : flag.kind === "RECEIPT_IMAGE_CHANGED_ON_ORDER" ? "Receipt image changed after an earlier scan or submission" : "Receipt reuse indicator"}{flag.orderNumber ? ` · Order #${flag.orderNumber}` : ""}</li>)}</ul></div>}
-              {selectedOrder.ocrAnalysis.rawImageSha256 && <p className="break-all"><b>File fingerprint:</b> {selectedOrder.ocrAnalysis.rawImageSha256}</p>}
-              {selectedOrder.ocrAnalysis.pixelFingerprintSha256 && <p className="break-all"><b>Pixel sample fingerprint:</b> {selectedOrder.ocrAnalysis.pixelFingerprintSha256}</p>}
-              {selectedOrder.ocrAnalysis.rawSummary && <details className="mt-2 border bg-white"><summary className="cursor-pointer p-2 font-bold">Older text-scan result</summary><div className="max-h-64 space-y-1 overflow-y-auto border-t p-2">{selectedOrder.ocrAnalysis.rawSummary}<p>Detected amount: {formatPHP(Number(selectedOrder.ocrAnalysis.amountPaid) || 0)} · Reference: {selectedOrder.ocrAnalysis.referenceNumber || "Unreadable"}</p>{selectedOrder.ocrAnalysis.providerResponse && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words border-t p-2 text-[10px]">{selectedOrder.ocrAnalysis.providerResponse}</pre>}{Array.isArray(selectedOrder.ocrAnalysis.extractedFields) && selectedOrder.ocrAnalysis.extractedFields.map((field: any, index: number) => <p key={`${field.label}-${index}`} className="break-words border-b py-1"><b>{field.label}: </b>{field.value}</p>)}</div></details>}
+              {Array.isArray(selectedOrder.ocrAnalysis.forensicsFlags) && selectedOrder.ocrAnalysis.forensicsFlags.length > 0 && <div className="rounded border border-rose-200 bg-rose-50 p-2 text-rose-950"><b>Reuse Indicators</b><ul className="mt-1 list-disc pl-4">{selectedOrder.ocrAnalysis.forensicsFlags.map((flag: any, index: number) => <li key={`${flag.kind}-${flag.orderId || index}`}>{flag.kind === "REFERENCE_REUSE" ? "Reference number seen on another order" : flag.kind === "EXACT_SCAN_IMAGE_REUSE" || flag.kind === "EXACT_UPLOADED_IMAGE_REUSE" ? "Exact image fingerprint seen on another order" : flag.kind === "RECEIPT_IMAGE_CHANGED_ON_ORDER" ? "Receipt image changed after an earlier scan or submission" : "Receipt reuse indicator"}{flag.orderNumber ? ` · Order #${flag.orderNumber}` : ""}</li>)}</ul></div>}
+              {selectedOrder.ocrAnalysis.rawImageSha256 && <p className="break-all"><b>File Fingerprint:</b> {selectedOrder.ocrAnalysis.rawImageSha256}</p>}
+              {selectedOrder.ocrAnalysis.pixelFingerprintSha256 && <p className="break-all"><b>Pixel Sample Fingerprint:</b> {selectedOrder.ocrAnalysis.pixelFingerprintSha256}</p>}
+              {selectedOrder.ocrAnalysis.rawSummary && <details className="mt-2 border bg-white"><summary className="cursor-pointer p-2 font-bold">Older Text-Scan Result</summary><div className="max-h-64 space-y-1 overflow-y-auto border-t p-2">{selectedOrder.ocrAnalysis.rawSummary}<p>Detected amount: {formatPHP(Number(selectedOrder.ocrAnalysis.amountPaid) || 0)} · Reference: {selectedOrder.ocrAnalysis.referenceNumber || "Unreadable"}</p>{selectedOrder.ocrAnalysis.providerResponse && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words border-t p-2 text-[10px]">{selectedOrder.ocrAnalysis.providerResponse}</pre>}{Array.isArray(selectedOrder.ocrAnalysis.extractedFields) && selectedOrder.ocrAnalysis.extractedFields.map((field: any, index: number) => <p key={`${field.label}-${index}`} className="break-words border-b py-1"><b>{field.label}: </b>{field.value}</p>)}</div></details>}
               <p className="font-bold text-amber-800">Image matches are review clues only. They do not prove payment or image tampering. Verify the transaction directly with the payment provider.</p>
             </div></details>}
             </section>
             <section hidden={orderDetailTab !== "overview"}>
-            {selectedOrder.notes && <details className="serverless-disclosure"><summary>Order notes</summary><div className="serverless-disclosure__body text-xs">{selectedOrder.notes}</div></details>}
+            {selectedOrder.notes && <details className="serverless-disclosure"><summary>Order Notes</summary><div className="serverless-disclosure__body text-xs">{selectedOrder.notes}</div></details>}
             </section>
 
 
@@ -822,11 +822,11 @@ export default function TelegramServerlessOrdersPanel({
         {editing && editingItemIndex !== null && itemDraft && editItems[editingItemIndex] && <div className="serverless-item-edit-backdrop" role="presentation">
           <section className="serverless-item-edit-sheet" role="dialog" aria-modal="true" aria-labelledby="serverless-item-edit-title">
             <header className="serverless-item-edit-sheet__header">
-              <div className="min-w-0"><span>Order item</span><h2 id="serverless-item-edit-title">Edit {editItems[editingItemIndex].name}</h2></div>
+              <div className="min-w-0"><span>Order Item</span><h2 id="serverless-item-edit-title">Edit {editItems[editingItemIndex].name}</h2></div>
               <button type="button" onClick={() => { setEditingItemIndex(null); setItemDraft(null); }} aria-label="Close item editor"><X /></button>
             </header>
             <div className="serverless-item-edit-sheet__body">
-              <label className="serverless-item-edit-price">Selling price per item<input autoFocus type="number" min="0" step="0.01" inputMode="decimal" value={itemDraft.price} onChange={(event) => setItemDraft((draft: any) => ({ ...draft, price: event.target.value }))} /><small>Before any item offer</small></label>
+              <label className="serverless-item-edit-price">Selling Price Per Item<input autoFocus type="number" min="0" step="0.01" inputMode="decimal" value={itemDraft.price} onChange={(event) => setItemDraft((draft: any) => ({ ...draft, price: event.target.value }))} /><small>Before any item offer</small></label>
               <div className="serverless-item-edit-quantity"><span>Quantity <small>Up to {Number(itemDraft.reservedQuantity) || 1} reserved</small></span><div>
                 <button type="button" aria-label="Decrease quantity" disabled={Number(itemDraft.quantity) <= 1} onClick={() => setItemDraft((draft: any) => ({ ...draft, quantity: String(Math.max(1, (Number(draft.quantity) || 1) - 1)) }))}><Minus /></button>
                 <input aria-label="Quantity" type="number" min="1" max={Number(itemDraft.reservedQuantity) || 1} step="1" inputMode="numeric" value={itemDraft.quantity} onChange={(event) => setItemDraft((draft: any) => ({ ...draft, quantity: event.target.value }))} />
@@ -834,11 +834,11 @@ export default function TelegramServerlessOrdersPanel({
               </div></div>
               <div className="serverless-item-edit-offer">
                 <button type="button" role="switch" aria-checked={Boolean(itemDraft.offerEnabled)} onClick={() => setItemDraft((draft: any) => ({ ...draft, offerEnabled: !draft.offerEnabled, offerMode: draft.offerMode === "none" ? "percent" : draft.offerMode }))}>
-                  <span><b>Apply offer</b><small>Discount this item or give it free</small></span><span className="serverless-item-edit-switch" aria-hidden="true" />
+                  <span><b>Apply Offer</b><small>Discount this item or give it free</small></span><span className="serverless-item-edit-switch" aria-hidden="true" />
                 </button>
                 {itemDraft.offerEnabled && <div className="serverless-item-edit-offer__options">
-                  <div className="serverless-item-edit-choice"><label><input type="radio" name="item-offer-mode" checked={itemDraft.offerMode !== "free"} onChange={() => setItemDraft((draft: any) => ({ ...draft, offerMode: "percent" }))} /> Give discount</label><label><input type="radio" name="item-offer-mode" checked={itemDraft.offerMode === "free"} onChange={() => setItemDraft((draft: any) => ({ ...draft, offerMode: "free", offerValue: "0" }))} /> Give as free</label></div>
-                  {itemDraft.offerMode !== "free" && <div className="serverless-item-edit-discount"><label>Discount type<select value={itemDraft.offerMode === "fixed" ? "fixed" : "percent"} onChange={(event) => setItemDraft((draft: any) => ({ ...draft, offerMode: event.target.value }))}><option value="percent">By percentage</option><option value="fixed">PHP off per item</option></select></label><label>{itemDraft.offerMode === "fixed" ? "Amount off each" : "Percentage off"}<span>{itemDraft.offerMode === "fixed" ? "₱" : "%"}<input type="number" min="0" max={itemDraft.offerMode === "fixed" ? undefined : "100"} step="0.01" inputMode="decimal" value={itemDraft.offerValue} onChange={(event) => setItemDraft((draft: any) => ({ ...draft, offerValue: event.target.value }))} /></span></label></div>}
+                  <div className="serverless-item-edit-choice"><label><input type="radio" name="item-offer-mode" checked={itemDraft.offerMode !== "free"} onChange={() => setItemDraft((draft: any) => ({ ...draft, offerMode: "percent" }))} /> Give Discount</label><label><input type="radio" name="item-offer-mode" checked={itemDraft.offerMode === "free"} onChange={() => setItemDraft((draft: any) => ({ ...draft, offerMode: "free", offerValue: "0" }))} /> Give as Free</label></div>
+                  {itemDraft.offerMode !== "free" && <div className="serverless-item-edit-discount"><label>Discount Type<select value={itemDraft.offerMode === "fixed" ? "fixed" : "percent"} onChange={(event) => setItemDraft((draft: any) => ({ ...draft, offerMode: event.target.value }))}><option value="percent">By Percentage</option><option value="fixed">PHP Off Per Item</option></select></label><label>{itemDraft.offerMode === "fixed" ? "Amount Off Each" : "Percentage Off"}<span>{itemDraft.offerMode === "fixed" ? "₱" : "%"}<input type="number" min="0" max={itemDraft.offerMode === "fixed" ? undefined : "100"} step="0.01" inputMode="decimal" value={itemDraft.offerValue} onChange={(event) => setItemDraft((draft: any) => ({ ...draft, offerValue: event.target.value }))} /></span></label></div>}
                 </div>}
               </div>
               {(() => {
@@ -847,17 +847,17 @@ export default function TelegramServerlessOrdersPanel({
                 const value = Math.max(0, Number(itemDraft.offerValue) || 0);
                 const unit = mode === "free" ? 0 : mode === "percent" ? price * (100 - Math.min(100, value)) / 100 : mode === "fixed" ? Math.max(0, price - value) : price;
                 const quantity = Math.min(Number(itemDraft.reservedQuantity) || 1, Math.max(1, Number(itemDraft.quantity) || 1));
-                return <div className="serverless-item-edit-total"><span>Updated line total</span><strong>{formatPHP(unit * quantity)}</strong><small>{quantity} × {formatPHP(unit)} each</small></div>;
+                return <div className="serverless-item-edit-total"><span>Updated Line Total</span><strong>{formatPHP(unit * quantity)}</strong><small>{quantity} × {formatPHP(unit)} each</small></div>;
               })()}
-              <button type="button" className="serverless-item-edit-remove" onClick={() => { setEditItems((rows) => rows.filter((_, index) => index !== editingItemIndex)); setEditingItemIndex(null); setItemDraft(null); }}><Trash2 /> Remove this item from the order</button>
+              <button type="button" className="serverless-item-edit-remove" onClick={() => { setEditItems((rows) => rows.filter((_, index) => index !== editingItemIndex)); setEditingItemIndex(null); setItemDraft(null); }}><Trash2 /> Remove This Item from the Order</button>
             </div>
-            <footer className="serverless-item-edit-sheet__footer"><button type="button" onClick={() => { setEditingItemIndex(null); setItemDraft(null); }}>Cancel</button><button type="button" onClick={saveItemDraft}>Update item</button></footer>
+            <footer className="serverless-item-edit-sheet__footer"><button type="button" onClick={() => { setEditingItemIndex(null); setItemDraft(null); }}>Cancel</button><button type="button" onClick={saveItemDraft}>Update Item</button></footer>
           </section>
         </div>}
 
         {receiptOpen && receiptUrl && <div className="serverless-receipt-modal" role="dialog" aria-modal="true" aria-label="Payment receipt viewer" onClick={() => setReceiptOpen(false)}>
           <div className="serverless-receipt-modal__panel" onClick={(event) => event.stopPropagation()}>
-            <header><strong>Payment receipt</strong><a href={receiptUrl} download={`receipt-${selectedOrder?.orderNumber || "order"}`}><Download /> Download</a><button type="button" onClick={() => setReceiptOpen(false)} aria-label="Close receipt viewer"><X /></button></header>
+            <header><strong>Payment Receipt</strong><a href={receiptUrl} download={`receipt-${selectedOrder?.orderNumber || "order"}`}><Download /> Download</a><button type="button" onClick={() => setReceiptOpen(false)} aria-label="Close receipt viewer"><X /></button></header>
             <div className="serverless-receipt-modal__tools"><button type="button" onClick={() => setReceiptZoom((zoom) => Math.max(0.5, zoom - 0.25))}>−</button><span>{Math.round(receiptZoom * 100)}%</span><button type="button" onClick={() => setReceiptZoom((zoom) => Math.min(4, zoom + 0.25))}>+</button><button type="button" onClick={() => setReceiptZoom(1)}>Reset</button></div>
             <div className="serverless-receipt-modal__scroll"><img src={receiptUrl} alt="Uploaded payment receipt" style={{ width: `${receiptZoom * 100}%`, maxWidth: "none" }} /></div>
           </div>
@@ -868,7 +868,7 @@ export default function TelegramServerlessOrdersPanel({
             <div className="serverless-panel-toolbar grid grid-cols-1 sm:grid-cols-2">
               <label className="relative min-w-0"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order, customer, Telegram ID" className="w-full min-w-0 border border-slate-200 pl-9 pr-3 py-2 text-xs" /></label>
               <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setQueueFilter("all"); }} className="w-full min-w-0 border border-slate-200 px-3 py-2 text-xs">
-                <option value="all">All statuses</option><option value="pending">Pending</option><option value="processing">Processing</option><option value="ready">Ready</option><option value="packed">Packed</option><option value="dispatched">Dispatched</option><option value="completed">Completed</option><option value="expired">Expired</option>
+                <option value="all">All Statuses</option><option value="pending">Pending</option><option value="processing">Processing</option><option value="ready">Ready</option><option value="packed">Packed</option><option value="dispatched">Dispatched</option><option value="completed">Completed</option><option value="expired">Expired</option>
               </select>
             </div>
             {filteredOrders.length === 0 && !loading ? (
@@ -879,7 +879,7 @@ export default function TelegramServerlessOrdersPanel({
               <span className="serverless-record__copy"><strong>#{order.orderNumber || order.id} · {formatPHP(order.totalAmount ?? order.subtotal)}</strong><small>{order.telegramName || "Telegram user"} · {order.status} / {order.paymentStatus}</small><small>{displayDate(order.createdAt)} · {order.items.map((item: any) => item.name || item.productName || "Item").join(", ") || "No item details"}</small></span>
                   {order.paymentProofImage && <span className="text-[9px] text-emerald-700 font-bold uppercase">Receipt</span>}
                 </button>
-                <details className="serverless-disclosure serverless-record__details"><summary>Order overview</summary><div className="serverless-disclosure__body"><div className="serverless-fields text-xs"><div><span>Payment method</span><strong>{order.paymentMethodName || "—"}</strong></div><div><span>Payment deadline</span><strong>{paymentDeadlineMs(order) === null ? "—" : displayDate(paymentDeadlineMs(order))}</strong></div><div><span>Delivery address</span><strong>{addressText(order.deliveryAddress)}</strong></div><div><span>Total</span><strong>{formatPHP(order.totalAmount ?? order.subtotal)}</strong></div></div></div></details>
+                <details className="serverless-disclosure serverless-record__details"><summary>Order Overview</summary><div className="serverless-disclosure__body"><div className="serverless-fields text-xs"><div><span>Payment Method</span><strong>{order.paymentMethodName || "—"}</strong></div><div><span>Payment Deadline</span><strong>{paymentDeadlineMs(order) === null ? "—" : displayDate(paymentDeadlineMs(order))}</strong></div><div><span>Delivery Address</span><strong>{addressText(order.deliveryAddress)}</strong></div><div><span>Total</span><strong>{formatPHP(order.totalAmount ?? order.subtotal)}</strong></div></div></div></details>
               </article>
             ))}
           </div>

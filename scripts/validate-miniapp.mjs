@@ -32,6 +32,7 @@ run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
 run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
 run('node', ['scripts/test-media.mjs'], 'media upload/gallery/offline/playlist safety');
 run('node', ['scripts/test-secretary-ui.mjs'], 'Secretary configurator layout/navigation/save regressions');
+run('node', ['scripts/test-admin-portrait.mjs'], 'Admin portrait and configuration preservation');
 run('node', ['--check', 'public/media-offline-worker.js'], 'offline media worker syntax');
 run('node_modules/.bin/rolldown', ['cloudflare/prime-media/src/index.mjs', '--platform', 'browser', '--format', 'esm', '--file', 'cloudflare/prime-media/dist/worker.mjs'], 'R2 Worker bundle');
 run('node', ['cloudflare/prime-media/test-worker.mjs'], 'R2 Worker auth/metadata/range/unpublish safety');
