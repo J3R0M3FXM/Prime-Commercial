@@ -30,8 +30,21 @@ for(const stage of Object.keys(expected)) {
   assert.equal(document.querySelectorAll('table').length,0);
 }
 await render('Pending');await act(async()=>button('Review').click());
-assert.equal(button('Confirm Payment').disabled,true,'Provider verification and amount entry are mandatory');
-assert.equal(document.querySelector('input[type="checkbox"]').checked,false);
+assert.equal(document.querySelector('input[type="number"]'),null,'Exact confirmation requires no amount entry');
+assert.match(document.querySelector('section[aria-label="Order Controller"]').textContent,/after checking the provider transaction/i);
+assert.equal(button('Confirm Payment').disabled,false);
+await act(async()=>button('Confirm Payment').click());
+assert.deepEqual(calls.at(-1),{action:'markPaid',input:{confirmedAmount:100,expectedPayableNow:100,providerVerified:true}},'One click confirms only the displayed exact amount');
+await render('Pending');await act(async()=>button('Review').click());
+await act(async()=>button('Overpayment').click());
+assert.ok(document.querySelector('input[type="number"]'),'Only overpayments request an amount');
+assert.equal(button('Confirm Payment').disabled,true,'Exact confirmation is locked while entering an overpayment');
+assert.equal(button('Confirm Overpayment').disabled,true,'An empty overpayment cannot be confirmed');
+const input=document.querySelector('input[type="number"]');
+await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,'125');input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
+assert.equal(button('Confirm Overpayment').disabled,false);
+await act(async()=>button('Confirm Overpayment').click());
+assert.deepEqual(calls.at(-1),{action:'markPaid',input:{confirmedAmount:'125',expectedPayableNow:100,providerVerified:true}},'Overpayment sends the provider-confirmed amount');
 await render('Held');await act(async()=>button('Request Resubmit · One Hour').click());assert.equal(calls.at(-1).action,'resubmitOrder');
 await render('Held',{resubmitExpiresAt:Date.now()+3600000});assert.equal(button('Request Resubmit · One Hour').disabled,true);
 await render('Dispatched');await act(async()=>button('Completed').click());assert.equal(calls.at(-1).action,'complete');

@@ -5,12 +5,12 @@ import { formatPHP } from '@/lib/currency';
 export type OrderWorkflow={stage:string;actions?:string[];receiptFailures:number;replacementUploaded:boolean;canResubmit:boolean;resubmitExpiresAt:number|null;editState:string;editRequest?:any;cancellationRequested:boolean;refundedCredits:number;externalRefundState:string;externalRefundReference:string;refundMethod:string};
 type Props={order:{id:string;status:string;paymentStatus:string;payableNow:number;paymentProofImage:string;workflow?:OrderWorkflow};busy:boolean;onAction:(action:string,extra?:Record<string,any>)=>Promise<boolean>;onModify:()=>void};
 export default function OrderWorkflowController({order,busy,onAction,onModify}:Props) {
-  const [review,setReview]=useState(false),[cancelling,setCancelling]=useState(false),[amount,setAmount]=useState(''),[reason,setReason]=useState(''),[tracking,setTracking]=useState(''),[verified,setVerified]=useState(false),[refundMethod,setRefundMethod]=useState('credits'),[reference,setReference]=useState('');
+  const [review,setReview]=useState(false),[cancelling,setCancelling]=useState(false),[overpayment,setOverpayment]=useState(false),[amount,setAmount]=useState(''),[reason,setReason]=useState(''),[tracking,setTracking]=useState(''),[verified,setVerified]=useState(false),[refundMethod,setRefundMethod]=useState('credits'),[reference,setReference]=useState('');
   const flow=order.workflow,actions=flow?.actions||[],stage=flow?.stage||order.status,paid=order.paymentStatus.toLowerCase()==='paid';
   const available=(action:string)=>!busy&&actions.includes(action);
   const button='prime-workflow-button min-h-10 min-w-0 px-2 py-2 text-xs';
   const confirmAmount=verified&&amount!==''&&Number.isFinite(Number(amount))&&Number(amount)>=0&&(stage==='Cancelled'||Number(amount)>=order.payableNow);
-  const submit=async(action:string,extra?:Record<string,any>)=>{if(await onAction(action,extra)){setReview(false);setCancelling(false);setVerified(false);setAmount('');}};
+  const submit=async(action:string,extra?:Record<string,any>)=>{if(await onAction(action,extra)){setReview(false);setCancelling(false);setOverpayment(false);setVerified(false);setAmount('');}};
   return <section aria-label="Order Controller" className="prime-order-workflow space-y-3 border-b border-slate-200 py-3 text-sm">
     <h3 className="font-heading font-normal">Order Controller · {stage}</h3>
     {!flow?<p role="alert">Refresh To Load Available Order Actions.</p>:<>
@@ -26,9 +26,10 @@ export default function OrderWorkflowController({order,busy,onAction,onModify}:P
     {review&&actions.includes('review')&&<div className="space-y-2 border-t pt-2">
       <p className="text-xs">Inspect The Attached Receipt In Payment, Then Verify The Transaction In The Provider Account.</p>
       {stage==='Held'?<p className="text-xs">Waiting For The Customer’s Replacement Receipt.</p>:<>
-      <label className="block text-xs">Provider-Confirmed Amount<input className="mt-1 min-h-10 w-full rounded border px-2 font-mono" type="number" step="0.01" min="0" value={amount} onChange={event=>setAmount(event.target.value)} placeholder={formatPHP(order.payableNow)}/></label>
-      <label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={verified} onChange={event=>setVerified(event.target.checked)}/>I Verified This Payment Directly With The Provider. Courier Pay-On-Arrival Is Excluded.</label>
-      <div className="grid grid-cols-2 gap-2"><button className={button+' prime-workflow-button--success'} type="button" disabled={busy||!confirmAmount||!order.paymentProofImage} onClick={()=>void submit('markPaid',{confirmedAmount:amount,providerVerified:true})}>Confirm Payment</button><button className={button+' prime-workflow-button--danger'} type="button" disabled={busy||!order.paymentProofImage} onClick={()=>void submit('failReceipt')}>Failed</button></div>
+      <p className="text-xs">Confirm only after checking the provider transaction. Exact payment: {formatPHP(order.payableNow)}. Courier pay-on-arrival is excluded.</p>
+      <div className="grid grid-cols-2 gap-2"><button className={button+' prime-workflow-button--success'} type="button" disabled={busy||!order.paymentProofImage||overpayment} onClick={()=>void submit('markPaid',{confirmedAmount:order.payableNow,expectedPayableNow:order.payableNow,providerVerified:true})}>Confirm Payment</button><button className={button+' prime-workflow-button--danger'} type="button" disabled={busy||!order.paymentProofImage} onClick={()=>void submit('failReceipt')}>Failed</button></div>
+      <button className={button+' prime-workflow-button--modify w-full'} type="button" disabled={busy} aria-expanded={overpayment} onClick={()=>{setOverpayment(value=>!value);setAmount('');}}>Overpayment</button>
+      {overpayment&&<div className="space-y-2"><label className="block text-xs">Provider-Confirmed Total Received<input className="mt-1 min-h-10 w-full rounded border px-2 font-mono" type="number" step="0.01" min="0" value={amount} onChange={event=>setAmount(event.target.value)} placeholder="Enter amount received"/></label><button className={button+' prime-workflow-button--success w-full'} type="button" disabled={busy||!order.paymentProofImage||amount===''||!Number.isFinite(Number(amount))||Number(amount)<=order.payableNow} onClick={()=>void submit('markPaid',{confirmedAmount:amount,expectedPayableNow:order.payableNow,providerVerified:true})}>Confirm Overpayment</button></div>}
       <p className="text-xs text-slate-600">Verified Overpayments Are Refunded In Store Credits. A Second Failed Receipt Cancels The Order.</p>
       </>}
     </div>}

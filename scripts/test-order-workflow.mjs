@@ -140,7 +140,8 @@ await assert.rejects(manage({action:'markPaid',orderId:'busy',admin:true},{}),e=
 sqlite.exec("INSERT INTO products(id,name,price,is_active,bundle_config) VALUES('sku','Product',60,1,'{}')");
 await create('endpoint-edit',{subtotal:120,store_credits_used:20,items:JSON.stringify([{productId:'sku',variantId:'default',quantity:2,price:60}])});
 sqlite.prepare("UPDATE inventory_reservations SET product_id='sku',variant_id='default',quantity=2 WHERE order_id='endpoint-edit'").run();
-await manage({action:'markPaid',orderId:'endpoint-edit',confirmedAmount:100,providerVerified:true},{testStaff:true});
+await assert.rejects(manage({action:'markPaid',orderId:'endpoint-edit',confirmedAmount:100,expectedPayableNow:101,providerVerified:true},{testStaff:true}),e=>e.code==='ORDER_CHANGED');
+await manage({action:'markPaid',orderId:'endpoint-edit',confirmedAmount:100,expectedPayableNow:100,providerVerified:true},{testStaff:true});
 const beforeEndpoint=balance();
 const editPayload={action:'edit',orderId:'endpoint-edit',expectedVersion:0,items:[{productId:'sku',variantId:'default',quantity:1,price:60}],discountMode:'none',discountValue:0,deliveryFee:0,charges:[]};
 await manage(editPayload,{testStaff:true});

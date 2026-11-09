@@ -96,6 +96,10 @@ export default async function (input, ctx) {
   await workflowFor(currentOrder);
   const workflowAction=({markPaid:'confirmPayment',approveZeroDue:'confirmPayment',failReceipt:'failReceipt',holdOrder:'hold',resubmitOrder:'resubmit',startProcessing:'processing',cancelOrder:'cancel',rejectOrder:'cancel',approveCustomerEdit:'approveCustomerEdit',rejectCustomerEdit:'rejectCustomerEdit',rejectCancellation:'rejectCancellation',revalidatePayment:'revalidatePayment',recordOriginalRefund:'recordOriginalRefund'})[action];
   if(workflowAction) {
+    if(action==='markPaid'&&input.expectedPayableNow!=null) {
+      const expected=Number(input.expectedPayableNow),actual=Number(currentOrder.payableNow??currentOrder.totalAmount??0);
+      if(!Number.isFinite(expected)||!Number.isFinite(actual)||Math.round(expected*100)!==Math.round(actual*100))throw new EndpointError('The amount due changed. Refresh the order and verify the payment again.',{code:'ORDER_CHANGED'});
+    }
     const result=await applyWorkflowAction(currentOrder,workflowAction,{...input,...(action==='approveZeroDue'?{confirmedAmount:0}:{})});
     const saved=await db.select().from(orders).where(eq(orders.id,orderId)).get();
     await notifyOrderStatusChanged({chatId:saved.tgUserId,orderNumber:saved.orderNumber||saved.id,status:action==='resubmitOrder'?'Replacement Receipt Requested — Upload Within One Hour':saved.status,paymentStatus:saved.paymentStatus,totalAmount:Number(saved.totalAmount)||0});
