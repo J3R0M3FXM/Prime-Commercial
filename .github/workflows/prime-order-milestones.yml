@@ -38,4 +38,8 @@ jobs:
           test ! -e tgcloud/endpoints/orderMilestones.js
           cp "$GITHUB_WORKSPACE/automation/order-milestones.js" tgcloud/endpoints/orderMilestones.js
           sha256sum --check --strict "$GITHUB_WORKSPACE/automation/order-milestones.sha256"
-          npm exec --yes --package=@tgcloud/cli -- tgcloud run endpoints/orderMilestones
+          if ! npm exec --yes --package=@tgcloud/cli -- tgcloud run endpoints/orderMilestones > "$automation_dir/private-runtime.log" 2>&1; then
+            echo 'Order maintenance failed. Private runtime logs were not published; inspect through the owner CLI.' >&2
+            exit 1
+          fi
+          echo 'Order milestone reconciliation completed successfully.'
