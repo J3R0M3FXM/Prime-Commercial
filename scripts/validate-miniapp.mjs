@@ -30,6 +30,8 @@ run('node', ['scripts/check-telegram-serverless-contracts.mjs'], 'Serverless con
 run('node', ['scripts/test-promo-codec.mjs'], 'promo regressions');
 run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
 run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
+run('node', ['scripts/test-shopfront-queue.mjs'], 'shopfront queue ownership and ordering');
+run('node', ['scripts/test-shopfront-payment-link.mjs'], 'shopfront secure payment link');
 run('node', ['scripts/test-media.mjs'], 'media upload/gallery/offline/playlist safety');
 run('node', ['scripts/test-secretary-ui.mjs'], 'Secretary configurator layout/navigation/save regressions');
 run('node', ['scripts/test-admin-portrait.mjs'], 'Admin portrait and configuration preservation');

@@ -22,7 +22,6 @@ import {
   Sparkles,
   ShoppingBag,
   Copy,
-  Download,
   QrCode,
   ExternalLink,
   Check,
@@ -43,7 +42,7 @@ import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
 import { getClientFingerprint, getOrCreateSessionToken, getFreshClientLocation } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import TelegramMediaImage from "./telegram-media-image";
-import SecuredPaymentLink from "./secured-payment-link";
+import SecuredPaymentLink, { openSecuredPaymentLink } from "./secured-payment-link";
 import { readCheckoutDraft, saveCheckoutDraft, clearCheckoutDraft } from "@/lib/checkout-draft";
 import {
   callServerless,
@@ -53,7 +52,6 @@ import {
   createPaymentSession,
   uploadPaymentProofDataUrl,
   resolveTelegramMedia,
-  downloadTelegramMedia,
   uploadPaymentReceiptDataUrl,
   resumeServerlessCheckout,
   preparePaymentProofImage,
@@ -154,6 +152,10 @@ export default function CheckoutModal({
   const [paymentPageDirection, setPaymentPageDirection] = useState<1 | -1>(1);
   const [isPaymentQrModalOpen, setIsPaymentQrModalOpen] = useState(false);
   const [isPaymentDetailsModalOpen, setIsPaymentDetailsModalOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const receiptScanVersion = useRef(0);
+  const promoValidationVersion = useRef(0);
+  const referralValidationVersion = useRef(0);
   const [zoomedPaymentMethod, setZoomedPaymentMethod] = useState<any>(null);
   const [isStartingMayaCheckout, setIsStartingMayaCheckout] = useState(false);
   const [mayaCheckoutError, setMayaCheckoutError] = useState("");
@@ -167,6 +169,7 @@ export default function CheckoutModal({
   const [isAnalyzingReceipt, setIsAnalyzingReceipt] = useState(false);
   const [ocrAnalysis, setOcrAnalysis] = useState<any>(null);
   const [ocrError, setOcrError] = useState<string>("");
+  const [confirmationQueue, setConfirmationQueue] = useState<{ position?: number | null; createdAt?: number | null; wait?: number | null }>({});
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -351,6 +354,7 @@ export default function CheckoutModal({
   // Store Credits State
   const [availableStoreCredits, setAvailableStoreCredits] = useState<number>(0);
   const [useStoreCredits, setUseStoreCredits] = useState<boolean>(false);
+  const [creditAmountInput, setCreditAmountInput] = useState("");
 
   // Referral Code State
   const [referralCodeInput, setReferralCodeInput] = useState<string>("");
@@ -365,7 +369,7 @@ export default function CheckoutModal({
   } | null>(null);
   const [isCheckingReferral, setIsCheckingReferral] = useState<boolean>(false);
   const [referralError, setReferralError] = useState<string>("");
-  const checkoutError = promoError || referralError || submitError;
+  const checkoutError = submitError;
   const dismissCheckoutError = () => {
     setPromoError("");
     setReferralError("");
@@ -547,6 +551,12 @@ export default function CheckoutModal({
   // deliveryPaymentMethod can reopen directly on Review with an invalid payload.
   useEffect(() => {
     if (!isOpen) {
+      receiptScanVersion.current++;
+      setIsAnalyzingReceipt(false); setOcrAnalysis(null); setOcrError("");
+      setIsReceiptModalOpen(false); setIsPaymentDetailsModalOpen(false); setIsGatewayPromptOpen(false);
+      setPromoCodeInput(""); setReferralCodeInput(""); setAppliedPromo(null); setAppliedReferral(null);
+      setPromoError(""); setReferralError(""); setReferralSuccess("");
+      setUseStoreCredits(false); setCreditAmountInput("");
       setCurrentStep(1);
       setPinDropArmed(false);
       setReceiverName("");
@@ -571,6 +581,17 @@ export default function CheckoutModal({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isAnalyzingReceipt) return;
+    const timer = window.setTimeout(() => {
+      receiptScanVersion.current++;
+      setIsAnalyzingReceipt(false);
+      setOcrAnalysis(null);
+      setOcrError("Image analysis timed out. Please re-scan or replace the receipt.");
+    }, 30_000);
+    return () => window.clearTimeout(timer);
+  }, [isAnalyzingReceipt]);
+
   // Restore only after the shopfront has verified the active Telegram account.
   useEffect(() => {
     if (!isOpen) { setDraftReady(false); return; }
@@ -589,7 +610,10 @@ export default function CheckoutModal({
       setSelectedPaymentMethod(s.selectedPaymentMethod || null);
       setUploadedProofImage(s.uploadedProofImage || ""); setOcrAnalysis(s.ocrAnalysis || null);
       setCustomerNotes(s.customerNotes || ""); setUseStoreCredits(Boolean(s.useStoreCredits));
+      setCreditAmountInput(typeof s.creditAmountInput === "string" ? s.creditAmountInput : s.useStoreCredits ? "max" : "");
       setAppliedPromo(s.appliedPromo || null); setAppliedReferral(s.appliedReferral || null);
+      setPromoCodeInput(s.promoCodeInput || s.appliedPromo?.code || "");
+      setReferralCodeInput(s.referralCodeInput || s.appliedReferral?.code || "");
       setSubmissionKey(s.submissionKey || "");
       setSubmissionSessionId(s.submissionSessionId || "");
       if (s.submissionKey) setSubmitError("Your previous submission may already be saved. Tap Submit to recover it; do not pay again.");
@@ -603,8 +627,8 @@ export default function CheckoutModal({
   const draftState = {
     currentStep, receiverName, receiverPhone, selectedAddress, hasSelectedAddress, unitDetails, coords,
     availableCouriers, selectedCourierId, deliveryPaymentMethod, calculatedDistance, estimatedTravelMinutes,
-    selectedPaymentMethod, uploadedProofImage, ocrAnalysis, customerNotes, useStoreCredits,
-    appliedPromo, appliedReferral, submissionKey, submissionSessionId,
+    selectedPaymentMethod, uploadedProofImage, ocrAnalysis, customerNotes, useStoreCredits, creditAmountInput,
+    appliedPromo, appliedReferral, promoCodeInput, referralCodeInput, submissionKey, submissionSessionId,
   };
   const draftStateJson = JSON.stringify(draftState);
   useEffect(() => {
@@ -995,8 +1019,9 @@ export default function CheckoutModal({
   // Store credits to deduct
   const creditsDeducted = useMemo(() => {
     if (!useStoreCredits || availableStoreCredits <= 0) return 0;
-    return Math.min(availableStoreCredits, payableBeforeCredits);
-  }, [useStoreCredits, availableStoreCredits, payableBeforeCredits]);
+    const requested = creditAmountInput === "max" ? Infinity : Math.max(0, Math.floor((Number(creditAmountInput) || 0) * 100) / 100);
+    return Math.min(requested, availableStoreCredits, payableBeforeCredits);
+  }, [useStoreCredits, availableStoreCredits, payableBeforeCredits, creditAmountInput]);
 
   // Final payable now
   const payableNow = useMemo(() => {
@@ -1034,11 +1059,7 @@ export default function CheckoutModal({
   // comparison evidence only; it does not authenticate a receipt or approve payment.
   const analyzeReceiptImage = async (base64Image: string) => {
     if (!base64Image) return;
-    const analysisStartedAt = Date.now();
-    const waitForMinimumScanDuration = async () => {
-      const remaining = Math.max(0, 15_000 - (Date.now() - analysisStartedAt));
-      if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
-    };
+    const version = receiptScanVersion.current;
     try {
       setIsAnalyzingReceipt(true);
       setOcrError("");
@@ -1080,19 +1101,17 @@ export default function CheckoutModal({
         forensicsResult: "Image hashes and a normalized pixel sample are ready. Exact reuse and replacement comparisons are checked during secure upload; staff must still verify the payment manually.",
         requiresManualReview: true,
       };
-      await waitForMinimumScanDuration();
-      setOcrAnalysis(analysis);
+      if (version === receiptScanVersion.current) setOcrAnalysis(analysis);
     } catch (e: any) {
-      await waitForMinimumScanDuration();
       console.warn("Receipt image analysis failed:", e);
-      setOcrError(e?.message || "Receipt image analysis failed. Please re-scan the image.");
+      if (version === receiptScanVersion.current) setOcrError(e?.message || "Receipt image analysis failed. Please re-scan the image.");
     } finally {
-      setIsAnalyzingReceipt(false);
+      if (version === receiptScanVersion.current) setIsAnalyzingReceipt(false);
     }
   };
 
   // Promo Code Validation Handler
-  const handleApplyPromo = async () => {
+  const handleApplyPromo = async (version = promoValidationVersion.current) => {
     const cleanCode = promoCodeInput.trim().toUpperCase();
     if (!cleanCode) {
       setPromoError("Please enter a promo code.");
@@ -1120,6 +1139,7 @@ export default function CheckoutModal({
       };
       if (!hasTelegramServerlessBridge()) throw new Error("TGCloud checkout is unavailable.");
       const data: any = await callServerless<any>("validatePromo", promoRequest, 20_000);
+      if (version !== promoValidationVersion.current) return;
       if (!data?.valid) {
         setPromoError(data.error || "Invalid promo code.");
         return;
@@ -1142,11 +1162,10 @@ export default function CheckoutModal({
         cashbackPoints: Number(data.cashbackPoints) || 0,
         freeProductName: String(data.freeProductName || "")
       });
-      setPromoCodeInput("");
     } catch (err: any) {
-      setPromoError("We couldn't check this code right now. Please try again.");
+      if (version === promoValidationVersion.current) setPromoError("We couldn't check this code right now. Please try again.");
     } finally {
-      setIsCheckingPromo(false);
+      if (version === promoValidationVersion.current) setIsCheckingPromo(false);
     }
   };
 
@@ -1156,7 +1175,7 @@ export default function CheckoutModal({
   };
 
   // Referral Code Validation Handler
-  const handleApplyReferral = async () => {
+  const handleApplyReferral = async (version = referralValidationVersion.current) => {
     const cleanCode = referralCodeInput.trim().toUpperCase();
     if (!cleanCode) {
       setReferralError("Please enter a referral code.");
@@ -1167,6 +1186,7 @@ export default function CheckoutModal({
     setReferralSuccess("");
     try {
       const data = await callServerless<any>("validateReferral", { referralCode: cleanCode });
+      if (version !== referralValidationVersion.current) return;
       if (!data?.valid) {
         setReferralError(data.error || "Invalid referral code.");
         return;
@@ -1178,9 +1198,9 @@ export default function CheckoutModal({
       });
       setReferralSuccess(`Referred by ${data.referrerName} (${data.referrerMemberId}). ${data.message || "Bonus requires completed orders from both members."}`);
     } catch (err: any) {
-      setReferralError(err.message || "Failed to validate referral code.");
+      if (version === referralValidationVersion.current) setReferralError(err.message || "Failed to validate referral code.");
     } finally {
-      setIsCheckingReferral(false);
+      if (version === referralValidationVersion.current) setIsCheckingReferral(false);
     }
   };
 
@@ -1190,6 +1210,41 @@ export default function CheckoutModal({
     setReferralSuccess("");
     setReferralCodeInput("");
   };
+
+  useEffect(() => {
+    const version = ++promoValidationVersion.current;
+    if (!isOpen || currentStep !== 4 || !promoCodeInput.trim()) { setIsCheckingPromo(false); return; }
+    setAppliedPromo(null);
+    setIsCheckingPromo(true);
+    const timer = window.setTimeout(() => void handleApplyPromo(version), 350);
+    return () => { window.clearTimeout(timer); promoValidationVersion.current++; };
+  }, [isOpen, currentStep, promoCodeInput, itemsSubtotal, courierDeliveryFee, selectedCourierId, deliveryPaymentMethod]);
+
+  useEffect(() => {
+    const version = ++referralValidationVersion.current;
+    if (!isOpen || currentStep !== 4 || !referralCodeInput.trim() || existingReferrer) { setIsCheckingReferral(false); return; }
+    setIsCheckingReferral(true);
+    const timer = window.setTimeout(() => void handleApplyReferral(version), 350);
+    return () => { window.clearTimeout(timer); referralValidationVersion.current++; };
+  }, [isOpen, currentStep, referralCodeInput, existingReferrer]);
+
+  useEffect(() => {
+    if (!isOpen || currentStep !== 6 || !completedOrder?.id) return;
+    let active = true;
+    setConfirmationQueue({});
+    void Promise.allSettled([
+      callServerless<any>("getMyOrderQueuePosition", { orderId: completedOrder.id }),
+      callServerless<any>("getPublicOrderQueue", {}),
+    ]).then(([own, queue]) => {
+      if (!active) return;
+      setConfirmationQueue({
+        position: own.status === "fulfilled" ? own.value?.position : null,
+        createdAt: own.status === "fulfilled" ? own.value?.createdAt : null,
+        wait: queue.status === "fulfilled" ? queue.value?.averageReadyMinutes : null,
+      });
+    });
+    return () => { active = false; };
+  }, [isOpen, currentStep, completedOrder?.id]);
 
   // Step Navigations & Validations
   const handleNextFromStep1 = () => {
@@ -1240,14 +1295,17 @@ export default function CheckoutModal({
   // Submit Order to API
   const handleAttachPreSubmitProof = async (file?: File) => {
     if (!file) return;
+    const version = ++receiptScanVersion.current;
     setIsAnalyzingReceipt(true);
+    setOcrAnalysis(null); setOcrError(""); setUploadedProofImage("");
     try {
       const value = await preparePaymentProofImage(file);
+      if (version !== receiptScanVersion.current) return;
       setUploadedProofImage(value); setOcrAnalysis(null); setSubmitError("");
       await analyzeReceiptImage(value);
     } catch (error: any) {
-      setSubmitError(error?.message || "This receipt could not be prepared. Choose it again.");
-    } finally { setIsAnalyzingReceipt(false); }
+      if (version === receiptScanVersion.current) setOcrError(error?.message || "This receipt could not be prepared. Choose it again.");
+    } finally { if (version === receiptScanVersion.current) setIsAnalyzingReceipt(false); }
   };
 
   const handleSubmitOrder = async () => {
@@ -1284,6 +1342,10 @@ export default function CheckoutModal({
       setSubmitError("Choose a payment method and upload your payment proof before submitting the order.");
       return;
     }
+    if (isAnalyzingReceipt || ocrAnalysis?.matchStatus !== "ANALYSIS_COMPLETED") {
+      setSubmitError("Complete the receipt image analysis before submitting your order.");
+      return;
+    }
 
     // Do not send an order request with a missing delivery-payment channel.
     // Step 4 should never be able to fall through to the API in an invalid state.
@@ -1313,7 +1375,7 @@ export default function CheckoutModal({
         : Math.max(0, courierDeliveryFee - Number(appliedPromo?.shippingSubsidy || 0));
       const reviewPayableBeforeCredits = Math.max(0, itemsSubtotal - promoDiscountAmount) + freshChargeBreakdown.totalChargesAmount +
         (deliveryPaymentMethod === "upon_checkout" ? reviewEffectiveDeliveryFee : 0);
-      const reviewCredits = Math.min(useStoreCredits ? availableStoreCredits : 0, reviewPayableBeforeCredits);
+      const reviewCredits = Math.min(useStoreCredits ? (creditAmountInput === "max" ? Infinity : Math.max(0, Math.floor((Number(creditAmountInput) || 0) * 100) / 100)) : 0, availableStoreCredits, reviewPayableBeforeCredits);
       const reviewPayableNow = Math.max(0, reviewPayableBeforeCredits - reviewCredits);
       const reviewPayableOnDelivery = deliveryPaymentMethod === "upon_delivery" ? reviewEffectiveDeliveryFee : 0;
       const reviewTotal = reviewPayableNow + reviewPayableOnDelivery;
@@ -1376,7 +1438,7 @@ export default function CheckoutModal({
           formatted: selectedAddress,
           lat: coords.lat,
           lon: coords.lon,
-          unitDetails: unitDetails.trim() || "Non",
+          unitDetails: unitDetails.trim() || "NONE PROVIDED",
         },
         courier: selectedCourier ? {
           id: selectedCourier.id,
@@ -1400,7 +1462,7 @@ export default function CheckoutModal({
         appliedStoreCredits: creditsDeducted,
         storeCreditsUsed: creditsDeducted,
         referralCode: appliedReferral?.code || (existingReferrer?.memberId || null),
-        notes: customerNotes.trim() || "Non",
+        notes: customerNotes.trim() || "NONE PROVIDED",
         deviceId: fpData.deviceId,
         sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
         coordinates: `${coords.lat}, ${coords.lon}`,
@@ -1583,14 +1645,8 @@ export default function CheckoutModal({
                   </div>
                 </div>
 
-                {(availableStoreCredits > 0 || existingReferrer) && (
+                {existingReferrer && (
                   <div className="mt-3 pt-2.5 border-t border-gray-200/80 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
-                    {availableStoreCredits > 0 ? (
-                      <span className="text-amber-800 font-bold flex items-center gap-1.5 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                        <Coins className="w-3.5 h-3.5 text-amber-600" />
-                        Available Store Credits: {formatPHP(availableStoreCredits)}
-                      </span>
-                    ) : <span />}
                     {existingReferrer && (
                       <span className="text-gray-600 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-200">
                         <Gift className="w-3 h-3 text-blue-600" />
@@ -1781,7 +1837,7 @@ export default function CheckoutModal({
                   <span className="block text-[9px] uppercase tracking-wide text-slate-500 font-heading">Estimated travel time</span>
                   <span className="block text-sm font-mono font-bold text-slate-900">{estimatedTravelMinutes !== null ? `~${estimatedTravelMinutes} min` : "Unavailable"}</span>
                 </div>
-                <p className="col-span-2 text-center text-[9px] leading-tight text-slate-500 font-mono">PRIME constantly pools road traffic data every 30 minutes. The indicated travel time is still an estimate and may change depending on actual traffic conditions.</p>
+                <p className="col-span-2 text-center text-[10.5px] leading-tight text-slate-500 font-mono">Our algorithm constantly pools road traffic data every 30 minutes. The indicated travel time is still an estimate and may change depending on actual traffic conditions.</p>
               </div>
 
               {courierFetchError && (
@@ -1886,7 +1942,7 @@ export default function CheckoutModal({
               <div className="p-2.5 rounded-none border border-slate-200 bg-slate-50 space-y-2.5 text-xs font-mono">
                 <div className="flex justify-between items-start">
                   <span className="prime-checkout__review-label text-gray-500 uppercase text-[10px]">Receiver</span>
-                  <span className="prime-checkout__review-value font-heading font-semibold text-[11px] text-gray-900 text-right">
+                  <span className="prime-checkout__review-value prime-checkout__contact-value font-heading font-semibold text-[11px] text-gray-900 text-right">
                     {receiverName} ({receiverPhone})
                   </span>
                 </div>
@@ -1895,18 +1951,19 @@ export default function CheckoutModal({
                   <span className="prime-checkout__review-label text-gray-500 uppercase text-[10px] flex items-center gap-1">
                     <span>Address</span>
                   </span>
-                  <span className="prime-checkout__review-value font-heading font-semibold text-[11px] text-gray-900 text-right max-w-xs break-words">
+                  <span className="prime-checkout__review-value prime-checkout__contact-value font-heading font-semibold text-[11px] text-gray-900 text-right max-w-xs break-words">
                     {selectedAddress}
-                    <span className="block text-gray-500 text-[10px] font-heading font-semibold">Unit/Landmark: {unitDetails.trim() || "Non"}</span>
+                    <span className="block text-gray-500 text-[10px] font-heading font-semibold">Unit/Landmark: {unitDetails.trim() || "NONE PROVIDED"}</span>
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center pt-1 border-t border-gray-200">
                   <span className="prime-checkout__review-label text-gray-500 uppercase text-[10px]">Courier</span>
-                  <span className="prime-checkout__review-value font-heading font-semibold text-[11px] text-gray-900">
+                  <span className="prime-checkout__review-value prime-checkout__contact-value font-heading font-semibold text-[11px] text-gray-900">
                     {selectedCourier?.name} ({calculatedDistance} km)
                   </span>
                 </div>
+                <div className="flex justify-between items-start pt-1 border-t border-gray-200"><span className="prime-checkout__review-label text-gray-500 uppercase text-[10px]">Rider Notes</span><span className="prime-checkout__review-value prime-checkout__contact-value text-right">{customerNotes.trim() || "NONE PROVIDED"}</span></div>
               </div>
 
 
@@ -1930,10 +1987,11 @@ export default function CheckoutModal({
                     return (
                       <div key={item.id} className="p-2 flex items-center justify-between gap-3 text-xs">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <img
+                          <TelegramMediaImage
                             src={item.imageUrl || "/product-image-unavailable.svg"}
                             alt={displayProductName}
                             className="w-10 h-10 object-cover rounded bg-white border border-gray-200 shrink-0"
+                            fallbackSrc="/product-image-unavailable.svg"
                           />
                           <div className="min-w-0">
                             <div className="min-w-0">
@@ -2030,220 +2088,47 @@ export default function CheckoutModal({
 
               </div>
 
-              {/* Side-by-Side Voucher (Left) and Referral (Right) Code Inputs */}
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                {/* Voucher / Promo Code (Left) */}
-                <div className="border border-gray-200 rounded-none p-3 sm:p-3.5 bg-white space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-900">
-                      <Tag className="w-3.5 h-3.5 text-slate-700" />
-                      <span>Voucher Code</span>
-                    </div>
-                    {appliedPromo && (
-                      <span className="text-[10px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-300">
-                        Applied
-                      </span>
-                    )}
+              {/* Codes are checked as they are typed; stale responses are ignored. */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="min-w-0 space-y-1">
+                  <label htmlFor="checkout-promo" className="text-xs font-heading font-bold uppercase">Voucher Code</label>
+                  <div className="relative"><input id="checkout-promo" value={promoCodeInput} onChange={(event) => {
+                    promoValidationVersion.current++; setAppliedPromo(null); setPromoError(""); setPromoCodeInput(event.target.value.toUpperCase());
+                  }} placeholder="ENTER CODE" autoComplete="off" className={`prime-code-input ${promoError ? "is-invalid" : appliedPromo ? "is-valid" : ""}`} aria-invalid={Boolean(promoError)} />
+                    {appliedPromo && <Check className="prime-code-check" aria-label="Valid voucher" />}
                   </div>
-
-                  {appliedPromo ? (
-                    <div className="p-2 bg-emerald-50/80 border border-emerald-200 rounded-lg flex items-center justify-between text-xs font-mono">
-                      <div className="min-w-0 flex-1 pr-1">
-                        <span className="font-bold text-emerald-950 uppercase block truncate">{appliedPromo.code}</span>
-                        <span className="text-[10px] text-emerald-700 font-semibold block truncate">
-                          {appliedPromo.discountType === "free_product"
-                            ? `Free product: ${appliedPromo.freeProductName || "selected item"}`
-                            : appliedPromo.discountType === "coins_cashback"
-                            ? `${appliedPromo.discountValue}% points back`
-                            : appliedPromo.isFreeShipping
-                            ? "Free Shipping"
-                            : appliedPromo.discountType === "shipping_discount"
-                            ? `₱${appliedPromo.shippingSubsidy?.toLocaleString() || "0"} shipping off`
-                            : appliedPromo.discountType === "percentage"
-                            ? `${appliedPromo.discountValue}% OFF`
-                            : `₱${appliedPromo.discountAmount.toLocaleString()} OFF`}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAppliedPromo(null);
-                          setPromoCodeInput("");
-                          setPromoError("");
-                        }}
-                        className="p-1 text-emerald-700 hover:text-emerald-900 rounded transition-colors cursor-pointer shrink-0"
-                        title="Remove voucher"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="text"
-                          value={promoCodeInput}
-                          onChange={(e) => {
-                            setPromoCodeInput(e.target.value.toUpperCase());
-                            if (promoError) setPromoError("");
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              void handleApplyPromo();
-                            }
-                          }}
-                          placeholder="ENTER CODE"
-                          aria-label="Voucher code"
-                          className="min-w-0 flex-1 pl-2.5 pr-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[10px] sm:text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
-                        />
-                        <button type="button" onClick={handleApplyPromo} disabled={isCheckingPromo || !promoCodeInput.trim()} className="shrink-0 px-2 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-[9px] font-heading font-bold uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed">
-                          {isCheckingPromo ? "..." : "Apply"}
-                        </button>
-                      </div>
-
-                      {promoError && (
-                        <div className="text-[10px] font-mono text-red-600 flex items-center gap-1 bg-red-50 p-1.5 rounded border border-red-200">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{promoError}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {isCheckingPromo && <p className="text-[10px] text-slate-500">Checking…</p>}
+                  {promoError && <p className="text-[10px] text-red-700" role="status">{promoError}</p>}
                 </div>
-
-                {/* Referral Code (Right) */}
-                <div className="border border-gray-200 rounded-none p-3 sm:p-3.5 bg-white space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-gray-900">
-                      <Gift className="w-3.5 h-3.5 text-slate-700" />
-                      <span>Referral Code</span>
+                <div className="min-w-0 space-y-1">
+                  <label htmlFor="checkout-referral" className="text-xs font-heading font-bold uppercase">Referral Code</label>
+                  {existingReferrer ? <p className="text-[10px]">Referred by {existingReferrer.name || "Member"} ({existingReferrer.memberId})</p> : <>
+                    <div className="relative"><input id="checkout-referral" value={referralCodeInput} onChange={(event) => {
+                      referralValidationVersion.current++; setAppliedReferral(null); setReferralError(""); setReferralSuccess(""); setReferralCodeInput(event.target.value.toUpperCase());
+                    }} placeholder="ENTER CODE" autoComplete="off" className={`prime-code-input ${referralError ? "is-invalid" : appliedReferral ? "is-valid" : ""}`} aria-invalid={Boolean(referralError)} />
+                      {appliedReferral && <Check className="prime-code-check" aria-label="Valid referral" />}
                     </div>
-                    {(existingReferrer || appliedReferral) && (
-                      <span className="text-[10px] font-mono font-bold uppercase bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200">
-                        Linked
-                      </span>
-                    )}
-                  </div>
-
-                  {existingReferrer ? (
-                    <div className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono flex items-center justify-between">
-                      <div className="truncate">
-                        <span className="text-gray-500 text-[9px] uppercase block">Referred By</span>
-                        <span className="font-bold text-gray-900 truncate block">{existingReferrer.name || "Member"} ({existingReferrer.memberId})</span>
-                      </div>
-                      <span className="text-[9px] text-gray-400 font-mono uppercase shrink-0">Permanent</span>
-                    </div>
-                  ) : appliedReferral ? (
-                    <div className="p-2 bg-blue-50/80 border border-blue-200 rounded-lg flex items-center justify-between text-xs font-mono">
-                      <div className="min-w-0 flex-1 pr-1">
-                        <span className="text-blue-600 text-[9px] uppercase font-bold block">Referral Applied</span>
-                        <span className="font-bold text-blue-950 truncate block">{appliedReferral.referrerName} ({appliedReferral.code})</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAppliedReferral(null);
-                          setReferralCodeInput("");
-                          setReferralError("");
-                          setReferralSuccess("");
-                        }}
-                        className="p-1 text-blue-600 hover:text-blue-900 rounded transition-colors cursor-pointer shrink-0"
-                        title="Remove referral code"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="text"
-                          value={referralCodeInput}
-                          onChange={(e) => {
-                            setReferralCodeInput(e.target.value.toUpperCase());
-                            if (referralError) setReferralError("");
-                            if (referralSuccess) setReferralSuccess("");
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              void handleApplyReferral();
-                            }
-                          }}
-                          placeholder="ENTER CODE"
-                          aria-label="Referral code"
-                          className="min-w-0 flex-1 pl-2.5 pr-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[10px] sm:text-xs font-mono uppercase text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
-                        />
-                        <button type="button" onClick={handleApplyReferral} disabled={isCheckingReferral || !referralCodeInput.trim()} className="shrink-0 px-2 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-[9px] font-heading font-bold uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed">
-                          {isCheckingReferral ? "..." : "Apply"}
-                        </button>
-                      </div>
-
-                      {referralError && (
-                        <div className="text-[10px] font-mono text-red-600 flex items-center gap-1 bg-red-50 p-1.5 rounded border border-red-200">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{referralError}</span>
-                        </div>
-                      )}
-                      {referralSuccess && (
-                        <div className="text-[10px] font-mono text-blue-700 flex items-center gap-1 bg-blue-50 p-1.5 rounded border border-blue-200">
-                          <Check className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{referralSuccess}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    {isCheckingReferral && <p className="text-[10px] text-slate-500">Checking…</p>}
+                    {referralError && <p className="text-[10px] text-red-700" role="status">{referralError}</p>}
+                    {referralSuccess && <p className="text-[10px] text-emerald-700">{referralSuccess}</p>}
+                  </>}
                 </div>
               </div>
 
-
-
-              {/* PRIME Store Credits Section */}
-              {availableStoreCredits > 0 && (
-                <div className="border border-amber-200/80 rounded-none p-3.5 sm:p-2.5 bg-amber-50/30 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-amber-950">
-                      <Coins className="w-3.5 h-3.5 text-amber-700" />
-                      <span>PRIME Store Credits</span>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-amber-900">
-                      ₱{availableStoreCredits.toLocaleString()} Available
-                    </span>
-                  </div>
-
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none bg-white p-2.5 rounded-lg border border-amber-200">
-                    <input
-                      type="checkbox"
-                      checked={useStoreCredits}
-                      onChange={(e) => setUseStoreCredits(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                    />
-                    <div className="text-xs font-mono flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-gray-900">
-                          Apply Store Credits to this order
-                        </span>
-                        {useStoreCredits && creditsDeducted > 0 && (
-                          <span className="font-bold text-emerald-700 font-mono">
-                            -{formatPHP(creditsDeducted)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        {useStoreCredits
-                          ? (payableBeforeCredits <= availableStoreCredits
-                              ? "Full payable amount covered by your store credits."
-                              : `Deducting ₱${creditsDeducted.toLocaleString()} from your payable total.`)
-                          : "Use your accumulated PRIME Store Credits for instant order deduction."}
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              )}
-
-
-
+              {/* Store credits are optional and the entered amount is capped to the balance and payable total. */}
+              {availableStoreCredits > 0 && <section className="prime-credit-option">
+                <label className="prime-credit-toggle"><span>Use Store Credits</span><input type="checkbox" role="switch" checked={useStoreCredits} onChange={(event) => {
+                  const enabled = event.target.checked;
+                  setUseStoreCredits(enabled);
+                  if (enabled && !creditAmountInput) setCreditAmountInput(Math.min(availableStoreCredits, payableBeforeCredits).toFixed(2));
+                }} /><span className="prime-credit-switch" aria-hidden="true" /></label>
+                {useStoreCredits && <div className="prime-credit-details">
+                  <p>Available: {formatPHP(availableStoreCredits)}</p>
+                  <label htmlFor="checkout-credit-amount">Amount to Use</label>
+                  <div className="prime-credit-input"><input id="checkout-credit-amount" type="number" min="0" step="0.01" max={Math.min(availableStoreCredits, payableBeforeCredits)} value={creditAmountInput === "max" ? Math.min(availableStoreCredits, payableBeforeCredits).toFixed(2) : creditAmountInput} onChange={(event) => setCreditAmountInput(event.target.value)} /><button type="button" onClick={() => setCreditAmountInput(Math.min(availableStoreCredits, payableBeforeCredits).toFixed(2))}>MAX</button></div>
+                  <small>Applied: {formatPHP(creditsDeducted)}</small>
+                </div>}
+              </section>}
               {/* Final Total & Applied Benefits */}
               <div className="border border-slate-200 rounded-none p-2.5 bg-slate-50 space-y-2">
                 {/* Promo Code Discount */}
@@ -2366,13 +2251,15 @@ export default function CheckoutModal({
                                   return;
                                 }
                                 setSelectedPaymentMethod(method);
+                                receiptScanVersion.current++;
                                 setUploadedProofImage("");
                                 setOcrAnalysis(null);
+                                setOcrError(""); setIsAnalyzingReceipt(false);
                                 setSubmitError("");
                                 if (type.includes("qr") && qr) {
                                   setZoomedPaymentMethod(method);
                                   setIsPaymentQrModalOpen(true);
-                                }
+                                } else setIsPaymentDetailsModalOpen(true);
                               }} aria-pressed={selected} className={selectorTileClass(selected)} title={method.name}>
                                 <CheckoutTileLogo reference={String(method.logo || "")} name={method.name} selected={selected} payment />
                                 {type.includes("qr") && <QrCode className="absolute bottom-1 right-1 h-3 w-3 text-slate-500" aria-hidden="true" />}
@@ -2392,22 +2279,12 @@ export default function CheckoutModal({
                     </div>;
                   })()}
 
-                  {selectedPaymentMethod && <div className="flex items-center justify-between gap-2 border border-slate-200 bg-slate-50 p-3 text-xs">
-                    <div className="min-w-0"><p className="font-heading font-bold uppercase text-slate-900">{selectedPaymentMethod.name}</p><p className="mt-0.5 text-[11px] text-slate-600">Payment instructions are available in a secure pop-up.</p></div>
-                    <button type="button" onClick={() => setIsPaymentDetailsModalOpen(true)} className="shrink-0 min-h-10 border border-slate-300 bg-white px-3 font-heading font-semibold uppercase text-slate-800">View details</button>
-                  </div>}
-
                   <input ref={preSubmitProofInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => {
                     const file = event.target.files?.[0];
                     event.target.value = "";
                     void handleAttachPreSubmitProof(file);
                   }} />
-                  <button type="button" onClick={() => preSubmitProofInputRef.current?.click()} disabled={!selectedPaymentMethod?.id || isAnalyzingReceipt} className="w-full bg-slate-900 px-3 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-white disabled:cursor-not-allowed disabled:opacity-50">
-                    {!selectedPaymentMethod?.id ? "Select Payment Method First" : uploadedProofImage ? "Replace Payment Proof" : "Attach Payment Proof"}
-                  </button>
-                  {isAnalyzingReceipt && <p className="text-center text-[11px] font-mono text-slate-600">Analyzing proof image…</p>}
-                  {uploadedProofImage && !isAnalyzingReceipt && <div className="prime-checkout__notice prime-checkout__notice--success" role="status"><span className="prime-checkout__notice-icon"><CheckCircle2 aria-hidden="true" /></span><div className="min-w-0"><p className="prime-checkout__notice-title">Receipt attached</p><p className="prime-checkout__notice-copy">You can submit the order for staff review.</p></div></div>}
-                  {ocrError && <div className="prime-checkout__notice prime-checkout__notice--warning" role="alert"><span className="prime-checkout__notice-icon"><AlertTriangle aria-hidden="true" /></span><div className="min-w-0"><p className="prime-checkout__notice-title">Receipt scan needs attention</p><p className="prime-checkout__notice-copy">{ocrError}</p></div></div>}
+                  {selectedPaymentMethod && !isPaymentQrModalOpen && !isPaymentDetailsModalOpen && !isGatewayPromptOpen && <button type="button" onClick={() => setIsReceiptModalOpen(true)} className="w-full bg-slate-900 px-3 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-white">{ocrAnalysis ? "Review Payment Receipt" : "Upload Payment Receipt"}</button>}
                 </>
               )}
             </section>
@@ -2448,14 +2325,17 @@ export default function CheckoutModal({
               {/* Proof is already stored before this confirmation is reachable. */}
               {true ? (
                 <div>
-                  <div className="prime-checkout__notice prime-checkout__notice--success prime-checkout__notice--order" role="status">
-                    <span className="prime-checkout__notice-icon"><CheckCircle2 aria-hidden="true" /></span>
-                    <div className="min-w-0">
-                      <p className="prime-checkout__notice-kicker">Order submitted</p>
-                      <h3 className="prime-checkout__notice-title">Payment proof received</h3>
-                      <p className="prime-checkout__notice-copy">Order <span className="font-mono">{completedOrder.orderNumber || completedOrder.id}</span> <span className="mx-1 text-emerald-700">·</span> Payable <span className="font-mono font-semibold">{formatPHP(currentPayableNow)}</span></p>
-                      <p className="prime-checkout__notice-copy mt-1">Staff will review the receipt. Payment is not confirmed until verified.</p>
-                    </div>
+                  <div className="space-y-3 border border-emerald-200 bg-emerald-50 p-4 text-center" role="status">
+                    <CheckCircle2 className="prime-success-check mx-auto h-12 w-12 text-emerald-600" aria-hidden="true" />
+                    <h3 className="font-heading font-semibold uppercase">Order Successfully Submitted</h3>
+                    <dl className="grid grid-cols-2 gap-2 text-left text-xs">
+                      <dt>ORDER NO.</dt><dd className="text-right">{completedOrder.orderNumber || completedOrder.id}</dd>
+                      <dt>ORDER DATE &amp; TIME</dt><dd className="text-right">{confirmationQueue.createdAt ? formatPaymentDeadline(confirmationQueue.createdAt * 1000) : "Unavailable"}</dd>
+                      <dt>ESTIMATED WAIT</dt><dd className="text-right">{confirmationQueue.wait ? `${confirmationQueue.wait} minutes` : "Unavailable"}</dd>
+                      <dt>POSITION ON QUEUE</dt><dd className="text-right">{confirmationQueue.position ?? "Unavailable"}</dd>
+                    </dl>
+                    <p className="text-xs">Staff will review the receipt. Payment is not confirmed until verified. Queue position is an estimate.</p>
+                    {completedOrder.deliveryFeePaymentMethod === "upon_delivery" && <p className="text-xs">Please prepare {formatPHP(Number(completedOrder.payableOnDelivery) || 0)} upon courier's arrival as payment for the Delivery Fee.</p>}
                   </div>
                 </div>
               ) : (
@@ -2988,6 +2868,7 @@ export default function CheckoutModal({
               <button
                 type="button"
                 onClick={() => setCurrentStep(5)}
+                disabled={isCheckingPromo || isCheckingReferral || Boolean(promoCodeInput.trim() && !appliedPromo) || Boolean(!existingReferrer && referralCodeInput.trim() && !appliedReferral)}
                 className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs"
               >
                 <span>Continue</span>
@@ -3008,7 +2889,7 @@ export default function CheckoutModal({
                     isSubmittingOrder ||
                     isLoadingCharges ||
                     Boolean(chargesLoadError) ||
-                    (!submissionKey && (isAnalyzingReceipt || Boolean(hasTelegramServerlessBridge() && (!selectedPaymentMethod?.id || !uploadedProofImage))))
+                    (!submissionKey && (isAnalyzingReceipt || ocrAnalysis?.matchStatus !== "ANALYSIS_COMPLETED" || !selectedPaymentMethod?.id || !uploadedProofImage))
                   }
                   className="prime-checkout__submit px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -3028,11 +2909,16 @@ export default function CheckoutModal({
       {isGatewayPromptOpen && gatewayMethodPending && (
         <div className="fixed inset-0 z-[2600] flex items-center justify-center bg-slate-950/70 p-4">
           <div className="w-full max-w-[390px] space-y-3 rounded-xl bg-white p-4 shadow-xl">
-            <h3 className="font-heading text-sm font-bold uppercase text-slate-900">Secure Payment Gateway</h3>
-            <p className="font-mono text-xs leading-relaxed text-slate-700">You will be redirected to a secure page to process your payment with our processor and acquirer (Maya Business). Would you like to proceed?</p>
+            <h3 className="text-center font-heading text-sm font-bold uppercase text-slate-900">Secure Payment Gateway</h3>
+            {gatewayMethodPending.logo ? <TelegramMediaImage src={gatewayMethodPending.logo} alt={gatewayMethodPending.name} className="mx-auto h-12 max-w-[160px] object-contain" /> : <p className="text-center text-lg font-bold">{gatewayMethodPending.name || "Payment Gateway"}</p>}
+            <p className="text-center font-mono text-xs leading-relaxed text-slate-700">You will be redirected to the configured secure payment page.</p>
+            <p className="pt-2 text-center font-mono text-xs text-slate-700">Would you like to proceed?</p>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => { setIsGatewayPromptOpen(false); setGatewayMethodPending(null); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-heading text-xs font-bold uppercase text-slate-700">No</button>
-              <button type="button" onClick={() => { setSelectedPaymentMethod(gatewayMethodPending); setProofSubmitSuccess(false); setUploadedProofImage(""); setIsGatewayPromptOpen(false); setGatewayMethodPending(null); }} className="rounded-lg bg-slate-900 px-3 py-2 font-heading text-xs font-bold uppercase text-white">Yes</button>
+              <button type="button" onClick={() => {
+                if (!openSecuredPaymentLink(gatewayMethodPending.paymentLinkUrl)) { setIsGatewayPromptOpen(false); setSubmitError("This payment link is unavailable. Please choose another method or contact the shop."); return; }
+                receiptScanVersion.current++; setSelectedPaymentMethod(gatewayMethodPending); setProofSubmitSuccess(false); setUploadedProofImage(""); setOcrAnalysis(null); setOcrError(""); setIsAnalyzingReceipt(false); setIsGatewayPromptOpen(false); setGatewayMethodPending(null); setIsReceiptModalOpen(true);
+              }} className="rounded-lg bg-slate-900 px-3 py-2 font-heading text-xs font-bold uppercase text-white">Yes</button>
             </div>
           </div>
         </div>
@@ -3040,7 +2926,7 @@ export default function CheckoutModal({
 
       {/* Upload Proof Preview Modal */}
       {isPreviewProofOpen && uploadedProofImage && (
-        <div className="fixed inset-0 z-[2500] flex items-center justify-center p-2.5 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[3200] flex items-center justify-center p-2.5 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
           <button 
             onClick={() => setIsPreviewProofOpen(false)} 
             className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer"
@@ -3085,18 +2971,18 @@ export default function CheckoutModal({
       )}
 
       {isPaymentDetailsModalOpen && selectedPaymentMethod && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/75 p-2.5 backdrop-blur-xs" role="presentation" onClick={() => setIsPaymentDetailsModalOpen(false)}>
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/75 p-2.5 backdrop-blur-xs" role="presentation" onClick={() => { setIsPaymentDetailsModalOpen(false); setIsReceiptModalOpen(true); }}>
           <section className="w-full max-w-[430px] space-y-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-2xl" role="dialog" aria-modal="true" aria-label="Payment instructions" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div><h3 className="font-heading text-sm font-bold uppercase text-slate-900">Payment details</h3><p className="text-[11px] text-slate-500">{selectedPaymentMethod.name}</p></div>
-              <button type="button" onClick={() => setIsPaymentDetailsModalOpen(false)} className="grid min-h-10 min-w-10 place-items-center rounded-full bg-slate-100 text-slate-700" aria-label="Close payment details">✕</button>
+              <button type="button" onClick={() => { setIsPaymentDetailsModalOpen(false); setIsReceiptModalOpen(true); }} className="grid min-h-10 min-w-10 place-items-center rounded-full bg-slate-100 text-slate-700" aria-label="Close payment details">✕</button>
             </div>
             {selectedPaymentMethod.accountName && <div className="border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[10px] font-heading font-semibold uppercase text-slate-500">Account name</span><div className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 break-words font-mono text-sm text-slate-900">{selectedPaymentMethod.accountName}</span><button type="button" onClick={() => { void navigator.clipboard.writeText(String(selectedPaymentMethod.accountName)); setCopiedField("modal-name"); window.setTimeout(() => setCopiedField(null), 1800); }} className="min-h-10 shrink-0 border border-slate-300 bg-white px-2 text-xs">{copiedField === "modal-name" ? "Copied" : "Copy"}</button></div></div>}
             {selectedPaymentMethod.accountNumber && <div className="border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[10px] font-heading font-semibold uppercase text-slate-500">Account / mobile number</span><div className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 break-all font-mono text-sm font-bold text-slate-900">{selectedPaymentMethod.accountNumber}</span><button type="button" onClick={() => { void navigator.clipboard.writeText(String(selectedPaymentMethod.accountNumber)); setCopiedField("modal-number"); window.setTimeout(() => setCopiedField(null), 1800); }} className="min-h-10 shrink-0 border border-slate-300 bg-white px-2 text-xs">{copiedField === "modal-number" ? "Copied" : "Copy"}</button></div></div>}
             {selectedPaymentMethod.walletAddress && <div className="border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[10px] font-heading font-semibold uppercase text-slate-500">Wallet address</span><div className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 break-all font-mono text-sm text-slate-900">{selectedPaymentMethod.walletAddress}</span><button type="button" onClick={() => { void navigator.clipboard.writeText(String(selectedPaymentMethod.walletAddress)); setCopiedField("modal-wallet"); window.setTimeout(() => setCopiedField(null), 1800); }} className="min-h-10 shrink-0 border border-slate-300 bg-white px-2 text-xs">{copiedField === "modal-wallet" ? "Copied" : "Copy"}</button></div></div>}
             {selectedPaymentMethod.instructions && <p className="break-words border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-950">{selectedPaymentMethod.instructions}</p>}
             {selectedPaymentMethod.paymentLinkUrl && <SecuredPaymentLink url={selectedPaymentMethod.paymentLinkUrl} />}
-            <button type="button" onClick={() => setIsPaymentDetailsModalOpen(false)} className="min-h-11 w-full bg-slate-900 px-3 text-xs font-heading font-bold uppercase tracking-wider text-white">Done</button>
+            <button type="button" onClick={() => { setIsPaymentDetailsModalOpen(false); setIsReceiptModalOpen(true); }} className="min-h-11 w-full bg-slate-900 px-3 text-xs font-heading font-bold uppercase tracking-wider text-white">Done</button>
           </section>
         </div>
       )}
@@ -3113,7 +2999,7 @@ export default function CheckoutModal({
                     Payment QR Code
                   </h3>
                   <p className="text-[10px] font-mono text-slate-500">
-                    Scan or download to make payment
+                    Scan to make payment
                   </p>
                 </div>
               </div>
@@ -3122,6 +3008,7 @@ export default function CheckoutModal({
                 onClick={() => {
                   setIsPaymentQrModalOpen(false);
                   setZoomedPaymentMethod(null);
+                  setIsReceiptModalOpen(true);
                 }}
                 className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-mono font-bold cursor-pointer transition-colors"
               >
@@ -3130,72 +3017,17 @@ export default function CheckoutModal({
             </div>
 
             <div className="max-h-[70dvh] overflow-y-auto p-2.5 bg-slate-50 border border-slate-200/80 rounded-none flex flex-col items-center justify-center space-y-3">
-              {(zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image) ? (
-                <div className="p-3 bg-white rounded-none shadow-xs border border-slate-200">
-                  <TelegramMediaImage
-                    src={zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image}
-                    alt={`${zoomedPaymentMethod.name} QR Code`}
-                    className="w-48 h-48 object-contain"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-              ) : (
-                <div className="w-48 h-48 bg-white border border-slate-200 rounded-none flex items-center justify-center text-slate-400 font-mono text-xs">
-                  No QR image uploaded
-                </div>
-              )}
-
-              <div>
-                <span className="font-heading font-black text-lg text-slate-900 tracking-tight block">
-                  {zoomedPaymentMethod.name}
-                </span>
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block mt-0.5">
-                  {zoomedPaymentMethod.accountNumber ? `Account: ${zoomedPaymentMethod.accountNumber}` : "Static QR Code"}
-                </span>
-              </div>
-            </div>
-
-            {zoomedPaymentMethod.accountName && (
-              <div className="p-2.5 bg-gray-50 border border-gray-100 rounded-none text-left text-[11px] font-mono text-gray-700">
-                <div className="font-bold text-gray-400 uppercase text-[9px] tracking-wider">Account Name</div>
-                <div className="font-bold uppercase text-slate-800 mt-0.5">{zoomedPaymentMethod.accountName}</div>
-              </div>
-            )}
-
-            {zoomedPaymentMethod.walletAddress && (
-              <div className="p-2.5 bg-gray-50 border border-gray-100 rounded-none text-left text-[11px] font-mono text-gray-700">
-                <div className="font-bold text-gray-400 uppercase text-[9px] tracking-wider">Wallet Address</div>
-                <div className="mt-1 flex items-start gap-2">
-                  <span className="min-w-0 flex-1 break-all font-bold text-slate-800 select-all">{zoomedPaymentMethod.walletAddress}</span>
-                  <button type="button" onClick={() => { void navigator.clipboard.writeText(String(zoomedPaymentMethod.walletAddress)); setCopiedField("wallet"); setTimeout(() => setCopiedField(null), 2000); }} className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 font-heading text-[10px] font-semibold text-slate-800">{copiedField === "wallet" ? "Copied" : "Copy"}</button>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 pt-1">
-              {(zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const url = zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image;
-                    const filename = `PRIME_QR_${String(zoomedPaymentMethod.name || "payment").replace(/[^a-zA-Z0-9_-]+/g, "_")}.png`;
-                    void downloadTelegramMedia(String(url || ""), filename).catch((error) => {
-                      console.error("[PRIME payment QR] Download failed", error);
-                      window.alert("The QR image could not be downloaded. Please try again.");
-                    });
-                  }}
-
-                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-none text-xs font-bold uppercase tracking-wider font-mono transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download</span>
-                </button>
-              )}
+              <TelegramMediaImage src={zoomedPaymentMethod.qrCodeImage || zoomedPaymentMethod.qrCode || zoomedPaymentMethod.qrImage || zoomedPaymentMethod.qr_code_image} alt={`${zoomedPaymentMethod.name} QR Code`} className="h-48 w-48 object-contain" />
+              <p className="font-heading text-lg font-bold">{zoomedPaymentMethod.name}</p>
+              {zoomedPaymentMethod.accountName && <p className="text-xs">Account Name: {zoomedPaymentMethod.accountName}</p>}
+              {zoomedPaymentMethod.accountNumber && <p className="text-xs">Account: {zoomedPaymentMethod.accountNumber}</p>}
+              {zoomedPaymentMethod.walletAddress && <p className="break-all text-xs">Wallet Address: {zoomedPaymentMethod.walletAddress}</p>}
               <button
                 type="button"
                 onClick={() => {
                   setIsPaymentQrModalOpen(false);
                   setZoomedPaymentMethod(null);
+                  setIsReceiptModalOpen(true);
                 }}
                 className="flex-1 px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs"
               >
@@ -3203,6 +3035,19 @@ export default function CheckoutModal({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {isReceiptModalOpen && selectedPaymentMethod && currentStep === 5 && (
+        <div className="fixed inset-0 z-[2700] flex items-center justify-center bg-slate-950/75 p-3" role="dialog" aria-modal="true" aria-label="Payment receipt upload">
+          <section className="w-full max-w-[430px] space-y-3 rounded-xl bg-white p-4 text-center shadow-xl">
+            <p className="text-xs leading-relaxed">Please upload a clear copy of your payment receipt. Our system will conduct an Automated Image Analysis to help review its authenticity before it can be submitted. Staff must verify the payment.</p>
+            {!ocrAnalysis && !ocrError && !isAnalyzingReceipt && <div className="space-y-2">{uploadedProofImage && <button type="button" onClick={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }} className="w-full border border-slate-300 px-3 py-2 text-xs">Re-scan Saved Receipt</button>}<button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="w-full bg-slate-900 px-3 py-3 text-xs font-heading font-semibold uppercase text-white">Select Receipt for Upload</button></div>}
+            {isAnalyzingReceipt && <div role="status" className="space-y-3"><div className="prime-upload-scan">{uploadedProofImage ? <img src={uploadedProofImage} alt="Receipt being analyzed" /> : <Loader2 className="mx-auto h-10 w-10 animate-spin" />}<span /></div><p className="text-xs">Automated Forensics Image Analysis is in progress. Please do not close or refresh this page. This process will take up to 30 seconds.</p></div>}
+            {ocrAnalysis?.matchStatus === "ANALYSIS_COMPLETED" && !isAnalyzingReceipt && <div role="status" className="space-y-3"><CheckCircle2 className="prime-success-check mx-auto h-12 w-12 text-emerald-600" /><p className="font-heading font-semibold">Image Analysis Completed</p><div className="grid grid-cols-3 gap-2"> <button type="button" onClick={() => setIsPreviewProofOpen(true)} className="border border-slate-300 p-2 text-xs">PREVIEW</button><button type="button" onClick={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }} className="border border-slate-300 p-2 text-xs">RE-SCAN</button><button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="border border-slate-300 p-2 text-xs">REPLACE</button></div></div>}
+            {ocrError && <><p role="alert" className="text-xs text-red-700">{ocrError}</p><div className="flex justify-center gap-2">{uploadedProofImage && <button type="button" onClick={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }} className="border border-slate-300 p-2 text-xs">RE-SCAN</button>}<button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="border border-slate-300 p-2 text-xs">REPLACE</button></div></>}
+            {!isAnalyzingReceipt && <button type="button" onClick={() => setIsReceiptModalOpen(false)} className="min-h-10 px-4 text-xs font-heading font-semibold uppercase">Done</button>}
+          </section>
         </div>
       )}
 

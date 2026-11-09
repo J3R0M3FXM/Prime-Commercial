@@ -225,7 +225,9 @@ assert.match(mediaReader, /api\.getFileContent\(asset\.fileId\)/, 'Legacy Telegr
 const serverlessClient = readFileSync('lib/telegram-serverless-client.ts', 'utf8');
 assert.match(serverlessClient, /export async function downloadTelegramMedia[\s\S]*resolveTelegramMedia\(reference\)/, 'Media downloads must resolve Telegram-backed references first');
 const checkoutUi = readFileSync('app/components/checkout-modal.tsx', 'utf8');
-assert.match(checkoutUi, /downloadTelegramMedia\(String\(url \|\| ""\), filename\)/, 'Payment QR download must use the media resolver');
+const qrModal = checkoutUi.split('{/* Enlarged Payment QR Code Pop-up Modal */}')[1].split('{isReceiptModalOpen')[0];
+assert.match(qrModal, /<TelegramMediaImage[\s\S]*zoomedPaymentMethod\.qrCodeImage/, 'Payment QR must resolve Telegram-backed images');
+assert.doesNotMatch(qrModal, /downloadTelegramMedia|>Download</, 'Payment QR must not offer the unavailable download control');
 
 const promoCodec = readFileSync('tgcloud/lib/promos.js', 'utf8');
 assert.match(promoCodec, /realDescription/, 'Promo description metadata must preserve the human-readable description');

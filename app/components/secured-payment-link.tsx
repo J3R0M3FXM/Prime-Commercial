@@ -14,6 +14,19 @@ export function validatedPaymentLink(value: unknown): string {
   }
 }
 
+export function openSecuredPaymentLink(value: unknown): boolean {
+  const href = validatedPaymentLink(value);
+  if (!href) return false;
+  const webApp = (window as unknown as { Telegram?: { WebApp?: { initData?: string; openLink?: (url: string, options?: { try_instant_view: boolean }) => void } } }).Telegram?.WebApp;
+  try {
+    if (webApp?.initData && webApp.openLink) webApp.openLink(href, { try_instant_view: false });
+    else window.open(href, "_blank", "noopener,noreferrer");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function handleSecuredPaymentLink(event: MouseEvent<HTMLAnchorElement>, url: string) {
   if (!validatedPaymentLink(url)) {
     event.preventDefault();

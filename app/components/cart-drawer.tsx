@@ -9,6 +9,7 @@ import { ShoppingCart, X, Plus, Minus, AlertCircle, RefreshCw } from 'lucide-rea
 import { formatPHP } from "@/lib/currency";
 import CheckoutModal from './checkout-modal';
 import PrimePageHeading from './prime-page-heading';
+import TelegramMediaImage from './telegram-media-image';
 
 // Defensive Error Boundary to ensure Cart never crashes the host page
 interface ErrorBoundaryProps {
@@ -155,11 +156,11 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange }: { isOpen: 
                       onChange={(e) => toggleSelection && toggleSelection(item.id, e.target.checked)}
                       className="h-4 w-4 cursor-pointer accent-slate-900 shrink-0"
                     />
-                    <img
+                    <TelegramMediaImage
                       src={item.imageUrl || "/product-image-unavailable.svg"}
                       alt={item.name || "Item"}
                       className="h-14 w-14 aspect-square object-cover rounded-lg bg-white border border-gray-200 shrink-0"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/product-image-unavailable.svg"; }}
+                      fallbackSrc="/product-image-unavailable.svg"
                     />
                   </div>
                   <div className="min-w-0 flex-1 pt-0.5">

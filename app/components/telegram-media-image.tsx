@@ -13,7 +13,7 @@ export default function TelegramMediaImage({ src, fallbackSrc, alt = "", classNa
   useEffect(() => {
     let current = true;
     setResolved("");
-    if (!reference) return () => { current = false; };
+    if (!reference) { setResolved(fallbackSrc || ""); return () => { current = false; }; }
     resolveTelegramMedia(reference)
       .then((url) => { if (current) setResolved(url); })
       .catch(() => { if (current) setResolved(fallbackSrc || ""); });
