@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { dirname,relative,resolve } from 'node:path';
 const require=createRequire(import.meta.url),yaml=require('js-yaml');
 const source=readFileSync('automation/order-milestones.js','utf8').replace(/^import[^\n]*\n/gm,'').replace('export default async function','async function handler');
-const load=reconcile=>new Function('reconcileOrderMilestones',source+'\nreturn handler;')(reconcile);
+const load=reconcile=>new Function('reconcileOrderMilestones','dispatchOrderNotificationRetries',source+'\nreturn handler;')(reconcile,async limit=>{assert.equal(limit,20);return {sent:0};});
 let calls=0;
 const result=await load(async input=>{assert.equal(input.limit,20);calls++;return calls===1?{autoCompleted:2,receiptExpired:1,credited:3,purchasingAwarded:2,pending:0}:{autoCompleted:0,receiptExpired:0,credited:0,purchasingAwarded:0,pending:1};})();
 assert.equal(calls,2);assert.equal(result.autoCompleted,2);assert.equal(result.receiptExpired,1);assert.equal(result.credited,3);

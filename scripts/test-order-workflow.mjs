@@ -21,7 +21,7 @@ class EndpointError extends Error {constructor(message,{code}){super(message);th
 let index=0;
 function sql(strings,...values){const params={};let text=strings[0];values.forEach((value,i)=>{if(value&&typeof value==='object'&&value.text!=null){text+=value.text;Object.assign(params,value.params);}else{const key=':p'+index++;params[key]=value;text+=key;}text+=strings[i+1];});return {text,params};}
 function load(file,names,deps={}){return new Function('db','EndpointError',...Object.keys(deps),readFileSync(file,'utf8').replace(/^import[^\n]*\n/gm,'').replace(/export default async function/,'async function handler').replace(/export /g,'')+'\nreturn {'+names.join(',')+'};')(db,EndpointError,...Object.values(deps));}
-const workflow=load('tgcloud/lib/order-workflow.js',['ensureOrderWorkflow','workflowFor','applyWorkflowAction','attachWorkflow','expireReceiptResubmissions','workflowActions','orderWorkflowColumns','customerWorkflowColumns','workflowDefinitions']);
+const workflow=load('tgcloud/lib/order-workflow.js',['ensureOrderWorkflow','workflowFor','applyWorkflowAction','attachWorkflow','expireReceiptResubmissions','workflowActions','orderWorkflowColumns','customerWorkflowColumns','workflowDefinitions'],{notifyOrderStatusChanged:async()=>{}});
 await workflow.ensureOrderWorkflow();
 const readiness=load('automation/order-workflow-readiness.js',['handler'],workflow).handler;
 assert.equal((await readiness()).ready,true);

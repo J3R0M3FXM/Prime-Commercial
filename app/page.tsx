@@ -6,6 +6,7 @@ import ProductModal from "./components/product-modal";
 import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
 import AccountModal from "./components/account-modal";
+import { orderNotificationDestination } from '@/lib/order-notification-navigation';
 import { useCart } from "./components/cart-context";
 import PrimeIdentityHeader from "./components/prime-identity-header";
 import SupportTickets from "./components/support-tickets";
@@ -53,6 +54,8 @@ export default function Shopfront() {
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [initialOrderIdFromLink, setInitialOrderIdFromLink] = useState<string | null>(null);
+  const [initialFocusReceipt, setInitialFocusReceipt] = useState(false);
+  const [accountInitialTab, setAccountInitialTab] = useState<'overview' | 'points'>('overview');
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window === "undefined" || import.meta.env?.VITE_UI_PREVIEW !== "1") return "shop";
     const params = new URLSearchParams(window.location.search);
@@ -237,13 +240,16 @@ export default function Shopfront() {
               params.get("tgWebAppStartParam") ||
               "";
 
-            const rawOrderLink = queryOrderId || telegramStartParam;
-            const openOrderId = String(rawOrderLink || "").replace(/^order[_:-]?/i, "").trim();
+            const destination = queryOrderId ? { tab: 'orders' as const, orderId: queryOrderId, receipt: false } : orderNotificationDestination(String(telegramStartParam));
+            const openOrderId = destination?.orderId || '';
 
             if (openOrderId) {
               setInitialOrderIdFromLink(openOrderId);
               setActiveTab("orders");
+              setInitialFocusReceipt(Boolean(destination?.receipt));
             }
+            if (destination?.tab === 'account') { setAccountInitialTab('points'); setActiveTab('account'); }
+            if (destination?.tab === 'media') setActiveTab('media');
 
             sessionStorage.setItem("prime_customer_id", customerId);
             sessionStorage.setItem("prime_customer_name", customerName);
@@ -254,7 +260,7 @@ export default function Shopfront() {
             localStorage.setItem("prime_customer_name", customerName);
             localStorage.setItem("prime_customer_username", customerUsername);
             localStorage.setItem("prime_member_id", memberId);
-            if (!openOrderId && readCheckoutDraft(String(customerId))) {
+            if (!destination && readCheckoutDraft(String(customerId))) {
               setActiveTab("cart");
               setIsCartOpen(true);
             }
@@ -506,6 +512,7 @@ export default function Shopfront() {
         <OrderHistoryModal
           isOpen={true}
           initialSelectedOrderId={initialOrderIdFromLink}
+          initialFocusReceipt={initialFocusReceipt}
           onClose={() => {
             setInitialOrderIdFromLink(null);
             setActiveTab("shop");
@@ -515,6 +522,7 @@ export default function Shopfront() {
 
       {/* Customer Account & Points Modal */}
       {activeTab === "account" && <AccountModal
+        initialTab={accountInitialTab}
         isOpen={true}
         onClose={() => setActiveTab("shop")}
         onSelectOrder={(ord) => {

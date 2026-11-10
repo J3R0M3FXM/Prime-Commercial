@@ -102,7 +102,9 @@ export default async function (input, ctx) {
     }
     const result=await applyWorkflowAction(currentOrder,workflowAction,{...input,...(action==='approveZeroDue'?{confirmedAmount:0}:{})});
     const saved=await db.select().from(orders).where(eq(orders.id,orderId)).get();
-    await notifyOrderStatusChanged({chatId:saved.tgUserId,orderNumber:saved.orderNumber||saved.id,status:action==='resubmitOrder'?'Replacement Receipt Requested — Upload Within One Hour':saved.status,paymentStatus:saved.paymentStatus,totalAmount:Number(saved.totalAmount)||0});
+    if (!result.alreadyApproved && ['markPaid','approveZeroDue','failReceipt','holdOrder','resubmitOrder','startProcessing','cancelOrder','rejectOrder'].includes(action)) {
+      await notifyOrderStatusChanged({ ...saved, chatId:saved.tgUserId, orderNumber:saved.orderNumber||saved.id, resubmitExpiresAt:result.resubmitExpiresAt });
+    }
     return result;
   }
   if(action==='dispatchOverride'||action==='approveAdjustmentPayment')throw new EndpointError('Tracking is required for dispatch; bill increases require a new order.',{code:'LEGACY_WORKFLOW_RETIRED'});

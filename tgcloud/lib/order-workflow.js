@@ -1,4 +1,5 @@
 import { db, EndpointError } from 'sdk';
+import { notifyOrderStatusChanged } from './order-notifications.js';
 
 const fail=(message,code='ORDER_ACTION_UNAVAILABLE')=>{throw new EndpointError(message,{code});};
 const gross=`max(0,coalesce(NEW.subtotal,0)-coalesce(NEW.staff_discount_amount,0)-coalesce(NEW.discount_amount,0)-coalesce(NEW.points_discount,0))
@@ -133,7 +134,8 @@ export async function expireReceiptResubmissions({customerId='',limit=20}={}) {
         AND (:customer='' OR o.customer_id=:customer)
       ORDER BY d.expires_at,o.id LIMIT :limit)
       AND lower(status)='pending' AND lower(payment_status)='failed' AND control_state='held'
-      RETURNING id`,{':customer':String(customerId),':limit':Math.max(1,Math.min(100,Number(limit)||20))});
+      RETURNING id,order_number AS orderNumber,tg_user_id AS chatId`,{':customer':String(customerId),':limit':Math.max(1,Math.min(100,Number(limit)||20))});
+  await Promise.allSettled((result?.rows || []).map(order => notifyOrderStatusChanged({ ...order, status: 'Cancelled', cancellationReason: 'non-payment' })));
   return {cancelled:Number(result?.rowsAffected)||0};
 }
 export function workflowStage(order) {

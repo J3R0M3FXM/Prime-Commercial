@@ -2,6 +2,19 @@ import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { systemSettings } from '../schema.js';
 import { configuredAdminIds } from './auth.js';
+import { customerNotificationContent, customerNotificationKeyboard } from './customer-order-notifications.js';
+
+export async function ensureNotificationOutbox() {
+  const exists = () => db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='telegram_notification_outbox'");
+  if (await exists()) return;
+  try {
+    await db.run(`CREATE TABLE IF NOT EXISTS telegram_notification_outbox (
+      id TEXT PRIMARY KEY,event_key TEXT NOT NULL UNIQUE,chat_id TEXT NOT NULL,
+      message_text TEXT NOT NULL,order_number TEXT NOT NULL,button_label TEXT NOT NULL,
+      status TEXT NOT NULL,attempt_count INTEGER NOT NULL DEFAULT 0,next_attempt_at INTEGER NOT NULL,
+      lease_token TEXT,lease_until INTEGER,created_at INTEGER NOT NULL,sent_at INTEGER,last_error TEXT)`);
+  } catch (error) { if (!await exists()) throw error; }
+}
 
 export async function getAdminNotificationRecipients() {
   const setting = await db.select({ value: systemSettings.value }).from(systemSettings)
@@ -44,13 +57,20 @@ function formatDeadline(value) {
 }
 
 let botUsername = '';
-async function orderKeyboard(orderNumber, label) {
+export async function orderKeyboard(orderNumber, label) {
   if (!botUsername) {
     const bot = await api.getMe();
     botUsername = String(bot?.username || '').trim();
   }
   if (!botUsername) throw new Error('Telegram bot username is unavailable.');
-  const prefix = label === 'Open Admin Order' ? 'admin_order_' : 'order_';
+  if (label !== 'Open Admin Order') {
+    const saved = label === 'TRACK DELIVERY' ? await db.get(
+      'SELECT tracking_url AS trackingUrl, status FROM orders WHERE order_number=:number',
+      { ':number': String(orderNumber) }) : null;
+    return customerNotificationKeyboard(botUsername, orderNumber, label,
+      String(saved?.status || '').toLowerCase() === 'dispatched' ? String(saved?.trackingUrl || '') : '');
+  }
+  const prefix = 'admin_order_';
   const startParam = encodeURIComponent(prefix + String(orderNumber || ''));
   return { inline_keyboard: [[{
     text: label,
@@ -65,6 +85,7 @@ async function send(chatId, text, orderNumber, buttonLabel, eventKey) {
   let ownsOutboxRow = false;
   let outboxAvailable = false;
   try {
+    await ensureNotificationOutbox();
     leaseToken = randomToken();
     privateEventKey = await hashEventKey(eventKey);
     await db.run(
@@ -129,33 +150,8 @@ async function send(chatId, text, orderNumber, buttonLabel, eventKey) {
   }
 }
 
-function paymentProofButton(order) {
-  return String(order?.status || '').toLowerCase() === 'pending' &&
-    String(order?.paymentStatus || '').toLowerCase() === 'unpaid'
-    ? 'Upload Payment Proof'
-    : 'View Order Details';
-}
-
 export async function notifyOrderCreated(order) {
-  const items = Array.isArray(order.items) ? order.items.slice(0, 10).map((item) => {
-    const quantity = Number(item?.quantity ?? item?.qty ?? 1) || 1;
-    return `- ${escapeHtml(item?.name || 'Item')} x ${quantity}`;
-  }).join('\n') : '';
-  const deadline = formatDeadline(order.paymentDeadlineAt);
-  const message = formatMessage([
-    '<b>PRIME™ ORDER MANAGEMENT</b>',
-    [
-      `Order No.: <code>${escapeHtml(order.orderNumber)}</code>`,
-      `Status: ${String(order.paymentStatus || '').toLowerCase() === 'unpaid' ? 'Awaiting Payment' : escapeHtml(order.status)}`,
-      deadline ? `Payment deadline: ${escapeHtml(deadline)}` : '',
-    ].filter(Boolean).join('\n'),
-    `Hi, ${escapeHtml(order.customerName || 'there')}!`,
-    `We have received your order. Total payable: <b>${money(order.payableNow ?? order.totalAmount)}</b>.`,
-    deadline ? 'Please settle the amount and upload your proof of payment before the deadline above to avoid automatic cancellation.' : 'We will notify you when your order status changes.',
-    items ? `<b>Order items</b>\n${items}` : '',
-    'Thank you for choosing PRIME™ Sourcing &amp; Distribution Network!',
-  ]);
-  return send(order.chatId, message, order.orderNumber, 'Upload Payment Proof', 'order-created:' + String(order.orderNumber));
+  return notifyCustomerOrder({ ...order, status: 'Pending' }, 'order-created:' + String(order.orderNumber));
 }
 
 /** Notify the configured Admin independently of the customer delivery result. */
@@ -196,68 +192,96 @@ export async function notifyAdminOrderCreated(order) {
   }
 }
 
-/** Notify the recipient of a POS order whose payment was already collected. */
+/** Resolve stored status before composing a customer message. */
+async function notificationOrder(input) {
+  const stored = await db.get(`
+    SELECT order_number AS orderNumber, tg_user_id AS chatId, status,
+      payment_status AS paymentStatus, control_state AS controlState,
+      review_status AS reviewStatus, tracking_url AS trackingUrl,
+      payment_proof_image AS paymentProofImage, id
+    FROM orders WHERE order_number=:number`, { ':number': String(input.orderNumber || '') });
+  const order = { ...input, ...(stored || {}) };
+  if (String(order.controlState || '').toLowerCase() === 'held') {
+    const deadline = await db.get(`SELECT d.expires_at AS expiresAt FROM order_receipt_deadlines d
+      JOIN order_workflow w ON w.order_id=d.order_id
+      WHERE d.order_id=:id AND w.resubmission_requested=1`, { ':id': String(order.id || '') });
+    order.resubmitExpiresAt = deadline ? Number(deadline.expiresAt) * 1000 : null;
+  }
+  return order;
+}
+
+async function notifyCustomerOrder(input, eventKey = '') {
+  const order = await notificationOrder(input);
+  const content = customerNotificationContent(order);
+  if (!content) return false;
+  return send(order.chatId, content.text, order.orderNumber, content.buttonLabel,
+    eventKey || 'order-status:' + String(order.orderNumber) + ':' + content.kind +
+      (content.kind === 'hold' ? ':' + String(order.resubmitExpiresAt) : '') +
+      (order.controlEventId ? ':' + String(order.controlEventId) : ''));
+}
+
 export async function notifyPosOrderCreated(order) {
-  const items = Array.isArray(order.items) ? order.items.slice(0, 10).map((item) => {
-    const quantity = Number(item?.quantity ?? item?.qty ?? 1) || 1;
-    return `- ${escapeHtml(item?.name || 'Item')} x ${quantity}`;
-  }).join('\n') : '';
-  const message = formatMessage([
-    '<b>PRIME™ ORDER MANAGEMENT</b>',
-    [
-      `Order No.: <code>${escapeHtml(order.orderNumber)}</code>`,
-      `Status: ${escapeHtml(order.status || 'Processing')}`,
-      `Payment: Received by ${escapeHtml(order.paymentMethodName || 'staff')}`,
-      `Total: <b>${money(order.totalAmount)}</b>`,
-    ].join('\n'),
-    `Hi, ${escapeHtml(order.customerName || 'there')}!`,
-    'Your order has been recorded by PRIME staff and payment is confirmed.',
-    items ? `<b>Order items</b>\n${items}` : '',
-    'We will send another message when your order status changes.',
-    'Thank you for choosing PRIME™ Sourcing &amp; Distribution Network!',
-  ]);
-  return send(order.chatId, message, order.orderNumber, 'View Order Details', 'pos-created:' + String(order.orderNumber));
+  return notifyCustomerOrder({ ...order, status: order.status || 'Processing', paymentStatus: 'Paid' },
+    'pos-created:' + String(order.orderNumber));
 }
 
-export async function notifyOrderStatusChanged(order) {
-  const status = String(order.status || 'Updated');
-  const expired = status.toLowerCase() === 'expired';
-  const message = formatMessage([
-    '<b>PRIME™ ORDER MANAGEMENT</b>',
-    [
-      `Order No.: <code>${escapeHtml(order.orderNumber)}</code>`,
-      `Status: ${escapeHtml(status)}`,
-      order.courierName ? `Courier: ${escapeHtml(order.courierName)}` : '',
-      order.trackingNumber ? `Tracking number: <code>${escapeHtml(order.trackingNumber)}</code>` : '',
-      order.totalAmount !== undefined ? `Total amount: ${money(order.totalAmount)}` : '',
-    ].filter(Boolean).join('\n'),
-    expired ? 'Your order expired because payment proof was not received within the one-hour submission window. The order has been cancelled.' : order.trackingOverridden ? 'Your order has been dispatched. A tracking link is not available yet; contact PRIME Commercial support if you need delivery details.' : 'Your order status has been updated.',
-    'If you need assistance, please contact PRIME™ Commercial support.',
-  ]);
-  return send(order.chatId, message, order.orderNumber, paymentProofButton(order),
-    'order-status:' + String(order.orderNumber) + ':' + status.toLowerCase() + (order.controlEventId ? ':' + String(order.controlEventId) : ''));
-}
+export async function notifyOrderStatusChanged(order) { return notifyCustomerOrder(order); }
 
-export async function notifyPaymentUpdated(order) {
-  const paid = String(order.paymentStatus || '').toLowerCase() === 'paid';
-  const message = formatMessage([
-    '<b>PRIME™ ORDER MANAGEMENT</b>',
-    [
-      `Order No.: <code>${escapeHtml(order.orderNumber)}</code>`,
-      `Status: ${escapeHtml(order.status || 'Pending')}`,
-      `Payment status: ${escapeHtml(order.paymentStatus || 'Pending Review')}`,
-      order.totalAmount !== undefined ? `Total amount: ${money(order.totalAmount)}` : '',
-    ].filter(Boolean).join('\n'),
-    paid ? 'Your payment has been reviewed and the order payment is confirmed.' : 'We have received your payment proof. It is awaiting staff review. We will notify you when the review is complete.',
-  ]);
-  return send(order.chatId, message, order.orderNumber, 'View Order Details',
-    'payment-status:' + String(order.orderNumber) + ':' + String(order.paymentStatus || '').toLowerCase());
-}
+export async function notifyPaymentUpdated(order) { return notifyCustomerOrder(order); }
 
-export async function notifyPaymentProofSubmitted(order) {
-  return notifyPaymentUpdated({ ...order, paymentStatus: 'Pending Review' });
+export async function notifyPaymentProofSubmitted(input) {
+  const order = await notificationOrder(input);
+  return notifyCustomerOrder(order, 'receipt-review:' + String(order.orderNumber) + ':' + String(order.paymentProofImage || ''));
 }
 
 export async function notifyOrderExpired(order) {
-  return notifyOrderStatusChanged({ ...order, status: 'Expired', paymentStatus: 'Unpaid' });
+  return notifyCustomerOrder({ ...order, status: 'Expired', cancellationReason: 'non-payment' });
+}
+
+/** The existing owner scheduler and staff retry UI share this bounded, leased dispatcher. */
+export async function dispatchOrderNotificationRetries(limit = 20) {
+  await ensureNotificationOutbox();
+  const rows = await db.all(`SELECT id,chat_id AS chatId,message_text AS messageText,
+    order_number AS orderNumber,button_label AS buttonLabel,attempt_count AS attemptCount
+    FROM telegram_notification_outbox WHERE attempt_count<8 AND
+      ((status='retry' AND next_attempt_at<=unixepoch()) OR
+       (status IN ('inline','sending') AND coalesce(lease_until,0)<=unixepoch()))
+    ORDER BY next_attempt_at,id LIMIT :limit`, { ':limit': Math.max(1,Math.min(20,Number(limit)||20)) });
+  const result = { sent: 0, deferred: 0, superseded: 0 };
+  for (const row of rows) {
+    const token = randomToken();
+    const claimed = await db.run(`UPDATE telegram_notification_outbox
+      SET status='sending',lease_token=:token,lease_until=unixepoch()+180
+      WHERE id=:id AND attempt_count<8 AND
+        ((status='retry' AND next_attempt_at<=unixepoch()) OR
+         (status IN ('inline','sending') AND coalesce(lease_until,0)<=unixepoch())) RETURNING id`,
+    { ':id': row.id, ':token': token });
+    if (!Number(claimed?.rowsAffected)) continue;
+    const params = { ':id': row.id, ':token': token };
+    try {
+      if (row.buttonLabel !== 'Open Admin Order') {
+        const content = customerNotificationContent(await notificationOrder({ orderNumber: row.orderNumber }));
+        if (!content || content.text !== row.messageText || content.buttonLabel !== row.buttonLabel) {
+          await db.run(`UPDATE telegram_notification_outbox SET status='failed',last_error='superseded_status_or_template',
+            lease_token=NULL,lease_until=NULL WHERE id=:id AND lease_token=:token`, params);
+          result.superseded++; continue;
+        }
+      }
+      await api.sendMessage({ chat_id: String(row.chatId), text: row.messageText,
+        parse_mode: 'HTML', disable_web_page_preview: true,
+        reply_markup: await orderKeyboard(row.orderNumber,row.buttonLabel) });
+      await db.run(`UPDATE telegram_notification_outbox SET status='sent',sent_at=unixepoch(),
+        chat_id='',message_text='',order_number='',button_label='',lease_token=NULL,lease_until=NULL,last_error=NULL
+        WHERE id=:id AND lease_token=:token`, params);
+      result.sent++;
+    } catch {
+      const attempts = Number(row.attemptCount || 0) + 1;
+      await db.run(`UPDATE telegram_notification_outbox SET status=:status,attempt_count=:attempts,
+        next_attempt_at=unixepoch()+:delay,last_error='telegram_delivery_failed',lease_token=NULL,lease_until=NULL
+        WHERE id=:id AND lease_token=:token`, { ...params, ':status': attempts >= 8 ? 'failed' : 'retry',
+        ':attempts': attempts, ':delay': Math.min(3600,60 * 2 ** attempts) });
+      result.deferred++;
+    }
+  }
+  return result;
 }

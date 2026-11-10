@@ -30,6 +30,8 @@ run('node', ['scripts/check-telegram-serverless-contracts.mjs'], 'Serverless con
 run('node', ['scripts/test-receipt-deadlines.mjs'], 'staff-requested receipt expiry');
 run('node', ['scripts/test-order-workflow.mjs'], 'order controller, refunds and scheduled completion');
 run('node', ['scripts/test-order-controller-ui.mjs'], 'rendered order controller and action locks');
+run('node', ['scripts/test-customer-notifications.mjs'], 'customer status messages and Telegram delivery');
+run('node', ['scripts/test-customer-order-actions.mjs'], 'customer action locks and notification destinations');
 run('node', ['scripts/test-order-scheduler.mjs'], 'GitHub order scheduler activation and bounds');
 run('node', ['scripts/test-support-tabs.mjs'], 'customer and staff Support sub-tabs');
 run('node', ['scripts/test-support-backend.mjs'], 'Support ownership, replies and FAQ capacity');

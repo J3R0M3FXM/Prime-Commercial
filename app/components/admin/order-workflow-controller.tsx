@@ -7,12 +7,14 @@ type Props={order:{id:string;status:string;paymentStatus:string;payableNow:numbe
 export default function OrderWorkflowController({order,busy,onAction,onModify}:Props) {
   const [review,setReview]=useState(false),[cancelling,setCancelling]=useState(false),[overpayment,setOverpayment]=useState(false),[amount,setAmount]=useState(''),[reason,setReason]=useState(''),[tracking,setTracking]=useState(''),[verified,setVerified]=useState(false),[refundMethod,setRefundMethod]=useState('credits'),[reference,setReference]=useState('');
   const flow=order.workflow,actions=flow?.actions||[],stage=flow?.stage||order.status,paid=order.paymentStatus.toLowerCase()==='paid';
-  const available=(action:string)=>!busy&&actions.includes(action);
+  const closed=['completed','delivered'].includes(String(order.status).toLowerCase());
+  const available=(action:string)=>!busy&&!closed&&actions.includes(action);
   const button='prime-workflow-button min-h-10 min-w-0 px-2 py-2 text-xs';
   const confirmAmount=verified&&amount!==''&&Number.isFinite(Number(amount))&&Number(amount)>=0&&(stage==='Cancelled'||Number(amount)>=order.payableNow);
-  const submit=async(action:string,extra?:Record<string,any>)=>{if(await onAction(action,extra)){setReview(false);setCancelling(false);setOverpayment(false);setVerified(false);setAmount('');}};
+  const submit=async(action:string,extra?:Record<string,any>)=>{if(closed||busy)return;if(await onAction(action,extra)){setReview(false);setCancelling(false);setOverpayment(false);setVerified(false);setAmount('');}};
   return <section aria-label="Order Controller" className="prime-order-workflow space-y-3 border-b border-slate-200 py-3 text-sm">
     <h3 className="font-heading font-normal">Order Controller · {stage}</h3>
+    <fieldset disabled={busy||closed} className="min-w-0 space-y-3">
     {!flow?<p role="alert">Refresh To Load Available Order Actions.</p>:<>
     <div className="grid grid-cols-2 gap-2">
       <button type="button" className={button} disabled={!available('review')} onClick={()=>setReview(value=>!value)}>Review</button>
@@ -45,5 +47,5 @@ export default function OrderWorkflowController({order,busy,onAction,onModify}:P
     {flow.externalRefundReference&&<p className="break-words text-xs font-mono">Provider Refund Reference: {flow.externalRefundReference}</p>}
     {flow.refundedCredits>0&&<p className="text-xs font-mono">Refunded Store Credits: {formatPHP(flow.refundedCredits)}</p>}
     </>}
-  </section>;
+  </fieldset></section>;
 }

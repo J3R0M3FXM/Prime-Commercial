@@ -9,6 +9,8 @@ CREATE TABLE point_transactions(id TEXT PRIMARY KEY,user_id TEXT,type TEXT,amoun
 CREATE TABLE inventory_reservations(order_id TEXT,status TEXT,updated_at INTEGER);
 CREATE TABLE promo_claims(order_id TEXT,status TEXT,updated_at INTEGER);`);
 sqlite.exec('ALTER TABLE orders ADD COLUMN received_transfer_used REAL');
+sqlite.exec('ALTER TABLE orders ADD COLUMN tg_user_id TEXT');
+const notifications=[];
 const db={
   async all(sql,params={}) { return sqlite.prepare(sql).all(params); },
   async get(sql,params={}) { return sqlite.prepare(sql).get(params); },
@@ -16,13 +18,13 @@ const db={
     if(/^CREATE /i.test(sql.trim())) { sqlite.exec(sql); return {rowsAffected:0}; }
     const statement=sqlite.prepare(sql);
     // Telegram db.run returns rowsAffected even for statements with RETURNING.
-    if(/RETURNING/i.test(sql))return {rowsAffected:statement.all(params).length};
+    if(/RETURNING/i.test(sql)){const rows=statement.all(params);return {rowsAffected:rows.length,rows};}
     return {rowsAffected:Number(statement.run(params).changes)};
   },
 };
 class EndpointError extends Error {constructor(message,{code}){super(message);this.code=code;}}
 const source=readFileSync('tgcloud/lib/order-workflow.js','utf8').replace(/^import[^\n]*\n/gm,'').replace(/export /g,'');
-const workflow=new Function('db','EndpointError',source+'\nreturn {ensureOrderWorkflow,applyWorkflowAction,attachWorkflow,expireReceiptResubmissions};')(db,EndpointError);
+const workflow=new Function('db','EndpointError','notifyOrderStatusChanged',source+'\nreturn {ensureOrderWorkflow,applyWorkflowAction,attachWorkflow,expireReceiptResubmissions};')(db,EndpointError,async order=>notifications.push(order));
 await workflow.ensureOrderWorkflow();
 await workflow.ensureOrderWorkflow();
 function create(id) {
@@ -46,11 +48,14 @@ assert.throws(()=>sqlite.prepare("UPDATE orders SET payment_proof_image='late-re
 await assert.rejects(workflow.applyWorkflowAction(first,'resubmit'),error=>error.code==='RECEIPT_DEADLINE_EXPIRED');
 assert.equal((await workflow.expireReceiptResubmissions({customerId:'someone-else'})).cancelled,0);
 assert.equal((await workflow.expireReceiptResubmissions()).cancelled,1);
+assert.equal(notifications.length,1,'Deadline cancellation must notify the customer');
+assert.equal(notifications[0].cancellationReason,'non-payment');
 assert.equal(sqlite.prepare('SELECT status FROM orders WHERE id=?').get(first.id).status,'Cancelled');
 assert.equal(sqlite.prepare('SELECT status FROM inventory_reservations WHERE order_id=?').get(first.id).status,'released');
 assert.equal(sqlite.prepare('SELECT status FROM promo_claims WHERE order_id=?').get(first.id).status,'released');
 assert.equal(sqlite.prepare('SELECT count(*) n FROM order_workflow_credits').get().n,0,'Unverified payments must not create refunds');
 assert.equal((await workflow.expireReceiptResubmissions()).cancelled,0,'Repeated scheduler runs are idempotent');
+assert.equal(notifications.length,1,'Repeated expiry must not create another notification');
 const uploaded=create('uploaded');
 await workflow.applyWorkflowAction(uploaded,'resubmit');
 sqlite.prepare("UPDATE orders SET payment_proof_image='replacement',payment_status='Pending Review' WHERE id=?").run(uploaded.id);

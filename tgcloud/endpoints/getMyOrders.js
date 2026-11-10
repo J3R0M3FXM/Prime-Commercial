@@ -21,8 +21,10 @@ export default async function (_input, ctx) {
   if (customer?.id) ownership.push(eq(orders.customerId, customer.id));
   if (customer?.primeMemberId) ownership.push(eq(orders.primeMemberId, customer.primeMemberId));
 
-  const rows = await db.select().from(orders)
-    .where(ownership.length === 1 ? ownership[0] : or(...ownership))
+  const owned = ownership.length === 1 ? ownership[0] : or(...ownership);
+  const target = String(_input?.orderId || '').trim();
+  const selection = target ? db.select().from(orders).where(owned,or(eq(orders.id,target),eq(orders.orderNumber,target))) : db.select().from(orders).where(owned);
+  const rows = await selection
     .orderBy(desc(orders.createdAt))
     .limit(100)
     .all();

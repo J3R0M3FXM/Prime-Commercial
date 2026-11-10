@@ -14,7 +14,7 @@ const {createElement,act}=await import('react'),{createRoot}=await import('react
 const root=createRoot(document.getElementById('root')),calls=[];
 const workflowSource=readFileSync('tgcloud/lib/order-workflow.js','utf8').replace(/^import[^\n]*\n/gm,'').replace(/export /g,'');
 const workflowActions=new Function(workflowSource+'\nreturn workflowActions;')();
-const expected={Pending:['review','modify','cancel'],Confirmed:['processing','modify','cancel'],Failed:['hold','cancel'],Held:['resubmit','review','cancel'],Processing:['ready','cancel'],Ready:['dispatch','cancel'],Dispatched:['complete'],Cancelled:['revalidate']};
+const expected={Pending:['review','modify','cancel'],Confirmed:['processing','modify','cancel'],Failed:['hold','cancel'],Held:['resubmit','review','cancel'],Processing:['ready','cancel'],Ready:['dispatch','cancel'],Dispatched:['complete'],Completed:[],Cancelled:['revalidate']};
 const button=label=>[...document.querySelectorAll('button')].find(node=>node.textContent===label);
 async function render(stage,extra={}) {
   const order={id:'order-'+stage,status:['Failed','Held'].includes(stage)?'Pending':stage,controlState:stage.toLowerCase(),paymentStatus:['Confirmed','Processing','Ready','Dispatched'].includes(stage)?'Paid':'Pending Review',payableNow:100,paymentProofImage:'proof',workflow:{stage,actions:expected[stage],receiptFailures:stage==='Held'?1:0,resubmitExpiresAt:null,editState:'',refundedCredits:0,...extra}};
@@ -48,6 +48,8 @@ assert.deepEqual(calls.at(-1),{action:'markPaid',input:{confirmedAmount:'125',ex
 await render('Held');await act(async()=>button('Request Resubmit · One Hour').click());assert.equal(calls.at(-1).action,'resubmitOrder');
 await render('Held',{resubmitExpiresAt:Date.now()+3600000});assert.equal(button('Request Resubmit · One Hour').disabled,true);
 await render('Dispatched');await act(async()=>button('Completed').click());assert.equal(calls.at(-1).action,'complete');
+await render('Completed');
+assert.ok([...document.querySelectorAll('section[aria-label="Order Controller"] button')].every(node=>node.matches(':disabled')),'All completed-order staff controls are disabled');
 await render('Confirmed',{editState:'pending',editRequest:{receiverName:'<script>Not HTML</script>',receiverPhone:'09123456789',deliveryAddress:{unitDetails:'Unit 1'}}});
 assert.equal(button('Processing').disabled,true);assert.equal(document.querySelectorAll('script').length,0);
 await act(async()=>button('Approve Edit').click());assert.equal(calls.at(-1).action,'approveCustomerEdit');

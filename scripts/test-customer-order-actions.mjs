@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { build } from 'rolldown';
+import { JSDOM } from 'jsdom';
+const require=createRequire(import.meta.url);
+const dom=new JSDOM('<div id="root"></div>',{url:'https://local.example/'});
+for(const key of ['window','document','navigator','HTMLElement','Event','MouseEvent'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+async function bundle(input){const output=await build({input,write:false,platform:'node',tsconfig:false,resolve:{alias:{'@':process.cwd()}},transform:{jsx:{runtime:'automatic'}},onLog(level,log,handler){if(log.code!=='MODULE_LEVEL_DIRECTIVE')handler(level,log);},plugins:[{name:'react-singleton',resolveId(id){if(id==='react'||id.startsWith('react/'))return {id:pathToFileURL(require.resolve(id)).href,external:true};}}],output:{format:'esm'}});return import('data:text/javascript;base64,'+Buffer.from(output.output[0].code).toString('base64'));}
+const Component=(await bundle('app/components/customer-order-actions.tsx')).default;
+const navigation=await bundle('lib/order-notification-navigation.ts');
+const {createElement,act}=await import('react'),{createRoot}=await import('react-dom/client');
+const root=createRoot(document.getElementById('root'));
+const calls=[];window.Telegram={WebApp:{openLink:url=>calls.push(url)}};
+const callbacks={onEdit:()=>calls.push('edit'),onCancel:()=>calls.push('cancel'),onReceived:()=>calls.push('received')};
+const expected={Pending:[false,false,true,true],Confirmed:[false,false,true,true],Processing:[true,false,true,true],Ready:[true,true,true,true],Dispatched:[true,true,false,false],Completed:[true,true,true,true],Delivered:[true,true,true,true],Cancelled:[true,true,true,true]};
+for(const [status,locks] of Object.entries(expected)) {
+  await act(async()=>root.render(createElement(Component,{order:{status,trackingUrl:'https://courier.example/track',workflow:{}},busy:false,receiptBusy:false,preview:false,...callbacks})));
+  const buttons=[...document.querySelectorAll('button')];
+  assert.deepEqual(buttons.map(button=>button.textContent),['EDIT ORDER','CANCEL ORDER','TRACK COURIER','RECEIVED']);
+  assert.deepEqual(buttons.map(button=>button.disabled),locks,status);
+  const before=calls.length;
+  await act(async()=>buttons.forEach(button=>button.click()));
+  if(status==='Dispatched')assert.deepEqual(calls.slice(before),['https://courier.example/track','received']);
+  if(['Completed','Delivered','Cancelled','Ready'].includes(status))assert.equal(calls.length,before,'Disabled controls cannot invoke actions');
+}
+await act(async()=>root.render(createElement(Component,{order:{status:'Dispatched',trackingUrl:'javascript:alert(1)'},busy:false,receiptBusy:false,preview:false,...callbacks})));
+assert.equal([...document.querySelectorAll('button')][2].disabled,true);
+assert.deepEqual(navigation.orderNotificationDestination('order_1111011558'),{tab:'orders',orderId:'1111011558',receipt:false});
+assert.deepEqual(navigation.orderNotificationDestination('receipt_1111011558'),{tab:'orders',orderId:'1111011558',receipt:true});
+assert.deepEqual(navigation.orderNotificationDestination('rewards'),{tab:'account'});
+assert.deepEqual(navigation.orderNotificationDestination('media'),{tab:'media'});
+assert.equal(navigation.orderNotificationDestination('unrelated'),null);
+assert.equal(navigation.courierTrackingLink('https://user:password@example.com'),null);
+const page=readFileSync('app/page.tsx','utf8');
+assert.match(page,/orderNotificationDestination\(String\(telegramStartParam\)\)/);
+assert.match(page,/destination\?\.tab === 'account'.*setAccountInitialTab\('points'\)/);
+assert.match(page,/initialFocusReceipt=\{initialFocusReceipt\}/);
+await act(async()=>root.unmount());dom.window.close();
+console.log('PASS: rendered four-button ordering, every status lock, real action callbacks, safe courier links, rewards/account and receipt deep links.');

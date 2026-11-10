@@ -30,11 +30,13 @@ import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import TelegramMediaImage from "./telegram-media-image";
 import SecuredPaymentLink from "./secured-payment-link";
 import PrimePageHeading from "./prime-page-heading";
+import CustomerOrderActions from "./customer-order-actions";
 
 interface OrderHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialSelectedOrderId?: string | null;
+  initialFocusReceipt?: boolean;
 }
 
 function normalizeOrder(raw: any) {
@@ -175,7 +177,8 @@ function orderItemTitle(item: any): string {
 export default function OrderHistoryModal({
   isOpen,
   onClose,
-  initialSelectedOrderId = null
+  initialSelectedOrderId = null,
+  initialFocusReceipt = false
 }: OrderHistoryModalProps) {
   const isVisualPreview = import.meta.env.VITE_UI_PREVIEW === "1";
   const [orders, setOrders] = useState<any[]>([]);
@@ -274,6 +277,10 @@ export default function OrderHistoryModal({
         const authoritativeOrders = serverOrders
           .map(normalizeOrder)
           .filter(Boolean);
+        if (initialSelectedOrderId && !authoritativeOrders.some(order => String(order.id) === String(initialSelectedOrderId) || String(order.orderNumber) === String(initialSelectedOrderId))) {
+          const linked = await callServerless<any[]>('getMyOrders', { orderId: initialSelectedOrderId }, 20_000);
+          if (Array.isArray(linked)) authoritativeOrders.push(...linked.map(normalizeOrder).filter(Boolean));
+        }
         setOrders(authoritativeOrders);
       } else {
         throw new Error("Order history response was invalid.");
@@ -899,62 +906,18 @@ export default function OrderHistoryModal({
                   </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <button type="button" disabled={orderActionBusy || !['pending','confirmed'].includes(String(selectedOrder.status || '').toLowerCase()) || ['held','failed'].includes(String(selectedOrder.controlState||'').toLowerCase()) || selectedOrder.workflow?.editState==='pending'} onClick={() => { setOrderActionError(''); setCustomerEdit({ receiverName: String(selectedOrder.deliveryAddress?.receiverName || selectedOrder.receiverName || ''), receiverPhone: String(selectedOrder.deliveryAddress?.receiverPhone || selectedOrder.receiverPhone || ''), unitDetails: String(selectedOrder.deliveryAddress?.unitDetails || ''), deliveryNotes: String(selectedOrder.deliveryAddress?.deliveryNotes || '') }); setCustomerEditOpen(true); }} className="min-h-10 flex-1 rounded-lg border border-slate-300 bg-white px-2 font-roboto-condensed-semibold text-xs text-slate-800 disabled:opacity-45">Edit Order</button>
-                  <button type="button" disabled={orderActionBusy || !['pending', 'confirmed', 'approved', 'processing'].includes(String(selectedOrder.status || '').toLowerCase()) || selectedOrder.workflow?.cancellationRequested} onClick={() => void cancelCustomerOrder()} className="min-h-10 flex-1 rounded-lg border border-rose-300 bg-rose-50 px-2 font-roboto-condensed-semibold text-xs text-rose-800 disabled:opacity-45">Cancel Order</button>
-                </div>
+                <CustomerOrderActions order={selectedOrder} busy={orderActionBusy} receiptBusy={confirmingReceiptOrderId === selectedOrder.id} preview={isVisualPreview}
+                  onEdit={() => { setOrderActionError(''); setCustomerEdit({ receiverName: String(selectedOrder.deliveryAddress?.receiverName || selectedOrder.receiverName || ''), receiverPhone: String(selectedOrder.deliveryAddress?.receiverPhone || selectedOrder.receiverPhone || ''), unitDetails: String(selectedOrder.deliveryAddress?.unitDetails || ''), deliveryNotes: String(selectedOrder.deliveryAddress?.deliveryNotes || '') }); setCustomerEditOpen(true); }}
+                  onCancel={() => void cancelCustomerOrder()} onReceived={() => void confirmOrderReceived(selectedOrder.id)}/>
                 {selectedOrder.workflow?.editState==='pending'&&<p className="text-xs font-mono">Your Edit Request Is Awaiting Staff Approval. Existing Details Remain In Effect.</p>}
                 {selectedOrder.workflow?.cancellationRequested&&<p className="text-xs font-mono">Your Cancellation Request Is Awaiting Staff Approval.</p>}
                 {Number(selectedOrder.workflow?.refundedCredits)>0&&<p className="text-xs font-mono">{formatPHP(selectedOrder.workflow.refundedCredits)} Returned As Store Credits.</p>}
                 {selectedOrder.workflow?.externalRefundState&&<p className="text-xs font-mono">Your Original-Method Refund Is {selectedOrder.workflow.externalRefundState==='submitted'?'Submitted To The Provider':'Awaiting Staff Processing'}. Allow 3–5 Banking Days After Submission, Subject To Your Financial Institution’s Refund And Reversal Policy.</p>}
-                {selectedOrder.workflow?.resubmitExpiresAt&&selectedOrder.workflow?.canResubmit&&<section className="space-y-2 rounded border p-3"><p className="text-xs font-mono">Upload Your One Replacement Receipt Before {new Date(selectedOrder.workflow.resubmitExpiresAt).toLocaleString('en-PH',{timeZone:'Asia/Manila'})}. Otherwise, The Order Will Be Cancelled.</p><label className="block text-xs">Payment Method<select className="mt-1 min-h-10 w-full rounded border px-2" value={selectedPaymentMethod?.id||selectedOrder.paymentMethodId||''} disabled={isSubmittingProof} onChange={event=>setSelectedPaymentMethod(paymentMethods.find((method:any)=>String(method.id)===event.target.value)||{id:selectedOrder.paymentMethodId,name:selectedOrder.paymentMethodName})}><option value={selectedOrder.paymentMethodId}>{selectedOrder.paymentMethodName||'Original Payment Method'}</option>{paymentMethods.filter((method:any)=>String(method.id)!==String(selectedOrder.paymentMethodId)&&method.isActive!==false).map((method:any)=><option key={method.id} value={method.id}>{method.name}</option>)}</select></label><label className="block text-xs">Replacement Receipt<input className="block w-full min-w-0 py-2" type="file" accept="image/*" disabled={isSubmittingProof} onChange={handleProofFileChange}/></label>{proofImage&&<button type="button" disabled={isSubmittingProof||isVisualPreview} className="w-full rounded border p-2 text-xs font-mono" onClick={()=>void handleSubmitProof()}>{isSubmittingProof?'Uploading…':'Upload Replacement Receipt'}</button>}{proofError&&<p role="alert" className="text-xs text-rose-700">{proofError}</p>}</section>}
+                {selectedOrder.workflow?.resubmitExpiresAt&&selectedOrder.workflow?.canResubmit&&<section id="replacement-receipt" ref={node => { if (node && initialFocusReceipt && node.dataset.notificationFocused !== 'true' && typeof node.scrollIntoView === 'function') { node.dataset.notificationFocused = 'true'; node.scrollIntoView({ block: 'center' }); } }} className="space-y-2 rounded border p-3"><p className="text-xs font-mono">Upload Your One Replacement Receipt Before {new Date(selectedOrder.workflow.resubmitExpiresAt).toLocaleString('en-PH',{timeZone:'Asia/Manila'})}. Otherwise, The Order Will Be Cancelled.</p><label className="block text-xs">Payment Method<select className="mt-1 min-h-10 w-full rounded border px-2" value={selectedPaymentMethod?.id||selectedOrder.paymentMethodId||''} disabled={isSubmittingProof} onChange={event=>setSelectedPaymentMethod(paymentMethods.find((method:any)=>String(method.id)===event.target.value)||{id:selectedOrder.paymentMethodId,name:selectedOrder.paymentMethodName})}><option value={selectedOrder.paymentMethodId}>{selectedOrder.paymentMethodName||'Original Payment Method'}</option>{paymentMethods.filter((method:any)=>String(method.id)!==String(selectedOrder.paymentMethodId)&&method.isActive!==false).map((method:any)=><option key={method.id} value={method.id}>{method.name}</option>)}</select></label><label className="block text-xs">Replacement Receipt<input className="block w-full min-w-0 py-2" type="file" accept="image/*" disabled={isSubmittingProof} onChange={handleProofFileChange}/></label>{proofImage&&<button type="button" disabled={isSubmittingProof||isVisualPreview} className="w-full rounded border p-2 text-xs font-mono" onClick={()=>void handleSubmitProof()}>{isSubmittingProof?'Uploading…':'Upload Replacement Receipt'}</button>}{proofError&&<p role="alert" className="text-xs text-rose-700">{proofError}</p>}</section>}
                 {orderActionError && <p role="alert" className="rounded border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700">{orderActionError}</p>}
 
-                {String(selectedOrder.status || '').toLowerCase() === 'dispatched' && (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-2">
-                    <p className="text-xs font-mono text-emerald-900">
-                      Confirm when the order has arrived. If you do not confirm, the system will mark it completed six hours after dispatch.
-                    </p>
-                    {receiptConfirmationError && <p className="text-xs text-red-700">{receiptConfirmationError}</p>}
-                    <button
-                      type="button"
-                      disabled={isVisualPreview || confirmingReceiptOrderId === selectedOrder.id}
-                      onClick={() => confirmOrderReceived(selectedOrder.id)}
-                      className="w-full rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-mono font-bold text-white disabled:opacity-60"
-                    >
-                      {isVisualPreview ? 'PREVIEW ONLY' : confirmingReceiptOrderId === selectedOrder.id ? 'CONFIRMING…' : 'ORDER RECEIVED'}
-                    </button>
-                  </div>
-                )}
-
-                {/* Live Courier Tracking Interactive Card */}
-                {selectedOrder.trackingUrl && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
-                        <Truck className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="font-heading font-bold text-xs uppercase tracking-wider text-blue-950">
-                          Shipment &amp; Courier Tracking
-                        </h4>
-                        <p className="text-[11px] font-mono text-blue-700">
-                          Live rider location link is ready
-                        </p>
-                      </div>
-                    </div>
-
-                    <a
-                      href={selectedOrder.trackingUrl.startsWith("http") ? selectedOrder.trackingUrl : `https://${selectedOrder.trackingUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-heading font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>TRACK RIDER</span>
-                    </a>
-                  </div>
-                )}
+                {String(selectedOrder.status || '').toLowerCase() === 'dispatched' && <p className="text-xs font-mono text-emerald-900">Confirm when the order has arrived. If you do not confirm, the system will mark it completed six hours after dispatch.</p>}
+                {receiptConfirmationError && <p role="alert" className="text-xs text-red-700">{receiptConfirmationError}</p>}
 
                 {/* Itemized Order Products Breakdown */}
                 <div className="space-y-2">

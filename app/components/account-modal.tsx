@@ -34,13 +34,14 @@ interface AccountModalProps {
   onClose: () => void;
   onSelectOrder?: (order: any) => void;
   staffCustomerId?: string;
+  initialTab?: 'overview' | 'points';
 }
 
-export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCustomerId }: AccountModalProps) {
+export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCustomerId, initialTab = 'overview' }: AccountModalProps) {
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'points' | 'referrals' | 'orders'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'points' | 'referrals' | 'orders'>(initialTab);
 
   // Copy helper state
   const [copiedCode, setCopiedCode] = useState(false);
