@@ -627,6 +627,37 @@ export async function uploadStaffImage(file: File, bucket: PublicImageBucket): P
   return result.reference;
 }
 
+/** Story photos must retain Telegram's exact 1080×1920 dimensions. */
+export async function uploadStoryPhoto(file: File): Promise<string> {
+  if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error('Choose a JPG, PNG, or WEBP photo.');
+  const loaded = await loadImage(file);
+  let blob: Blob | null = null;
+  try {
+    const source = loaded.image as CanvasImageSource & { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number };
+    if (Number(source.width || source.naturalWidth) !== 1080 || Number(source.height || source.naturalHeight) !== 1920) {
+      throw new Error('Story photos must be 1080 × 1920 pixels.');
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080; canvas.height = 1920;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('This photo could not be prepared.');
+    context.fillStyle = '#ffffff'; context.fillRect(0, 0, 1080, 1920);
+    context.drawImage(loaded.image, 0, 0);
+    for (const quality of [0.82, 0.72, 0.62, 0.52, 0.42, 0.32]) {
+      blob = await canvasJpeg(canvas, quality);
+      if (blob.size <= 850_000) break;
+    }
+  } finally { loaded.release(); }
+  if (!blob || blob.size > 850_000) throw new Error('Story photo is too large after preparation. Choose a simpler image.');
+  const id = 'img-' + globalThis.crypto.randomUUID();
+  const result = await callServerless<{ success: boolean; reference: string }>('manageMediaAssets', {
+    action: 'uploadPublicImage', id, bucket: 'media-gallery', contentType: 'image/jpeg',
+    data: toBase64Url(new Uint8Array(await blob.arrayBuffer())),
+  }, 60_000);
+  if (!result?.success || !result.reference) throw new Error('Story upload was not confirmed.');
+  return result.reference;
+}
+
 export async function uploadProductImage(file: File): Promise<string> {
   if (file.size > 3 * 1024 * 1024) throw new Error('Product image files must be 3 MB or smaller.');
   const upload = await prepareJpegUpload(file);

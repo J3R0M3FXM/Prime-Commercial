@@ -1,0 +1,48 @@
+name: PRIME Story Campaigns
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: prime-story-campaigns
+  cancel-in-progress: false
+jobs:
+  publish:
+    # Activate only after the matching validated backend is deployed.
+    if: vars.PRIME_STORY_SCHEDULER_ENABLED == 'true' && vars.PRIME_STORY_SOURCE_REF != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Publish due campaigns
+        env:
+          TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_TOKEN }}
+          VALIDATED_SOURCE: ${{ vars.PRIME_STORY_SOURCE_REF }}
+        run: |
+          test -n "$TGCLOUD_TOKEN"
+          case "$TGCLOUD_TOKEN" in
+            app8830494959:*) ;;
+            *) echo 'Refusing to run against an unexpected TGCloud app.' >&2; exit 1 ;;
+          esac
+          test "$(git rev-parse HEAD)" = "$VALIDATED_SOURCE"
+          printf 'Validated Source: %s\n' "$VALIDATED_SOURCE"
+          automation_dir=$(mktemp -d "$RUNNER_TEMP/prime-story-campaigns.XXXXXX")
+          cd "$automation_dir"
+          npm exec --yes --package=@tgcloud/cli -- tgcloud pull
+          test ! -e tgcloud/endpoints/storyCampaignTick.js
+          cp "$GITHUB_WORKSPACE/automation/story-campaigns.js" tgcloud/endpoints/storyCampaignTick.js
+          cd "$GITHUB_WORKSPACE"
+          sha256sum --check --strict automation/story-campaigns.sha256
+          cd "$automation_dir"
+          if ! npm exec --yes --package=@tgcloud/cli -- tgcloud run endpoints/storyCampaignTick > "$automation_dir/private-runtime.log" 2>&1; then
+            echo 'Story campaign run failed. Inspect private runtime logs through the owner CLI.' >&2
+            exit 1
+          fi
+          echo 'Story campaign run completed.'
