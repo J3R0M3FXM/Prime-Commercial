@@ -4,7 +4,7 @@ import { orders, charges, couriers, customers } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
 import { canonicalizeOrderItems } from '../lib/orders.js';
 import { calculateChargesBreakdown } from '../lib/charges.js';
-import { beginCheckoutOperation, advanceCheckoutOperation, finishCheckoutOperation } from '../lib/checkout-operations.js';
+import { beginCheckoutOperation, findCheckoutOperation, canonicalRequest, saveCanonicalCheckoutSnapshot, advanceCheckoutOperation, finishCheckoutOperation, beginCheckoutCompensation, finishCheckoutCompensation } from '../lib/checkout-operations.js';
 import { reserveInventoryLine, releaseInventoryReservations } from '../lib/inventory.js';
 import { notifyAdminOrderCreated, notifyPosOrderCreated } from '../lib/order-notifications.js';
 
@@ -17,7 +17,7 @@ function orderNumber(seconds) {
   return `${pad(pht.getUTCDate())}${pad(pht.getUTCMonth() + 1)}${String(pht.getUTCFullYear()).slice(-2)}${pad(pht.getUTCHours())}${pad(pht.getUTCMinutes())}${pad(pht.getUTCSeconds())}`;
 }
 
-export default async function (input = {}, ctx) {
+export default async function handler(input = {}, ctx) {
   const admin = await requireAdmin(ctx);
   const mode = String(input.mode || '').toLowerCase();
   if (!['store', 'delivery'].includes(mode)) throw new EndpointError('Choose store pickup or delivery.', { code: 'INVALID_ORDER_TYPE' });
@@ -29,8 +29,40 @@ export default async function (input = {}, ctx) {
     const chargeResult = calculateChargesBreakdown(chargeRows, cart.subtotal, new Date());
     return { subtotal: cart.subtotal, chargeTotal: chargeResult.totalChargesAmount, deliveryFee: money(deliveryFee), totalAmount: money(cart.subtotal + chargeResult.totalChargesAmount + money(deliveryFee)) };
   }
-  const key = text(input.operationKey, 128);
+  const key = String(input.operationKey || '').trim();
   if (!/^[A-Za-z0-9_-]{16,128}$/.test(key)) throw new EndpointError('Refresh the POS and retry with a new checkout key.', { code: 'INVALID_OPERATION_KEY' });
+  const request = {
+    mode, customerName:text(input.customerName,120), customerPhone:text(input.customerPhone,40),
+    paymentMethodName:text(input.paymentMethodName,100), customerId:text(input.customerId,120),
+    telegramId:text(input.telegramId,20), deliveryAddress:mode==='delivery'?text(input.deliveryAddress,500):'',
+    deliveryFee:mode==='delivery'?Number(input.deliveryFee):0, courierId:mode==='delivery'?text(input.courierId,120):'',
+    items:input.items, expectedTotal:input.expectedTotal == null ? null : Number(input.expectedTotal),
+  };
+  const prior = await findCheckoutOperation({customerId:'pos-'+String(admin.id),requestKey:key});
+  if(prior.ok) {
+    if(input.action!=='resume' && prior.requestSnapshot?.expectedTotal !== undefined && canonicalRequest(prior.requestSnapshot)!==canonicalRequest(request))
+      throw new EndpointError('Retry the original sale before changing its details.',{code:'IDEMPOTENCY_CONFLICT'});
+    const saved = await db.select().from(orders).where(eq(orders.id,prior.operationId)).get();
+    if(saved) {
+      const response={success:true,id:saved.id,orderNumber:saved.orderNumber,mode:prior.requestSnapshot?.mode||mode,totalAmount:Number(saved.totalAmount)||0};
+      await finishCheckoutOperation({operationId:prior.operationId,responseSnapshot:response});
+      return response;
+    }
+    if(prior.status==='failed')throw new EndpointError('This sale was not saved. Review the sale and start a new checkout.',{code:'POS_CHECKOUT_FAILED'});
+    if(prior.status==='compensating') {
+      await releaseInventoryReservations(prior.operationId);
+      await finishCheckoutCompensation({operationId:prior.operationId});
+      throw new EndpointError('This sale was not saved. Review the sale and start a new checkout.',{code:'POS_CHECKOUT_FAILED'});
+    }
+    if(input.action==='resume')return await handler({...prior.requestSnapshot,operationKey:key},ctx);
+  } else if(input.action==='resume')throw new EndpointError('No saved checkout attempt was found.',{code:'POS_OPERATION_MISSING'});
+  const operation = await beginCheckoutOperation({
+    customerId: 'pos-' + String(admin.id), requestKey: key, requestSnapshot: request,
+    expiresAt: Math.floor(Date.now() / 1000) + 24 * 60 * 60, submittedAt: Math.floor(Date.now() / 1000),
+  });
+  if (!operation.ok) throw new EndpointError('Retry the original sale before changing its details.', { code: 'IDEMPOTENCY_CONFLICT' });
+  const operationId=operation.operationId;
+  try {
   const customerName = text(input.customerName, 120);
   const customerPhone = text(input.customerPhone, 40);
   const paymentMethodName = text(input.paymentMethodName, 100);
@@ -60,25 +92,15 @@ export default async function (input = {}, ctx) {
     if (!courier || courier.isActive === false) throw new EndpointError('The selected courier is no longer available.', { code: 'COURIER_UNAVAILABLE' });
   }
 
-  const cart = await canonicalizeOrderItems(input.items);
+  let cart = prior.canonicalSnapshot?.cart || await canonicalizeOrderItems(input.items);
   const chargeRows = await db.select().from(charges).where(eq(charges.isActive, true)).orderBy(asc(charges.sortOrder)).all();
-  const chargeResult = calculateChargesBreakdown(chargeRows, cart.subtotal, new Date());
-  const deliveryFee = money(requestedFee);
-  const total = money(cart.subtotal + chargeResult.totalChargesAmount + deliveryFee);
-  const request = {
-    mode, customerName, customerPhone, paymentMethodName, items: cart.items,
-    customerId: linkedCustomer?.id || '', telegramId: recipientTelegramId,
-    deliveryAddress: mode === 'delivery' ? addressText : '', deliveryFee,
-    courierId: courier?.id || '', courierName: courier?.name || '',
-  };
-  const operation = await beginCheckoutOperation({
-    customerId: 'pos-' + String(admin.id), requestKey: key, requestSnapshot: request,
-    expiresAt: Math.floor(Date.now() / 1000) + 24 * 60 * 60, submittedAt: Math.floor(Date.now() / 1000),
-  });
-  if (!operation.ok) throw new EndpointError('This checkout key was already used for different sale details. Refresh the POS and retry.', { code: 'IDEMPOTENCY_CONFLICT' });
+  let chargeResult = prior.canonicalSnapshot?.chargeResult || calculateChargesBreakdown(chargeRows, cart.subtotal, new Date());
+  let deliveryFee = money(requestedFee);
+  let total = prior.canonicalSnapshot?.total ?? money(cart.subtotal + chargeResult.totalChargesAmount + deliveryFee);
+  if(input.expectedTotal!=null && (!Number.isFinite(Number(input.expectedTotal)) || Math.round(Number(input.expectedTotal)*100)!==Math.round(total*100)))
+    throw new EndpointError('The sale total changed. Review the updated quote before confirming payment.',{code:'POS_TOTAL_CHANGED'});
   if (operation.status === 'complete' && operation.responseSnapshot) return operation.responseSnapshot;
 
-  const operationId = operation.operationId;
   const existingOrder = await db.select().from(orders).where(eq(orders.id, operationId)).get();
   if (existingOrder) {
     const response = { success: true, id: existingOrder.id, orderNumber: existingOrder.orderNumber, mode, totalAmount: Number(existingOrder.totalAmount) || 0 };
@@ -91,7 +113,9 @@ export default async function (input = {}, ctx) {
   }
 
   const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
-  try {
+    const frozen=await saveCanonicalCheckoutSnapshot({operationId,snapshot:{cart,chargeResult,deliveryFee,total}});
+    if(!frozen.saved)throw new EndpointError('The sale is being recovered. Retry shortly.',{code:'POS_RECOVERY_REQUIRED'});
+    if(frozen.snapshot)({cart,chargeResult,deliveryFee,total}=frozen.snapshot);
     for (const line of cart.reservations) {
       const held = await reserveInventoryLine({ orderId: operationId, ...line, expiresAt });
       if (!held.reserved) throw new EndpointError('Stock changed while this sale was being checked out. Refresh the catalog.', { code: 'INSUFFICIENT_STOCK' });
@@ -127,12 +151,24 @@ export default async function (input = {}, ctx) {
       const result = await db.run(
         `INSERT INTO orders (${columns.join(', ')}) SELECT ${values.join(', ')}
           WHERE EXISTS (SELECT 1 FROM checkout_operations WHERE id=:operation_id AND status='processing')
+          AND NOT EXISTS (
+            SELECT 1 FROM json_each(:reservations) line
+            LEFT JOIN inventory_reservations r ON r.order_id=:operation_id
+              AND r.product_id=json_extract(line.value,'$.productId') AND r.variant_id=json_extract(line.value,'$.variantId')
+            WHERE r.id IS NULL OR r.status<>'held' OR r.expires_at<=unixepoch() OR r.quantity<>json_extract(line.value,'$.quantity'))
           ON CONFLICT DO NOTHING RETURNING id`,
-        { ...params, ':operation_id': operationId },
+        { ...params, ':operation_id': operationId, ':reservations': JSON.stringify(cart.reservations) },
       );
       if (Number(result?.rowsAffected) > 0) { inserted = true; break; }
       const existing = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, operationId)).get();
       if (existing) { inserted = true; break; }
+      const invalidHold = await db.get(`SELECT 1 AS invalid FROM json_each(:reservations) line
+        LEFT JOIN inventory_reservations r ON r.order_id=:operation_id
+          AND r.product_id=json_extract(line.value,'$.productId') AND r.variant_id=json_extract(line.value,'$.variantId')
+        WHERE r.id IS NULL OR r.status<>'held' OR r.expires_at<=unixepoch()
+          OR r.quantity<>json_extract(line.value,'$.quantity') LIMIT 1`,
+      { ':operation_id': operationId, ':reservations': JSON.stringify(cart.reservations) });
+      if (invalidHold) throw new EndpointError('The stock reservation expired. Review the sale and retry.', { code: 'INVENTORY_RESERVATION_EXPIRED' });
       number = orderNumber(start + attempt + 1);
     }
     if (!inserted) throw new EndpointError('Could not save this sale. Retry from the POS.', { code: 'POS_ORDER_SAVE_FAILED' });
@@ -149,10 +185,20 @@ export default async function (input = {}, ctx) {
     ]);
     return response;
   } catch (error) {
-    const saved = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, operationId)).get();
+    let saved = await db.select().from(orders).where(eq(orders.id, operationId)).get();
     if (!saved) {
-      await releaseInventoryReservations(operationId);
-      await db.run("DELETE FROM checkout_operations WHERE id=:id AND status='processing'", { ':id': operationId });
+      const fenced=await beginCheckoutCompensation({operationId,message:error?.message});
+      if(fenced.compensating) {
+        await releaseInventoryReservations(operationId);
+        await finishCheckoutCompensation({operationId});
+        throw new EndpointError(error?.message || 'This sale could not be saved.',{code:'POS_CHECKOUT_FAILED'});
+      }
+      saved=await db.select().from(orders).where(eq(orders.id,operationId)).get();
+    }
+    if(saved) {
+      const response={success:true,id:saved.id,orderNumber:saved.orderNumber,mode,totalAmount:Number(saved.totalAmount)||0};
+      await finishCheckoutOperation({operationId,responseSnapshot:response});
+      return response;
     }
     throw error;
   }

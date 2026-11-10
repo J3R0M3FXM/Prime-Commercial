@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronRight, Loader2, Minus, Package, Plus, RefreshCw, Search, ShieldCheck, ShoppingCart, Store, Truck, X } from "lucide-react";
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { formatPHP } from "@/lib/currency";
+import { beginPosCheckoutAttempt, readPosCheckoutAttempt, finishPosCheckoutAttempt, type PosCheckoutAttempt } from '@/lib/pos-checkout-attempt';
 
 type Product = { id: string; name: string; price: number; stock: number; category?: string; imageUrl?: string; isActive?: boolean; variants?: Array<Record<string, any>>; bundleConfig?: { variants?: Array<Record<string, any>> } };
 type CartLine = { key: string; productId: string; variantId: string; name: string; price: number; quantity: number; stock: number };
@@ -17,6 +18,9 @@ function productVariants(product: Product) {
 
 export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => void }) {
   const [authorized, setAuthorized] = useState(false);
+  const [staffId,setStaffId]=useState('');
+  const [pendingSale,setPendingSale]=useState<PosCheckoutAttempt|null>(null);
+  const submissionBusy=useRef(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -48,7 +52,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
     setLoading(true); setError("");
     try {
       const [catalog, customerRows, courierRows, paymentRows] = await Promise.all([
-        callServerless<Product[]>("manageProducts", { action: "list" }, 30_000),
+        callServerless<Product[]>("getCatalog", {}, 30_000),
         callServerless<Customer[]>("manageCustomers", { action: "list" }, 30_000),
         callServerless<Courier[]>("manageCouriers", { action: "list" }, 30_000),
         callServerless<Tender[]>("managePaymentMethods", { action: "list" }, 30_000),
@@ -67,6 +71,9 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
     getTelegramServerlessSession().then((session) => {
       if (!current) return;
       if (!session?.authenticated || !session?.isAdmin) { setError(session?.error || "Verified Telegram admin access is required to use POS."); return; }
+      const id=String(session.tgUserId||'');
+      setStaffId(id);
+      setPendingSale(readPosCheckoutAttempt(id));
       setAuthorized(true);
     }).catch((err: any) => { if (current) setError(err?.message || "Open PRIME from Telegram to use POS."); })
       .finally(() => { if (current) setCheckingAuth(false); });
@@ -132,6 +139,10 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   };
 
   const checkout = async () => {
+    if(submissionBusy.current)return;
+    let attempt:PosCheckoutAttempt|null;
+    try {attempt=readPosCheckoutAttempt(staffId);}catch(err:any){setError(err?.message||'Could not restore the pending sale.');return;}
+    if(!attempt) {
     if (!cart.length) { setError("Add at least one item to the sale."); return; }
     if (!customerName.trim()) { setError("Enter the customer name."); return; }
     if (customerType === "existing" && !selectedCustomerId) { setError("Select an existing customer or choose New / guest."); return; }
@@ -141,31 +152,37 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
       setError("Enter the delivery address, choose a courier, and check the delivery fee."); return;
     }
     if (!window.confirm(`Confirm ${formatPHP(total)} received by ${paymentMethodName} and save this ${mode === "store" ? "store sale" : "delivery order"}?`)) return;
+    if(quoteResult.key!==quoteKey||!Number.isFinite(total)){setError('Wait for the current sale total before confirming.');return;}
+    }
+    submissionBusy.current=true;
     setSaving(true); setError(""); setNotice(""); setLastSale(null);
     try {
       if (!window.crypto?.getRandomValues) throw new Error("Secure checkout keys are unavailable on this device.");
-      let operationKey = retryKey;
-      if (!operationKey) {
-        const bytes = new Uint8Array(24); window.crypto.getRandomValues(bytes);
-        operationKey = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-        setRetryKey(operationKey);
-      }
-      const result = await callServerless<{ success?: boolean; orderNumber?: string; totalAmount?: number }>("createPosOrder", {
-        operationKey, mode, customerName: customerName.trim(), customerPhone: customerPhone.trim(),
+      attempt=attempt||beginPosCheckoutAttempt(staffId,{
+        mode, customerName: customerName.trim(), customerPhone: customerPhone.trim(), expectedTotal:total,
         customerId: customerType === "existing" ? selectedCustomerId : "",
-        telegramId: notifyTelegramId,
+        telegramId: customerType==='guest'?telegramId.trim():'',
         paymentMethodName, deliveryAddress: deliveryAddress.trim(), courierId,
         deliveryFee: mode === "delivery" ? Number(deliveryFee) : 0,
         items: cart.map((line) => ({ productId: line.productId, variantId: line.variantId, quantity: line.quantity })),
-      }, 60_000);
+      });
+      setPendingSale(attempt);
+      const result = await callServerless<{ success?: boolean; orderNumber?: string; totalAmount?: number }>('createPosOrder',{...attempt.payload,operationKey:attempt.operationKey},60_000);
       if (!result?.success || !result.orderNumber) throw new Error("The POS did not receive a saved order confirmation.");
-      setLastSale({ orderNumber: result.orderNumber, totalAmount: Number(result.totalAmount) || total, mode });
+      finishPosCheckoutAttempt(staffId,attempt.operationKey);setPendingSale(null);
+      setLastSale({ orderNumber: result.orderNumber, totalAmount: Number(result.totalAmount) || 0, mode:attempt.payload.mode });
       setNotice(`Order ${result.orderNumber} saved in the shared Orders list.`);
       setRetryKey("");
       setCart([]); setCustomerName(""); setCustomerPhone(""); setTelegramId(""); setSelectedCustomerId(""); setCustomerType("guest"); setDeliveryAddress(""); setDeliveryFee("0");
       await load();
-    } catch (err: any) { setError(err?.message || "Could not save this sale."); }
-    finally { setSaving(false); }
+    } catch (err: any) {
+      const code=String(err?.parameters?.code||err?.code||err?.type||'');
+      if(attempt&&code==='POS_CHECKOUT_FAILED') {
+        finishPosCheckoutAttempt(staffId,attempt.operationKey);setPendingSale(null);
+      }
+      setError(err?.message || "Sale confirmation is pending. Retry this sale without collecting payment again.");
+    }
+    finally { submissionBusy.current=false;setSaving(false); }
   };
 
   return <main className="serverless-admin-panel" aria-label="Point of sale">
@@ -177,6 +194,8 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
     {(error || notice) && <div role={error ? "alert" : "status"} className={`my-2 border p-2 text-xs ${error ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>{error || notice}</div>}
     {checkingAuth && <div className="my-2 flex justify-center border bg-white p-5"><Loader2 className="h-5 w-5 animate-spin"/></div>}
     {authorized && <>
+      {pendingSale&&<section className="my-2 border p-2"><p className="text-xs">An earlier sale is awaiting confirmation. Retry it before starting another sale.</p><button type="button" className="serverless-action" disabled={saving} onClick={()=>void checkout()}>Retry Pending Sale</button></section>}
+      <fieldset disabled={saving||Boolean(pendingSale)} className="min-w-0 border-0 p-0">
       <div className="grid grid-cols-2 gap-2 py-2">
         <button type="button" onClick={() => { setMode("store"); setRetryKey(""); }} className={`flex min-h-11 items-center justify-center gap-2 border text-xs font-bold uppercase ${mode === "store" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700"}`}><Store className="h-4 w-4"/>Store Sale</button>
         <button type="button" onClick={() => { setMode("delivery"); setRetryKey(""); }} className={`flex min-h-11 items-center justify-center gap-2 border text-xs font-bold uppercase ${mode === "delivery" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700"}`}><Truck className="h-4 w-4"/>Delivery</button>
@@ -247,6 +266,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
         <p className="mt-2 text-center text-[10px] text-slate-500">Only confirm after payment is received. Stock and orders sync to the Serverless database.</p>
       </div>
       {lastSale && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/60 p-2 sm:items-center"><section className="w-full max-w-[430px] border border-slate-200 bg-white p-4 shadow-xl" role="dialog" aria-modal="true" aria-label="Sale saved"><div className="flex items-start justify-between"><div><div className="mb-2 inline-flex items-center gap-2 text-xs font-bold uppercase text-emerald-800"><Check className="h-4 w-4"/>Sale saved</div><h2 className="font-heading text-lg">Order {lastSale.orderNumber}</h2></div><button type="button" onClick={() => setLastSale(null)} className="serverless-action" aria-label="Close"><X className="h-4 w-4"/></button></div><p className="my-3 font-mono text-xl">{formatPHP(lastSale.totalAmount)}</p><p className="mb-3 text-xs text-slate-600">This paid {lastSale.mode === "store" ? "store sale" : "delivery order"} is now in Admin → Orders.</p><button type="button" onClick={() => setLastSale(null)} className="serverless-action serverless-action--primary w-full justify-center">New Sale</button></section></div>}
+      </fieldset>
     </>}
   </main>;
 }

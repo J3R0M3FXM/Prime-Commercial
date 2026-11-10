@@ -4,6 +4,10 @@ import { eq } from 'sdk/db';
 
 const text = (value, max = 500) => String(value ?? '').trim().slice(0, max);
 const id = (value, prefix) => prefix + '-' + text(value, 120).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 96);
+async function sessionHash(customerId, key) {
+  const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([String(customerId),key])));
+  return Array.from(new Uint8Array(bytes),byte=>byte.toString(16).padStart(2,'0')).join('');
+}
 
 export default async function (input, ctx) {
   const telegramId = ctx?.initData?.user?.id == null ? '' : String(ctx.initData.user.id);
@@ -31,8 +35,8 @@ export default async function (input, ctx) {
   }
   const request = input?.request && typeof input.request === 'object' ? input.request : null;
   const paymentMethodId = text(input?.paymentMethodId, 120);
-  const operationKey = text(input?.operationKey, 128);
-  if (!request || !paymentMethodId || !operationKey) throw new EndpointError('Checkout details and payment method are required.', { code: 'INVALID_INPUT' });
+  const operationKey = String(input?.operationKey || '').trim();
+  if (!request || !paymentMethodId || !/^[A-Za-z0-9_-]{16,128}$/.test(operationKey)) throw new EndpointError('Checkout details and a valid payment retry key are required.', { code: 'INVALID_INPUT' });
   const method = await db.select().from(paymentMethods).where(eq(paymentMethods.id, paymentMethodId)).get();
   if (!method || !method.isActive) throw new EndpointError('Choose an active payment method.', { code: 'PAYMENT_METHOD_UNAVAILABLE' });
   const now = Math.floor(Date.now() / 1000);
@@ -41,18 +45,20 @@ export default async function (input, ctx) {
     ':customer_id': String(customer.id), ':request_key': operationKey,
   });
   const retryingTerminalFailure = previousOperation?.status === 'failed';
-  const sessionOperationKey = retryingTerminalFailure ? 'retry-' + globalThis.crypto.randomUUID() : operationKey;
+  const sessionOperationKey = retryingTerminalFailure ? 'retry-' + await sessionHash(customer.id,operationKey) : operationKey;
   // Use a deterministic ID for the first attempt. If its session was consumed,
   // createOrder will recover the existing immutable operation by operationKey
   // before looking at the new session, preventing duplicate reservations/orders.
-  const baseSessionId = id(operationKey, 'payment-session');
+  const legacyId=id(operationKey,'payment-session');
+  const legacy=await db.get('SELECT customer_id AS customerId, operation_key AS operationKey FROM payment_sessions WHERE id=:id',{':id':legacyId});
+  const baseSessionId = legacy?.customerId===String(customer.id) && legacy.operationKey===operationKey
+    ? legacyId : 'payment-session-' + await sessionHash(customer.id,operationKey);
   const existing = await db.get('SELECT customer_id AS customerId, status, expires_at AS expiresAt FROM payment_sessions WHERE id=:id', { ':id': baseSessionId });
   if (existing && String(existing.customerId) !== String(customer.id)) {
     throw new EndpointError('This checkout key is already in use. Refresh checkout and try again.', { code: 'CHECKOUT_KEY_CONFLICT' });
   }
-  const sessionId = retryingTerminalFailure || (existing && (existing.status === 'consumed' || Number(existing.expiresAt) <= now))
-    ? id(operationKey + '-' + now.toString(36) + '-' + globalThis.crypto.randomUUID(), 'payment-session')
-    : baseSessionId;
+  const sessionId = retryingTerminalFailure ? 'payment-session-' + await sessionHash(customer.id,sessionOperationKey)
+    : existing && (existing.status === 'consumed' || Number(existing.expiresAt) <= now) ? 'payment-session-' + globalThis.crypto.randomUUID() : baseSessionId;
   const expiresAt = now + 60 * 60;
   await db.run(`INSERT INTO payment_sessions (id,customer_id,request_snapshot,payment_method_id,status,expires_at,created_at,updated_at,operation_key)
     VALUES (:id,:customer_id,json(:request),:method,'awaiting_proof',:expires_at,unixepoch(),unixepoch(),:operation_key)

@@ -39,6 +39,7 @@ run('node', ['scripts/test-voucher-generator.mjs'], 'voucher generation and PNG 
 run('node', ['scripts/test-voucher-delivery.mjs'], 'voucher delivery authorization and retries');
 run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
 run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
+run('node', ['scripts/test-checkout-idempotency.mjs'], 'checkout and POS collision/retry hardening');
 run('node', ['scripts/test-credit-operations.mjs'], 'points conversion and Store Credit transfer safety');
 run('node', ['scripts/test-account-staff-view.mjs'], 'staff account view authorization and customer parity');
 run('node', ['scripts/test-shopfront-queue.mjs'], 'shopfront queue ownership and ordering');
@@ -50,6 +51,7 @@ run('node', ['scripts/test-device-security.mjs'], 'device recognition ownership,
 run('node', ['scripts/test-device-security-ui.mjs'], 'device security customer and staff controls');
 run('node', ['scripts/test-media.mjs'], 'media upload/gallery/offline/playlist safety');
 run('node', ['scripts/test-secretary-ui.mjs'], 'Secretary configurator layout/navigation/save regressions');
+run('node', ['scripts/test-secretary-broadcast.mjs'], 'Secretary broadcast authorization and duplicate-send safety');
 run('node', ['scripts/test-admin-portrait.mjs'], 'Admin portrait and configuration preservation');
 run('node', ['--check', 'public/media-offline-worker.js'], 'offline media worker syntax');
 run('node_modules/.bin/rolldown', ['cloudflare/prime-media/src/index.mjs', '--platform', 'browser', '--format', 'esm', '--file', 'cloudflare/prime-media/dist/worker.mjs'], 'R2 Worker bundle');

@@ -48,6 +48,7 @@ import {
   callServerless,
   clearPendingServerlessCheckoutKey,
   getOrCreateServerlessCheckoutKey,
+  replacePendingServerlessCheckoutKey,
   hasTelegramServerlessBridge,
   createPaymentSession,
   uploadPaymentProofDataUrl,
@@ -162,6 +163,7 @@ export default function CheckoutModal({
   const [isPaymentDetailsModalOpen, setIsPaymentDetailsModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const receiptScanVersion = useRef(0);
+  const checkoutSubmissionBusy = useRef(false);
   const promoValidationVersion = useRef(0);
   const referralValidationVersion = useRef(0);
   const [zoomedPaymentMethod, setZoomedPaymentMethod] = useState<any>(null);
@@ -1314,8 +1316,9 @@ export default function CheckoutModal({
   };
 
   const handleSubmitOrder = async () => {
-    if (isSubmittingOrder) return;
+    if (isSubmittingOrder || checkoutSubmissionBusy.current) return;
     if (submissionKey) {
+      checkoutSubmissionBusy.current=true;
       setIsSubmittingOrder(true);
       try {
         const result = submissionSessionId
@@ -1329,7 +1332,7 @@ export default function CheckoutModal({
         const code = String(err?.parameters?.code || err?.code || err?.type || "");
         if (["OPERATION_FAILED", "CHECKOUT_ATTEMPT_FAILED"].includes(code)) setSubmissionKey("");
         setSubmitError(err?.message || "Order recovery is pending. Retry without paying again.");
-      } finally { setIsSubmittingOrder(false); }
+      } finally { checkoutSubmissionBusy.current=false;setIsSubmittingOrder(false); }
       return;
     }
     if (chargesLoadError || isLoadingCharges) {
@@ -1365,6 +1368,7 @@ export default function CheckoutModal({
 
     let activeOperationKey = "";
     try {
+      checkoutSubmissionBusy.current=true;
       setIsSubmittingOrder(true);
       setSubmitError("");
 
@@ -1487,6 +1491,8 @@ export default function CheckoutModal({
         if (!paymentSession?.success || !paymentSession.paymentSessionId) throw new Error("We couldn't start the payment session. Please try again.");
         await uploadPaymentProofDataUrl(uploadedProofImage, paymentSession.paymentSessionId, "image/jpeg", ocrAnalysis);
         const effectiveKey = paymentSession.operationKey || operationKey;
+        replacePendingServerlessCheckoutKey(String(tgCustomer.id),operationKey,effectiveKey);
+        activeOperationKey=effectiveKey;
         setSubmissionKey(effectiveKey);
         setSubmissionSessionId(paymentSession.paymentSessionId);
         if (!saveCheckoutDraft(tgCustomer.id, selectedItems, { ...draftState, submissionKey: effectiveKey, submissionSessionId: paymentSession.paymentSessionId })) {
@@ -1501,7 +1507,7 @@ export default function CheckoutModal({
         if (!orderResult || orderResult.success === false) {
           throw new Error(orderResult?.error || "We couldn't submit your order. Please try again.");
         }
-        clearPendingServerlessCheckoutKey(String(tgCustomer.id), operationKey);
+        clearPendingServerlessCheckoutKey(String(tgCustomer.id), effectiveKey);
         clearCheckoutDraft(tgCustomer.id);
       } else {
         throw new Error("TGCloud checkout is unavailable.");
@@ -1530,6 +1536,7 @@ export default function CheckoutModal({
       const code = String(err?.parameters?.code || err?.code || err?.type || "");
       if (["OPERATION_FAILED", "CHECKOUT_ATTEMPT_FAILED", "OUT_OF_STOCK", "CHECKOUT_TOTAL_CHANGED", "INVALID_RECEIVER", "INVENTORY_RESERVATION_EXPIRED"].includes(code)) setSubmissionKey("");
     } finally {
+      checkoutSubmissionBusy.current=false;
       setIsSubmittingOrder(false);
     }
   };

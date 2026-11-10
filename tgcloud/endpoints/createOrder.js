@@ -230,7 +230,11 @@ async function advanceAtLeast(operationId, target) {
     expectedStages: [String(operation.stage)],
     nextStage: target,
   });
-  if (!result.advanced) throw new EndpointError('Checkout is being recovered. Please retry shortly.', { code: 'OPERATION_STAGE_CONFLICT' });
+  if (!result.advanced) {
+    const latest = await readOperation(operationId);
+    if (latest && ['processing', 'complete'].includes(latest.status) && stages.indexOf(String(latest.stage)) >= targetIndex) return;
+    throw new EndpointError('Checkout is being recovered. Please retry shortly.', { code: 'OPERATION_STAGE_CONFLICT' });
+  }
 }
 
 function sanitizedRequest(input) {
@@ -243,7 +247,7 @@ function sanitizedRequest(input) {
     paymentProofContentType: text(input?.paymentProofContentType, 40),
     paymentProofOcrAnalysis: input?.paymentProofOcrAnalysis && typeof input.paymentProofOcrAnalysis === 'object' ? input.paymentProofOcrAnalysis : null,
     paymentMethodId: text(input?.paymentMethodId, 120),
-    items: Array.isArray(input?.items) ? input.items.slice(0, 100).map((item) => ({
+    items: Array.isArray(input?.items) ? input.items.map((item) => ({
       id: text(item?.id, 200), productId: text(item?.productId || item?.product_id, 120),
       variantId: text(item?.variantId || item?.variant_id, 120), quantity: Number(item?.quantity ?? 1),
     })) : [],
@@ -715,7 +719,7 @@ export default async function (input, ctx) {
   if (!customer) throw new EndpointError('Customer account was not found. Reopen the Mini App and try again.', { code: 'CUSTOMER_MISSING' });
   if (customer.isBanned === true) throw new EndpointError('This customer account cannot place orders.', { code: 'CUSTOMER_BANNED' });
 
-  let requestKey = text(input?.operationKey, 128);
+  let requestKey = String(input?.operationKey || '').trim();
   const resuming = input?.resume === true;
   let request;
   let operation;

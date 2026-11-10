@@ -19,6 +19,12 @@ export async function reserveStoreCredits({ customerId, operationId, amount }) {
   if (!customer || !operation) throw new TypeError('Customer and checkout operation IDs are required.');
   if (requested === 0) return { reserved: true, reused: false, amount: 0, receivedUsed: 0 };
 
+  const persisted = await db.get(`SELECT store_credits_used AS amount, received_transfer_used AS receivedUsed
+    FROM orders WHERE id=:operation_id AND customer_id=:customer_id`, { ':operation_id': operation, ':customer_id': customer });
+  if (persisted) return Math.round(Number(persisted.amount || 0) * 100) === Math.round(requested * 100)
+    ? { reserved: true, reused: true, amount: requested, receivedUsed: Number(persisted.receivedUsed) || 0 }
+    : { reserved: false, reason: 'operation_amount_conflict' };
+
   const existing = await db.get(
     `SELECT store_credits AS balance,
             store_credits_operation_id AS operationId,
@@ -49,6 +55,7 @@ export async function reserveStoreCredits({ customerId, operationId, amount }) {
         AND coalesce(store_credits, 0) >= :amount
         AND EXISTS (SELECT 1 FROM checkout_operations o
           WHERE o.id = :operation_id AND o.status = 'processing')
+        AND NOT EXISTS (SELECT 1 FROM orders WHERE id = :operation_id)
       RETURNING store_credits AS balance, store_credits_operation_id AS operationId,
                 store_credits_operation_amount AS operationAmount,
                 store_credits_operation_received_amount AS receivedUsed`,

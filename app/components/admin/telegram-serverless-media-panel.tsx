@@ -188,7 +188,7 @@ export default function TelegramServerlessMediaPanel({
   const pickFile = async (selected?: File, force = false) => {
     // Android pickers may emit another change for the same selected file.
     // Keep its prepared frames instead of unnecessarily restarting the decoder.
-    if (!force && selected && file && choices.length === 3 &&
+    if (!force && selected && file && (choices.length > 0 || cover || thumbnailError || generating) &&
       selected.name === file.name && selected.size === file.size &&
       selected.lastModified === file.lastModified && selected.type === file.type) return;
     generation.current?.abort();
@@ -266,19 +266,21 @@ export default function TelegramServerlessMediaPanel({
     try {
       if (!form.title.trim() || !form.categories.length)
         throw new Error("Enter a title and add at least one category.");
-      if (!editing && (!file || (choices.length !== 3 && !cover)))
+      if (!editing && !file)
         throw new Error(
-          "Choose an MP4 and select a generated thumbnail or a cover image.",
+          "Choose an MP4 to upload.",
         );
       if (thumbnailError && form.isPublished)
         throw new Error("Save this video as a draft first, then verify playback before publishing.");
-      const thumbnailUrl = cover
-        ? await uploadStaffImage(cover, "media-gallery")
-        : choices[choice]
-        ? await uploadStaffImage(choices[choice].file, "media-gallery")
-        : form.thumbnailUrl;
+      let thumbnailUrl=form.thumbnailUrl, thumbnailUploadFailed=false;
+      try {
+        if(cover || choices[choice]) thumbnailUrl=await uploadStaffImage(cover || choices[choice].file,"media-gallery");
+      } catch {
+        thumbnailUploadFailed=true;
+      }
       const metadata = {
         ...form,
+        isPublished:form.isPublished && !thumbnailUploadFailed,
         title: form.title.trim(),
         category: form.categories[0],
         thumbnailUrl,
@@ -301,7 +303,7 @@ export default function TelegramServerlessMediaPanel({
         setForm((current) => ({ ...current, thumbnailUrl }));
         setFile(null);
         setChoices([]);
-        if (form.isPublished)
+        if (metadata.isPublished)
           await updateR2Video(video.id, { isPublished: true });
       } else
         await uploadServerlessGalleryVideo(file!, metadata, (part, total) =>
@@ -309,7 +311,7 @@ export default function TelegramServerlessMediaPanel({
         );
       reset();
       await load();
-      setNotice(editing ? "Media updated." : "Media uploaded.");
+      setNotice(thumbnailUploadFailed ? "Video saved as a draft. The cover could not be uploaded; you can add it later." : thumbnailError ? "Video uploaded as a draft. Preview playback, then add a cover or publish when ready." : editing ? "Media updated." : "Media uploaded.");
     } catch (err: any) {
       setError(err.message || "Media could not be saved.");
     } finally {
@@ -574,7 +576,7 @@ export default function TelegramServerlessMediaPanel({
                     required={!editing}
                     accept="video/mp4,.mp4"
                     disabled={busy}
-                    onChange={(event) => void pickFile(event.target.files?.[0])}
+                    onChange={(event) => { if(event.target.files?.[0])void pickFile(event.target.files[0]); }}
                   />
                   {file && (
                     <small>
@@ -587,13 +589,14 @@ export default function TelegramServerlessMediaPanel({
                 <p className="media-message">
                   <Loader2 size={14} className="animate-spin" />
                   Generating three thumbnail choices…
+                  <button type="button" className="serverless-action" onClick={()=>{generation.current?.abort();setGenerating(false);setThumbnailError('Automatic thumbnails skipped. You can upload this video without a cover.');setForm(current=>({...current,isPublished:false}));}}>Skip Thumbnails</button>
                 </p>
               )}
               {thumbnailError && (
                 <div className="media-thumbnail-warning" role="status">
                   <p>{thumbnailError}</p>
                   <button type="button" className="serverless-action" disabled={busy || generating} onClick={() => void pickFile(file || undefined, true)}>Retry Thumbnails</button>
-                  <small>Cover-image uploads are saved as drafts until playback is verified. This does not convert an unsupported codec.</small>
+                  <small>You can upload now without a cover, or select your own image. The video will be saved as a draft for playback review.</small>
                 </div>
               )}
               <label className="serverless-field">
@@ -612,7 +615,7 @@ export default function TelegramServerlessMediaPanel({
                 <small>{cover ? `Selected cover: ${cover.name}` : "Use a cover if this device cannot generate frames."}</small>
                 {coverPreview && <img src={coverPreview} className="media-current-thumbnail" alt="Selected cover preview" />}
               </label>
-              {choices.length === 3 && (
+              {choices.length > 0 && (
                 <fieldset disabled={busy}>
                   <legend>Select a Thumbnail</legend>
                   <div className="media-thumbnail-choices">

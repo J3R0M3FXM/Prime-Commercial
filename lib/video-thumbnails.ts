@@ -125,6 +125,7 @@ export async function inspectVideo(
       choices,
     };
   } catch (error) {
+    if(choices.length && !signal?.aborted) return {duration:Math.round(video.duration)||0,width:video.videoWidth||0,height:video.videoHeight||0,choices};
     choices.forEach((choice) => URL.revokeObjectURL(choice.url));
     throw error;
   } finally {

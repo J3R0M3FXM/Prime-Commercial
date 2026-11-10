@@ -2,6 +2,7 @@ import { db } from 'sdk';
 import { asc, eq } from 'sdk/db';
 import { products } from '../schema.js';
 import { publicMediaReference } from '../lib/media.js';
+import { activeReservationTotals, withAvailableInventory } from '../lib/inventory.js';
 
 /**
  * Public, read-only catalog endpoint.
@@ -31,8 +32,9 @@ export default async function () {
     .orderBy(asc(products.sortOrder))
     .all();
 
+  const reserved = await activeReservationTotals();
   return await Promise.all(rows.map(async (product) => ({
-    ...product,
+    ...withAvailableInventory(product, reserved),
     imageUrl: await publicMediaReference(product.imageUrl),
     gallery: await Promise.all((Array.isArray(product.gallery) ? product.gallery : []).map(publicMediaReference)),
   })));

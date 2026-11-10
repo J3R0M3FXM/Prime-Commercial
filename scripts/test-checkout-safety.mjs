@@ -222,6 +222,14 @@ if (!isMainThread) {
     const fresh = await startPayment({ request, paymentMethodId: 'qr', operationKey: key }, ctx);
     assert.notEqual(fresh.operationKey, key);
     assert.notEqual(fresh.paymentSessionId, session.paymentSessionId);
+    const repeated=await startPayment({request,paymentMethodId:'qr',operationKey:key},ctx);
+    assert.equal(repeated.operationKey,fresh.operationKey,'Concurrent retry initialization keeps one effective order key');
+    assert.equal(repeated.paymentSessionId,fresh.paymentSessionId);
+    const longKey='x'.repeat(120);
+    const longFirst=await startPayment({request,paymentMethodId:'qr',operationKey:longKey+'A'},ctx);
+    const longSecond=await startPayment({request,paymentMethodId:'qr',operationKey:longKey+'B'},ctx);
+    assert.notEqual(longFirst.paymentSessionId,longSecond.paymentSessionId,'Full keys participate in identity without truncation');
+    assert.ok(longFirst.paymentSessionId.length<=120);
     payments.close();
     console.log('PASS: proof image/type validation, session ownership, changed-request proof invalidation, effective retry identity.');
 

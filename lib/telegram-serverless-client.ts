@@ -170,6 +170,14 @@ export function getOrCreateServerlessCheckoutKey(telegramUserId: string): string
   return key;
 }
 
+/** Persist a server-issued recovery key without overwriting another window's checkout. */
+export function replacePendingServerlessCheckoutKey(telegramUserId: string, expectedKey: string, nextKey: string) {
+  if (!CHECKOUT_OPERATION_KEY_PATTERN.test(nextKey)) throw new Error('The checkout recovery key is invalid.');
+  const storageKey=checkoutAttemptStorageKey(telegramUserId);
+  if(window.localStorage.getItem(storageKey)!==expectedKey)throw new Error('Checkout changed in another window. Reopen checkout to recover it.');
+  window.localStorage.setItem(storageKey,nextKey);
+}
+
 /** Clear only after the Serverless endpoint confirms a terminal result. */
 export function clearPendingServerlessCheckoutKey(telegramUserId: string, expectedKey?: string): void {
   if (typeof window === 'undefined') return;

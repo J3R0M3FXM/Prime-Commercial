@@ -528,7 +528,7 @@ async function bundle(entry, withDefault = true) {
             return `${withDefault ? "export {default}" : "export *"} from ${JSON.stringify(resolve(entry))};export * from ${JSON.stringify(resolve("lib/media-library.ts"))};`;
           if (id === "\0css") return "";
           if (id === "\0bridge")
-            return `export const getServerlessVideos=async()=>globalThis.__mediaTest.fixtures.filter(v=>v.storageType==='telegram');export const callServerless=(name,input)=>globalThis.__mediaTest.call(name,input);export const resolveTelegramMedia=async value=>value;export const resolveTelegramVideo=async()=> 'blob:test-video';export const getTelegramServerlessSession=async()=>({authenticated:true,isAdmin:true,tgUserId:'123'});export const uploadStaffImage=async()=> 'tgmedia:img-test1234';export const uploadServerlessGalleryVideo=async(file,metadata)=>{globalThis.__mediaTest.calls.push({name:'telegramUpload',metadata});return{success:true};};`;
+            return `export const getServerlessVideos=async()=>globalThis.__mediaTest.fixtures.filter(v=>v.storageType==='telegram');export const callServerless=(name,input)=>globalThis.__mediaTest.call(name,input);export const resolveTelegramMedia=async value=>value;export const resolveTelegramVideo=async()=> 'blob:test-video';export const getTelegramServerlessSession=async()=>({authenticated:true,isAdmin:true,tgUserId:'123'});export const uploadStaffImage=async()=>{if(globalThis.__mediaTest.failCover)throw Error('Cover upload failed');return 'tgmedia:img-test1234';};export const uploadServerlessGalleryVideo=async(file,metadata)=>{globalThis.__mediaTest.calls.push({name:'telegramUpload',metadata});return{success:true};};`;
           if (id === "\0r2")
             return `export const listR2Videos=async()=>globalThis.__mediaTest.fixtures.filter(v=>v.storageType==='r2');export const grantR2Playback=async id=>'https://r2.example/stream/'+id;export const checkR2Connection=async()=>({connected:true,multipart:true});export const updateR2Video=async()=>({});export const deleteR2Video=async()=>{};export const uploadR2Video=async(file,metadata)=>{globalThis.__mediaTest.calls.push({name:'r2Upload',metadata});return{id:'uploaded'};};`;
         },
@@ -694,6 +694,8 @@ const originalCreate = document.createElement.bind(document);
 let drawn = 0,
   thumbnailPaused = 0;
 let decoderFailure = false;
+let frameFailureAt = Infinity;
+let stallDecoder = false;
 document.createElement = function (tag, ...args) {
   const element = originalCreate(tag, ...args);
   if (tag === "video") {
@@ -719,6 +721,7 @@ document.createElement = function (tag, ...args) {
     element.load = () => {
       if (element.getAttribute("src")) {
         assert.ok(element.isConnected, "Mobile decoder must remain attached");
+        if (stallDecoder) return;
         if (decoderFailure) Object.defineProperty(element, "error", { value: { code: 3 }, configurable: true });
         queueMicrotask(() => element.dispatchEvent(new Event(decoderFailure ? "error" : "loadedmetadata")));
       }
@@ -732,6 +735,7 @@ document.createElement = function (tag, ...args) {
       drawImage(video) {
         assert.equal(video.readyState, 2, 'Wait for a decoded frame, not only metadata or seek completion');
         drawn++;
+        if (drawn === frameFailureAt) throw Error('Frame extraction interrupted');
       },
     });
     element.toBlob = (callback) =>
@@ -846,6 +850,18 @@ assert.match(document.querySelector('.media-thumbnail-warning').textContent, /ca
 assert.equal(document.querySelector('input[type=checkbox]').checked, false, "Decoder failure forces draft");
 assert.equal(document.querySelector('input[type=checkbox]').disabled, true);
 assert.equal(document.querySelectorAll('video[aria-hidden="true"]').length, 0, "Decoder removed after error");
+await act(async () => document.querySelector('.media-upload-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+assert.ok(__mediaTest.calls.some(call => call.name === 'r2Upload' && call.metadata.title === 'Manual cover draft' && call.metadata.thumbnailUrl === '' && call.metadata.isPublished === false), 'Decoder failure must allow upload without any cover');
+await act(async () => [...document.querySelectorAll('header button')].find(button => button.textContent.includes('Upload')).click());
+await inputValue('.media-upload-form input[maxlength="180"]', 'Manual cover draft');
+await inputValue('[aria-label="New category"]','Tutorials');
+await act(async()=>document.querySelector('.media-category-add button').click());
+await act(async()=>{
+ const input=document.querySelector('.media-upload-form input[accept="video/mp4,.mp4"]');
+ Object.defineProperty(input,'files',{value:[new File([bytes],'unsupported.mp4',{type:'video/mp4'})],configurable:true});
+ input.dispatchEvent(new Event('change',{bubbles:true}));
+ await new Promise(resolve=>setTimeout(resolve,10));
+});
 await act(async () => {
   const input = document.querySelector('[aria-label="Cover image"]');
   Object.defineProperty(input, "files", { value: [new File([new Uint8Array([255,216,255])], "cover.jpg", { type: "image/jpeg" })], configurable: true });
@@ -853,10 +869,47 @@ await act(async () => {
 });
 await act(async () => document.querySelector('.media-upload-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
 assert.ok(__mediaTest.calls.some(call => call.name === 'r2Upload' && call.metadata.title === 'Manual cover draft' && call.metadata.isPublished === false), 'Manual cover must allow draft upload after decoder failure');
-console.log('PASS: attached metadata-only decoder, error cleanup, manual-cover fallback and forced draft safety.');
+// Cover storage failure must not prevent the video itself from being saved.
+decoderFailure=false;
+await act(async()=>[...document.querySelectorAll('header button')].find(button=>button.textContent.includes('Upload')).click());
+await inputValue('.media-upload-form input[maxlength="180"]','Cover Failure Draft');
+await inputValue('[aria-label="New category"]','Tutorials');
+await act(async()=>document.querySelector('.media-category-add button').click());
+await act(async()=>{
+  const input=document.querySelector('.media-upload-form input[accept="video/mp4,.mp4"]');
+  Object.defineProperty(input,'files',{value:[new File([bytes],'cover-failure.mp4',{type:'video/mp4'})],configurable:true});
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+  await new Promise(resolve=>setTimeout(resolve,10));
+});
+__mediaTest.failCover=true;
+await act(async()=>document.querySelector('.media-upload-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+assert.ok(__mediaTest.calls.some(call=>call.name==='r2Upload'&&call.metadata.title==='Cover Failure Draft'&&call.metadata.thumbnailUrl===''&&call.metadata.isPublished===false));
+assert.match(document.body.textContent,/cover could not be uploaded/);
+__mediaTest.failCover=false;
+// An unresponsive WebView decoder can be skipped without waiting for its timeout.
+stallDecoder=true;
+await act(async()=>[...document.querySelectorAll('header button')].find(button=>button.textContent.includes('Upload')).click());
+await act(async()=>{
+  const input=document.querySelector('.media-upload-form input[accept="video/mp4,.mp4"]');
+  Object.defineProperty(input,'files',{value:[new File([bytes],'stalled.mp4',{type:'video/mp4'})],configurable:true});
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+});
+await act(async()=>[...document.querySelectorAll('button')].find(button=>button.textContent==='Skip Thumbnails').click());
+assert.equal(document.querySelectorAll('video[aria-hidden="true"]').length,0);
+assert.equal(document.querySelector('input[type=checkbox]').checked,false);
+assert.match(document.querySelector('.media-thumbnail-warning').textContent,/skipped/);
+stallDecoder=false;
+console.log('PASS: attached decoder, error cleanup, coverless upload, manual-cover fallback and draft safety.');
 await act(async () => {
   adminRoot.unmount();
 });
+drawn=0;frameFailureAt=2;
+const thumbnailModule=await bundle('lib/video-thumbnails.ts',false);
+const partial=await thumbnailModule.inspectVideo(new File([bytes],'partial.mp4',{type:'video/mp4'}));
+assert.equal(partial.choices.length,1,'Frames generated before an error remain usable');
+assert.equal(document.querySelectorAll('video[aria-hidden="true"]').length,0);
+partial.choices.forEach(choice=>URL.revokeObjectURL(choice.url));
+frameFailureAt=Infinity;
 document.createElement = originalCreate;
 const fullscreen = await bundle("lib/media-fullscreen.ts", false);
 let locked = "",

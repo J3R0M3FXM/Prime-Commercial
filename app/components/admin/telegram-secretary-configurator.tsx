@@ -6,6 +6,7 @@ import { AdminDisclosure, AdminSwitch } from "./admin-ui";
 import { callServerless, uploadStaffImage } from "@/lib/telegram-serverless-client";
 import TelegramMediaImage from "@/app/components/telegram-media-image";
 import "./secretary-configurator.css";
+import SecretaryBroadcastPanel from "./secretary-broadcast-panel";
 
 type Action = "flow" | "reply" | "url";
 
@@ -145,7 +146,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
   const [testMode, setTestMode] = useState(false);
   const [testChatId, setTestChatId] = useState("");
   const [monoMode, setMonoMode] = useState(false);
-  const [section, setSection] = useState<"steps" | "settings" | "preview" | "guide">("steps");
+  const [section, setSection] = useState<"steps" | "settings" | "preview" | "guide" | "broadcast">("steps");
 
   async function requestAutomation(action: string, payload: Record<string, unknown> = {}, _legacyRequest?: RequestInit, _legacyUrl?: string) {
     if (!serverless) throw new Error("Telegram Serverless Secretary access is required.");
@@ -366,8 +367,10 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
       </header>
 
       <nav className="secretary-section-tabs" aria-label="Secretary Sections">
-        {([["steps", "Reply Steps"], ["settings", "Settings"], ["preview", "Preview"], ["guide", "Guide"]] as const).map(([id, label]) => <button type="button" key={id} aria-current={section === id ? "page" : undefined} onClick={() => setSection(id)}>{label}</button>)}
+        {([["steps", "Reply Steps"], ["settings", "Settings"], ["preview", "Preview"], ["guide", "Guide"], ["broadcast", "Broadcast"]] as const).map(([id, label]) => <button type="button" key={id} aria-current={section === id ? "page" : undefined} onClick={() => setSection(id)}>{label}</button>)}
       </nav>
+
+      {section === "broadcast" && serverless && <SecretaryBroadcastPanel/>}
 
       <div hidden={section !== "guide"}>
       <AdminDisclosure title="How The Secretary Works" meta="Quick Guide" defaultOpen>

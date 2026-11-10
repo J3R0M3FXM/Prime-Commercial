@@ -26,10 +26,10 @@ export async function canonicalizeOrderItems(inputItems) {
     const productId = productIdOf(raw);
     const variantId = variantIdOf(raw) || 'default';
     const quantityValue = Number(raw?.quantity ?? 1);
-    if (!productId || !Number.isFinite(quantityValue) || quantityValue < 1) {
+    if (!productId || !Number.isSafeInteger(quantityValue) || quantityValue < 1 || quantityValue > 1000) {
       throw new EndpointError('Each cart item needs a product and valid quantity.', { code: 'INVALID_CART' });
     }
-    const quantity = Math.min(1000, Math.floor(quantityValue));
+    const quantity = quantityValue;
     const key = productId + '\u0000' + variantId;
     const previous = grouped.get(key);
     const total = (previous?.quantity || 0) + quantity;
