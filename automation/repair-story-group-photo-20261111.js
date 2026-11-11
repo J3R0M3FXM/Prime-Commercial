@@ -1,8 +1,10 @@
 import { api, db } from 'sdk';
 import { resolveSecretaryPhoto } from '../lib/secretary-media.js';
+import { ensureStoryCampaigns } from '../lib/story-campaigns.js';
 
 /** Owner CLI only. Guarded one-time repair of the 2026-11-11 text-only group campaign. */
 export default async function () {
+  await ensureStoryCampaigns();
   const id = '218f5272-67d1-4fa9-b8b1-90577b43150a';
   const previousMessageId = 2229;
   const row = await db.get(`SELECT * FROM secretary_story_campaigns WHERE id=:id`, { ':id': id });
