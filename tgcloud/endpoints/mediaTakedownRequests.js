@@ -1,24 +1,48 @@
 import { db, EndpointError } from 'sdk';
 import { eq } from 'sdk/db';
 import { fetch } from 'sdk/fetch';
-import { videos } from '../schema.js';
+import { videos, systemSettings } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
 
 const invalid = (message) => { throw new EndpointError(message, { code: 'INVALID_INPUT' }); };
+const defaultReasons = ['Copyright Ownership', 'Unauthorized Use', 'Privacy Concern', 'Other'];
+async function reasons() {
+  const row = await db.select({ value: systemSettings.value }).from(systemSettings).where(eq(systemSettings.key, 'media_takedown_reason_options')).get();
+  return Array.isArray(row?.value) && row.value.length ? row.value : defaultReasons;
+}
 
 async function ensureTable() {
   await db.run(`CREATE TABLE IF NOT EXISTS media_takedown_requests (
     id TEXT PRIMARY KEY, storage_type TEXT NOT NULL, video_id TEXT NOT NULL,
     video_title TEXT NOT NULL, requester_id TEXT NOT NULL, reason TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending', created_at INTEGER NOT NULL,
-    reviewed_at INTEGER, reviewed_by TEXT)`);
+    reviewed_at INTEGER, reviewed_by TEXT, description TEXT NOT NULL DEFAULT '')`);
+  try {
+    await db.run(`ALTER TABLE media_takedown_requests ADD COLUMN description TEXT NOT NULL DEFAULT ''`);
+  } catch (error) {
+    if (!/duplicate column name/i.test(String(error?.message || error))) throw error;
+  }
   await db.run(`CREATE INDEX IF NOT EXISTS media_takedown_status_idx ON media_takedown_requests(status,created_at DESC)`);
 }
 
 export default async function (input, ctx) {
   const action = String(input?.action || '');
-  if (!['submit', 'list', 'review'].includes(action)) invalid('Invalid request action.');
-  if (action !== 'submit') await requireAdmin(ctx);
+  if (!['submit', 'list', 'review', 'getReasons', 'saveReasons'].includes(action)) invalid('Invalid request action.');
+  if (!['submit', 'getReasons'].includes(action)) await requireAdmin(ctx);
+  else if (!/^\d{1,24}$/.test(String(ctx?.initData?.user?.id || '')))
+    throw new EndpointError('Telegram access required.', { code: 'AUTH_REQUIRED' });
+  if (action === 'getReasons') return await reasons();
+  if (action === 'saveReasons') {
+    const options = input?.reasons;
+    if (!Array.isArray(options) || options.length < 1 || options.length > 20 ||
+      options.some((option) => typeof option !== 'string' || option.trim().length < 3 || option.trim().length > 80) ||
+      new Set(options.map((option) => option.trim().toLowerCase())).size !== options.length)
+      invalid('Enter 1 to 20 unique reasons, 3 to 80 characters each.');
+    const cleaned = options.map((option) => option.trim());
+    await db.run(`INSERT INTO system_settings (key,value,updated_at) VALUES ('media_takedown_reason_options',json(:value),unixepoch())
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=unixepoch()`, { ':value': JSON.stringify(cleaned) });
+    return { success: true, reasons: cleaned };
+  }
   await ensureTable();
   if (action === 'list') return await db.all(`SELECT * FROM media_takedown_requests ORDER BY CASE WHEN status='pending' THEN 0 ELSE 1 END,created_at DESC LIMIT 100`);
   if (action === 'review') {
@@ -35,8 +59,10 @@ export default async function (input, ctx) {
   const storageType = String(input?.storageType || '');
   const videoId = String(input?.id || '');
   const reason = String(input?.reason || '').trim();
+  const description = String(input?.description || '').trim();
   if (!['r2', 'telegram'].includes(storageType) || !/^[A-Za-z0-9_-]{1,120}$/.test(videoId)) invalid('Invalid video.');
-  if (reason.length < 10 || reason.length > 2000) invalid('Describe your request in 10 to 2000 characters.');
+  if (!(await reasons()).includes(reason)) invalid('Choose a valid request reason.');
+  if (description.length > 2000) invalid('Description must be 2000 characters or less.');
   let video;
   if (storageType === 'telegram') video = await db.select().from(videos).where(eq(videos.id, videoId)).get();
   else {
@@ -51,10 +77,10 @@ export default async function (input, ctx) {
   });
   if (existing) return { success: true, id: existing.id, alreadyPending: true };
   const id = globalThis.crypto.randomUUID();
-  await db.run(`INSERT INTO media_takedown_requests (id,storage_type,video_id,video_title,requester_id,reason,created_at)
-    VALUES (:id,:storage,:video,:title,:requester,:reason,unixepoch())`, {
+  await db.run(`INSERT INTO media_takedown_requests (id,storage_type,video_id,video_title,requester_id,reason,description,created_at)
+    VALUES (:id,:storage,:video,:title,:requester,:reason,:description,unixepoch())`, {
     ':id': id, ':storage': storageType, ':video': videoId,
-    ':title': String(video.title || 'Untitled video').slice(0, 300), ':requester': requesterId, ':reason': reason,
+    ':title': String(video.title || 'Untitled video').slice(0, 300), ':requester': requesterId, ':reason': reason, ':description': description,
   });
   return { success: true, id };
 }

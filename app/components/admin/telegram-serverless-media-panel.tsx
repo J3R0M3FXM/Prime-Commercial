@@ -34,7 +34,7 @@ import { inspectVideo, type ThumbnailChoice } from "@/lib/video-thumbnails";
 import TelegramMediaImage from "../telegram-media-image";
 import "./media-panel.css";
 type ManagedVideo = MediaVideo & { featured?: boolean };
-type TakedownRequest = { id: string; storage_type: string; video_id: string; video_title: string; requester_id: string; reason: string; status: string; created_at: number };
+type TakedownRequest = { id: string; storage_type: string; video_id: string; video_title: string; requester_id: string; reason: string; description?: string; status: string; created_at: number };
 const empty = {
   title: "",
   categories: [] as string[],
@@ -60,6 +60,8 @@ export default function TelegramServerlessMediaPanel({
     [notice, setNotice] = useState(""),
     [videos, setVideos] = useState<ManagedVideo[]>([]),
     [takedownRequests, setTakedownRequests] = useState<TakedownRequest[]>([]),
+    [reasonOptions, setReasonOptions] = useState<string[]>([]),
+    [reasonDraft, setReasonDraft] = useState(""),
     [connection, setConnection] = useState("Checking R2 connection…");
   const [storageChat, setStorageChat] = useState(""),
     [savedChat, setSavedChat] = useState("");
@@ -117,7 +119,7 @@ export default function TelegramServerlessMediaPanel({
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [telegram, r2, target, health, requests] = await Promise.allSettled([
+    const [telegram, r2, target, health, requests, reasons] = await Promise.allSettled([
       callServerless<ManagedVideo[]>("manageVideos", { action: "list" }, 30000),
       listR2Videos(true),
       callServerless<{ chatId?: string }>("manageVideos", {
@@ -125,6 +127,7 @@ export default function TelegramServerlessMediaPanel({
       }),
       checkR2Connection(),
       callServerless<TakedownRequest[]>("mediaTakedownRequests", { action: "list" }, 20000),
+      callServerless<string[]>("mediaTakedownRequests", { action: "getReasons" }, 20000),
     ]);
     const rows: ManagedVideo[] = [],
       warnings: string[] = [];
@@ -139,6 +142,10 @@ export default function TelegramServerlessMediaPanel({
     setVideos(rows);
     if (requests.status === "fulfilled") setTakedownRequests(requests.value);
     else warnings.push("Takedown requests could not load.");
+    if (reasons.status === "fulfilled") {
+      setReasonOptions(reasons.value);
+      setReasonDraft(reasons.value.join("\n"));
+    } else warnings.push("Takedown reasons could not load.");
     if (target.status === "fulfilled") {
       setStorageChat(target.value.chatId || "");
       setSavedChat(target.value.chatId || "");
@@ -155,6 +162,18 @@ export default function TelegramServerlessMediaPanel({
     setError(warnings.join(" "));
     setLoading(false);
   }, []);
+  const saveReasons = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const next = reasonDraft.split("\n").map((value) => value.trim()).filter(Boolean);
+      const result = await callServerless<{ reasons: string[] }>("mediaTakedownRequests", { action: "saveReasons", reasons: next }, 20000);
+      setReasonOptions(result.reasons);
+      setReasonDraft(result.reasons.join("\n"));
+      setNotice("Takedown reasons saved.");
+    } catch (err: any) { setError(err.message || "Reasons could not be saved."); }
+    finally { setBusy(false); }
+  };
   const reviewTakedown = async (request: TakedownRequest, status: "reviewed" | "dismissed") => {
     setBusy(true);
     setError("");
@@ -459,16 +478,25 @@ export default function TelegramServerlessMediaPanel({
             <button type="button" aria-current={formOpen ? "page" : undefined} disabled={busy} onClick={() => setFormOpen(true)}>{editing ? "Edit Media" : "Uploader"}</button>
           </nav>
           <section className="media-takedown-queue" aria-label="Takedown requests" hidden={formOpen}>
-            <h2>Takedown requests · {takedownRequests.filter((request) => request.status === "pending").length} need review</h2>
+            <h2>Takedown Requests · {takedownRequests.filter((request) => request.status === "pending").length} Need Review</h2>
             {takedownRequests.filter((request) => request.status === "pending").map((request) => <article key={request.id}>
               <strong>{request.video_title}</strong>
               <p>{request.storage_type} · {request.video_id} · Telegram user {request.requester_id}</p>
               <p>{request.reason}</p>
+              {request.description && <p>{request.description}</p>}
               <p>{new Date(request.created_at * 1000).toLocaleString()}</p>
-              <button disabled={busy} onClick={() => void reviewTakedown(request, "reviewed")}>Mark reviewed</button>
+              <button disabled={busy} onClick={() => void reviewTakedown(request, "reviewed")}>Mark Reviewed</button>
               <button disabled={busy} onClick={() => void reviewTakedown(request, "dismissed")}>Dismiss</button>
             </article>)}
           </section>
+          <details className="media-storage-settings" hidden={formOpen}>
+            <summary>Takedown Request Reasons · {reasonOptions.length} Options</summary>
+            <label className="serverless-field">Dropdown Options (One Reason Per Line)
+              <textarea value={reasonDraft} onChange={(event) => setReasonDraft(event.target.value)} rows={6} maxLength={1600} />
+            </label>
+            <p className="media-message">Customers choose one reason. Description is optional.</p>
+            <button className="serverless-action" disabled={busy || reasonDraft === reasonOptions.join("\n")} onClick={() => void saveReasons()}>Save Reasons</button>
+          </details>
           <details className="media-storage-settings" hidden={formOpen && storage !== "telegram"}>
             <summary>Telegram Storage Channel</summary>
             <form onSubmit={saveTarget}>

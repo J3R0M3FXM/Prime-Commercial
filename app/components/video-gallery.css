@@ -168,10 +168,11 @@
   color: white;
   filter: drop-shadow(0 1px 2px #000);
 }
-.media-card h2 {
-  font-size: 9.5px;
-  line-height: 1.25;
-  height: 30px;
+#mobile-portrait-viewport .prime-media-gallery .media-card h2 {
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  font-weight: 400 !important;
+  height: 29px;
   margin: 6px 5px 3px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -322,21 +323,19 @@
 }
 .media-takedown-icon {
   position: absolute;
-  top: 5px;
-  right: 5px;
+  top: 4px;
+  right: 4px;
   z-index: 4;
-  width: 30px;
-  height: 30px;
-  border: 1px solid #ef4444 !important;
+  width: 24px;
+  height: 24px;
+  border: 0 !important;
   border-radius: 50% !important;
   background: #fff !important;
-  color: #111827 !important;
   display: grid !important;
   place-items: center;
   padding: 0 !important;
 }
-.media-takedown-icon svg { grid-area: 1 / 1; }
-.media-takedown-icon svg:last-child { color: #ef2020; }
+.media-takedown-icon svg { display: block; width: 22px; height: 22px; }
 .media-legal-backdrop {
   position: fixed;
   inset: 0;
@@ -368,6 +367,7 @@
 .media-legal-dialog button { width: 100%; margin-top: 12px; background: #0f766e; color: white; }
 .media-report-dialog h2 { font: 400 22px 'Roboto Condensed', sans-serif; }
 .media-report-dialog label { display: block; margin: 12px 0; }
+.media-report-dialog select { display: block; width: 100%; min-height: 42px; padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; }
 .media-report-dialog textarea { display: block; width: 100%; min-height: 110px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
 .media-report-dialog > div { display: flex; justify-content: flex-end; gap: 8px; }
 .media-report-dialog button:last-child { background: #0f766e; color: white; }

@@ -16,7 +16,6 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
-  Ban,
   WifiOff,
   X,
 } from "lucide-react";
@@ -81,6 +80,8 @@ export default function VideoGalleryModal({
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [reportVideo, setReportVideo] = useState<MediaVideo | null>(null);
   const [reportReason, setReportReason] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportReasons, setReportReasons] = useState<string[]>([]);
   const [reportBusy, setReportBusy] = useState(false);
   const [playlists, setPlaylists] = useState<MediaPlaylist[]>([]),
     [playlistPanel, setPlaylistPanel] = useState(false),
@@ -184,13 +185,20 @@ export default function VideoGalleryModal({
     if (isOpen && !offlineOnly) setDisclaimerOpen(true);
     if (!isOpen) { setDisclaimerOpen(false); setReportVideo(null); }
   }, [isOpen, offlineOnly]);
+  useEffect(() => {
+    if (!isOpen || offlineOnly) return;
+    void callServerless<string[]>("mediaTakedownRequests", { action: "getReasons" }, 20000)
+      .then(setReportReasons)
+      .catch(() => setReportReasons([]));
+  }, [isOpen, offlineOnly]);
   const submitReport = async () => {
     if (!reportVideo || reportBusy) return;
     setReportBusy(true);
     try {
-      await callServerless("mediaTakedownRequests", { action: "submit", id: reportVideo.id, storageType: reportVideo.storageType, reason: reportReason.trim() }, 20000);
+      await callServerless("mediaTakedownRequests", { action: "submit", id: reportVideo.id, storageType: reportVideo.storageType, reason: reportReason, description: reportDescription.trim() }, 20000);
       setReportVideo(null);
       setReportReason("");
+      setReportDescription("");
       setNotice("Takedown request received. Staff will review it.");
     } catch (err: any) { setNotice(err.message || "Request could not be sent."); }
     finally { setReportBusy(false); }
@@ -691,7 +699,7 @@ export default function VideoGalleryModal({
                   })
                 }
                 feedbackDisabled={!online || feedbackBusy}
-                onReport={() => { setReportVideo(video); setReportReason(""); }}
+                onReport={() => { setReportVideo(video); setReportReason(""); setReportDescription(""); }}
               />
             ))}
           </div>
@@ -733,7 +741,7 @@ export default function VideoGalleryModal({
               </button>
             </header>
             <div className="media-video-stage">
-              <ReportIcon onClick={() => { setReportVideo(active); setReportReason(""); }} />
+              <ReportIcon onClick={() => { setReportVideo(active); setReportReason(""); setReportDescription(""); }} />
               <video
                 ref={videoRef}
                 src={source || undefined}
@@ -921,7 +929,7 @@ export default function VideoGalleryModal({
         </div>
       )}
       {disclaimerOpen && <div className="media-legal-backdrop"><section className="media-legal-dialog" role="dialog" aria-modal="true" aria-label="Copyright disclaimer"><img src="/copyright-disclaimer.png" alt="Copyright disclaimer. Publicly sourced content belongs to its respective owners. Use the takedown icon on a video to request removal." /><button onClick={() => setDisclaimerOpen(false)}>Continue to Media</button></section></div>}
-      {reportVideo && <div className="media-legal-backdrop"><section className="media-report-dialog" role="dialog" aria-modal="true" aria-label="Request video takedown"><h2>Request takedown</h2><p>{reportVideo.title}</p><label>Why should this video be removed?<textarea value={reportReason} onChange={(event) => setReportReason(event.target.value)} maxLength={2000} placeholder="Describe your rights or concern for staff review." /></label><div><button onClick={() => setReportVideo(null)} disabled={reportBusy}>Cancel</button><button onClick={() => void submitReport()} disabled={reportBusy || reportReason.trim().length < 10}>{reportBusy ? "Sending…" : "Send request"}</button></div></section></div>}
+      {reportVideo && <div className="media-legal-backdrop"><section className="media-report-dialog" role="dialog" aria-modal="true" aria-label="Request Video Takedown"><h2>Request Video Takedown</h2><p>{reportVideo.title}</p><label>Reason for Request<select value={reportReason} onChange={(event) => setReportReason(event.target.value)}><option value="">Select a Reason</option>{reportReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select></label><label>Description (Optional)<textarea value={reportDescription} onChange={(event) => setReportDescription(event.target.value)} maxLength={2000} placeholder="Add details for staff review." /></label><div><button onClick={() => setReportVideo(null)} disabled={reportBusy}>Cancel</button><button onClick={() => void submitReport()} disabled={reportBusy || !reportReason}>{reportBusy ? "Sending…" : "Send Request"}</button></div></section></div>}
     </div>
   );
 }
@@ -1019,5 +1027,5 @@ function MediaCard({
 }
 
 function ReportIcon({ onClick }: { onClick: () => void }) {
-  return <button className="media-takedown-icon" type="button" aria-label="Request video takedown" title="Request takedown" onClick={onClick}><Trash2 size={15} /><Ban size={24} /></button>;
+  return <button className="media-takedown-icon" type="button" aria-label="Request video takedown" title="Request takedown" onClick={onClick}><svg viewBox="660 700 105 105" aria-hidden="true"><image href="/copyright-disclaimer.png" width="1448" height="1086" /></svg></button>;
 }
