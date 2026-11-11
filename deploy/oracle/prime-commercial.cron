@@ -1,0 +1,3 @@
+# Install as /etc/cron.d/prime-commercial after setting permissions to 0644.
+# Jobs are idempotency-sensitive; keep a single scheduler active during cutover.
+*/5 * * * * root flock -n /run/lock/prime-commercial-cron.lock /usr/local/sbin/prime-commercial-cron.sh >> /var/log/prime-commercial-cron.log 2>&1

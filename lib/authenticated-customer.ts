@@ -9,6 +9,14 @@ function generateMemberId() {
 export async function getAuthenticatedCustomer(request: Request) {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
+    if (process.env.NODE_ENV === 'production') {
+      return {
+        customer: null,
+        error: 'Server-side Supabase credentials are not configured.' as string,
+        status: 503,
+      };
+    }
+
     return {
       customer: {
         id: 'cust-preview-001',
@@ -40,7 +48,10 @@ export async function getAuthenticatedCustomer(request: Request) {
   const headerInitData = request.headers.get('x-telegram-init-data') || '';
   let initDataSession: { tgUserId: string; isAdmin: boolean } | null = null;
   if (headerInitData === 'preview') {
-    initDataSession = { tgUserId: '100000001', isAdmin: false };
+    if (process.env.NODE_ENV !== 'production') {
+      initDataSession = { tgUserId: '100000001', isAdmin: false };
+    }
+    // In production, ignore the preview sentinel and allow a valid signed cookie to be checked below.
   } else if (headerInitData) {
     try {
       const params = new URLSearchParams(headerInitData);
@@ -75,7 +86,7 @@ export async function getAuthenticatedCustomer(request: Request) {
     } catch {}
   }
   const session = initDataSession || verifyTelegramSessionCookie(cookieValue);
-  if (!session) return { customer: null, error: 'Telegram authentication required' as string };
+  if (!session) return { customer: null, error: 'Telegram authentication required' as string, status: 401 };
 
   const { data: customer, error } = await supabase
     .from('customers')
@@ -85,7 +96,7 @@ export async function getAuthenticatedCustomer(request: Request) {
 
   if (error) {
     console.error('Authenticated customer lookup failed:', error);
-    return { customer: null, error: 'Unable to load customer session.' as string };
+    return { customer: null, error: 'Unable to load customer session.' as string, status: 503 };
   }
 
   // A valid Telegram session must always have a corresponding customer row.
@@ -106,7 +117,7 @@ export async function getAuthenticatedCustomer(request: Request) {
 
     if (repairError || !repaired) {
       console.error('Authenticated customer repair failed:', repairError);
-      return { customer: null, error: 'Unable to initialize customer profile.' as string };
+      return { customer: null, error: 'Unable to initialize customer profile.' as string, status: 503 };
     }
 
     return { customer: repaired, session, error: null as string | null };

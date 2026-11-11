@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     if (auth.error || !auth.customer) {
       return NextResponse.json(
         { error: auth.error || 'Telegram authentication required' },
-        { status: 401 }
+        { status: 'status' in auth && typeof auth.status === 'number' ? auth.status : 401 }
       );
     }
 
@@ -221,7 +221,10 @@ export async function POST(request: Request) {
     }
     const auth = await getAuthenticatedCustomer(request);
     if (auth.error || !auth.customer) {
-      return NextResponse.json({ error: auth.error || 'Telegram authentication required' }, { status: 401 });
+      return NextResponse.json(
+        { error: auth.error || 'Telegram authentication required' },
+        { status: 'status' in auth && typeof auth.status === 'number' ? auth.status : 401 }
+      );
     }
     const supabase = getSupabaseAdmin()!;
     const body = await request.json();
@@ -234,7 +237,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Photo is too large.' }, { status: 413 });
     }
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('customers')
       .update({
         photo_url: photoUrl,
@@ -242,6 +245,11 @@ export async function POST(request: Request) {
         updated_at: new Date().toISOString()
       })
       .eq('id', auth.customer.id);
+
+    if (updateError) {
+      console.error('Profile photo update failed:', updateError.code || updateError.name);
+      return NextResponse.json({ error: 'Unable to save profile photo.' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, photoUrl });
   } catch (err: any) {

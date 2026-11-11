@@ -20,6 +20,10 @@ export async function GET(request: NextRequest) {
   const session = verifyTelegramSessionCookie(request.cookies.get('prime_telegram_session')?.value);
 
   if (!session) {
+    if (process.env.NODE_ENV === 'production') {
+      return json({ authenticated: false, sessionReady: false, error: 'Telegram authentication required' }, 401);
+    }
+
     return json({
       authenticated: true,
       sessionReady: true,
@@ -44,7 +48,17 @@ export async function POST(request: NextRequest) {
     const fingerprint = body.fingerprint;
     const heartbeat = Boolean(body.heartbeat);
 
-    const isPreview = !initData || initData === 'preview' || Boolean(body.isPreview) || !process.env.TELEGRAM_BOT_TOKEN?.trim();
+    const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN?.trim() || '';
+    const previewRequested = !initData || initData === 'preview' || Boolean(body.isPreview);
+
+    if (process.env.NODE_ENV === 'production' && !BOT_TOKEN) {
+      return json({ error: 'Server configuration error: TELEGRAM_BOT_TOKEN is missing.' }, 503);
+    }
+    if (process.env.NODE_ENV === 'production' && previewRequested) {
+      return json({ error: 'Valid Telegram Mini App data is required.' }, 401);
+    }
+
+    const isPreview = process.env.NODE_ENV !== 'production' && (previewRequested || !BOT_TOKEN);
 
     if (isPreview) {
       const tgUserId = '100000001';
@@ -75,9 +89,8 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN?.trim();
     if (!BOT_TOKEN) {
-      return json({ error: 'Server configuration error: TELEGRAM_BOT_TOKEN is missing.' }, 500);
+      return json({ error: 'Server configuration error: TELEGRAM_BOT_TOKEN is missing.' }, 503);
     }
 
     const params = new URLSearchParams(initData);

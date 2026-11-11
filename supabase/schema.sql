@@ -72,6 +72,8 @@ CREATE TABLE IF NOT EXISTS public.customers (
   tg_name TEXT,
   tg_username TEXT,
   phone_number TEXT,
+  photo_url TEXT,
+  has_custom_photo BOOLEAN NOT NULL DEFAULT false,
   prime_member_id TEXT UNIQUE,
   points NUMERIC(10, 2) DEFAULT 0.00,
   store_credits NUMERIC(10, 2) DEFAULT 0.00,
