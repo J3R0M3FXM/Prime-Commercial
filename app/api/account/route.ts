@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured, isSupabaseConfigured } from '@/lib/supabase';
 import { calculateCustomerTier, processMaturedReferrals } from '@/lib/points-system';
 import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
@@ -16,10 +16,24 @@ export async function GET(request: Request) {
     }
 
     const customer = auth.customer;
-    const supabase = getSupabaseAdmin()!;
 
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 503 });
+    // Account and loyalty reads require the server-only Supabase key. A public
+    // publishable key alone must never be treated as a working admin connection.
+    if (!isSupabaseAdminConfigured()) {
+      console.error('Account profile unavailable: server-side Supabase credentials are not configured.');
+      return NextResponse.json(
+        { error: 'Account data is temporarily unavailable. Please try again later.' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      console.error('Account profile unavailable: Supabase admin client could not be initialized.');
+      return NextResponse.json(
+        { error: 'Account data is temporarily unavailable. Please try again later.' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     // Referral maturity is an atomic database operation. Running it here also
@@ -216,8 +230,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 400 });
+    if (!isSupabaseAdminConfigured()) {
+      return NextResponse.json({ error: 'Account updates are temporarily unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     }
     const auth = await getAuthenticatedCustomer(request);
     if (auth.error || !auth.customer) {

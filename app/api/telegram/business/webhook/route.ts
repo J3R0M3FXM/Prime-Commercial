@@ -77,8 +77,8 @@ function findButton(flow: any, buttonId: string) {
 }
 
 function verifyWebhookSecret(request: Request) {
-  const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (!expected) return true;
+  const expected = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  if (!expected) return process.env.NODE_ENV !== 'production' && process.env.ALLOW_PREVIEW_AUTH === 'true';
   return request.headers.get('x-telegram-bot-api-secret-token') === expected;
 }
 

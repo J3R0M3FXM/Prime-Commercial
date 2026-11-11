@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isSupabaseAdminConfigured } from '@/lib/supabase';
 import { cacheStore } from '@/lib/cache';
 import { 
   createProductInDb, 
@@ -12,6 +13,7 @@ export const revalidate = 0;
 
 export async function POST(request: Request) {
   try {
+    if (process.env.NODE_ENV === 'production' && !isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin credentials are not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     const product = await request.json();
     const result = await createProductInDb(product);
     cacheStore.invalidateProducts();
@@ -23,6 +25,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    if (process.env.NODE_ENV === 'production' && !isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin credentials are not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     const body = await request.json();
 
     // Handle batch reordering
@@ -47,6 +50,7 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    if (process.env.NODE_ENV === 'production' && !isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Supabase admin credentials are not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     const { id } = await request.json();
     await deleteProductInDb(id);
     cacheStore.invalidateProducts();

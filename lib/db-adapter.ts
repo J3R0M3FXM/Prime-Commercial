@@ -341,47 +341,47 @@ let inMemoryPromoRedemptions: any[] = [];
 // PRODUCTS
 // ==============================================================================
 export async function getProductsFromDb() {
-  if (isSupabaseAdminConfigured()) {
-    try {
-      const supabase = getSupabaseAdmin()!;
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('sort_order', { ascending: true })
-        .order('name', { ascending: true });
-
-      if (!error && data && data.length > 0) {
-        return data.map(p => {
-          const bundleConfig = (p.bundle_config && typeof p.bundle_config === 'object') ? p.bundle_config : {};
-          const variants = Array.isArray(bundleConfig.variants) ? bundleConfig.variants : [];
-          return {
-            id: p.id,
-            name: p.name,
-            price: Number(p.price),
-            stock: Number(p.stock),
-            category: p.category,
-            imageUrl: p.image_url || '',
-            image_url: p.image_url || '',
-            description: p.description || '',
-            isActive: p.is_active !== false,
-            active: p.is_active !== false,
-            isFeatured: Boolean(p.is_featured),
-            sortOrder: Number(p.sort_order) || 0,
-            bundleConfig,
-            variants,
-            lowStockThreshold: Number(bundleConfig.lowStockThreshold ?? 10),
-            tags: p.tags || [],
-            gallery: p.gallery || [],
-            createdAt: p.created_at,
-            updatedAt: p.updated_at,
-          };
-        });
-      }
-    } catch (err) {
-      console.warn("Supabase getProducts fallback to local:", err);
+  if (!isSupabaseAdminConfigured()) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Supabase admin credentials are not configured.');
     }
+    return [...inMemoryProducts];
   }
-  return [...inMemoryProducts];
+
+  const supabase = getSupabaseAdmin()!;
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (error) throw error;
+
+  return (data || []).map(p => {
+    const bundleConfig = (p.bundle_config && typeof p.bundle_config === 'object') ? p.bundle_config : {};
+    const variants = Array.isArray(bundleConfig.variants) ? bundleConfig.variants : [];
+    return {
+      id: p.id,
+      name: p.name,
+      price: Number(p.price),
+      stock: Number(p.stock),
+      category: p.category,
+      imageUrl: p.image_url || '',
+      image_url: p.image_url || '',
+      description: p.description || '',
+      isActive: p.is_active !== false,
+      active: p.is_active !== false,
+      isFeatured: Boolean(p.is_featured),
+      sortOrder: Number(p.sort_order) || 0,
+      bundleConfig,
+      variants,
+      lowStockThreshold: Number(bundleConfig.lowStockThreshold ?? 10),
+      tags: p.tags || [],
+      gallery: p.gallery || [],
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+    };
+  });
 }
 
 async function processProductImage(imageUrl: string | undefined, productId: string, prefix = 'prod'): Promise<string> {
@@ -426,6 +426,10 @@ async function processProductImage(imageUrl: string | undefined, productId: stri
 }
 
 export async function createProductInDb(productData: any) {
+  const previousProducts = [...inMemoryProducts];
+  if (process.env.NODE_ENV === 'production' && !isSupabaseAdminConfigured()) {
+    throw new Error('Supabase admin credentials are not configured.');
+  }
   const id = productData.id || `prod-${Date.now()}`;
   const rawImage = productData.imageUrl !== undefined ? productData.imageUrl : (productData.image_url || '');
   const finalImageUrl = await processProductImage(rawImage, id, 'prod');
@@ -502,12 +506,12 @@ export async function createProductInDb(productData: any) {
         updated_at: newProduct.updatedAt,
       };
       const { error: upsertErr } = await supabase.from('products').upsert([payload]);
-      if (upsertErr) {
-        console.warn("Supabase product upsert failed, trying update:", upsertErr.message);
-        await supabase.from('products').update(payload).eq('id', id);
-      }
+      if (upsertErr) throw upsertErr;
     } catch (err) {
-      console.warn("Supabase product upsert fallback to local:", err);
+      inMemoryProducts = previousProducts;
+      saveInMemoryProducts(inMemoryProducts);
+      cacheStore.invalidateProducts();
+      throw err;
     }
   }
 
@@ -515,6 +519,10 @@ export async function createProductInDb(productData: any) {
 }
 
 export async function updateProductInDb(id: string, updates: any) {
+  const previousProducts = [...inMemoryProducts];
+  if (process.env.NODE_ENV === 'production' && !isSupabaseAdminConfigured()) {
+    throw new Error('Supabase admin credentials are not configured.');
+  }
   const idx = inMemoryProducts.findIndex(p => p.id === id);
   const sanitizedUpdates = Object.entries(updates).reduce((acc, [key, val]) => {
     if (val !== undefined && val !== null) acc[key] = val;
@@ -597,6 +605,7 @@ export async function updateProductInDb(id: string, updates: any) {
   cacheStore.invalidateProducts();
 
   if (isSupabaseAdminConfigured()) {
+    try {
     // IMPORTANT: Updates must be sparse. Never upsert a reconstructed in-memory
     // product here: serverless instances may not have the current DB row loaded,
     // and a sort-only update could otherwise overwrite real product data with
@@ -655,12 +664,21 @@ export async function updateProductInDb(id: string, updates: any) {
 
     if (error) throw error;
     if (!data) throw new Error(`Product not found for update: ${id}`);
+    } catch (error) {
+      inMemoryProducts = previousProducts;
+      saveInMemoryProducts(inMemoryProducts);
+      cacheStore.invalidateProducts();
+      throw error;
+    }
   }
 
   return { success: true, product: updatedProduct };
 }
 
 export async function deleteProductInDb(id: string) {
+  if (process.env.NODE_ENV === 'production' && !isSupabaseAdminConfigured()) {
+    throw new Error('Supabase admin credentials are not configured.');
+  }
   if (!isSupabaseAdminConfigured()) {
     inMemoryProducts = inMemoryProducts.filter(p => p.id !== id);
     saveInMemoryProducts(inMemoryProducts);
@@ -676,7 +694,10 @@ export async function deleteProductInDb(id: string) {
 // ORDERS
 // ==============================================================================
 export async function getOrdersFromDb(limitCount = 150) {
-  if (!isSupabaseAdminConfigured()) return [...inMemoryOrders];
+  if (!isSupabaseAdminConfigured()) {
+    if (process.env.NODE_ENV === 'production') throw new Error('Supabase admin credentials are not configured.');
+    return [...inMemoryOrders];
+  }
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('orders')
@@ -934,7 +955,10 @@ function serializePromoDescription(promoData: any) {
 }
 
 export async function getPromosFromDb() {
-  if (!isSupabaseAdminConfigured()) return [...inMemoryPromos];
+  if (!isSupabaseAdminConfigured()) {
+    if (process.env.NODE_ENV === 'production') throw new Error('Supabase admin credentials are not configured.');
+    return [...inMemoryPromos];
+  }
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('promos')
@@ -1074,7 +1098,10 @@ export async function deletePromoInDb(id: string) {
 }
 
 export async function getPromoRedemptionsFromDb(limitCount = 200) {
-  if (!isSupabaseAdminConfigured()) return [...inMemoryPromoRedemptions];
+  if (!isSupabaseAdminConfigured()) {
+    if (process.env.NODE_ENV === 'production') throw new Error('Supabase admin credentials are not configured.');
+    return [...inMemoryPromoRedemptions];
+  }
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from('promo_redemptions')
@@ -1183,7 +1210,10 @@ export async function getPromoRedemptionsForCodeFromDb(code: string) {
 // WAREHOUSES, COURIERS, CHARGES, PAYMENT METHODS, CUSTOMERS
 // ==============================================================================
 export async function getWarehousesFromDb() {
-  if (!isSupabaseAdminConfigured()) return [...inMemoryWarehouses];
+  if (!isSupabaseAdminConfigured()) {
+    if (process.env.NODE_ENV === 'production') throw new Error('Supabase admin credentials are not configured.');
+    return [...inMemoryWarehouses];
+  }
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('warehouses').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -1203,7 +1233,10 @@ export async function getWarehousesFromDb() {
 }
 
 export async function getCouriersFromDb() {
-  if (!isSupabaseAdminConfigured()) return [...inMemoryCouriers];
+  if (!isSupabaseAdminConfigured()) {
+    if (process.env.NODE_ENV === 'production') throw new Error('Supabase admin credentials are not configured.');
+    return [...inMemoryCouriers];
+  }
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('couriers').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -1219,7 +1252,10 @@ export async function getCouriersFromDb() {
 }
 
 export async function getChargesFromDb() {
-  if (!isSupabaseAdminConfigured()) return [...inMemoryCharges];
+  if (!isSupabaseAdminConfigured()) {
+    if (process.env.NODE_ENV === 'production') throw new Error('Supabase admin credentials are not configured.');
+    return [...inMemoryCharges];
+  }
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('charges').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -1257,7 +1293,10 @@ export async function getChargesFromDb() {
 }
 
 export async function getPaymentMethodsFromDb() {
-  if (!isSupabaseAdminConfigured()) return [...inMemoryPaymentMethods];
+  if (!isSupabaseAdminConfigured()) {
+    if (process.env.NODE_ENV === 'production') throw new Error('Supabase admin credentials are not configured.');
+    return [...inMemoryPaymentMethods];
+  }
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('payment_methods').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
@@ -1281,7 +1320,10 @@ export async function getPaymentMethodsFromDb() {
 }
 
 export async function getCustomersFromDb() {
-  if (!isSupabaseAdminConfigured()) return [...inMemoryCustomers];
+  if (!isSupabaseAdminConfigured()) {
+    if (process.env.NODE_ENV === 'production') throw new Error('Supabase admin credentials are not configured.');
+    return [...inMemoryCustomers];
+  }
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
   if (error) throw error;

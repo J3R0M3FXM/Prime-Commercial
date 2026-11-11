@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase';
 import { getAuthenticatedCustomer } from '@/lib/authenticated-customer';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseAdminConfigured()) {
       return NextResponse.json({ error: 'Supabase is not configured.' }, { status: 503 });
     }
 
