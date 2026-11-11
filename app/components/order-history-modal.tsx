@@ -50,7 +50,12 @@ function normalizeOrder(raw: any) {
     receiverName: raw.receiverName || raw.receiver_name || raw.customerName || raw.customer_name || "",
     receiverPhone: raw.receiverPhone || raw.receiver_phone || raw.customerPhone || raw.customer_phone || "",
     deliveryAddress: raw.deliveryAddress || raw.delivery_address || {},
-    courierName: raw.courierName || raw.courier_name || "",
+    courierName: raw.courierName || raw.courier_name || raw.courier?.name || "",
+    courierId: raw.courierId || raw.courier_id || raw.courier?.id || "",
+    courier: raw.courier || {
+      id: raw.courierId || raw.courier_id || "",
+      name: raw.courierName || raw.courier_name || "",
+    },
     trackingNumber: raw.trackingNumber || raw.tracking_number || "",
     trackingUrl: raw.trackingUrl || raw.tracking_url || "",
     deliveryFee: raw.deliveryFee ?? raw.delivery_fee ?? 0,
@@ -725,7 +730,7 @@ export default function OrderHistoryModal({
                                 {itemsSummary}
                               </p>
                               <p className="text-[10px] font-mono text-gray-500">
-                                {itemCount} {itemCount === 1 ? "item" : "items"} • {order.courier?.name ? order.courier.name : "Courier Delivery"}
+                                {itemCount} {itemCount === 1 ? "item" : "items"} • {order.courier?.name || order.courierName || order.courier_name || "Courier Delivery"}
                               </p>
                             </div>
                           </div>
