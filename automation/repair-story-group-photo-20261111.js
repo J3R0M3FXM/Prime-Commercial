@@ -10,7 +10,9 @@ export default async function () {
   const row = await db.get(`SELECT * FROM secretary_story_campaigns WHERE id=:id`, { ':id': id });
   if (!row || row.group_status !== 'sent' || row.group_photo_confirmed !== 0 ||
       row.message_id !== previousMessageId || row.story_status !== 'sent') {
-    return { repaired: false, reason: 'Campaign does not match the one-time repair guard.' };
+    return { repaired: false, reason: 'Campaign does not match the one-time repair guard.',
+      status: row?.group_status, photoFlag: row?.group_photo_confirmed,
+      messageId: row?.message_id, storyStatus: row?.story_status };
   }
   const claim = await db.run(`UPDATE secretary_story_campaigns SET group_status='repairing',updated_at=unixepoch()
     WHERE id=:id AND group_status='sent' AND group_photo_confirmed=0 AND message_id=:previous RETURNING id`,
