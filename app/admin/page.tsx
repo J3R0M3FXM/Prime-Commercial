@@ -76,7 +76,8 @@ import {
   ChevronUp,
   Film,
   Scan,
-  FileCheck
+  FileCheck,
+  Headphones
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { motion, AnimatePresence } from "motion/react";
@@ -89,6 +90,7 @@ import ShareOrderModal from "@/app/components/admin/share-order-modal";
 import { StaticOrderMap } from "@/app/components/static-order-map";
 import dynamic from 'next/dynamic';
 import AutomationModule from '@/app/components/admin/automation-module';
+import SupportModule from '@/app/components/admin/support-module';
 import LogisticsModule from "@/app/components/admin/logistics-module";
 import {
   AdminBadge,
@@ -133,7 +135,8 @@ type AdminView =
   | "payments"
   | "promos"
   | "media"
-  | "automation";
+  | "automation"
+  | "support";
 
 function AdminAccessGate({ onSubmit }: { onSubmit: (accessCode: string) => Promise<void> }) {
   const accessCodeRef = React.useRef<HTMLInputElement>(null);
@@ -2196,7 +2199,7 @@ export default function AdminPage() {
                 { id: "customers", name: "Customers", count: customers.length, icon: Users }, { id: "orders", name: "Orders", count: orders.length, icon: ClipboardList }, { id: "products", name: "Products", count: products.length, icon: Package }, { id: "inventory", name: "Inventory", count: `${products.reduce((a: number, p: any) => a + (Number(p.stock) || 0), 0)} units`, icon: Sliders },
               ].map((item) => (<button key={item.id} type="button" onClick={() => setView(item.id as AdminView)} className="admin-command-item"><span className="admin-command-item__icon"><item.icon className="h-4 w-4" /></span><span className="admin-command-item__copy"><strong>{item.name}</strong><small>{item.count}</small></span><ChevronRight className="admin-command-item__arrow h-4 w-4" /></button>))}</div></AdminSection>
               <AdminSection title="Configuration" eyebrow="02" description="Business rules, payments, promotions, media, and automation."><div className="admin-command-grid admin-command-grid--config">{[
-                { id: "settings", name: "Settings", meta: "Protected", icon: Lock }, { id: "logistics", name: "Logistics", meta: "Routes", icon: Truck }, { id: "charges", name: "Charges", meta: "Rules", icon: Receipt }, { id: "payments", name: "Payments", meta: "Methods", icon: CreditCard }, { id: "promos", name: "Promos", meta: "Vouchers", icon: Tag }, { id: "media", name: "Media", meta: "Gallery", icon: Film }, { id: "automation", name: "Secretary", meta: "Flows", icon: MessageSquare },
+                { id: "settings", name: "Settings", meta: "Protected", icon: Lock }, { id: "logistics", name: "Logistics", meta: "Routes", icon: Truck }, { id: "charges", name: "Charges", meta: "Rules", icon: Receipt }, { id: "payments", name: "Payments", meta: "Methods", icon: CreditCard }, { id: "promos", name: "Promos", meta: "Vouchers", icon: Tag }, { id: "media", name: "Media", meta: "Gallery", icon: Film }, { id: "automation", name: "Secretary", meta: "Flows", icon: MessageSquare }, { id: "support", name: "Support", meta: "Tickets", icon: Headphones },
               ].map((item) => (<button key={item.id} type="button" onClick={() => setView(item.id as AdminView)} className="admin-command-item"><span className="admin-command-item__icon"><item.icon className="h-4 w-4" /></span><span className="admin-command-item__copy"><strong>{item.name}</strong><small>{item.meta}</small></span><ChevronRight className="admin-command-item__arrow h-4 w-4" /></button>))}</div></AdminSection>
               <AdminSection title="Observability" eyebrow="03" description="Telemetry, diagnostics, and live service checks."><div className="admin-command-grid admin-command-grid--observability">{[
                 { id: "analytics", name: "Analytics", meta: "Live", icon: TrendingUp }, { id: "diagnostics", name: "Diagnostics", meta: "Health", icon: Activity },
@@ -6416,6 +6419,8 @@ export default function AdminPage() {
             <div className="flex-1 w-full p-0"><AutomationModule /></div>
           </motion.div>
         )}
+
+        {view === "support" && (<motion.div key="support" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex-1 flex flex-col min-h-screen bg-slate-50"><div className="sticky top-0 z-40 bg-white border-b p-3 flex items-center justify-between"><button onClick={() => setView("dashboard")} className="px-3 py-2 bg-slate-100 text-xs font-bold flex items-center gap-2"><ArrowLeft className="w-4 h-4"/> Dashboard</button><h2 className="font-black uppercase">Support Center</h2></div><SupportModule /></motion.div>)}
 
         {/* ========================================================================= */}
         {/* 13. MEDIA MANAGER: TELEGRAM VIDEO GALLERY                                   */}
