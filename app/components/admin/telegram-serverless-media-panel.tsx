@@ -34,6 +34,7 @@ import { inspectVideo, type ThumbnailChoice } from "@/lib/video-thumbnails";
 import TelegramMediaImage from "../telegram-media-image";
 import "./media-panel.css";
 type ManagedVideo = MediaVideo & { featured?: boolean };
+type TakedownRequest = { id: string; storage_type: string; video_id: string; video_title: string; requester_id: string; reason: string; status: string; created_at: number };
 const empty = {
   title: "",
   categories: [] as string[],
@@ -58,6 +59,7 @@ export default function TelegramServerlessMediaPanel({
   const [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [videos, setVideos] = useState<ManagedVideo[]>([]),
+    [takedownRequests, setTakedownRequests] = useState<TakedownRequest[]>([]),
     [connection, setConnection] = useState("Checking R2 connection…");
   const [storageChat, setStorageChat] = useState(""),
     [savedChat, setSavedChat] = useState("");
@@ -115,13 +117,14 @@ export default function TelegramServerlessMediaPanel({
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [telegram, r2, target, health] = await Promise.allSettled([
+    const [telegram, r2, target, health, requests] = await Promise.allSettled([
       callServerless<ManagedVideo[]>("manageVideos", { action: "list" }, 30000),
       listR2Videos(true),
       callServerless<{ chatId?: string }>("manageVideos", {
         action: "getStorageTarget",
       }),
       checkR2Connection(),
+      callServerless<TakedownRequest[]>("mediaTakedownRequests", { action: "list" }, 20000),
     ]);
     const rows: ManagedVideo[] = [],
       warnings: string[] = [];
@@ -134,6 +137,8 @@ export default function TelegramServerlessMediaPanel({
       rows.push(...r2.value.map((row) => normalizeMedia(row, "r2")));
     else warnings.push("R2 catalog unavailable.");
     setVideos(rows);
+    if (requests.status === "fulfilled") setTakedownRequests(requests.value);
+    else warnings.push("Takedown requests could not load.");
     if (target.status === "fulfilled") {
       setStorageChat(target.value.chatId || "");
       setSavedChat(target.value.chatId || "");
@@ -150,6 +155,17 @@ export default function TelegramServerlessMediaPanel({
     setError(warnings.join(" "));
     setLoading(false);
   }, []);
+  const reviewTakedown = async (request: TakedownRequest, status: "reviewed" | "dismissed") => {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await callServerless<{ success: boolean }>("mediaTakedownRequests", { action: "review", id: request.id, status }, 20000);
+      if (!result.success) throw new Error("Request was already handled. Refresh the list.");
+      setNotice(status === "reviewed" ? "Request marked reviewed. Check the video visibility separately." : "Request dismissed.");
+      await load();
+    } catch (err: any) { setError(err.message || "Review could not be saved."); }
+    finally { setBusy(false); }
+  };
   useEffect(() => {
     if (authorized) void load();
   }, [authorized, load]);
@@ -442,6 +458,17 @@ export default function TelegramServerlessMediaPanel({
             <button type="button" aria-current={!formOpen ? "page" : undefined} disabled={busy} onClick={reset}>Library · {videos.length}</button>
             <button type="button" aria-current={formOpen ? "page" : undefined} disabled={busy} onClick={() => setFormOpen(true)}>{editing ? "Edit Media" : "Uploader"}</button>
           </nav>
+          <section className="media-takedown-queue" aria-label="Takedown requests" hidden={formOpen}>
+            <h2>Takedown requests · {takedownRequests.filter((request) => request.status === "pending").length} need review</h2>
+            {takedownRequests.filter((request) => request.status === "pending").map((request) => <article key={request.id}>
+              <strong>{request.video_title}</strong>
+              <p>{request.storage_type} · {request.video_id} · Telegram user {request.requester_id}</p>
+              <p>{request.reason}</p>
+              <p>{new Date(request.created_at * 1000).toLocaleString()}</p>
+              <button disabled={busy} onClick={() => void reviewTakedown(request, "reviewed")}>Mark reviewed</button>
+              <button disabled={busy} onClick={() => void reviewTakedown(request, "dismissed")}>Dismiss</button>
+            </article>)}
+          </section>
           <details className="media-storage-settings" hidden={formOpen && storage !== "telegram"}>
             <summary>Telegram Storage Channel</summary>
             <form onSubmit={saveTarget}>

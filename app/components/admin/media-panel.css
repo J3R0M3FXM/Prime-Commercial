@@ -259,3 +259,8 @@
   font-size: 11px !important;
   padding: 5px !important;
 }
+.media-takedown-queue { margin: 12px; padding: 12px; border: 1px solid #f4c46a; border-radius: 10px; background: #fff9e9; }
+.media-takedown-queue h2 { font: 400 19px 'Roboto Condensed', sans-serif; margin-bottom: 8px; }
+.media-takedown-queue article { border-top: 1px solid #ead7a9; padding: 10px 0; overflow-wrap: anywhere; }
+.media-takedown-queue p { margin: 5px 0; font: 13px 'Lato Condensed', 'Lato', sans-serif; }
+.media-takedown-queue button { min-height: 34px; margin: 4px 7px 0 0; padding: 5px 10px; border: 1px solid #bdad8c; border-radius: 6px; background: white; }

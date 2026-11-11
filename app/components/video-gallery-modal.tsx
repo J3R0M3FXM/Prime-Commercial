@@ -16,6 +16,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
+  Ban,
   WifiOff,
   X,
 } from "lucide-react";
@@ -77,6 +78,10 @@ export default function VideoGalleryModal({
   const [saving, setSaving] = useState(false),
     [notice, setNotice] = useState(""),
     [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [disclaimerOpen, setDisclaimerOpen] = useState(false);
+  const [reportVideo, setReportVideo] = useState<MediaVideo | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
   const [playlists, setPlaylists] = useState<MediaPlaylist[]>([]),
     [playlistPanel, setPlaylistPanel] = useState(false),
     [newPlaylist, setNewPlaylist] = useState(""),
@@ -175,6 +180,21 @@ export default function VideoGalleryModal({
   useEffect(() => {
     if (isOpen) void load();
   }, [isOpen, load]);
+  useEffect(() => {
+    if (isOpen && !offlineOnly) setDisclaimerOpen(true);
+    if (!isOpen) { setDisclaimerOpen(false); setReportVideo(null); }
+  }, [isOpen, offlineOnly]);
+  const submitReport = async () => {
+    if (!reportVideo || reportBusy) return;
+    setReportBusy(true);
+    try {
+      await callServerless("mediaTakedownRequests", { action: "submit", id: reportVideo.id, storageType: reportVideo.storageType, reason: reportReason.trim() }, 20000);
+      setReportVideo(null);
+      setReportReason("");
+      setNotice("Takedown request received. Staff will review it.");
+    } catch (err: any) { setNotice(err.message || "Request could not be sent."); }
+    finally { setReportBusy(false); }
+  };
   useEffect(() => {
     const sync = () => {
       setOnline(navigator.onLine && !offlineOnly);
@@ -671,6 +691,7 @@ export default function VideoGalleryModal({
                   })
                 }
                 feedbackDisabled={!online || feedbackBusy}
+                onReport={() => { setReportVideo(video); setReportReason(""); }}
               />
             ))}
           </div>
@@ -712,6 +733,7 @@ export default function VideoGalleryModal({
               </button>
             </header>
             <div className="media-video-stage">
+              <ReportIcon onClick={() => { setReportVideo(active); setReportReason(""); }} />
               <video
                 ref={videoRef}
                 src={source || undefined}
@@ -898,6 +920,8 @@ export default function VideoGalleryModal({
           </section>
         </div>
       )}
+      {disclaimerOpen && <div className="media-legal-backdrop"><section className="media-legal-dialog" role="dialog" aria-modal="true" aria-label="Copyright disclaimer"><img src="/copyright-disclaimer.png" alt="Copyright disclaimer. Publicly sourced content belongs to its respective owners. Use the takedown icon on a video to request removal." /><button onClick={() => setDisclaimerOpen(false)}>Continue to Media</button></section></div>}
+      {reportVideo && <div className="media-legal-backdrop"><section className="media-report-dialog" role="dialog" aria-modal="true" aria-label="Request video takedown"><h2>Request takedown</h2><p>{reportVideo.title}</p><label>Why should this video be removed?<textarea value={reportReason} onChange={(event) => setReportReason(event.target.value)} maxLength={2000} placeholder="Describe your rights or concern for staff review." /></label><div><button onClick={() => setReportVideo(null)} disabled={reportBusy}>Cancel</button><button onClick={() => void submitReport()} disabled={reportBusy || reportReason.trim().length < 10}>{reportBusy ? "Sending…" : "Send request"}</button></div></section></div>}
     </div>
   );
 }
@@ -911,6 +935,7 @@ function MediaCard({
   onPlaylist,
   onReaction,
   feedbackDisabled,
+  onReport,
 }: {
   video: MediaVideo;
   saved: boolean;
@@ -920,6 +945,7 @@ function MediaCard({
   onPlaylist: () => void;
   onReaction: (value: number) => void;
   feedbackDisabled: boolean;
+  onReport: () => void;
 }) {
   const [thumbnail, setThumbnail] = useState("");
   useEffect(() => {
@@ -938,6 +964,7 @@ function MediaCard({
   }, [owner, offline, video.id, video.storageType, video.thumbnailUrl]);
   return (
     <article className="media-card">
+      <ReportIcon onClick={onReport} />
       <button className="media-card-open" onClick={onOpen}>
         <span className="media-card-thumbnail">
           <TelegramMediaImage
@@ -989,4 +1016,8 @@ function MediaCard({
       </div>
     </article>
   );
+}
+
+function ReportIcon({ onClick }: { onClick: () => void }) {
+  return <button className="media-takedown-icon" type="button" aria-label="Request video takedown" title="Request takedown" onClick={onClick}><Trash2 size={15} /><Ban size={24} /></button>;
 }
