@@ -68,13 +68,13 @@ export default function SecretarySchedulerPanel() {
       {notice && <p role="status" className="text-xs font-mono break-words">{notice}</p>}
       <form onSubmit={event => { event.preventDefault(); void schedule(); }} className="space-y-3 min-w-0">
         <fieldset disabled={busy} className="space-y-3 min-w-0">
-          <label className="block"><span className="label-mini">Story Photo · 1080 × 1920</span><input className="control-mini w-full" type="file" accept="image/jpeg,image/png,image/webp" onChange={async event => {
+          <label className="block"><span className="label-mini">Story Photo · Any Size</span><input className="control-mini w-full" type="file" accept="image/jpeg,image/png,image/webp" onChange={async event => {
             const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
             setBusy(true); setError("");
             try { change({ photo: await uploadStoryPhoto(file) }); }
             catch (cause: any) { setError(cause?.message || "Story photo upload failed."); }
             finally { setBusy(false); }
-          }}/></label>
+          }}/><span className="secretary-help">Square and landscape photos are centered without cropping. The background fills Telegram's portrait Story frame.</span></label>
           {draft.photo && <TelegramMediaImage src={draft.photo} alt="Scheduled Story photo" className="max-h-48 w-full object-contain"/>}
           <label className="block"><span className="label-mini">Story Caption</span><textarea className="control-mini w-full min-h-20" maxLength={2048} value={draft.storyCaption} onChange={event => change({ storyCaption:event.target.value })}/></label>
           <label className="block"><span className="label-mini">Story Duration</span><select className="control-mini w-full" value={draft.activePeriod} onChange={event => change({activePeriod:Number(event.target.value)})}><option value={86400}>24 hours</option><option value={21600}>6 hours · Premium</option><option value={43200}>12 hours · Premium</option><option value={172800}>48 hours · Premium</option></select></label>

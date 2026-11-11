@@ -627,22 +627,33 @@ export async function uploadStaffImage(file: File, bucket: PublicImageBucket): P
   return result.reference;
 }
 
-/** Story photos must retain Telegram's exact 1080×1920 dimensions. */
+/** Fit any source photo into Telegram's required 1080×1920 Story frame. */
 export async function uploadStoryPhoto(file: File): Promise<string> {
   if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error('Choose a JPG, PNG, or WEBP photo.');
   const loaded = await loadImage(file);
   let blob: Blob | null = null;
   try {
     const source = loaded.image as CanvasImageSource & { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number };
-    if (Number(source.width || source.naturalWidth) !== 1080 || Number(source.height || source.naturalHeight) !== 1920) {
-      throw new Error('Story photos must be 1080 × 1920 pixels.');
-    }
+    const width = Number(source.width || source.naturalWidth || 0);
+    const height = Number(source.height || source.naturalHeight || 0);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) throw new Error('Photo dimensions could not be read.');
     const canvas = document.createElement('canvas');
     canvas.width = 1080; canvas.height = 1920;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('This photo could not be prepared.');
-    context.fillStyle = '#ffffff'; context.fillRect(0, 0, 1080, 1920);
-    context.drawImage(loaded.image, 0, 0);
+    context.fillStyle = '#0f172a'; context.fillRect(0, 0, 1080, 1920);
+    const cover = Math.max(1080 / width, 1920 / height) * 1.12;
+    const coverWidth = width * cover;
+    const coverHeight = height * cover;
+    context.save();
+    context.filter = 'blur(32px)';
+    context.drawImage(loaded.image, (1080 - coverWidth) / 2, (1920 - coverHeight) / 2, coverWidth, coverHeight);
+    context.restore();
+    context.fillStyle = 'rgba(15, 23, 42, 0.36)'; context.fillRect(0, 0, 1080, 1920);
+    const fit = Math.min(1080 / width, 1920 / height);
+    const fitWidth = width * fit;
+    const fitHeight = height * fit;
+    context.drawImage(loaded.image, (1080 - fitWidth) / 2, (1920 - fitHeight) / 2, fitWidth, fitHeight);
     for (const quality of [0.82, 0.72, 0.62, 0.52, 0.42, 0.32]) {
       blob = await canvasJpeg(canvas, quality);
       if (blob.size <= 850_000) break;
