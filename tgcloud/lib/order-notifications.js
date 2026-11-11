@@ -19,7 +19,7 @@ export async function ensureNotificationOutbox() {
 export async function getAdminNotificationRecipients() {
   const setting = await db.select({ value: systemSettings.value }).from(systemSettings)
     .where(eq(systemSettings.key, 'admin_telegram_user_id')).get();
-  return [...configuredAdminIds(setting?.value)];
+  return [...new Set(configuredAdminIds(setting?.value))];
 }
 
 function randomToken() {
@@ -63,7 +63,7 @@ export async function orderKeyboard(orderNumber, label) {
     botUsername = String(bot?.username || '').trim();
   }
   if (!botUsername) throw new Error('Telegram bot username is unavailable.');
-  if (label !== 'Open Admin Order') {
+  if (label !== 'Open Admin Order' && label !== 'VIEW IN ADMIN PANEL') {
     const saved = label === 'TRACK DELIVERY' ? await db.get(
       'SELECT tracking_url AS trackingUrl, status FROM orders WHERE order_number=:number',
       { ':number': String(orderNumber) }) : null;
@@ -168,18 +168,42 @@ export async function notifyAdminOrderCreated(order) {
     // never sends an unexpected backlog from before this feature was enabled.
     await db.run(`INSERT OR IGNORE INTO system_settings (key, value, updated_at)
       VALUES ('admin_order_alert_start_at', unixepoch(), unixepoch())`);
-    const message = formatMessage([
+    const isPos = order?.source === 'pos';
+    const stored = isPos ? null : await db.get(`SELECT o.prime_member_id AS memberId,
+      o.customer_name AS receiverName, o.customer_phone AS phone,
+      o.courier_name AS courier, o.payment_method_name AS paymentName,
+      c.tg_username AS username, p.name AS configuredPaymentName
+      FROM orders o LEFT JOIN customers c ON c.id=o.customer_id
+      LEFT JOIN payment_methods p ON p.id=o.payment_method_id
+      WHERE o.order_number=:number`, { ':number': number });
+    const field = (label, value) => `${label.padEnd(13)}: <code>${escapeHtml(value || '—')}</code>`;
+    const username = String(stored?.username || order?.username || '').replace(/^@/, '').trim();
+    const paymentName = stored?.paymentName || stored?.configuredPaymentName || order?.paymentMethodName || 'Pending Payment';
+    const amount = Number(order?.totalAmount);
+    const formattedAmount = 'P' + new Intl.NumberFormat('en-PH', {
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(Number.isFinite(amount) ? amount : 0);
+    const message = isPos ? formatMessage([
       '<b>PRIME™ NEW ORDER</b>',
       `Order No.: <code>${escapeHtml(number)}</code>`,
-      `Source: ${escapeHtml(order?.source === 'pos' ? 'POS' : 'Shopfront')}`,
+      'Source: POS',
       `Customer: ${escapeHtml(order?.customerName || 'Customer')}`,
       `Total: <b>${money(order?.totalAmount)}</b>`,
       `Payment: ${escapeHtml(order?.paymentStatus || 'Unpaid')}`,
       'Open Order Management to review this order.',
-    ]);
+    ]) : '<b>NEW SHOPFRONT ORDER</b>\n\n' + [
+      field('Order No.', number),
+      field('Customer', username ? '@' + username : '—'),
+      field('Member ID', stored?.memberId || order?.memberId),
+      field('Order Amount', formattedAmount),
+      field('Receiver', stored?.receiverName || order?.receiverName),
+      field('Phone', stored?.phone || order?.receiverPhone),
+      field('Courier', stored?.courier || order?.courier?.name),
+      field('Payment', paymentName),
+    ].join('\n');
     const results = await Promise.all(recipients.map(async (chatId) => {
       try {
-        return await send(chatId, message, number, 'Open Admin Order',
+        return await send(chatId, message, number, isPos ? 'Open Admin Order' : 'VIEW IN ADMIN PANEL',
           'admin-order-created:' + number + ':' + chatId);
       } catch {
         return false;
@@ -259,7 +283,7 @@ export async function dispatchOrderNotificationRetries(limit = 20) {
     if (!Number(claimed?.rowsAffected)) continue;
     const params = { ':id': row.id, ':token': token };
     try {
-      if (row.buttonLabel !== 'Open Admin Order') {
+      if (row.buttonLabel !== 'Open Admin Order' && row.buttonLabel !== 'VIEW IN ADMIN PANEL') {
         const content = customerNotificationContent(await notificationOrder({ orderNumber: row.orderNumber }));
         if (!content || content.text !== row.messageText || content.buttonLabel !== row.buttonLabel) {
           await db.run(`UPDATE telegram_notification_outbox SET status='failed',last_error='superseded_status_or_template',

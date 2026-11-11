@@ -783,6 +783,7 @@ export default async function (input, ctx) {
   if (operation.status === 'complete' && operation.responseSnapshot) {
     const completedOrder = await db.select().from(orders).where(eq(orders.id, operation.operationId)).get();
     await releaseCustomerCheckoutLock({ customerId: customer.id, operationId: operation.operationId });
+    if (completedOrder) await notifyAdminOrderCreated({ ...operation.responseSnapshot, source: 'shopfront' });
     return operation.responseSnapshot;
   }
 
@@ -809,8 +810,8 @@ export default async function (input, ctx) {
   const storedRequest = operation.created ? request : operation.requestSnapshot || request;
   try {
     const response = await processOperation(fullOperation, storedRequest, customer);
-    if (operation.created) await Promise.allSettled([
-      notifyOrderCreated({
+    await Promise.allSettled([
+      ...(operation.created ? [notifyOrderCreated({
         chatId: customer.tgUserId,
         orderNumber: response.orderNumber,
         status: response.status,
@@ -820,9 +821,8 @@ export default async function (input, ctx) {
         paymentDeadlineAt: response.paymentDeadlineAt,
         paymentStatus: response.paymentStatus,
         items: response.items,
-      }),
-      notifyAdminOrderCreated({ ...response, customerName: response.receiverName,
-        paymentStatus: response.paymentStatus, source: 'shopfront' }),
+      })] : []),
+      notifyAdminOrderCreated({ ...response, source: 'shopfront' }),
     ]);
     if (request.paymentSessionId) await db.run(`UPDATE payment_sessions SET status='consumed', consumed_at=unixepoch(), updated_at=unixepoch() WHERE id=:id AND status='proof_uploaded'`, { ':id': request.paymentSessionId });
     return response;
