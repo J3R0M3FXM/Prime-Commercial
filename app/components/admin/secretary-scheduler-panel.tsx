@@ -7,6 +7,7 @@ import SecretaryBroadcastPanel from "./secretary-broadcast-panel";
 
 type Button = { text: string; url: string; row: number };
 type Campaign = { id: string; target: string; publishAt: number; storyStatus: string; groupStatus: string; storyId?: number; messageId?: number; storyError?: string; groupError?: string };
+type Pending = { id: string; draft: ReturnType<typeof initial>; createdAt?: number };
 const initial = () => ({ target: "", photo: "", storyCaption: "", groupMessage: "", buttons: [] as Button[], publishAt: "", activePeriod: 86400 });
 const pendingKey = "prime_story_campaign_pending_v1";
 
@@ -22,35 +23,92 @@ export default function SecretarySchedulerPanel() {
     const result = await callServerless<{ campaigns: Campaign[] }>("manageStoryCampaigns", { action: "list" });
     setCampaigns(result.campaigns || []);
   }
+  async function checkSaved(id: string) {
+    return await callServerless<{ found: boolean; storyStatus?: string; groupStatus?: string }>("manageStoryCampaigns", { action: "status", id });
+  }
   useEffect(() => {
+    let pending: Pending | null = null;
     try {
       const saved = localStorage.getItem(pendingKey);
       if (saved) {
-        const pending = JSON.parse(saved);
-        if (/^[A-Za-z0-9_-]{16,128}$/.test(pending?.id) && pending?.draft) {
+        pending = JSON.parse(saved);
+        if (typeof pending?.id === "string" && /^[A-Za-z0-9_-]{16,128}$/.test(pending.id) && pending.draft) {
           setDraft(pending.draft);
-          setNotice("A previous scheduling request needs confirmation. Submit again to recover its saved request key.");
+          setNotice("Checking a previous scheduling request. Your draft is available to edit.");
+        } else {
+          pending = null;
         }
       }
     } catch { setError("Could not read the saved scheduling request."); }
-    void refresh().catch(cause => setError(cause?.message || "Could not load scheduled campaigns."));
+    void (async () => {
+      try {
+        await refresh();
+        if (pending) {
+          const status = await checkSaved(pending.id);
+          if (status.found) {
+            localStorage.removeItem(pendingKey);
+            setDraft(initial());
+            setNotice("Your previous campaign is saved. Check Scheduled Campaigns below.");
+          } else setNotice("The previous request was not saved. Edit the draft and schedule it when ready.");
+        }
+      } catch (cause: any) { setError(cause?.message || "Could not load scheduled campaigns."); }
+    })();
   }, []);
   async function schedule() {
     if (busy) return;
     const publishAt = Math.floor(new Date(draft.publishAt).getTime() / 1000);
-    if (!Number.isSafeInteger(publishAt)) { setError("Choose a valid publication time."); return; }
+    if (!draft.photo) { setError("Upload a Story photo before scheduling."); return; }
+    if (!draft.target.trim()) { setError("Enter the group username or chat ID."); return; }
+    if (!draft.groupMessage.trim()) { setError("Write the group message."); return; }
+    if (draft.buttons.some(button => !button.text.trim() || !/^https:\/\//i.test(button.url.trim()))) {
+      setError("Finish or remove every URL button. Each needs a label and HTTPS link."); return;
+    }
+    if (!Number.isSafeInteger(publishAt) || publishAt < Math.floor(Date.now()/1000)+60) {
+      setError("Choose a publication time at least one minute from now."); return;
+    }
     setBusy(true); setError(""); setNotice("");
     try {
       const saved = localStorage.getItem(pendingKey);
-      const pending = saved ? JSON.parse(saved) : { id: crypto.randomUUID(), draft };
-      if (JSON.stringify(pending.draft) !== JSON.stringify(draft)) throw new Error("Recover the saved scheduling request before changing it. Refresh this screen.");
+      let pending: Pending | null = saved ? JSON.parse(saved) : null;
+      if (pending && JSON.stringify(pending.draft) !== JSON.stringify(draft)) {
+        const status = await checkSaved(pending.id);
+        if (status.found) {
+          localStorage.removeItem(pendingKey);
+          setNotice("Your previous campaign is already saved. Check Scheduled Campaigns before scheduling another.");
+          await refresh();
+          return;
+        }
+        if (pending.createdAt && Date.now() - pending.createdAt < 120_000) {
+          throw new Error("The previous request may still be finishing. Wait two minutes, then schedule your edited draft.");
+        }
+        localStorage.removeItem(pendingKey);
+        pending = null;
+      }
+      pending ||= { id: crypto.randomUUID(), draft, createdAt: Date.now() };
       localStorage.setItem(pendingKey, JSON.stringify(pending));
       await callServerless("manageStoryCampaigns", { action: "create", id: pending.id, ...draft, publishAt }, 60_000);
       localStorage.removeItem(pendingKey);
       setDraft(initial());
       setNotice("Campaign queued. The scheduler checks for due campaigns about every five minutes when activated.");
       await refresh();
-    } catch (cause: any) { setError(cause?.message || "Could not schedule campaign. Refresh before trying again."); }
+    } catch (cause: any) {
+      const saved = localStorage.getItem(pendingKey);
+      let confirmed = false;
+      if (saved) {
+        try {
+          const pending: Pending = JSON.parse(saved);
+          const status = await checkSaved(pending.id);
+          if (status.found) {
+            localStorage.removeItem(pendingKey);
+            setDraft(initial());
+            setNotice("Campaign was saved. Check Scheduled Campaigns below.");
+            await refresh();
+            confirmed = true;
+          } else if (cause?.code === "INVALID_CAMPAIGN") localStorage.removeItem(pendingKey);
+        } catch { /* Keep the request key until its status can be checked. */ }
+      }
+      if (!confirmed) setError(cause?.message || "Could not schedule campaign. Check the saved request before trying again.");
+    }
     finally { setBusy(false); }
   }
   async function cancel(id: string) {
@@ -66,7 +124,7 @@ export default function SecretarySchedulerPanel() {
       <div className="secretary-help-card"><h2>Story + Group Campaign</h2><p>Post a photo Story on the connected Business account, then send a message as the bot to a group with optional URL buttons. Delivery is checked separately for each destination.</p></div>
       {error && <p role="alert" className="text-xs text-red-700 break-words">{error}</p>}
       {notice && <p role="status" className="text-xs font-mono break-words">{notice}</p>}
-      <form onSubmit={event => { event.preventDefault(); void schedule(); }} className="space-y-3 min-w-0">
+      <form noValidate onSubmit={event => { event.preventDefault(); void schedule(); }} className="space-y-3 min-w-0">
         <fieldset disabled={busy} className="space-y-3 min-w-0">
           <label className="block"><span className="label-mini">Story Photo · Any Size</span><input className="control-mini w-full" type="file" accept="image/jpeg,image/png,image/webp" onChange={async event => {
             const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
@@ -80,11 +138,12 @@ export default function SecretarySchedulerPanel() {
           <label className="block"><span className="label-mini">Story Duration</span><select className="control-mini w-full" value={draft.activePeriod} onChange={event => change({activePeriod:Number(event.target.value)})}><option value={86400}>24 hours</option><option value={21600}>6 hours · Premium</option><option value={43200}>12 hours · Premium</option><option value={172800}>48 hours · Premium</option></select></label>
           <label className="block"><span className="label-mini">Group @username Or Chat ID</span><input className="control-mini w-full" required value={draft.target} onChange={event => change({ target:event.target.value })} placeholder="@groupname or -100…" maxLength={40}/></label>
           <label className="block"><span className="label-mini">Group Message</span><textarea className="control-mini w-full min-h-28" required maxLength={4096} value={draft.groupMessage} onChange={event => change({groupMessage:event.target.value})}/></label>
-          <details><summary className="label-mini cursor-pointer">URL Buttons · {draft.buttons.length}/12</summary><div className="space-y-2 mt-2">
+          <details open={draft.buttons.length > 0}><summary className="label-mini cursor-pointer">URL Buttons · {draft.buttons.length}/12</summary><div className="space-y-2 mt-2">
             {draft.buttons.map((button,index) => <div key={index} className="border-b border-slate-200 pb-2 space-y-2"><div className="grid grid-cols-2 gap-2"><label className="min-w-0"><span className="label-mini">Label</span><input className="control-mini w-full" required maxLength={64} value={button.text} onChange={event => change({buttons:draft.buttons.map((item,i)=>i===index?{...item,text:event.target.value}:item)})}/></label><label className="min-w-0"><span className="label-mini">Row</span><select className="control-mini w-full" value={button.row} onChange={event => change({buttons:draft.buttons.map((item,i)=>i===index?{...item,row:Number(event.target.value)}:item)})}>{[1,2,3,4,5,6].map(row=><option key={row}>{row}</option>)}</select></label></div><label className="block"><span className="label-mini">HTTPS URL</span><input className="control-mini w-full" required type="url" pattern="https://.*" maxLength={2048} value={button.url} onChange={event => change({buttons:draft.buttons.map((item,i)=>i===index?{...item,url:event.target.value}:item)})}/></label><button type="button" className="control-mini" onClick={() => change({buttons:draft.buttons.filter((_,i)=>i!==index)})}>Remove</button></div>)}
             <button type="button" className="control-mini" disabled={draft.buttons.length >= 12} onClick={() => change({buttons:[...draft.buttons,{text:"",url:"",row:Math.min(6,Math.floor(draft.buttons.length/2)+1)}]})}>Add Link Button</button>
           </div></details>
           <label className="block"><span className="label-mini">Publish Time · Your Local Time</span><input className="control-mini w-full" required type="datetime-local" value={draft.publishAt} onChange={event => change({publishAt:event.target.value})}/></label>
+          {error && <p role="alert" className="text-xs text-red-700 break-words">{error}</p>}
           <button className="control-mini w-full" type="submit" disabled={!draft.photo || !draft.target.trim() || !draft.groupMessage.trim() || !draft.publishAt}>Schedule Story + Group Message</button>
         </fieldset>
       </form>

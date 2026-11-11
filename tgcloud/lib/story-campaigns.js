@@ -100,6 +100,15 @@ export async function listStoryCampaigns() {
     FROM secretary_story_campaigns ORDER BY publish_at DESC LIMIT 50`);
 }
 
+export async function storyCampaignStatus(id, staffId) {
+  await ensureStoryCampaigns();
+  const key = String(id || '');
+  if (!keyPattern.test(key)) invalid('Invalid campaign key.');
+  const row = await db.get(`SELECT story_status AS storyStatus,group_status AS groupStatus
+    FROM secretary_story_campaigns WHERE id=:id AND staff_id=:staff`, { ':id':key, ':staff':String(staffId) });
+  return row ? { found:true, ...row } : { found:false };
+}
+
 export async function cancelStoryCampaign(id) {
   await ensureStoryCampaigns();
   const result = await db.run(`UPDATE secretary_story_campaigns SET story_status='cancelled',group_status='cancelled',updated_at=unixepoch()

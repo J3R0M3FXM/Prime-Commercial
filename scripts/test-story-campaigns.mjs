@@ -28,7 +28,7 @@ class EndpointError extends Error {}
 const source = readFileSync('tgcloud/lib/story-campaigns.js', 'utf8')
   .replace(/^import .*;\n/gm, '').replace(/^export /gm, '');
 const campaign = new Function('api','db','EndpointError','getAutomationSettings','resolveSecretaryPhoto',
-  `${source}\nreturn {validateStoryCampaign,createStoryCampaign,listStoryCampaigns,cancelStoryCampaign,dispatchStoryCampaigns};`)(
+  `${source}\nreturn {validateStoryCampaign,createStoryCampaign,listStoryCampaigns,storyCampaignStatus,cancelStoryCampaign,dispatchStoryCampaigns};`)(
     api,db,EndpointError,async () => ({ businessConnectionId:'business-1' }),async photo => ({ bytes:photo }));
 const now = Math.floor(Date.now()/1000);
 const base = { id:'campaign-0000000001',target:'@primegroup',photo:'tgmedia:storyphoto0001',storyCaption:'Story caption',
@@ -39,6 +39,9 @@ rights = false;
 await assert.rejects(campaign.createStoryCampaign(base,'staff-1'), /manage Stories/);
 rights = true;
 assert.equal((await campaign.createStoryCampaign(base,'staff-1')).status,'queued');
+assert.deepEqual(await campaign.storyCampaignStatus(base.id,'staff-1'),{found:true,storyStatus:'queued',groupStatus:'queued'});
+assert.deepEqual(await campaign.storyCampaignStatus(base.id,'staff-2'),{found:false});
+assert.deepEqual(await campaign.storyCampaignStatus('campaign-0000000999','staff-1'),{found:false});
 assert.equal((await campaign.createStoryCampaign(base,'staff-1')).status,'queued');
 await assert.rejects(campaign.createStoryCampaign({...base,id:'campaign-0000000002',target:'@private'},'staff-1'),/group/);
 assert.equal((await campaign.cancelStoryCampaign(base.id)).status,'cancelled');
