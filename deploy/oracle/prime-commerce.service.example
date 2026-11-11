@@ -1,0 +1,29 @@
+[Unit]
+Description=Prime Commercial Next.js application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=primecommerce
+Group=primecommerce
+WorkingDirectory=/opt/prime-commerce/current
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+EnvironmentFile=/etc/prime-commerce/prime-commerce.env
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/prime-commerce/shared
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
