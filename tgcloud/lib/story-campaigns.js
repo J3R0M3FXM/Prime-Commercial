@@ -16,6 +16,8 @@ export async function ensureStoryCampaigns() {
     group_status TEXT NOT NULL DEFAULT 'queued', story_id INTEGER, message_id INTEGER,
     story_error TEXT, group_error TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`);
   await db.run('CREATE INDEX IF NOT EXISTS secretary_story_campaigns_due_idx ON secretary_story_campaigns(publish_at,story_status,group_status)');
+  try { await db.run('ALTER TABLE secretary_story_campaigns ADD COLUMN group_photo_confirmed INTEGER NOT NULL DEFAULT 0'); }
+  catch (error) { if (!/duplicate column name/i.test(String(error?.message || error))) throw error; }
 }
 
 export function validateStoryCampaign(input) {
@@ -30,7 +32,7 @@ export function validateStoryCampaign(input) {
   if (!targetPattern.test(target) || (target.startsWith('-') && !Number.isSafeInteger(Number(target)))) invalid('Enter a group @username or negative chat ID.');
   if (!mediaPattern.test(photo)) invalid('Upload a Story photo.');
   if (storyCaption.length > 2048) invalid('Story caption exceeds 2048 characters.');
-  if (!groupMessage || groupMessage.length > 4096) invalid('Group message must be 1–4096 characters.');
+  if (!groupMessage || groupMessage.length > 1024) invalid('Group photo caption must be 1–1024 characters.');
   if (!Number.isSafeInteger(publishAt) || publishAt < Math.floor(Date.now() / 1000) + 60 || publishAt > Math.floor(Date.now() / 1000) + 31536000) invalid('Choose a time between one minute and one year from now.');
   if (![21600,43200,86400,172800].includes(activePeriod)) invalid('Choose a valid Story duration.');
   if (!Array.isArray(input?.buttons) || input.buttons.length > 12) invalid('Use at most 12 link buttons.');
@@ -96,6 +98,7 @@ export async function listStoryCampaigns() {
   return await db.all(`SELECT id,target,photo,story_caption AS storyCaption,group_message AS groupMessage,
     buttons,publish_at AS publishAt,active_period AS activePeriod,story_status AS storyStatus,
     group_status AS groupStatus,story_id AS storyId,message_id AS messageId,
+    group_photo_confirmed AS groupPhotoConfirmed,
     story_error AS storyError,group_error AS groupError,created_at AS createdAt
     FROM secretary_story_campaigns ORDER BY publish_at DESC LIMIT 50`);
 }
@@ -160,10 +163,13 @@ export async function dispatchStoryCampaigns(limit = 10) {
       WHERE id=:id AND story_status='sent' AND group_status='queued' RETURNING id`, { ':id':id });
     if (!claim?.rows?.length) continue;
     try {
-      const sent = await api.sendMessage({ chat_id:row.target,text:row.group_message,
-        ...(keyboard(JSON.parse(row.buttons)) ? { reply_markup:keyboard(JSON.parse(row.buttons)) } : {}) });
-      if (!Number.isSafeInteger(sent?.message_id) || sent.message_id <= 0) throw new Error('Telegram did not confirm the group message ID.');
-      await db.run(`UPDATE secretary_story_campaigns SET group_status='sent',message_id=:message,updated_at=unixepoch()
+      const photo = await resolveSecretaryPhoto(row.photo);
+      const replyMarkup = keyboard(JSON.parse(row.buttons));
+      const sent = await api.sendPhoto({ chat_id:row.target,photo,caption:row.group_message,
+        ...(replyMarkup ? { reply_markup:replyMarkup } : {}) });
+      if (!Number.isSafeInteger(sent?.message_id) || sent.message_id <= 0 || !Array.isArray(sent.photo) || !sent.photo.length)
+        throw new Error('Telegram did not confirm the group photo message.');
+      await db.run(`UPDATE secretary_story_campaigns SET group_status='sent',message_id=:message,group_photo_confirmed=1,updated_at=unixepoch()
         WHERE id=:id AND group_status='sending'`, { ':id':id, ':message':sent.message_id });
       totals.messages++;
     } catch (error) {

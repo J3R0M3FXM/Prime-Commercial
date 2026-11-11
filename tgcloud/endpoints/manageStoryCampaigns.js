@@ -1,5 +1,5 @@
 import { requireAdmin } from '../lib/auth.js';
-import { createStoryCampaign, listStoryCampaigns, storyCampaignStatus, cancelStoryCampaign } from '../lib/story-campaigns.js';
+import { createStoryCampaign, listStoryCampaigns, storyCampaignStatus, cancelStoryCampaign, dispatchStoryCampaigns } from '../lib/story-campaigns.js';
 import { EndpointError } from 'sdk';
 
 export default async function (input, ctx) {
@@ -9,5 +9,6 @@ export default async function (input, ctx) {
   if (action === 'status') return await storyCampaignStatus(input?.id, staff.id);
   if (action === 'create') return await createStoryCampaign(input, staff.id);
   if (action === 'cancel') return await cancelStoryCampaign(input?.id);
+  if (action === 'dispatchDue') return await dispatchStoryCampaigns(10);
   throw new EndpointError('Unsupported campaign action.', { code:'INVALID_ACTION' });
 }

@@ -6,7 +6,7 @@ import TelegramMediaImage from "@/app/components/telegram-media-image";
 import SecretaryBroadcastPanel from "./secretary-broadcast-panel";
 
 type Button = { text: string; url: string; row: number };
-type Campaign = { id: string; target: string; publishAt: number; storyStatus: string; groupStatus: string; storyId?: number; messageId?: number; storyError?: string; groupError?: string };
+type Campaign = { id: string; target: string; publishAt: number; storyStatus: string; groupStatus: string; groupPhotoConfirmed?: number; storyId?: number; messageId?: number; storyError?: string; groupError?: string };
 type Pending = { id: string; draft: ReturnType<typeof initial>; createdAt?: number };
 const initial = () => ({ target: "", photo: "", storyCaption: "", groupMessage: "", buttons: [] as Button[], publishAt: "", activePeriod: 86400 });
 const pendingKey = "prime_story_campaign_pending_v1";
@@ -60,6 +60,7 @@ export default function SecretarySchedulerPanel() {
     if (!draft.photo) { setError("Upload a Story photo before scheduling."); return; }
     if (!draft.target.trim()) { setError("Enter the group username or chat ID."); return; }
     if (!draft.groupMessage.trim()) { setError("Write the group message."); return; }
+    if (draft.groupMessage.length > 1024) { setError("Group photo caption must be 1024 characters or less."); return; }
     if (draft.buttons.some(button => !button.text.trim() || !/^https:\/\//i.test(button.url.trim()))) {
       setError("Finish or remove every URL button. Each needs a label and HTTPS link."); return;
     }
@@ -89,7 +90,7 @@ export default function SecretarySchedulerPanel() {
       await callServerless("manageStoryCampaigns", { action: "create", id: pending.id, ...draft, publishAt }, 60_000);
       localStorage.removeItem(pendingKey);
       setDraft(initial());
-      setNotice("Campaign queued. The scheduler checks for due campaigns about every five minutes when activated.");
+      setNotice("Campaign queued. Refresh Scheduled Campaigns to check delivery. Use Run Due Now if the timer is late.");
       await refresh();
     } catch (cause: any) {
       const saved = localStorage.getItem(pendingKey);
@@ -118,10 +119,20 @@ export default function SecretarySchedulerPanel() {
     catch (cause: any) { setError(cause?.message || "Could not cancel campaign."); }
     finally { setBusy(false); }
   }
+  async function runDueNow() {
+    if (busy) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await callServerless<{ stories: number; messages: number; uncertain: number }>("manageStoryCampaigns", { action: "dispatchDue" }, 60000);
+      setNotice(`Due campaigns checked. Stories: ${result.stories}; group photos: ${result.messages}; need review: ${result.uncertain}.`);
+      await refresh();
+    } catch (cause: any) { setError(cause?.message || "Due campaigns could not be checked."); }
+    finally { setBusy(false); }
+  }
   return <section className="space-y-3 w-full min-w-0 max-w-[430px] mx-auto" aria-label="Secretary Scheduler">
     <div className="grid grid-cols-2 gap-2"><button type="button" className="control-mini" aria-current={tab === "schedule" ? "page" : undefined} onClick={() => setTab("schedule")}>Story Scheduler</button><button type="button" className="control-mini" aria-current={tab === "broadcast" ? "page" : undefined} onClick={() => setTab("broadcast")}>Broadcast</button></div>
     {tab === "broadcast" ? <SecretaryBroadcastPanel /> : <>
-      <div className="secretary-help-card"><h2>Story + Group Campaign</h2><p>Post a photo Story on the connected Business account, then send a message as the bot to a group with optional URL buttons. Delivery is checked separately for each destination.</p></div>
+      <div className="secretary-help-card"><h2>Story + Group Campaign</h2><p>Post a photo Story on the connected Business account, then send the same photo with a caption and optional URL buttons to the group. Delivery is checked separately for each destination.</p></div>
       {error && <p role="alert" className="text-xs text-red-700 break-words">{error}</p>}
       {notice && <p role="status" className="text-xs font-mono break-words">{notice}</p>}
       <form noValidate onSubmit={event => { event.preventDefault(); void schedule(); }} className="space-y-3 min-w-0">
@@ -137,7 +148,7 @@ export default function SecretarySchedulerPanel() {
           <label className="block"><span className="label-mini">Story Caption</span><textarea className="control-mini w-full min-h-20" maxLength={2048} value={draft.storyCaption} onChange={event => change({ storyCaption:event.target.value })}/></label>
           <label className="block"><span className="label-mini">Story Duration</span><select className="control-mini w-full" value={draft.activePeriod} onChange={event => change({activePeriod:Number(event.target.value)})}><option value={86400}>24 hours</option><option value={21600}>6 hours · Premium</option><option value={43200}>12 hours · Premium</option><option value={172800}>48 hours · Premium</option></select></label>
           <label className="block"><span className="label-mini">Group @username Or Chat ID</span><input className="control-mini w-full" required value={draft.target} onChange={event => change({ target:event.target.value })} placeholder="@groupname or -100…" maxLength={40}/></label>
-          <label className="block"><span className="label-mini">Group Message</span><textarea className="control-mini w-full min-h-28" required maxLength={4096} value={draft.groupMessage} onChange={event => change({groupMessage:event.target.value})}/></label>
+          <label className="block"><span className="label-mini">Group Photo Caption</span><textarea className="control-mini w-full min-h-28" required maxLength={1024} value={draft.groupMessage} onChange={event => change({groupMessage:event.target.value})}/><span className="secretary-help">{draft.groupMessage.length}/1024 characters</span></label>
           <details open={draft.buttons.length > 0}><summary className="label-mini cursor-pointer">URL Buttons · {draft.buttons.length}/12</summary><div className="space-y-2 mt-2">
             {draft.buttons.map((button,index) => <div key={index} className="border-b border-slate-200 pb-2 space-y-2"><div className="grid grid-cols-2 gap-2"><label className="min-w-0"><span className="label-mini">Label</span><input className="control-mini w-full" required maxLength={64} value={button.text} onChange={event => change({buttons:draft.buttons.map((item,i)=>i===index?{...item,text:event.target.value}:item)})}/></label><label className="min-w-0"><span className="label-mini">Row</span><select className="control-mini w-full" value={button.row} onChange={event => change({buttons:draft.buttons.map((item,i)=>i===index?{...item,row:Number(event.target.value)}:item)})}>{[1,2,3,4,5,6].map(row=><option key={row}>{row}</option>)}</select></label></div><label className="block"><span className="label-mini">HTTPS URL</span><input className="control-mini w-full" required type="url" pattern="https://.*" maxLength={2048} value={button.url} onChange={event => change({buttons:draft.buttons.map((item,i)=>i===index?{...item,url:event.target.value}:item)})}/></label><button type="button" className="control-mini" onClick={() => change({buttons:draft.buttons.filter((_,i)=>i!==index)})}>Remove</button></div>)}
             <button type="button" className="control-mini" disabled={draft.buttons.length >= 12} onClick={() => change({buttons:[...draft.buttons,{text:"",url:"",row:Math.min(6,Math.floor(draft.buttons.length/2)+1)}]})}>Add Link Button</button>
@@ -147,9 +158,9 @@ export default function SecretarySchedulerPanel() {
           <button className="control-mini w-full" type="submit" disabled={!draft.photo || !draft.target.trim() || !draft.groupMessage.trim() || !draft.publishAt}>Schedule Story + Group Message</button>
         </fieldset>
       </form>
-      <div className="space-y-2"><div className="flex items-center justify-between gap-2"><h2 className="label-mini">Scheduled Campaigns</h2><button type="button" className="control-mini" disabled={busy} onClick={() => void refresh().catch(cause => setError(cause?.message || "Could not refresh."))}>Refresh</button></div>
+      <div className="space-y-2"><div className="flex items-center justify-between gap-2"><h2 className="label-mini">Scheduled Campaigns</h2><button type="button" className="control-mini" disabled={busy} onClick={() => void refresh().catch(cause => setError(cause?.message || "Could not refresh."))}>Refresh</button></div><button type="button" className="control-mini w-full" disabled={busy} onClick={() => void runDueNow()}>Run Due Now</button>
         {campaigns.length === 0 && <p className="secretary-help">No campaigns yet.</p>}
-        {campaigns.map(item => <div key={item.id} className="border border-slate-200 bg-white p-3 text-xs break-words space-y-1"><p className="font-mono">{new Date(item.publishAt * 1000).toLocaleString()} · {item.target}</p><p>Story: {item.storyStatus}{item.storyId ? ` #${item.storyId}` : ""} · Group: {item.groupStatus}{item.messageId ? ` #${item.messageId}` : ""}</p>{item.storyError && <p className="text-red-700">Story: {item.storyError}</p>}{item.groupError && <p className="text-red-700">Group: {item.groupError}</p>}{item.storyStatus === "queued" && item.groupStatus === "queued" && <button type="button" className="control-mini" disabled={busy} onClick={() => void cancel(item.id)}>Cancel</button>}</div>)}
+        {campaigns.map(item => <div key={item.id} className="border border-slate-200 bg-white p-3 text-xs break-words space-y-1"><p className="font-mono">{new Date(item.publishAt * 1000).toLocaleString()} · {item.target}</p><p>Story: {item.storyStatus === "sent" ? "accepted by Telegram" : item.storyStatus}{item.storyId ? ` #${item.storyId}` : ""} · Group: {item.groupStatus === "sent" ? (item.groupPhotoConfirmed ? "photo sent" : "text sent") : item.groupStatus}{item.messageId ? ` #${item.messageId}` : ""}</p>{item.storyError && <p className="text-red-700">Story: {item.storyError}</p>}{item.groupError && <p className="text-red-700">Group: {item.groupError}</p>}{item.storyStatus === "queued" && item.groupStatus === "queued" && <button type="button" className="control-mini" disabled={busy} onClick={() => void cancel(item.id)}>Cancel</button>}</div>)}
       </div>
     </>}
   </section>;
