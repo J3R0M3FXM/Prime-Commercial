@@ -132,7 +132,7 @@ export default function SecretarySchedulerPanel() {
   return <section className="space-y-3 w-full min-w-0 max-w-[430px] mx-auto" aria-label="Secretary Scheduler">
     <div className="grid grid-cols-2 gap-2"><button type="button" className="control-mini" aria-current={tab === "schedule" ? "page" : undefined} onClick={() => setTab("schedule")}>Story Scheduler</button><button type="button" className="control-mini" aria-current={tab === "broadcast" ? "page" : undefined} onClick={() => setTab("broadcast")}>Broadcast</button></div>
     {tab === "broadcast" ? <SecretaryBroadcastPanel /> : <>
-      <div className="secretary-help-card"><h2>Story + Group Campaign</h2><p>Post a photo Story on the connected Business account, then send the same photo with a caption and optional URL buttons to the group. Delivery is checked separately for each destination.</p></div>
+      <div className="secretary-help-card"><h2>Story + Group Campaign</h2><p>Post a photo Story on the connected Business account and keep it on the profile after expiry. Send the same photo with a caption and optional URL buttons to the group. Delivery is checked separately for each destination.</p></div>
       {error && <p role="alert" className="text-xs text-red-700 break-words">{error}</p>}
       {notice && <p role="status" className="text-xs font-mono break-words">{notice}</p>}
       <form noValidate onSubmit={event => { event.preventDefault(); void schedule(); }} className="space-y-3 min-w-0">

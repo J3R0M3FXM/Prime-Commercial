@@ -145,7 +145,8 @@ export async function dispatchStoryCampaigns(limit = 10) {
       try {
         const photo = await resolveSecretaryPhoto(row.photo);
         const story = await api.postStory({ business_connection_id: row.business_connection_id,
-          content: { type:'photo', photo }, caption: row.story_caption, active_period: row.active_period });
+          content: { type:'photo', photo }, caption: row.story_caption, active_period: row.active_period,
+          post_to_chat_page: true });
         if (!Number.isSafeInteger(story?.id) || story.id <= 0) throw new Error('Telegram did not confirm the Story ID.');
         await db.run(`UPDATE secretary_story_campaigns SET story_status='sent',story_id=:story,updated_at=unixepoch()
           WHERE id=:id AND story_status='sending'`, { ':id':id, ':story':story.id });
