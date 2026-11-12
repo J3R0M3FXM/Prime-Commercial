@@ -45,4 +45,13 @@
 .support-faqs { min-width:0; padding-top:12px; border-top:1px solid #dce2e9; }
 .support-faq { padding:10px 2px; border-bottom:1px solid #dce2e9; }
 .support-faq summary { cursor:pointer; font-weight:600; overflow-wrap:anywhere; }
-.support-faq p { margin:8px 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.support-faq-answer { margin:8px 0; overflow-wrap:anywhere; }
+.support-faq-answer :is(p,h2,h3,h4,blockquote,ul,ol,table,pre) { margin:8px 0; }
+.support-faq-answer table { width:100%; border-collapse:collapse; }
+.support-faq-answer :is(th,td) { padding:6px; border:1px solid #cfd8e4; text-align:left; }
+.support-faq-answer th { background:#edf3fa; font-weight:600; }
+.support-rich-editor { border:1px solid #cfd8e4; border-radius:5px; overflow:hidden; }
+.support-rich-toolbar { display:flex; flex-wrap:wrap; gap:4px; padding:5px; background:#f5f8fc; border-bottom:1px solid #cfd8e4; }
+.support-rich-toolbar button { min-height:28px; padding:3px 7px; border:1px solid #d1dbe7; border-radius:4px; background:white; color:#173756; cursor:pointer; }
+.support-rich-input { min-height:150px; padding:9px; outline:none; overflow-wrap:anywhere; }
+.support-rich-input:empty:before { content:attr(data-placeholder); color:#8794a4; }
