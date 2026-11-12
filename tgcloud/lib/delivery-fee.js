@@ -4,6 +4,7 @@ function money(value) {
 }
 
 export function normalizeDeliveryRate(raw) {
+  const bands = Array.isArray(raw?.pricingBands) ? raw.pricingBands : [];
   return {
     baseFare: money(raw?.baseFare ?? raw?.base_fare),
     firstMile: money(raw?.firstMile ?? raw?.first_mile),
@@ -12,6 +13,8 @@ export function normalizeDeliveryRate(raw) {
     surcharge: money(raw?.surcharge),
     nightDifferential: money(raw?.nightDifferential ?? raw?.night_differential),
     timeBasedFeePerMinute: money(raw?.timeBasedFeePerMinute ?? raw?.time_based_fee_per_minute),
+    maxDistanceKm: Number.isFinite(Number(raw?.maxDistanceKm)) && Number(raw.maxDistanceKm) > 0 ? Number(raw.maxDistanceKm) : null,
+    pricingBands: bands.map((band) => ({ fromKm: Math.max(0, Number(band?.fromKm) || 0), toKm: Number.isFinite(Number(band?.toKm)) ? Number(band.toKm) : null, ratePerKm: money(band?.ratePerKm) })).filter((band) => band.ratePerKm >= 0).sort((a,b) => a.fromKm-b.fromKm),
   };
 }
 
@@ -19,10 +22,19 @@ export function calculateDeliveryFee(raw, distanceKm, routeTimeMinutes = null) {
   const rate = normalizeDeliveryRate(raw);
   const distance = Math.max(0, Number(distanceKm) || 0);
   const routeMinutes = Number(routeTimeMinutes);
-  const includedKm = Math.min(distance, rate.firstMile);
-  const excessKm = Math.max(0, distance - rate.firstMile);
-  const fee = rate.baseFare + includedKm * rate.firstMileFee +
-    excessKm * rate.exceedingKmFee + rate.surcharge + rate.nightDifferential +
+  let distanceFee;
+  if (rate.pricingBands.length) {
+    distanceFee = rate.pricingBands.reduce((sum, band, index) => {
+      const start = Math.max(0, band.fromKm);
+      const end = band.toKm == null ? distance : Math.min(distance, band.toKm);
+      return sum + Math.max(0, end - start) * band.ratePerKm;
+    }, 0);
+  } else {
+    const includedKm = Math.min(distance, rate.firstMile);
+    const excessKm = Math.max(0, distance - rate.firstMile);
+    distanceFee = includedKm * rate.firstMileFee + excessKm * rate.exceedingKmFee;
+  }
+  const fee = rate.baseFare + distanceFee + rate.surcharge + rate.nightDifferential +
     (Number.isFinite(routeMinutes) && routeMinutes > 0 ? rate.timeBasedFeePerMinute * routeMinutes : 0);
   // Delivery fares are charged in whole Philippine pesos. Round once, after
   // combining every configured component, so quote and order totals agree.

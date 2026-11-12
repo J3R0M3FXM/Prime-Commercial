@@ -1877,22 +1877,26 @@ export default function CheckoutModal({
                   <div className="prime-courier-grid grid grid-cols-3 gap-1.5 sm:gap-2">
                     {availableCouriers.map((courier) => {
                       const isSelected = selectedCourierId === courier.id;
+                      const outsideCoverage = courier.coverageAvailable === false;
                       return (
-                        <div key={courier.id} className="flex flex-col items-center gap-1">
+                        <div key={courier.id} className={`relative flex flex-col items-center gap-1 ${outsideCoverage ? "opacity-60" : ""}`}>
                           <button
                             type="button"
+                            disabled={outsideCoverage}
                             onClick={() => setSelectedCourierId(courier.id)}
                             aria-pressed={isSelected}
-                            className={selectorTileClass(isSelected)}
+                            aria-label={outsideCoverage ? `${formatCourierName(courier.name)} outside coverage` : formatCourierName(courier.name)}
+                            className={`${selectorTileClass(isSelected)} ${outsideCoverage ? "blur-[2px]" : ""}`}
                           >
                             <CheckoutTileLogo reference={String(courier.logo || "")} name={courier.name} selected={isSelected} />
                           </button>
                           <div className="w-full text-center leading-tight">
+                            {outsideCoverage && <span className="pointer-events-none absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 text-[10px] font-bold tracking-tight text-red-600">OUTSIDE COVERAGE</span>}
                             <span className={`${selectorLabelClass} text-slate-900`}>
                               {formatCourierName(courier.name)}
                             </span>
                             <span className="block text-xs sm:text-[13px] font-mono font-bold text-slate-950 tracking-tight">
-                              {formatPHPWhole(courier.calculatedFee || 0)}
+                              {outsideCoverage ? "Unavailable" : formatPHPWhole(courier.calculatedFee || 0)}
                             </span>
                           </div>
                         </div>

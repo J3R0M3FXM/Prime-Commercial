@@ -5,6 +5,14 @@ import { couriers, systemSettings, warehouses } from '../schema.js';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from './delivery-fee.js';
 import { getCourierTimeRates, ensureCourierTimeRateColumn } from './ensure-courier-time-rate.js';
 
+function pricingForCourier(courier) {
+  const name = String(courier.name || '').toLowerCase();
+  if (name.includes('grab')) return { maxDistanceKm: 30, pricingBands: [{ fromKm: 0, toKm: 3, ratePerKm: 10 }, { fromKm: 3, toKm: null, ratePerKm: 12 }] };
+  if (name.includes('lalamove')) return { pricingBands: [{ fromKm: 0, toKm: 3, ratePerKm: 6.5 }, { fromKm: 3, toKm: 7, ratePerKm: 6.2 }, { fromKm: 7, toKm: 10, ratePerKm: 6 }, { fromKm: 10, toKm: 15, ratePerKm: 5.5 }, { fromKm: 15, toKm: null, ratePerKm: 5 }] };
+  if (name.includes('move it') || name.includes('moveit')) return { pricingBands: [{ fromKm: 2, toKm: 7, ratePerKm: 10 }, { fromKm: 7, toKm: null, ratePerKm: 15 }] };
+  return {};
+}
+
 export async function quoteDelivery(destinationLatValue, destinationLonValue, courierId = '') {
   await ensureCourierTimeRateColumn();
   const destinationLat = Number(destinationLatValue);
@@ -73,7 +81,10 @@ export async function quoteDelivery(destinationLatValue, destinationLonValue, co
     distanceKm = calculateRoadDistanceFallback(Number(warehouse.latitude), Number(warehouse.longitude), destinationLat, destinationLon);
   }
   distanceKm = Math.round(Math.max(0, distanceKm) * 100) / 100;
-  const computedCouriers = courierRows.map((courier) => ({
+  const computedCouriers = courierRows.map((courier) => {
+    const pricing = pricingForCourier(courier);
+    const covered = pricing.maxDistanceKm == null || distanceKm <= pricing.maxDistanceKm;
+    return ({
     id: courier.id,
     name: courier.name,
     logo: courier.logo || '',
@@ -87,16 +98,18 @@ export async function quoteDelivery(destinationLatValue, destinationLonValue, co
     timeBasedFeePerMinute: courierTimeRates.get(String(courier.id)) || 0,
     estimatedTravelMinutes: routeTimeMinutes,
     calculatedTimeFee: routeTimeMinutes == null ? 0 : Math.round((courierTimeRates.get(String(courier.id)) || 0) * routeTimeMinutes * 100) / 100,
-    calculatedFee: calculateDeliveryFee({ ...courier, timeBasedFeePerMinute: courierTimeRates.get(String(courier.id)) || 0 }, distanceKm, routeTimeMinutes),
+    maxDistanceKm: pricing.maxDistanceKm,
+    coverageAvailable: covered,
+    calculatedFee: covered ? calculateDeliveryFee({ ...courier, ...pricing, timeBasedFeePerMinute: courierTimeRates.get(String(courier.id)) || 0 }, distanceKm, routeTimeMinutes) : null,
     distanceKm,
-  }));
+  }); });
   const selectedId = String(courierId || '').trim();
-  const selectedCourier = selectedId ? computedCouriers.find((row) => String(row.id) === selectedId) : computedCouriers[0];
-  if (selectedId && !selectedCourier) throw new EndpointError('Selected courier is no longer available.', { code: 'COURIER_UNAVAILABLE' });
+  const selectedCourier = selectedId ? computedCouriers.find((row) => String(row.id) === selectedId) : computedCouriers.find((row) => row.coverageAvailable !== false) || computedCouriers[0];
+  if (selectedId && (!selectedCourier || selectedCourier.coverageAvailable === false)) throw new EndpointError('The selected courier does not cover this distance.', { code: 'COURIER_OUTSIDE_COVERAGE' });
   return {
     warehouse: { id: warehouse.id, name: warehouse.name, address: warehouse.address, lat: Number(warehouse.latitude), lon: Number(warehouse.longitude) },
     distanceKm,
-    fee: selectedCourier.calculatedFee,
+    fee: selectedCourier?.calculatedFee,
     courier: selectedCourier,
     couriers: computedCouriers,
     routingSource,
