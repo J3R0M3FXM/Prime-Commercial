@@ -2131,6 +2131,7 @@ export default function CheckoutModal({
                 <label className="prime-credit-toggle"><span>Use Store Credits</span><input type="checkbox" role="switch" checked={useStoreCredits} onChange={(event) => {
                   const enabled = event.target.checked;
                   setUseStoreCredits(enabled);
+                  if (!enabled) setCreditAmountInput("");
                 }} /><span className="prime-credit-switch" aria-hidden="true" /></label>
                 {useStoreCredits && <div className="prime-credit-details">
                   <p>Available: {formatPHP(availableStoreCredits)}</p>
