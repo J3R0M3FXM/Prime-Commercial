@@ -1388,10 +1388,6 @@ export default function CheckoutModal({
       const reviewPayableNow = Math.max(0, reviewPayableBeforeCredits - reviewCredits);
       const reviewPayableOnDelivery = deliveryPaymentMethod === "upon_delivery" ? reviewEffectiveDeliveryFee : 0;
       const reviewTotal = reviewPayableNow + reviewPayableOnDelivery;
-      if (Math.abs(reviewTotal - overallOrderValue) > 0.01) {
-        throw new Error("The current total changed while checkout was open. Review the updated charges and submit again.");
-      }
-
       const fpData = await getClientFingerprint();
 
       // Precise location is optional and only exists when the customer explicitly
@@ -1457,9 +1453,9 @@ export default function CheckoutModal({
           distanceKm: calculatedDistance,
           fee: courierDeliveryFee,
         } : null,
-        totalAmount: overallOrderValue,
-        payableNow,
-        payableOnDelivery,
+        totalAmount: reviewTotal,
+        payableNow: reviewPayableNow,
+        payableOnDelivery: reviewPayableOnDelivery,
         expectedTotalAmount: reviewTotal,
         expectedPayableNow: reviewPayableNow,
         expectedPayableOnDelivery: reviewPayableOnDelivery,
@@ -1468,8 +1464,8 @@ export default function CheckoutModal({
         promoTitle: appliedPromo?.title || null,
         promoId: appliedPromo?.promoId || null,
         isFreeShipping: Boolean(appliedPromo?.isFreeShipping),
-        appliedStoreCredits: creditsDeducted,
-        storeCreditsUsed: creditsDeducted,
+        appliedStoreCredits: reviewCredits,
+        storeCreditsUsed: reviewCredits,
         referralCode: appliedReferral?.code || (existingReferrer?.memberId || null),
         notes: customerNotes.trim() || "NONE PROVIDED",
         deviceId: fpData.deviceId,
