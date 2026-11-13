@@ -1,7 +1,9 @@
 .prime-account {
   color: #0c1e3c;
   background: #edf3fc;
-  font-family: MiSans, sans-serif;
+  font-family: 'Google Sans', 'Google Sans Text', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .prime-account > div:first-child {
@@ -218,10 +220,10 @@
 .prime-account__mid span { min-width: 0; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
 .prime-account__mid button { flex: none; line-height: 0; }
 .prime-account__tier-label { color: #e7f0ff !important; font: 600 10px/1.1 'Roboto Condensed', sans-serif !important; }
-.prime-account__tier-value { min-width: 0 !important; padding: 0 !important; color: #fff !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; font: 700 15px/1.1 MiSans, sans-serif !important; }
+.prime-account__tier-value { min-width: 0 !important; padding: 0 !important; color: #fff !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; font: 500 13px/1.1 'Google Sans', 'Google Sans Text', Arial, sans-serif !important; }
 .prime-account__tier-rate { color: #e7f0ff !important; font: 400 10px/1.1 'Roboto Condensed', sans-serif !important; white-space: nowrap; }
 .prime-account__tier > .prime-account__tier-label { color: #e7f0ff !important; font: 600 10px/1.1 'Roboto Condensed', sans-serif !important; }
-.prime-account__tier > .prime-account__tier-value { min-width: 0 !important; padding: 0 !important; font: 700 15px/1.1 MiSans, sans-serif !important; background: none !important; border: 0 !important; box-shadow: none !important; }
+.prime-account__tier > .prime-account__tier-value { min-width: 0 !important; padding: 0 !important; font: 500 13px/1.1 'Google Sans', 'Google Sans Text', Arial, sans-serif !important; background: none !important; border: 0 !important; box-shadow: none !important; }
 .prime-account__tier > .prime-account__tier-rate { color: #e7f0ff !important; font: 400 10px/1.1 'Roboto Condensed', sans-serif !important; }
 .prime-account__balance-grid { padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
 .prime-account__balance-grid .prime-account__balance-card {
@@ -234,7 +236,7 @@
 #mobile-portrait-viewport .prime-shopfront-shell .prime-account .prime-account__balance-label,
 #mobile-portrait-viewport .prime-shopfront-shell .prime-account .prime-account__balance-label span { font-family: 'Roboto Condensed', sans-serif !important; font-size: 12px !important; font-weight: 600 !important; line-height: 1.08 !important; letter-spacing: 0 !important; text-transform: uppercase !important; }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-account .prime-account__username { font-family: 'Roboto Condensed', sans-serif !important; font-size: 11px !important; font-weight: 400 !important; }
-.prime-account__balance-value { margin-top: 3px; color: #0a1c3a; font: 700 16px/1.2 MiSans, sans-serif; white-space: nowrap; }
+.prime-account__balance-value { margin-top: 3px; color: #0a1c3a; font: 500 13px/1.2 'Google Sans', 'Google Sans Text', Arial, sans-serif; white-space: nowrap; }
 .prime-account__help { position: absolute; top: 4px; right: 4px; width: 16px; height: 16px; padding: 0; color: #59718c; }
 .prime-account__help svg { width: 15px; height: 15px; }
 .prime-account__balance-grid .prime-account__balance-action { min-height: 25px; margin-top: auto; padding: 3px 5px; border: 1px solid #b9c9da; border-radius: 5px; background: #f8fafc; color: #0d3853; font: 600 10px/1 'Roboto Condensed', sans-serif; text-transform: uppercase; }
