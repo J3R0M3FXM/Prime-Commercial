@@ -28,7 +28,7 @@ export default function TelegramServerlessLogisticsPanel({ onBack, initialSectio
   const [courierEditingId, setCourierEditingId] = useState("");
   const [warehouseFormOpen, setWarehouseFormOpen] = useState(false);
   const [courierFormOpen, setCourierFormOpen] = useState(false);
-  const [courierForm, setCourierForm] = useState({ name: "", logo: "", type: "Standard", baseFare: "0", firstMile: "0", firstMileFee: "0", exceedingKmFee: "0", surcharge: "0", nightDifferential: "0", timeBasedFeePerMinute: "0" });
+  const [courierForm, setCourierForm] = useState({ name: "", logo: "", type: "Standard", baseFare: "0", firstMile: "0", firstMileFee: "0", exceedingKmFee: "0", surcharge: "0", nightDifferential: "0", timeBasedFeePerMinute: "0", maxDistanceKm: "", pricingBands: "" });
 
   const load = async () => {
     setBusy(true); setError("");
@@ -138,11 +138,12 @@ export default function TelegramServerlessLogisticsPanel({ onBack, initialSectio
   const saveCourier = (event: React.FormEvent) => {
     event.preventDefault();
     void run(async () => {
-      const numeric = Object.fromEntries(Object.entries(courierForm).filter(([key]) => !["name", "logo", "type"].includes(key)).map(([key, value]) => [key, Number(value)]));
-      await callServerless("manageCouriers", { action: courierEditingId ? "update" : "create", ...(courierEditingId ? { id: courierEditingId } : {}), ...courierForm, ...numeric, isActive: true, sortOrder: couriers.length });
+      const numeric = Object.fromEntries(Object.entries(courierForm).filter(([key]) => !["name", "logo", "type", "pricingBands", "maxDistanceKm"].includes(key)).map(([key, value]) => [key, Number(value)]));
+      const pricingBands = courierForm.pricingBands.split(',').map(part => { const [range, rate] = part.trim().split(':'); const [fromKm, toKm] = String(range || '').split('-').map(Number); return { fromKm, toKm: Number.isFinite(toKm) ? toKm : null, ratePerKm: Number(rate) }; }).filter(b => Number.isFinite(b.fromKm) && Number.isFinite(b.ratePerKm));
+      await callServerless("manageCouriers", { action: courierEditingId ? "update" : "create", ...(courierEditingId ? { id: courierEditingId } : {}), ...courierForm, ...numeric, maxDistanceKm: courierForm.maxDistanceKm === "" ? null : Number(courierForm.maxDistanceKm), pricingBands, isActive: true, sortOrder: couriers.length });
       setCourierEditingId("");
       setCourierFormOpen(false);
-      setCourierForm({ name: "", logo: "", type: "Standard", baseFare: "0", firstMile: "0", firstMileFee: "0", exceedingKmFee: "0", surcharge: "0", nightDifferential: "0", timeBasedFeePerMinute: "0" });
+      setCourierForm({ name: "", logo: "", type: "Standard", baseFare: "0", firstMile: "0", firstMileFee: "0", exceedingKmFee: "0", surcharge: "0", nightDifferential: "0", timeBasedFeePerMinute: "0", maxDistanceKm: "", pricingBands: "" });
       const rows = await callServerless<Row[]>("manageCouriers", { action: "list" }); setCouriers(rows);
     }, courierEditingId ? "Courier updated." : "Courier added.");
   };
@@ -163,7 +164,7 @@ export default function TelegramServerlessLogisticsPanel({ onBack, initialSectio
   const editCourier = (row: Row) => {
     setCourierFormOpen(true); setError("");
     setCourierEditingId(row.id);
-    setCourierForm({ name: row.name || "", logo: row.logo || "", type: row.type || "Standard", baseFare: String(row.baseFare ?? 0), firstMile: String(row.firstMile ?? 0), firstMileFee: String(row.firstMileFee ?? 0), exceedingKmFee: String(row.exceedingKmFee ?? 0), surcharge: String(row.surcharge ?? 0), nightDifferential: String(row.nightDifferential ?? 0), timeBasedFeePerMinute: String(row.timeBasedFeePerMinute ?? 0) });
+    setCourierForm({ name: row.name || "", logo: row.logo || "", type: row.type || "Standard", baseFare: String(row.baseFare ?? 0), firstMile: String(row.firstMile ?? 0), firstMileFee: String(row.firstMileFee ?? 0), exceedingKmFee: String(row.exceedingKmFee ?? 0), surcharge: String(row.surcharge ?? 0), nightDifferential: String(row.nightDifferential ?? 0), timeBasedFeePerMinute: String(row.timeBasedFeePerMinute ?? 0), maxDistanceKm: row.maxDistanceKm == null ? "" : String(row.maxDistanceKm), pricingBands: Array.isArray(row.pricingBands) ? row.pricingBands.map((b:any)=>`${b.fromKm}-${b.toKm ?? ''}:${b.ratePerKm}`).join(', ') : "" });
     setMessage("Editing courier. Save the form to apply changes.");
   };
   const uploadCourierLogo = async (file?: File) => {

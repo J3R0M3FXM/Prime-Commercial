@@ -3,6 +3,7 @@ import { asc, eq } from 'sdk/db';
 import { couriers } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
 import { ensureCourierTimeRateColumn, getCourierTimeRates, saveCourierTimeRate } from '../lib/ensure-courier-time-rate.js';
+import { getCourierPricing, saveCourierPricing } from '../lib/courier-pricing.js';
 
 const textFields = new Set(['name', 'trackingUrlPattern', 'logo', 'type']);
 const numericFields = new Set(['baseFare', 'firstMile', 'firstMileFee', 'exceedingKmFee', 'surcharge', 'nightDifferential', 'timeBasedFeePerMinute']);
@@ -56,7 +57,7 @@ export default async function (input, ctx) {
     const [rows, rates] = await Promise.all([
       db.select().from(couriers).orderBy(asc(couriers.sortOrder)).all(), getCourierTimeRates(),
     ]);
-    return rows.map((row) => ({ ...row, timeBasedFeePerMinute: rates.get(String(row.id)) || 0 }));
+    return Promise.all(rows.map(async (row) => ({ ...row, timeBasedFeePerMinute: rates.get(String(row.id)) || 0, ...(await getCourierPricing(row.id)) })));
   }
 
   if (action === 'create') {
@@ -66,7 +67,7 @@ export default async function (input, ctx) {
     values.createdAt = new Date();
     const [courier] = await db.insert(couriers).values(values).returning().run();
     const timeBasedFeePerMinute = await saveCourierTimeRate(courier.id, timeRate);
-    return { success: true, courier: { ...courier, timeBasedFeePerMinute } };
+    const pricing = await saveCourierPricing(courier.id, input); return { success: true, courier: { ...courier, timeBasedFeePerMinute, ...pricing } };
   }
 
   if (action === 'update') {
@@ -80,7 +81,7 @@ export default async function (input, ctx) {
       : [await db.select().from(couriers).where(eq(couriers.id, input.id)).get()];
     if (!courier) throw new EndpointError('Courier not found.', { code: 'NOT_FOUND' });
     const timeBasedFeePerMinute = hasTimeRate ? await saveCourierTimeRate(courier.id, timeRate) : (await getCourierTimeRates()).get(String(courier.id)) || 0;
-    return { success: true, courier: { ...courier, timeBasedFeePerMinute } };
+    const pricing = await saveCourierPricing(courier.id, input); return { success: true, courier: { ...courier, timeBasedFeePerMinute, ...pricing } };
   }
 
   if (action === 'delete') {

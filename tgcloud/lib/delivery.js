@@ -4,6 +4,7 @@ import { asc, desc, eq } from 'sdk/db';
 import { couriers, systemSettings, warehouses } from '../schema.js';
 import { calculateDeliveryFee, calculateRoadDistanceFallback } from './delivery-fee.js';
 import { getCourierTimeRates, ensureCourierTimeRateColumn } from './ensure-courier-time-rate.js';
+import { getCourierPricing } from './courier-pricing.js';
 
 function pricingForCourier(courier) {
   const name = String(courier.name || '').toLowerCase();
@@ -81,8 +82,9 @@ export async function quoteDelivery(destinationLatValue, destinationLonValue, co
     distanceKm = calculateRoadDistanceFallback(Number(warehouse.latitude), Number(warehouse.longitude), destinationLat, destinationLon);
   }
   distanceKm = Math.round(Math.max(0, distanceKm) * 100) / 100;
-  const computedCouriers = courierRows.map((courier) => {
-    const pricing = pricingForCourier(courier);
+  const computedCouriers = (await Promise.all(courierRows.map(async (courier) => {
+    const saved = await getCourierPricing(courier.id);
+    const pricing = Object.keys(saved).length ? saved : pricingForCourier(courier);
     const covered = pricing.maxDistanceKm == null || distanceKm <= pricing.maxDistanceKm;
     return ({
     id: courier.id,
@@ -102,7 +104,7 @@ export async function quoteDelivery(destinationLatValue, destinationLonValue, co
     coverageAvailable: covered,
     calculatedFee: covered ? calculateDeliveryFee({ ...courier, ...pricing, timeBasedFeePerMinute: courierTimeRates.get(String(courier.id)) || 0 }, distanceKm, routeTimeMinutes) : null,
     distanceKm,
-  }); });
+  }); }));
   const selectedId = String(courierId || '').trim();
   const selectedCourier = selectedId ? computedCouriers.find((row) => String(row.id) === selectedId) : computedCouriers.find((row) => row.coverageAvailable !== false) || computedCouriers[0];
   if (selectedId && (!selectedCourier || selectedCourier.coverageAvailable === false)) throw new EndpointError('The selected courier does not cover this distance.', { code: 'COURIER_OUTSIDE_COVERAGE' });
