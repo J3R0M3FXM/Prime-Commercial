@@ -458,7 +458,7 @@ export default function Shopfront() {
                     )}
 
                     {/* Product Name */}
-                    <h3 className="font-roboto-condensed-semibold text-gray-900 line-clamp-2 leading-[1.05] text-[13px] sm:text-[14.5px] tracking-tight">
+                    <h3 className="font-roboto-condensed-semibold text-gray-900 line-clamp-2 leading-[1.05] text-[12.5px] sm:text-[14.5px] tracking-tight">
                       {p.name}
                     </h3>
                     <p className="prime-product-card__availability font-mono text-[8.5px] sm:text-[9.5px] font-bold uppercase leading-none tracking-wide text-slate-700">
