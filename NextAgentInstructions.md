@@ -31,3 +31,5 @@ A per-Telegram-account checkout draft saves the screen, contact/address/courier/
 `npm run validate:miniapp` runs all backend syntax checks, the Vite entry's strict TypeScript check, existing contracts/promo/delivery regressions, SQLite concurrent inventory/referral tests, payment session/proof tests, draft reload tests, and a production Vite build. It does not place live orders or verify provider payment. The old repository-wide Next/native tsconfig is not the Mini App validation target. Keep generated tsbuildinfo out of version control.
 
 Last read-only TGCloud status during this task: app8830494959, revision 432, webhook in sync, backend clean, 51 static files current before these changes. No deployment was performed for this checkout-safety work. Historical release details remain in docs/PRODUCTION_AUDIT.md; they are not proof of the current runtime. When a deployment is requested, compare current status/parity again and scope the push to reviewed changed modules plus Sandbox-built dist; do not push the schema or hidden TGCloud state.
+
+Test for Acode.
