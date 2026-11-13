@@ -170,6 +170,7 @@
 .prime-account__timeline > div > div { padding: 7px 4px; border-bottom: 1px solid #d8e3f2; }
 .prime-account__timeline > div > div:last-child { border-bottom: 0; }
 .prime-account__timeline .line-clamp-2 { font-size: 11px; }
+.prime-account__live-date { font: 600 14px/1.2 'Google Sans', 'Google Sans Text', Arial, sans-serif !important; }
 
 .prime-account__share > div:first-child { padding-left: 0; }
 .prime-account__share p { color: #52637d !important; font-size: 11px !important; }
