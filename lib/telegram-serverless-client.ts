@@ -655,6 +655,16 @@ export async function uploadStoryPhoto(file: File): Promise<string> {
     const fitWidth = width * fit;
     const fitHeight = height * fit;
     context.drawImage(loaded.image, (1080 - fitWidth) / 2, (1920 - fitHeight) / 2, fitWidth, fitHeight);
+    // Keep the call-to-action visible in Telegram even before Story link-area
+    // support is enabled. The banner is intentionally full-width and 35px tall.
+    const bannerHeight = 35;
+    context.fillStyle = '#0b0b0d';
+    context.fillRect(0, 1920 - bannerHeight, 1080, bannerHeight);
+    context.fillStyle = '#ffffff';
+    context.font = '600 22px "Roboto Condensed", "Arial Narrow", sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText('ORDER THRU PRIME™ CORE APP', 540, 1920 - bannerHeight / 2);
     for (const quality of [0.82, 0.72, 0.62, 0.52, 0.42, 0.32]) {
       blob = await canvasJpeg(canvas, quality);
       if (blob.size <= 850_000) break;

@@ -143,7 +143,7 @@ export default function SecretarySchedulerPanel() {
             try { change({ photo: await uploadStoryPhoto(file) }); }
             catch (cause: any) { setError(cause?.message || "Story photo upload failed."); }
             finally { setBusy(false); }
-          }}/><span className="secretary-help">Square and landscape photos are centered without cropping. The background fills Telegram's portrait Story frame.</span></label>
+          }}/><span className="secretary-help">Square and landscape photos are centered without cropping. The background fills Telegram's portrait Story frame. A 35px full-width ORDER THRU PRIME™ CORE APP banner is added at the bottom.</span></label>
           {draft.photo && <TelegramMediaImage src={draft.photo} alt="Scheduled Story photo" className="max-h-48 w-full object-contain"/>}
           <label className="block"><span className="label-mini">Story Caption</span><textarea className="control-mini w-full min-h-20" maxLength={2048} value={draft.storyCaption} onChange={event => change({ storyCaption:event.target.value })}/></label>
           <label className="block"><span className="label-mini">Story Duration</span><select className="control-mini w-full" value={draft.activePeriod} onChange={event => change({activePeriod:Number(event.target.value)})}><option value={86400}>24 hours</option><option value={21600}>6 hours · Premium</option><option value={43200}>12 hours · Premium</option><option value={172800}>48 hours · Premium</option></select></label>
