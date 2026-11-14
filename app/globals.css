@@ -2548,13 +2548,15 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   text-transform: uppercase !important;
 }
 #mobile-portrait-viewport .prime-live-clock__date {
-  width: 99px !important;
+  width: 92px !important;
 }
 #mobile-portrait-viewport .prime-live-clock__time-value {
+  display: inline-flex !important;
+  justify-content: flex-start !important;
   width: 86px !important;
 }
 #mobile-portrait-viewport .prime-live-clock__separator {
-  margin-inline: 4px !important;
+  margin-inline: 1px !important;
 }
 #system-wide-proprietary-footer {
   background: #071b3d url('/prime-footer-art.png') center / 100% 100% no-repeat !important;
