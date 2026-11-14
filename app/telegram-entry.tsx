@@ -5,6 +5,7 @@ import "@fontsource/roboto-condensed/700.css";
 import "@fontsource/roboto-condensed/400.css";
 import "@fontsource/lato/400.css";
 import "@fontsource/lato/700.css";
+import "@fontsource/poppins/600.css";
 import "./globals.css";
 import "./admin/admin-portrait.css";
 import CartProvider from "./components/cart-context";
