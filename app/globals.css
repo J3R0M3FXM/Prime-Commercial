@@ -2542,8 +2542,16 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   font-family: 'Poppins', sans-serif !important;
   font-size: 13px !important;
   font-weight: 600 !important;
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: 'tnum' 1, 'lnum' 1 !important;
   color: #1254b5 !important;
   text-transform: uppercase !important;
+}
+#mobile-portrait-viewport .prime-live-clock__date {
+  width: 99px !important;
+}
+#mobile-portrait-viewport .prime-live-clock__time-value {
+  width: 86px !important;
 }
 #mobile-portrait-viewport .prime-live-clock__separator {
   margin-inline: 4px !important;
