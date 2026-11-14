@@ -2528,6 +2528,9 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   transform: scale(1.15); transform-origin: left center; filter: none !important;
 }
 #mobile-portrait-viewport .prime-live-clock__time:not(.prime-live-clock__placeholder) {
+  width: 100% !important;
+  max-width: 100% !important;
+  justify-content: flex-end !important;
   font-size: 13px !important;
   font-family: 'Poppins', sans-serif !important;
   font-weight: 600 !important;
@@ -2541,6 +2544,9 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   font-weight: 600 !important;
   color: #1254b5 !important;
   text-transform: uppercase !important;
+}
+#mobile-portrait-viewport .prime-live-clock__separator {
+  margin-inline: 4px !important;
 }
 #system-wide-proprietary-footer {
   background: #071b3d url('/prime-footer-art.png') center / 100% 100% no-repeat !important;

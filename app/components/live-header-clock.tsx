@@ -37,6 +37,7 @@ export default function LiveHeaderClock() {
     <div className="prime-live-clock" id="live-clock-container">
       <div className="prime-live-clock__time">
         <span className="prime-live-clock__time-text prime-live-clock__date">{dateStr}</span>
+        <span className="prime-live-clock__time-text prime-live-clock__separator" aria-hidden="true">•</span>
         <span className="prime-live-clock__time-text prime-live-clock__time-value">{timeStr}</span>
       </div>
     </div>
