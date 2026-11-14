@@ -2530,14 +2530,20 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 #mobile-portrait-viewport .prime-live-clock {
   flex: 0 0 clamp(164px, 52vw, 218px) !important;
   width: clamp(164px, 52vw, 218px) !important;
+  align-self: center !important;
+  margin-left: auto !important;
 }
 #mobile-portrait-viewport .prime-live-clock__time:not(.prime-live-clock__placeholder) {
-  display: block !important;
+  display: grid !important;
+  grid-template-columns: 92px 10px 86px !important;
+  justify-content: end !important;
+  align-items: center !important;
   box-sizing: border-box !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  position: relative !important;
-  align-self: stretch !important;
+  width: 188px !important;
+  max-width: 188px !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  margin-left: auto !important;
   text-align: right !important;
   font-size: 13px !important;
   font-family: 'Poppins', sans-serif !important;
@@ -2556,23 +2562,20 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   text-transform: uppercase !important;
 }
 #mobile-portrait-viewport .prime-live-clock__date {
-  position: absolute !important;
-  right: 96px !important;
+  grid-column: 1 !important;
   width: 92px !important;
   text-align: right !important;
 }
 #mobile-portrait-viewport .prime-live-clock__time-value {
-  display: inline-flex !important;
-  justify-content: flex-start !important;
-  position: absolute !important;
-  right: 0 !important;
+  grid-column: 3 !important;
+  display: block !important;
   width: 86px !important;
   text-align: left !important;
 }
 #mobile-portrait-viewport .prime-live-clock__separator {
-  position: absolute !important;
-  right: 88px !important;
+  grid-column: 2 !important;
   margin: 0 !important;
+  text-align: center !important;
 }
 /* Keep the identity strip visually in front of the lower queue monitor. */
 #mobile-portrait-viewport :is(.prime-shopfront-global-header, .prime-admin-global-header, .command-fixed-header) .prime-identity-header {
