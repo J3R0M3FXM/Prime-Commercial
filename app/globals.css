@@ -2570,6 +2570,16 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   right: 88px !important;
   margin: 0 !important;
 }
+/* Keep the identity strip visually in front of the lower queue monitor. */
+#mobile-portrait-viewport :is(.prime-shopfront-global-header, .prime-admin-global-header, .command-fixed-header) .prime-identity-header {
+  position: relative !important;
+  z-index: 2 !important;
+  box-shadow: 0 2px 7px rgb(15 23 42 / 18%) !important;
+}
+#mobile-portrait-viewport :is(.prime-shopfront-global-header, .prime-admin-global-header, .command-fixed-header) .prime-queue-monitor {
+  position: relative !important;
+  z-index: 1 !important;
+}
 #system-wide-proprietary-footer {
   background: #071b3d url('/prime-footer-art.png') center / 100% 100% no-repeat !important;
   border-top-color: #173e79;
