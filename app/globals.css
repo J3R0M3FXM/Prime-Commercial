@@ -2569,13 +2569,40 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 }
 #mobile-portrait-viewport .prime-live-clock__time-value {
   grid-column: 3 !important;
-  display: block !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
   width: 86px !important;
   min-width: 86px !important;
   max-width: 86px !important;
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
   font-feature-settings: 'tnum' 1, 'lnum' 1 !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap !important;
+}
+#mobile-portrait-viewport .prime-live-clock__digits {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+}
+#mobile-portrait-viewport .prime-live-clock__digit {
+  display: inline-block !important;
+  width: .62em !important;
+  flex: 0 0 .62em !important;
+  text-align: center !important;
+}
+#mobile-portrait-viewport .prime-live-clock__punctuation {
+  display: inline-block !important;
+  width: .42em !important;
+  flex: 0 0 .42em !important;
+  text-align: center !important;
+}
+#mobile-portrait-viewport .prime-live-clock__meridiem {
+  display: inline-block !important;
+  width: 1.6em !important;
+  flex: 0 0 1.6em !important;
+  margin-left: .22em !important;
+  text-align: right !important;
 }
 #mobile-portrait-viewport .prime-live-clock__separator {
   grid-column: 2 !important;

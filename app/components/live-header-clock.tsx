@@ -1,6 +1,28 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 
+function StablePoppinsTime({ value }: { value: string }) {
+  const parts = /^(\d{2}):(\d{2}):(\d{2})\s([AP]M)$/.exec(value);
+  if (!parts) return value;
+  const digits = (group: string, label: string) => (
+    <span className="prime-live-clock__digits" aria-label={label}>
+      {Array.from(group).map((digit, index) => (
+        <span className="prime-live-clock__digit" aria-hidden="true" key={index}>{digit}</span>
+      ))}
+    </span>
+  );
+  return (
+    <>
+      {digits(parts[1], "hour")}
+      <span className="prime-live-clock__punctuation" aria-hidden="true">:</span>
+      {digits(parts[2], "minute")}
+      <span className="prime-live-clock__punctuation" aria-hidden="true">:</span>
+      {digits(parts[3], "second")}
+      <span className="prime-live-clock__meridiem" aria-hidden="true">{parts[4]}</span>
+    </>
+  );
+}
+
 export default function LiveHeaderClock() {
   const [mounted, setMounted] = useState(false);
   const [dateStr, setDateStr] = useState("");
@@ -38,7 +60,9 @@ export default function LiveHeaderClock() {
       <div className="prime-live-clock__time">
         <span className="prime-live-clock__time-text prime-live-clock__date">{dateStr}</span>
         <span className="prime-live-clock__time-text prime-live-clock__separator" aria-hidden="true">•</span>
-        <span className="prime-live-clock__time-text prime-live-clock__time-value">{timeStr}</span>
+        <span className="prime-live-clock__time-text prime-live-clock__time-value" aria-label={timeStr}>
+          <StablePoppinsTime value={timeStr} />
+        </span>
       </div>
     </div>
   );
