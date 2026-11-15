@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 
-function StablePoppinsTime({ value }: { value: string }) {
+function StableLiveTime({ value }: { value: string }) {
   const parts = /^(\d{2}):(\d{2}):(\d{2})\s([AP]M)$/.exec(value);
   if (!parts) return value;
   const digits = (group: string, label: string) => (
@@ -61,7 +61,7 @@ export default function LiveHeaderClock() {
         <span className="prime-live-clock__time-text prime-live-clock__date">{dateStr}</span>
         <span className="prime-live-clock__time-text prime-live-clock__separator" aria-hidden="true">•</span>
         <span className="prime-live-clock__time-text prime-live-clock__time-value" aria-label={timeStr}>
-          <StablePoppinsTime value={timeStr} />
+          <StableLiveTime value={timeStr} />
         </span>
       </div>
     </div>
