@@ -2577,18 +2577,6 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   font-variant-numeric: tabular-nums !important;
   font-feature-settings: 'tnum' 1, 'lnum' 1 !important;
 }
-#mobile-portrait-viewport .prime-live-clock__time-value--fixed {
-  display: grid !important;
-  grid-template-columns: repeat(11, minmax(0, 1fr)) !important;
-  align-items: center !important;
-  letter-spacing: 0 !important;
-}
-#mobile-portrait-viewport .prime-live-clock__time-character {
-  display: block !important;
-  min-width: 0 !important;
-  overflow: visible !important;
-  text-align: center !important;
-}
 #mobile-portrait-viewport .prime-live-clock__separator {
   grid-column: 2 !important;
   margin: 0 !important;
