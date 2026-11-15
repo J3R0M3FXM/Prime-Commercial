@@ -1,5 +1,14 @@
 # PRIME native Telegram auth Worker
 
+## PARKED — NOT DEPLOYED
+
+This is an incomplete scaffold, not a live authentication service. Do not present
+standalone APK Telegram login as implemented, do not promote this directory to
+Checkout, and do not point the production APK at it. The Worker has not been
+deployed, the custom domain/BotFather setup is not confirmed, and the APK does
+not yet consume the `/exchange` response. Resume only after those prerequisites
+are deliberately completed and device-tested.
+
 This Worker is intentionally separate from `prime-media-preview`. It verifies Telegram Login Widget data, stores a single-use 60-second native handoff code in KV, and redirects to `prime://auth/callback`.
 
 Before deployment:
