@@ -14,7 +14,8 @@
     "android:add": "cap add android",
     "android:sync": "cap sync android",
     "android:open": "cap open android",
-    "android:build": "cap build android"
+    "android:check": "node scripts/check-android-sdk.mjs",
+    "android:build": "npm run android:check && cap build android"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",
