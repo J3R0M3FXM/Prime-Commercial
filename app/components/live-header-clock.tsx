@@ -34,7 +34,7 @@ export default function LiveHeaderClock() {
       const now = new Date();
       const date = new Intl.DateTimeFormat("en-PH", {
         timeZone: "Asia/Manila", day: "2-digit", month: "short", year: "numeric",
-      }).format(now).toUpperCase();
+      }).format(now).toUpperCase().replace(/^([A-Z]{3})(?=\s)/, "$1.");
       const time = new Intl.DateTimeFormat("en-PH", {
         timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true,
       }).format(now).toUpperCase();
@@ -59,7 +59,7 @@ export default function LiveHeaderClock() {
     <div className="prime-live-clock" id="live-clock-container">
       <div className="prime-live-clock__time">
         <span className="prime-live-clock__time-text prime-live-clock__date">{dateStr}</span>
-        <span className="prime-live-clock__time-text prime-live-clock__separator" aria-hidden="true">•</span>
+        <span className="prime-live-clock__time-text prime-live-clock__separator" aria-hidden="true">|</span>
         <span className="prime-live-clock__time-text prime-live-clock__time-value" aria-label={timeStr}>
           <StableLiveTime value={timeStr} />
         </span>
