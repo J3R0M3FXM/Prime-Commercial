@@ -2532,6 +2532,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   width: clamp(164px, 52vw, 218px) !important;
   align-self: center !important;
   margin-left: auto !important;
+  contain: layout paint !important;
 }
 #mobile-portrait-viewport .prime-live-clock__time:not(.prime-live-clock__placeholder) {
   display: grid !important;
@@ -2546,14 +2547,14 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   margin-left: auto !important;
   text-align: right !important;
   font-size: 13px !important;
-  font-family: 'Poppins', sans-serif !important;
+  font-family: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif !important;
   font-weight: 600 !important;
   color: #1254b5 !important;
   border-bottom: 0 !important;
   text-transform: uppercase !important;
 }
 #mobile-portrait-viewport .prime-live-clock__time-text {
-  font-family: 'Poppins', sans-serif !important;
+  font-family: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif !important;
   font-size: 13px !important;
   font-weight: 600 !important;
   font-variant-numeric: tabular-nums !important;
