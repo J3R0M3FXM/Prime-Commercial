@@ -44,13 +44,13 @@ jobs:
         run: npm run build:android:web
       - name: Sync Capacitor
         run: npx cap sync android
-      - name: Build release APK
+      - name: Build installable debug APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleRelease --no-daemon --stacktrace
-      - name: Upload release APK
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: prime-services-release-apk
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          name: prime-services-installable-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
