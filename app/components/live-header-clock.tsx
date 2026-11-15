@@ -38,7 +38,16 @@ export default function LiveHeaderClock() {
       <div className="prime-live-clock__time">
         <span className="prime-live-clock__time-text prime-live-clock__date">{dateStr}</span>
         <span className="prime-live-clock__time-text prime-live-clock__separator" aria-hidden="true">•</span>
-        <span className="prime-live-clock__time-text prime-live-clock__time-value">{timeStr}</span>
+        <span
+          className="prime-live-clock__time-text prime-live-clock__time-value prime-live-clock__time-value--fixed"
+          aria-label={timeStr}
+        >
+          {Array.from(timeStr).map((character, index) => (
+            <span className="prime-live-clock__time-character" aria-hidden="true" key={index}>
+              {character === " " ? "\u00a0" : character}
+            </span>
+          ))}
+        </span>
       </div>
     </div>
   );
