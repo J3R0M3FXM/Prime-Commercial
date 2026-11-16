@@ -2527,7 +2527,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   object-fit: contain; object-position: left center; align-self: center;
   margin-left: -6px !important;
   transform: none !important;
-  filter: drop-shadow(0 2px 3px rgb(15 23 42 / 48%)) !important;
+  filter: none !important;
 }
 #mobile-portrait-viewport .prime-live-clock {
   flex: 0 0 clamp(164px, 52vw, 218px) !important;
