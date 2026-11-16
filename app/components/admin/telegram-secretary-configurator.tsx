@@ -357,33 +357,32 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
         <div className="min-w-0">
           {onBack && <button type="button" onClick={onBack} className="mb-2 border border-slate-300 bg-white px-3 py-2 text-xs font-bold uppercase text-slate-700">← Admin</button>}
           <div className="secretary-eyebrow">Telegram Business · {serverless ? "Serverless Secretary" : "Automation"}</div>
-          <h1>Secretary Configurator</h1>
-          <p>Manage reply steps, inline buttons, and customer previews.</p>
+          <h1>Telegram Secretary</h1>
+          <p>Manage reply flows and their customer controls.</p>
         </div>
         <div className="secretary-header-actions">
           <button type="button" onClick={() => window.location.reload()}><RefreshCw className="w-4 h-4" /> Reload</button>
           <button type="button" disabled={busy || uploadingPhoto} onClick={() => { setSection("steps"); setWorkspace("editor"); setSelected(makeFlow()); setStepTab("trigger"); setNotice(""); }}><Plus className="w-4 h-4" /> New Step</button>
+          <button type="button" onClick={() => { setWorkspace("controls"); setSection("settings"); }}>Automation</button>
         </div>
       </header>
 
       <nav className="secretary-section-tabs" aria-label="Secretary workspace">
         {([
-          ["tree", "Menu Tree"],
-          ["editor", "Node Editor"],
+          ["tree", "Flows"],
+          ["editor", "Edit"],
           ["buttons", "Buttons"],
           ["simulator", "Simulator"],
-          ["controls", "Controls"],
         ] as const).map(([id, label]) => <button type="button" key={id} aria-current={workspace === id ? "page" : undefined} onClick={() => {
           setWorkspace(id);
           if (id === "simulator") { setSection("preview"); return; }
-          if (id === "controls") { setSection("settings"); return; }
           setSection("steps");
           if (id !== "tree") { setSelected((current) => current || flows[0] || makeFlow()); setStepTab(id === "buttons" ? "buttons" : "trigger"); }
           else setSelected(null);
         }}>{label}</button>)}
       </nav>
 
-      <div hidden={workspace !== "controls"}>
+      <div hidden>
       <AdminDisclosure title="How The Secretary Works" meta="Quick Guide" defaultOpen>
         <div className="secretary-help-card">
           <p><strong>1. Create a reply step.</strong> Give it a name, choose what customer message should trigger it, and write the reply.</p>
