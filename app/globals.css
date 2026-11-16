@@ -2716,6 +2716,34 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 }
 #mobile-portrait-viewport .prime-product-card__action { width: 28px !important; height: 28px !important; padding: 0 !important; }
 
+/* Shared PRIME shell: cool-gray workspace, white surfaces, and navy framing. */
+html,
+body,
+#mobile-portrait-viewport,
+#mobile-portrait-viewport .prime-shopfront-shell,
+#mobile-portrait-viewport .prime-shopfront-shell > main,
+#mobile-portrait-viewport.admin-viewport,
+#mobile-portrait-viewport.admin-viewport .prime-admin-app,
+#mobile-portrait-viewport.admin-viewport .admin-shell,
+#mobile-portrait-viewport.admin-viewport .serverless-admin-panel {
+  background-color: #f1f5f9 !important;
+}
+#mobile-portrait-viewport :is(.prime-shopfront-global-header, .prime-admin-global-header, .command-fixed-header) {
+  background: #ffffff !important;
+}
+#mobile-portrait-viewport :is(.prime-shopfront-global-header, .prime-admin-global-header, .command-fixed-header) .prime-identity-header {
+  border-bottom: 2px solid #0b1f36 !important;
+}
+#mobile-portrait-viewport .prime-shopfront-bottom-nav,
+#mobile-portrait-viewport.admin-viewport .prime-admin-bottom-nav {
+  background: #ffffff !important;
+  border-top-color: #dce4ee !important;
+}
+#system-wide-proprietary-footer {
+  border-top-color: #0b1f36 !important;
+  box-shadow: 0 -1px 0 rgb(11 31 54 / 18%) !important;
+}
+
 /* The live date and time are a single technical label: one face and the exact logo navy. */
 #mobile-portrait-viewport .prime-live-clock__time:not(.prime-live-clock__placeholder),
 #mobile-portrait-viewport .prime-live-clock__time-text,
