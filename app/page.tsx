@@ -404,7 +404,7 @@ export default function Shopfront() {
             <p className="text-gray-500">Try adjusting your search or filters.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2.5">
             {filteredProducts.map(p => {
               const variants = p.variants && p.variants.length > 0 ? p.variants : [];
               const isOutOfStock = variants.length > 0
@@ -433,11 +433,11 @@ export default function Shopfront() {
                     }
                   }}
                 >
-                  <div className="relative aspect-square overflow-hidden bg-gray-50 border-b border-gray-100">
+                  <div className="prime-product-card__media relative aspect-[4/3] overflow-hidden bg-gray-50 border-b border-gray-100">
                     <img
                       src={p.imageUrl || "/product-image-unavailable.svg"}
                       alt={p.name}
-                      className={`w-full h-full object-cover ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
+                      className={`w-full h-full object-contain ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
                     />
                     {p.tag && p.tag !== "NONE" && !isOutOfStock && <span className="absolute left-2 top-2 z-10 max-w-[calc(100%-1rem)] truncate border border-slate-500/40 bg-slate-900/85 px-2 py-1 text-[8px] font-mono font-bold uppercase tracking-wide text-white shadow-sm">{p.tag}</span>}
                     {isOutOfStock && (
@@ -449,7 +449,7 @@ export default function Shopfront() {
                     )}
                   </div>
 
-                  <div className="p-2 sm:p-2.5 flex flex-col flex-1 justify-between gap-0.5 sm:gap-1">
+                  <div className="prime-product-card__body p-2 flex flex-col flex-1 justify-between gap-1">
                     {/* Category */}
                     {p.category && (
                       <p className="prime-product-card__category text-[10px] sm:text-[11px] font-mono font-bold uppercase tracking-widest text-slate-600 truncate leading-none mb-0.5">
@@ -458,7 +458,7 @@ export default function Shopfront() {
                     )}
 
                     {/* Product Name */}
-                    <h3 className="font-roboto-condensed-semibold text-gray-900 line-clamp-2 leading-[1.05] text-[12.5px] sm:text-[14.5px] tracking-tight">
+                    <h3 className="prime-product-card__name text-gray-900 line-clamp-2 leading-[1.08]">
                       {p.name}
                     </h3>
                     <p className="prime-product-card__availability font-mono text-[8.5px] sm:text-[9.5px] font-bold uppercase leading-none tracking-wide text-slate-700">
@@ -478,7 +478,7 @@ export default function Shopfront() {
                           setSelectedProduct(p);
                         }}
                         disabled={isOutOfStock}
-                        className="p-1 sm:p-1.5 bg-transparent hover:bg-slate-100 disabled:bg-transparent disabled:text-gray-400 text-slate-800 rounded-md transition-colors cursor-pointer flex items-center justify-center shrink-0"
+                        className="prime-product-card__action bg-transparent hover:bg-slate-100 disabled:bg-transparent disabled:text-gray-400 text-slate-800 rounded-md transition-colors cursor-pointer flex items-center justify-center shrink-0"
                         title={isOutOfStock ? "Sold Out" : "Select Options / Add to Cart"}
                         aria-label="Select Options"
                       >

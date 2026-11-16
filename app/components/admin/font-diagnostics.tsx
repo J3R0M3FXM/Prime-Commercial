@@ -26,7 +26,7 @@ export interface FontViolation {
 }
 
 export const ALLOWED_FONTS = [
-  "MiSans",
+  "Lato",
   "Roboto Condensed",
 ];
 
@@ -350,7 +350,7 @@ export default function FontDiagnostics() {
             </h4>
             <p className="text-xs text-emerald-700 font-sans leading-relaxed">
               All {totalScanned} text-bearing DOM elements on the storefront resolve to the approved app typography:
-              <strong> MiSans</strong> for body text and <strong>Roboto Condensed Semibold</strong> for labels and headings. No unapproved font families were discovered in the computed styles.
+              <strong> Lato</strong> for body text and <strong>Roboto Condensed Semibold</strong> for labels and headings. No unapproved font families were discovered in the computed styles.
             </p>
           </div>
         </div>

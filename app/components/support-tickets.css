@@ -1,7 +1,7 @@
-#mobile-portrait-viewport .prime-support { width: 100%; background: #fff; color: #17263e; font: 400 14px/1.4 'MiSans',sans-serif !important; }
+#mobile-portrait-viewport .prime-support { width: 100%; background: #fff; color: #17263e; font: 400 14px/1.4 'Lato',sans-serif !important; }
 #mobile-portrait-viewport .prime-support :is(h3,strong,label,button) { font-family: 'Roboto Condensed',sans-serif !important; font-weight: 600 !important; }
 #mobile-portrait-viewport .prime-support h3 { margin: 0; font-size: 16px !important; line-height: 1.2 !important; }
-#mobile-portrait-viewport .prime-support :is(input,select,textarea,.support-message p,.support-excerpt) { font-family: 'MiSans',sans-serif !important; font-size: 14px !important; font-weight: 400 !important; text-transform: none !important; }
+#mobile-portrait-viewport .prime-support :is(input,select,textarea,.support-message p,.support-excerpt) { font-family: 'Lato',sans-serif !important; font-size: 14px !important; font-weight: 400 !important; text-transform: none !important; }
 #mobile-portrait-viewport .prime-support svg { width: 16px; height: 16px; flex-shrink: 0; }
 #mobile-portrait-viewport .prime-support .prime-page-heading button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #dce3eb; border-radius: 5px; background: white; color: #17263e; }
 #mobile-portrait-viewport .prime-support .support-body { display: grid; gap: 12px; padding: 12px; }

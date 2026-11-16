@@ -1,6 +1,4 @@
 @import "tailwindcss";
-@import url('https://cdn.jsdelivr.net/npm/misans@5.0.0/lib/Normal/MiSans-Regular.min.css');
-@import url('https://cdn.jsdelivr.net/npm/misans@5.0.0/lib/Normal/MiSans-Medium.min.css');
 #mobile-portrait-viewport .prime-shopfront-bottom-nav,
 #mobile-portrait-viewport.admin-viewport .prime-admin-bottom-nav {
   background: #f1f3f7 !important;
@@ -16,11 +14,11 @@
 }
 
 .prime-checkout__review-label { font-family: 'Roboto Condensed', sans-serif !important; font-weight: 600 !important; }
-.prime-checkout__review-value { font-family: 'MiSans', sans-serif !important; font-weight: 400 !important; }
+.prime-checkout__review-value { font-family: 'Lato', sans-serif !important; font-weight: 400 !important; }
 #system-wide-proprietary-footer .prime-system-footer__text { color: #102a56 !important; }
 #mobile-portrait-viewport.admin-viewport .admin-shell .command-header-queue span { color: #60708a !important; }
 #mobile-portrait-viewport.admin-viewport .admin-shell .command-header-queue strong { color: #102a56 !important; }
-#mobile-portrait-viewport.admin-viewport :is(.admin-shell, .serverless-admin-panel, .serverless-admin-panel *) { font-family: 'MiSans', sans-serif !important; }
+#mobile-portrait-viewport.admin-viewport :is(.admin-shell, .serverless-admin-panel, .serverless-admin-panel *) { font-family: 'Lato', sans-serif !important; }
 #mobile-portrait-viewport.admin-viewport :is(h1, h2, h3, h4, h5, h6, button, label, legend, th, .font-heading, [class*="title"], [class*="heading"], [class*="label"]) { font-family: 'Roboto Condensed', sans-serif !important; font-weight: 600 !important; }
 #mobile-portrait-viewport.admin-viewport :is(.subheading, [class*="subheading"], .subtitle, [class*="subtitle"], [class*="description"], [class*="caption"], [class*="eyebrow"], small, p) { font-family: 'Roboto Condensed', sans-serif !important; font-weight: 400 !important; }
 #mobile-portrait-viewport.admin-viewport .serverless-panel-header,
@@ -58,7 +56,7 @@
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-kicker { display: block; margin-bottom: 3px; color: #0755b8; font: 600 9px/1 'Roboto Condensed', sans-serif !important; letter-spacing: .12em; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-control-bar { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: end; margin-top: 10px; padding: 9px; border: 1px solid #d7e1ef; border-radius: 10px; background: #f8fafc; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-search { display: grid; gap: 4px; color: #60708a; font: 600 9px/1 'Roboto Condensed', sans-serif !important; letter-spacing: .08em; text-transform: uppercase; }
-#mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-search input { min-width: 0; height: 34px; padding: 0 9px; border: 1px solid #c7d3e2; border-radius: 7px; background: #fff; font-family: 'MiSans', sans-serif !important; text-transform: none; }
+#mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-search input { min-width: 0; height: 34px; padding: 0 9px; border: 1px solid #c7d3e2; border-radius: 7px; background: #fff; font-family: 'Lato', sans-serif !important; text-transform: none; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-metrics { display: flex; gap: 7px; padding-bottom: 2px; color: #60708a; font: 600 8px/1 'Roboto Condensed', sans-serif !important; text-align: right; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-metrics span { display: grid; gap: 3px; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-metrics b { color: #102a56; font-size: 13px; }
@@ -70,12 +68,12 @@
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-product-row__facts { display: grid; grid-template-columns: 1fr 1fr minmax(94px,auto); align-items: center; gap: 6px; padding: 8px 10px; border-top: 1px solid #e5edf6; background: #f8fafc; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-product-row__facts > span { display: grid; gap: 2px; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-product-row__facts small { color: #60708a; font: 600 8px/1 'Roboto Condensed', sans-serif !important; letter-spacing: .07em; }
-#mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-product-row__facts b { color: #102a56; font: 600 13px/1 'MiSans', sans-serif !important; }
+#mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-product-row__facts b { color: #102a56; font: 600 13px/1 'Lato', sans-serif !important; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-stock-low { color: #b45309 !important; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-product-row__facts .serverless-switch { min-height: 28px; justify-content: flex-end; font-size: 9px; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-variant-summary { margin: 0 !important; border-width: 1px 0 0 !important; border-radius: 0 !important; box-shadow: none !important; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-variant-summary summary { min-height: 34px !important; padding: 8px 10px !important; font-size: 10px !important; }
-#mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-variant-summary__row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 8px; padding: 5px 0; border-bottom: 1px solid #e5edf6; color: #344256; font: 400 10px/1.2 'MiSans', sans-serif !important; }
+#mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-variant-summary__row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 8px; padding: 5px 0; border-bottom: 1px solid #e5edf6; color: #344256; font: 400 10px/1.2 'Lato', sans-serif !important; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-editor-section { border: 1px solid #d7e1ef; border-radius: 10px; background: #f8fafc; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-editor-section__heading { display: flex; align-items: center; gap: 7px; min-height: 38px; padding: 0 10px; cursor: pointer; list-style: none; }
 #mobile-portrait-viewport.admin-viewport .serverless-catalog-panel .catalog-editor-section__heading::-webkit-details-marker { display: none; }
@@ -213,23 +211,23 @@
 }
 
 @theme {
-  --font-sans: 'MiSans', sans-serif;
+  --font-sans: 'Lato', sans-serif;
   --font-heading: 'Roboto Condensed', sans-serif;
-  --font-mono: 'MiSans', sans-serif;
-  --font-ibm-condensed: 'MiSans', sans-serif;
+  --font-mono: 'Lato', sans-serif;
+  --font-ibm-condensed: 'Lato', sans-serif;
 }
 
-/* App-wide base: MiSans body text. */
+/* App-wide base: Lato body text. */
 *, *::before, *::after {
-  font-family: 'MiSans', sans-serif !important;
+  font-family: 'Lato', sans-serif !important;
 }
 
 html, body {
-  font-family: 'MiSans', sans-serif !important;
+  font-family: 'Lato', sans-serif !important;
   letter-spacing: -0.01em;
 }
 
-/* Condensed semibold is unavailable in the MiSans files used by this app. */
+/* Condensed semibold is unavailable in the Lato files used by this app. */
 body :is(h1, h2, h3, h4, h5, h6, label, legend, th, b, strong, button, [role="button"],
   .font-heading, .font-medium, .font-semibold, .font-bold, .font-black, .font-roboto-condensed-semibold,
   .font-ibm-condensed, .font-value, [class*="label"], [class*="title"], [class*="heading"],
@@ -273,16 +271,16 @@ button, input, select, textarea, optgroup {
 .prime-checkout__notice--order .prime-checkout__notice-icon svg { width: 21px; height: 21px; }
 .prime-checkout__notice-kicker { margin: 0 0 2px; color: #16845b; font: 600 10px/1.2 'Roboto Condensed', sans-serif !important; letter-spacing: .08em; text-transform: uppercase; }
 .prime-checkout__notice-title { margin: 0; color: #1e293b; font: 600 12px/1.2 'Roboto Condensed', sans-serif !important; letter-spacing: .035em; text-transform: uppercase; }
-.prime-checkout__notice-copy { margin: 3px 0 0; color: #475569; font: 400 12px/1.4 'MiSans', sans-serif !important; overflow-wrap: anywhere; }
+.prime-checkout__notice-copy { margin: 3px 0 0; color: #475569; font: 400 12px/1.4 'Lato', sans-serif !important; overflow-wrap: anywhere; }
 .prime-checkout__notice--order .prime-checkout__notice-title { color: #0f5138; font-size: 15px !important; }
 .prime-checkout__notice--order .prime-checkout__notice-copy { color: #365f4d; }
 .prime-checkout__notice-action { justify-self: start; margin-top: 7px; padding: 6px 10px; border: 1px solid #d2b375; border-radius: 7px; background: #fff; color: #604616; font: 600 11px/1 'Roboto Condensed', sans-serif !important; }
 .prime-checkout__payment-total { min-height: 58px; padding: 10px 14px; border: 1px solid #294a73; border-radius: 11px; background: linear-gradient(115deg, #142b49 0%, #203f66 100%); box-shadow: 0 3px 10px rgb(15 39 68 / 18%); color: #fff; }
 .prime-checkout__payment-total > span:first-child { color: #d7e5f6; font: 600 11px/1.15 'Roboto Condensed', sans-serif !important; letter-spacing: .07em; }
-.prime-checkout__payment-total > span:last-child { color: #fff; font: 600 21px/1 'MiSans', sans-serif !important; white-space: nowrap; }
+.prime-checkout__payment-total > span:last-child { color: #fff; font: 600 21px/1 'Lato', sans-serif !important; white-space: nowrap; }
 .prime-checkout__payment-method-heading { display: flex; flex-direction: column; gap: 2px; padding: 2px 1px 7px; border-bottom: 1px solid #dce3ec; }
 .prime-checkout__payment-method-heading > span:first-child { color: #172b45; font: 600 14px/1.1 'Roboto Condensed', sans-serif !important; letter-spacing: .045em; text-transform: uppercase; }
-.prime-checkout__payment-method-heading > span:last-child { color: #64748b; font: 400 11px/1.2 'MiSans', sans-serif !important; }
+.prime-checkout__payment-method-heading > span:last-child { color: #64748b; font: 400 11px/1.2 'Lato', sans-serif !important; }
 .prime-payment-grid__pagination { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 5px 0 2px; }
 .prime-payment-grid__pagination button { width: 7px; height: 7px; padding: 0; border: 0; border-radius: 99px; background: #cbd5e1; }
 .prime-payment-grid__pagination button.is-active { width: 20px; background: #17375d; }
@@ -301,7 +299,7 @@ button, input, select, textarea, optgroup {
 .prime-checkout__title { margin: 0; overflow: hidden; font-size: 17px; line-height: 1; letter-spacing: -0.045em !important; text-overflow: ellipsis; white-space: nowrap; }
 .prime-checkout label { text-transform: none !important; letter-spacing: normal !important; }
 body .prime-checkout input, body .prime-checkout__review-value, body .prime-checkout__charge-value, body .prime-cart .prime-cart__product-name, body .prime-cart .prime-cart__value {
-  font-family: 'MiSans', sans-serif !important;
+  font-family: 'Lato', sans-serif !important;
   font-weight: 400 !important;
   letter-spacing: -0.01em;
 }
@@ -317,15 +315,15 @@ body .prime-checkout .payment-method-label { font-family: 'Roboto Condensed', sa
 .prime-checkout__charges .prime-checkout__charge-value { font-variant-numeric: tabular-nums; }
 .order-history__payment-breakdown { line-height: 1.18; }
 .order-history__payment-breakdown > div { line-height: 1.12; }
-body .prime-order-history .order-history__item-name { font-family: 'MiSans', sans-serif !important; font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
-body .prime-order-history .order-history__item-meta { font-family: 'MiSans', sans-serif !important; font-size: 12px; font-weight: 400; }
-body .prime-order-history .order-history__item-amount, body .prime-order-history .order-history__charge-amount { font-family: 'MiSans', sans-serif !important; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+body .prime-order-history .order-history__item-name { font-family: 'Lato', sans-serif !important; font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
+body .prime-order-history .order-history__item-meta { font-family: 'Lato', sans-serif !important; font-size: 12px; font-weight: 400; }
+body .prime-order-history .order-history__item-amount, body .prime-order-history .order-history__charge-amount { font-family: 'Lato', sans-serif !important; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 body .prime-order-history .order-history__payment-breakdown > div > span:first-child, body .prime-order-history .order-history__payment-breakdown > div > div > span:first-child { font-family: 'Roboto Condensed', sans-serif !important; font-size: 12px; font-weight: 400 !important; }
-body .prime-order-history .font-misans-bold { font-family: 'MiSans', sans-serif !important; font-weight: 700 !important; }
-body .prime-order-history .font-misans-regular { font-family: 'MiSans', sans-serif !important; font-weight: 400 !important; }
+body .prime-order-history .font-lato-bold { font-family: 'Lato', sans-serif !important; font-weight: 700 !important; }
+body .prime-order-history .font-lato-regular { font-family: 'Lato', sans-serif !important; font-weight: 400 !important; }
 .prime-order-history .order-history__active-status { animation: prime-order-status-pulse 1.5s ease-in-out infinite; transform-origin: right center; }
 @keyframes prime-order-status-pulse { 50% { opacity: .5; } }
-.prime-product-card__price { font-family: 'MiSans', sans-serif !important; font-weight: 700 !important; letter-spacing: -0.02em; }
+.prime-product-card__price { font-family: 'Lato', sans-serif !important; font-weight: 700 !important; letter-spacing: -0.02em; }
 @media (prefers-reduced-motion: reduce) { .prime-order-history .order-history__active-status { animation: none; } }
 @keyframes prime-cashier-breathe { 50% { transform: translateY(-2px) scale(1.04); } }
 @keyframes prime-cashier-note { 0%, 100% { transform: translate(0, 2px) rotate(-8deg); } 50% { transform: translate(-3px, -4px) rotate(8deg); } }
@@ -339,7 +337,7 @@ body .prime-order-history .font-misans-regular { font-family: 'MiSans', sans-ser
 .prime-receipt-forensics__icon::after { content: ''; position: absolute; inset: 5px; border: 1px solid rgb(167 243 208 / 35%); border-radius: 6px; animation: prime-forensics-pulse 1.8s ease-in-out infinite; }
 .prime-receipt-forensics__ring { position: absolute; inset: 3px; border: 1px solid rgb(110 231 183 / 35%); border-top-color: #a7f3d0; border-radius: 50%; animation: prime-forensics-spin 2.2s linear infinite; }
 .prime-receipt-forensics__line { position: absolute; left: 4px; right: 4px; top: 16px; height: 2px; border-radius: 999px; background: #a7f3d0; box-shadow: 0 0 8px #34d399; animation: prime-forensics-scan 1.4s ease-in-out infinite; }
-.prime-receipt-forensics__complete { padding: 12px 8px; color: #064e3b; font: 12px/1.45 'MiSans', sans-serif; text-align: center; text-justify: inter-word; }
+.prime-receipt-forensics__complete { padding: 12px 8px; color: #064e3b; font: 12px/1.45 'Lato', sans-serif; text-align: center; text-justify: inter-word; }
 @keyframes prime-forensics-spin { to { transform: rotate(360deg); } }
 @keyframes prime-forensics-scan { 0%, 100% { transform: translateY(-8px); opacity: .45; } 50% { transform: translateY(8px); opacity: 1; } }
 @keyframes prime-forensics-pulse { 50% { transform: scale(.82); opacity: .45; } }
@@ -468,7 +466,7 @@ body .prime-order-history .font-misans-regular { font-family: 'MiSans', sans-ser
   padding: 10px;
   color: #172033;
   background: #f5f7fa;
-  font-family: 'MiSans', sans-serif;
+  font-family: 'Lato', sans-serif;
   font-size: 14px;
   line-height: 1.4;
   overflow-x: hidden;
@@ -2176,14 +2174,14 @@ body { color:var(--prime-ink); }
 .admin-shell .admin-content, .serverless-admin-panel { padding:10px 10px 34px; }
 .admin-shell .admin-page-header, .serverless-panel-header { padding:12px; border:1px solid var(--prime-line); border-radius:12px; background:#fff; box-shadow:0 4px 14px #0f2d5b0d; }
 .admin-shell .admin-page-title, .serverless-panel-header h1 { color:var(--prime-ink); font:600 20px/1.05 'Roboto Condensed',sans-serif !important; }
-.admin-shell .admin-page-description { color:var(--prime-muted); font:400 12px/1.3 'MiSans',sans-serif; }
+.admin-shell .admin-page-description { color:var(--prime-muted); font:400 12px/1.3 'Lato',sans-serif; }
 .admin-shell .admin-section, .admin-shell .admin-feature-module, .serverless-admin-panel .serverless-record, .serverless-admin-panel .serverless-disclosure { margin-bottom:8px; border:1px solid var(--prime-line); border-radius:12px; background:#fff; box-shadow:0 3px 12px #0f2d5b0a; }
 .admin-shell .admin-section__header, .serverless-admin-panel .serverless-disclosure__trigger { min-height:42px; padding:8px 10px; }
 .admin-shell .admin-section__title, .serverless-admin-panel .serverless-disclosure__title { font:600 14px/1.1 'Roboto Condensed',sans-serif !important; }
 .admin-shell .admin-section__body, .serverless-admin-panel .serverless-disclosure__body { padding:8px 10px 10px; }
 .admin-shell .admin-stat-grid, .serverless-admin-panel .serverless-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
 .admin-shell .admin-primary-button, .admin-shell .admin-secondary-button, .serverless-admin-panel .serverless-action { min-height:32px; border-radius:7px; padding:0 10px; font:600 11px/1 'Roboto Condensed',sans-serif !important; }
-.admin-shell input,.admin-shell select,.admin-shell textarea,.serverless-admin-panel input,.serverless-admin-panel select,.serverless-admin-panel textarea { min-height:34px; border:1px solid #c7d3e2; border-radius:7px; background:#fff; padding:6px 8px; font:400 12px/1.2 'MiSans',sans-serif; }
+.admin-shell input,.admin-shell select,.admin-shell textarea,.serverless-admin-panel input,.serverless-admin-panel select,.serverless-admin-panel textarea { min-height:34px; border:1px solid #c7d3e2; border-radius:7px; background:#fff; padding:6px 8px; font:400 12px/1.2 'Lato',sans-serif; }
 .system-wide-proprietary-footer { position:fixed; bottom:0; max-width:430px; margin-inline:auto; }
 .prime-system-footer__text { width:100%; font:600 11.5px/1.1 'Roboto Condensed',sans-serif !important; letter-spacing:.04em; }
 .prime-page-heading { display:flex; flex:0 0 72px !important; min-height:72px !important; height:72px !important; max-height:72px !important; box-sizing:border-box; align-items:center; padding-top:8px !important; padding-bottom:8px !important; overflow:hidden; background:#fff; color:#0755b8; box-shadow:0 3px 10px rgba(7,85,184,.08); }
@@ -2201,7 +2199,7 @@ section > .prime-page-heading { width:calc(100% + 28px); margin-top:-14px; margi
 .prime-page-shell > .prime-page-heading + * { margin-top:0 !important; }
 .prime-page-shell > :not(.prime-page-heading) { box-sizing:border-box; }
 /* Shared typography foundation; the final phone-root contract is applied below. */
-body, input, textarea, select, .font-mono { font-family:'MiSans',sans-serif !important; }
+body, input, textarea, select, .font-mono { font-family:'Lato',sans-serif !important; }
 h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title { font-family:'Roboto Condensed',sans-serif !important; font-weight:600 !important; }
 @media (max-width:360px) { .admin-shell .admin-stat-grid,.serverless-admin-panel .serverless-fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
@@ -2223,7 +2221,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 #mobile-portrait-viewport,
 #mobile-portrait-viewport * {
   box-sizing: border-box;
-  font-family: 'MiSans', sans-serif !important;
+  font-family: 'Lato', sans-serif !important;
   letter-spacing: normal;
 }
 #mobile-portrait-viewport { font-size: 14px !important; line-height: 1.3; }
@@ -2428,7 +2426,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 /* Final typography contract for the shipped Telegram/Vite surface. */
 #mobile-portrait-viewport,
 #mobile-portrait-viewport * {
-  font-family: 'MiSans', sans-serif !important;
+  font-family: 'Lato', sans-serif !important;
   letter-spacing: normal;
 }
 #mobile-portrait-viewport :is(h1, h2, h3, h4, h5, h6, button, label, legend, th, .font-heading, [class*="title"], [class*="heading"], [class*="label"], [class*="category"], [class*="availability"], [class*="kicker"]) {
@@ -2440,7 +2438,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   font-weight: 400 !important;
 }
 #mobile-portrait-viewport :is(input, select, textarea, .font-mono, .prime-product-card__price, .prime-queue-monitor strong) {
-  font-family: 'MiSans', sans-serif !important;
+  font-family: 'Lato', sans-serif !important;
   font-variant-numeric: tabular-nums;
 }
 #mobile-portrait-viewport :is([class*="category"], [class*="availability"], [class*="kicker"]) {
@@ -2472,7 +2470,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 #mobile-portrait-viewport .prime-shopfront-product-card:active { box-shadow: inset 0 0 0 2px #94a3b8; }
 #mobile-portrait-viewport .prime-shopfront-shell { overflow-x: clip !important; overflow-y: visible !important; }
 #mobile-portrait-viewport .prime-checkout .prime-checkout__review-label { font-family: 'Roboto Condensed', sans-serif !important; font-weight: 600 !important; text-transform: uppercase; }
-#mobile-portrait-viewport .prime-checkout .prime-checkout__contact-value, #mobile-portrait-viewport .prime-checkout .prime-checkout__contact-value * { font-family: 'MiSans', 'Lato', sans-serif !important; font-weight: 400 !important; }
+#mobile-portrait-viewport .prime-checkout .prime-checkout__contact-value, #mobile-portrait-viewport .prime-checkout .prime-checkout__contact-value * { font-family: 'Lato', 'Lato', sans-serif !important; font-weight: 400 !important; }
 #mobile-portrait-viewport .prime-checkout .prime-checkout__actions button { font-family: 'Roboto Condensed', sans-serif !important; font-weight: 600 !important; }
 #mobile-portrait-viewport .prime-checkout button,
 #mobile-portrait-viewport .prime-checkout button :is(span, strong, small, p, div) {
@@ -2502,7 +2500,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 #mobile-portrait-viewport .prime-submission__table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
 #mobile-portrait-viewport .prime-submission__table :is(th,td) { padding: 9px 8px; border-bottom: 1px solid #dce2e9; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 #mobile-portrait-viewport .prime-submission__table th { width: 42%; font-family: 'Lato', sans-serif !important; font-weight: 600 !important; color: #475569; text-transform: uppercase; }
-#mobile-portrait-viewport .prime-submission__table td { font-family: 'MiSans', 'Lato', sans-serif !important; font-weight: 600 !important; color: #081c3a; font-variant-numeric: tabular-nums; }
+#mobile-portrait-viewport .prime-submission__table td { font-family: 'Lato', 'Lato', sans-serif !important; font-weight: 600 !important; color: #081c3a; font-variant-numeric: tabular-nums; }
 #mobile-portrait-viewport .prime-submission > .prime-submission__table tr:first-child td { color: #1254b5; }
 #mobile-portrait-viewport .prime-submission .prime-submission__estimate { margin-top: -5px; font-size: 11px; }
 #mobile-portrait-viewport .prime-submission__payment { padding: 9px 10px; border-left: 2px solid #1254b5; background: #f3f5f8; }
@@ -2683,6 +2681,36 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 .prime-splash-network { width: min(100%, 390px); margin: 0 auto 18px; }
 .prime-splash-brand, .prime-splash-footer-brand { display: block; width: 100%; height: auto; object-fit: contain; filter: drop-shadow(0 3px 8px rgb(15 23 42 / 22%)); }
 .prime-splash-footer-brand { width: min(100%, 300px); }
+
+/* Compact product hierarchy for the three-column portrait catalog. */
+#mobile-portrait-viewport .prime-shopfront-product-card {
+  border-color: rgb(226 232 240 / 88%) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 10%) !important;
+}
+#mobile-portrait-viewport .prime-product-card__media { aspect-ratio: 4 / 3 !important; }
+#mobile-portrait-viewport .prime-product-card__body { padding: 8px !important; gap: 4px !important; }
+#mobile-portrait-viewport .prime-product-card__category,
+#mobile-portrait-viewport .prime-product-card__availability {
+  font-family: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+  letter-spacing: .04em !important;
+}
+#mobile-portrait-viewport .prime-product-card__name {
+  font-family: 'Roboto Condensed', sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+}
+#mobile-portrait-viewport .prime-shopfront-product-card .prime-product-card__price {
+  font-family: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  letter-spacing: -.015em !important;
+}
+#mobile-portrait-viewport .prime-product-card__action { width: 28px !important; height: 28px !important; padding: 0 !important; }
 
 /* The live date and time are a single technical label: one face and the exact logo navy. */
 #mobile-portrait-viewport .prime-live-clock__time:not(.prime-live-clock__placeholder),
