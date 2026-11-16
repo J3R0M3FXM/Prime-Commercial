@@ -1,5 +1,13 @@
 # Production Reconstruction Audit
 
+## Orders, courier configurator and checkout validation — deployed — 2026-11-17
+
+Owner authorized promotion and deployment of the current Orders, uniform courier configurator, and promo/referral checkout work. The full `npm run validate:miniapp` passed in Sandbox, including 2,399 transformed modules and the production build. Source commits `6f1adb3` and `0cf888b` were promoted to clean Checkout as `1e34b18` and `7c8c6c8`; the 27 release files match Sandbox byte for byte. The branches retain pre-existing unrelated native-auth/Android scaffold differences. The exact 107-file Sandbox `dist` was copied to Checkout without rebuilding.
+
+TGCloud app8830494959 revision **528** is deployed. A batch push failed compilation without changing cloud revision; isolated pushes identified `tgcloud/lib/delivery.js`, whose async map was replaced with an equivalent sequential loop in Sandbox and revalidated. All 11 changed backend modules then compiled and deployed individually, followed by a static-only push. Fresh cloud fetch/status reports 89 modules, webhook in sync, working directory clean and 107 static files up to date. No schema, R2 Worker, protected customer/order record, or live payment configuration was changed.
+
+Public root HTML, `index-B8EXXOKc.js` and `index-DnnfwlCF.css` match the validated artifact byte for byte. SHA-256: root `fe2f724d69ab8f5a341173927128720a13a61ecd1444d5f3a2974a56f6cd895c`; JS `c78d8782392f47da5777028c441b6924d03b7f920d6afab9dc61e310aaf2ef15`; CSS `b7b881d8471c5bea044a11c36064def43d8d40fc513d6860b40272d2fe27531d`. Actual Telegram owner/device behavior, live courier configuration values, and real checkout payment flows were not exercised by these deployment checks.
+
 ## Admin portrait layout and prototype alignment — 2026-11-09
 
 Validated source `e108296` and the exact Sandbox-built dist were promoted to clean Checkout and deployed with a static-only scoped push. Fresh cloud fetch/status confirms app8830494959 revision **436**, unchanged 71 backend modules, webhook in sync and all **55 static files up to date**. Public root HTML and both entry assets match the validated files byte-for-byte: root SHA-256 `274b72f5d658cb8142adf667e155c148cd88837626882d2ee0277f93e913c213`; `index-lvT34qE5.js` SHA-256 `5117e5af570596d4fe15b0b4a8d1ffb037fb437ac0bc30d35df6457418a0d837`; `index-wY3wFCUE.css` SHA-256 `c5df233381d8805cff744435b39c5d7ca08780a0a88525685ba1c37dd48a3607`. No backend/schema deployment, authenticated data mutation or fabricated Telegram identity was used. The final audit-only commit is promoted to both trees. Live asset verification does not substitute for phone screenshots, accessibility or full module-by-module visual acceptance.
