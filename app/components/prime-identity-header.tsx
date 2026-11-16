@@ -10,7 +10,7 @@ export default function PrimeIdentityHeader({
 }) {
   return (
     <div className="prime-identity-header">
-      <img className="prime-identity-header__logo" src="/prime-brand-logo.png" alt="PRIME" />
+      <img className="prime-identity-header__logo" src="/prime-global-brand.png" alt="PRIME" />
       <div className="prime-identity-header__right">
         <LiveHeaderClock />
         {children}
