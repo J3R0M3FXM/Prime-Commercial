@@ -203,6 +203,21 @@ body:has(#mobile-portrait-viewport.admin-viewport) { background: #020617 !import
 #mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .prime-order-workflow button.prime-workflow-button:disabled { background: #e3e8ee; border-color: #cbd5df; color: #536274; cursor: not-allowed; opacity: 1; }
 #mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel .prime-order-workflow button.prime-workflow-button:focus-visible { outline: 2px solid #102a56; outline-offset: 2px; }
 #mobile-portrait-viewport.admin-viewport .serverless-order-dispatch input { min-height: 40px; padding: 8px; border: 1px solid #cbd4df; border-radius: 6px; background: #fff; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel .serverless-panel-header { position: sticky !important; top: 0; z-index: 30; background: #fff !important; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel .serverless-panel-toolbar { display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact { border-left-width: 4px; border-left-style: solid; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="pending"],
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="held"],
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="failed"] { border-left-color: #d97706; background: #fffbeb !important; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="confirmed"],
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="processing"] { border-left-color: #2563eb; background: #eff6ff !important; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="ready"],
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="packed"] { border-left-color: #0891b2; background: #ecfeff !important; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="dispatched"] { border-left-color: #7c3aed; background: #f5f3ff !important; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="completed"],
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="delivered"] { border-left-color: #059669; background: #ecfdf5 !important; }
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="cancelled"],
+#mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-orders-panel article.serverless-order-compact[data-status="expired"] { border-left-color: #dc2626; background: #fef2f2 !important; }
 #mobile-portrait-viewport.admin-viewport .admin-customer-account .prime-account__balance-label { align-items: flex-start; gap: 4px; padding-right: 12px; }
 #mobile-portrait-viewport.admin-viewport .admin-customer-account .prime-account__balance-label svg { width: 19px; height: 19px; }
 #mobile-portrait-viewport.admin-viewport .admin-customer-account .prime-account__balance-label,

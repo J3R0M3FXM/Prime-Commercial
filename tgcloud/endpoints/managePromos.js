@@ -1,5 +1,5 @@
 import { db, EndpointError } from 'sdk';
-import { desc, eq } from 'sdk/db';
+import { desc, eq, sql } from 'sdk/db';
 import { requireAdmin } from '../lib/auth.js';
 import { deserializePromo, generatePromoCode, serializePromoDescription } from '../lib/promos.js';
 import { promoRedemptions, promos } from '../schema.js';
@@ -109,24 +109,34 @@ function toDatabaseRow(promo, id, creating, existingDescription = '') {
 }
 
 async function listPromos() {
-  const [rows, redemptions] = await Promise.all([
+  const [rows, redemptions, claims] = await Promise.all([
     db.select().from(promos).orderBy(desc(promos.createdAt)).all(),
-    db.select().from(promoRedemptions).orderBy(desc(promoRedemptions.usedAt)).limit(200).all(),
+    db.select().from(promoRedemptions).orderBy(desc(promoRedemptions.usedAt)).all(),
+    db.all(sql`SELECT promo_id AS promoId, promo_code AS promoCode, customer_id AS customerId,
+      device_id AS deviceId, hardware_id AS hardwareId, device_fingerprint_id AS deviceFingerprintId,
+      created_at AS usedAt, status FROM promo_claims
+      WHERE status='redeemed' OR (status='held' AND expires_at>unixepoch())`),
   ]);
+  const uses = [...redemptions.filter((item) => !item.releasedAt), ...claims];
   return rows.map((row) => {
     const promo = deserializePromo(row);
-    const related = redemptions.filter((item) => item.promoCode === promo.code || item.promoId === promo.id);
+    const related = uses.filter((item) => item.promoCode === promo.code || item.promoId === promo.id);
     const deviceToCustomers = new Map();
     for (const redemption of related) {
-      if (!redemption.deviceId || !redemption.customerId) continue;
-      if (!deviceToCustomers.has(redemption.deviceId)) deviceToCustomers.set(redemption.deviceId, new Set());
-      deviceToCustomers.get(redemption.deviceId).add(redemption.customerId);
+      if (!redemption.customerId) continue;
+      for (const field of ['deviceId', 'hardwareId', 'deviceFingerprintId']) {
+        const value = String(redemption[field] || '').trim();
+        if (!value) continue;
+        const key = field + ':' + value;
+        if (!deviceToCustomers.has(key)) deviceToCustomers.set(key, new Set());
+        deviceToCustomers.get(key).add(redemption.customerId);
+      }
     }
-    let fraudFlagsCount = 0;
+    const flaggedCustomers = new Set();
     for (const customerIds of deviceToCustomers.values()) {
-      if (customerIds.size > 1) fraudFlagsCount += customerIds.size;
+      if (customerIds.size > 1) for (const id of customerIds) flaggedCustomers.add(id);
     }
-    return { ...promo, usageCount: related.length, redemptions: related.slice(0, 10), fraudFlagsCount };
+    return { ...promo, usageCount: related.length, redemptions: related.slice(-10), fraudFlagsCount: flaggedCustomers.size };
   });
 }
 

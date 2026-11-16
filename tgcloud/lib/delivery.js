@@ -6,14 +6,6 @@ import { calculateDeliveryFee, calculateRoadDistanceFallback } from './delivery-
 import { getCourierTimeRates, ensureCourierTimeRateColumn } from './ensure-courier-time-rate.js';
 import { getCourierPricing } from './courier-pricing.js';
 
-function pricingForCourier(courier) {
-  const name = String(courier.name || '').toLowerCase();
-  if (name.includes('grab')) return { maxDistanceKm: 30, pricingBands: [{ fromKm: 0, toKm: 3, ratePerKm: 10 }, { fromKm: 3, toKm: null, ratePerKm: 12 }] };
-  if (name.includes('lalamove')) return { pricingBands: [{ fromKm: 0, toKm: 3, ratePerKm: 6.5 }, { fromKm: 3, toKm: 7, ratePerKm: 6.2 }, { fromKm: 7, toKm: 10, ratePerKm: 6 }, { fromKm: 10, toKm: 15, ratePerKm: 5.5 }, { fromKm: 15, toKm: null, ratePerKm: 5 }] };
-  if (name.includes('move it') || name.includes('moveit')) return { pricingBands: [{ fromKm: 2, toKm: 7, ratePerKm: 10 }, { fromKm: 7, toKm: null, ratePerKm: 15 }] };
-  return {};
-}
-
 export async function quoteDelivery(destinationLatValue, destinationLonValue, courierId = '') {
   await ensureCourierTimeRateColumn();
   const destinationLat = Number(destinationLatValue);
@@ -84,7 +76,7 @@ export async function quoteDelivery(destinationLatValue, destinationLonValue, co
   distanceKm = Math.round(Math.max(0, distanceKm) * 100) / 100;
   const computedCouriers = (await Promise.all(courierRows.map(async (courier) => {
     const saved = await getCourierPricing(courier.id);
-    const pricing = Object.keys(saved).length ? saved : pricingForCourier(courier);
+    const pricing = saved;
     const covered = pricing.maxDistanceKm == null || distanceKm <= pricing.maxDistanceKm;
     return ({
     id: courier.id,

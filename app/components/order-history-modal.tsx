@@ -367,6 +367,16 @@ export default function OrderHistoryModal({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen || isVisualPreview) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void loadOrders();
+    }, 15_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void loadOrders(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [isOpen, isVisualPreview]);
+
   // Listen to cross-component updates
   useEffect(() => {
     const handleOrdersUpdated = () => {

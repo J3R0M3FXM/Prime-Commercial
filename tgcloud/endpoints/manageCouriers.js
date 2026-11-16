@@ -3,7 +3,7 @@ import { asc, eq } from 'sdk/db';
 import { couriers } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
 import { ensureCourierTimeRateColumn, getCourierTimeRates, saveCourierTimeRate } from '../lib/ensure-courier-time-rate.js';
-import { getCourierPricing, saveCourierPricing } from '../lib/courier-pricing.js';
+import { getCourierPricing, saveCourierPricing, validateCourierPricing } from '../lib/courier-pricing.js';
 
 const textFields = new Set(['name', 'trackingUrlPattern', 'logo', 'type']);
 const numericFields = new Set(['baseFare', 'firstMile', 'firstMileFee', 'exceedingKmFee', 'surcharge', 'nightDifferential', 'timeBasedFeePerMinute']);
@@ -15,7 +15,7 @@ function normalize(input, creating) {
   }
   const output = {};
   for (const [key, value] of Object.entries(input)) {
-    if (key === 'action' || key === 'id') continue;
+    if (key === 'action' || key === 'id' || key === 'maxDistanceKm' || key === 'pricingBands') continue;
     if (!writable.has(key)) throw new EndpointError('Unsupported courier field: ' + key, { code: 'INVALID_FIELD' });
     if (textFields.has(key)) {
       if (key === 'name' || key === 'type') {
@@ -43,7 +43,9 @@ function normalize(input, creating) {
   if (creating && (!Object.hasOwn(output, 'name') || !Object.hasOwn(output, 'type'))) {
     throw new EndpointError('name and type are required.', { code: 'INVALID_INPUT' });
   }
-  if (!creating && Object.keys(output).length === 0) throw new EndpointError('No editable courier fields supplied.', { code: 'INVALID_INPUT' });
+  if (!creating && Object.keys(output).length === 0 && !Object.hasOwn(input, 'pricingBands') && !Object.hasOwn(input, 'maxDistanceKm')) {
+    throw new EndpointError('No editable courier fields supplied.', { code: 'INVALID_INPUT' });
+  }
   output.updatedAt = new Date();
   return output;
 }
@@ -61,17 +63,22 @@ export default async function (input, ctx) {
   }
 
   if (action === 'create') {
+    const pricingInput = validateCourierPricing(input);
     const values = normalize(input, true);
     const timeRate = Object.hasOwn(values, 'timeBasedFeePerMinute') ? values.timeBasedFeePerMinute : 0;
     delete values.timeBasedFeePerMinute;
     values.createdAt = new Date();
     const [courier] = await db.insert(couriers).values(values).returning().run();
     const timeBasedFeePerMinute = await saveCourierTimeRate(courier.id, timeRate);
-    const pricing = await saveCourierPricing(courier.id, input); return { success: true, courier: { ...courier, timeBasedFeePerMinute, ...pricing } };
+    const pricing = await saveCourierPricing(courier.id, pricingInput); return { success: true, courier: { ...courier, timeBasedFeePerMinute, ...pricing } };
   }
 
   if (action === 'update') {
     if (typeof input?.id !== 'string' || !input.id.trim()) throw new EndpointError('A courier ID is required.', { code: 'INVALID_INPUT' });
+    const pricingChanged = Object.hasOwn(input, 'pricingBands') || Object.hasOwn(input, 'maxDistanceKm');
+    const pricingInput = pricingChanged ? validateCourierPricing({ ...(await getCourierPricing(input.id)),
+      ...(Object.hasOwn(input, 'pricingBands') ? { pricingBands: input.pricingBands } : {}),
+      ...(Object.hasOwn(input, 'maxDistanceKm') ? { maxDistanceKm: input.maxDistanceKm } : {}) }) : null;
     const values = normalize(input, false);
     const hasTimeRate = Object.hasOwn(values, 'timeBasedFeePerMinute');
     const timeRate = values.timeBasedFeePerMinute;
@@ -81,13 +88,15 @@ export default async function (input, ctx) {
       : [await db.select().from(couriers).where(eq(couriers.id, input.id)).get()];
     if (!courier) throw new EndpointError('Courier not found.', { code: 'NOT_FOUND' });
     const timeBasedFeePerMinute = hasTimeRate ? await saveCourierTimeRate(courier.id, timeRate) : (await getCourierTimeRates()).get(String(courier.id)) || 0;
-    const pricing = await saveCourierPricing(courier.id, input); return { success: true, courier: { ...courier, timeBasedFeePerMinute, ...pricing } };
+    const pricing = pricingInput ? await saveCourierPricing(courier.id, pricingInput) : await getCourierPricing(courier.id);
+    return { success: true, courier: { ...courier, timeBasedFeePerMinute, ...pricing } };
   }
 
   if (action === 'delete') {
     if (typeof input?.id !== 'string' || !input.id.trim()) throw new EndpointError('A courier ID is required.', { code: 'INVALID_INPUT' });
     const [deleted] = await db.delete(couriers).where(eq(couriers.id, input.id)).returning().run();
     if (!deleted) throw new EndpointError('Courier not found.', { code: 'NOT_FOUND' });
+    await db.run('DELETE FROM system_settings WHERE key=:key', { ':key': `courier_pricing_${String(input.id)}` });
     return { success: true, id: deleted.id };
   }
 

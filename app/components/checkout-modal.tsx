@@ -165,6 +165,7 @@ export default function CheckoutModal({
   const receiptScanVersion = useRef(0);
   const checkoutSubmissionBusy = useRef(false);
   const promoValidationVersion = useRef(0);
+  const checkoutCodeCheckBusy = useRef(false);
   const referralValidationVersion = useRef(0);
   const [zoomedPaymentMethod, setZoomedPaymentMethod] = useState<any>(null);
   const [isStartingMayaCheckout, setIsStartingMayaCheckout] = useState(false);
@@ -360,6 +361,7 @@ export default function CheckoutModal({
   } | null>(null);
   const [isCheckingPromo, setIsCheckingPromo] = useState<boolean>(false);
   const [promoError, setPromoError] = useState<string>("");
+  const [isConfirmingCodes, setIsConfirmingCodes] = useState(false);
 
   // Store Credits State
   const [availableStoreCredits, setAvailableStoreCredits] = useState<number>(0);
@@ -1121,11 +1123,11 @@ export default function CheckoutModal({
   };
 
   // Promo Code Validation Handler
-  const handleApplyPromo = async (version = promoValidationVersion.current) => {
+  const handleApplyPromo = async (version = promoValidationVersion.current): Promise<boolean> => {
     const cleanCode = promoCodeInput.trim().toUpperCase();
     if (!cleanCode) {
       setPromoError("Please enter a promo code.");
-      return;
+      return false;
     }
     setIsCheckingPromo(true);
     setPromoError("");
@@ -1149,10 +1151,11 @@ export default function CheckoutModal({
       };
       if (!hasTelegramServerlessBridge()) throw new Error("TGCloud checkout is unavailable.");
       const data: any = await callServerless<any>("validatePromo", promoRequest, 20_000);
-      if (version !== promoValidationVersion.current) return;
+      if (version !== promoValidationVersion.current) return false;
       if (!data?.valid) {
+        setAppliedPromo(null);
         setPromoError(data.error || "Invalid promo code.");
-        return;
+        return false;
       }
       if (data.customerTier) {
         setTgCustomer(prev => ({ ...prev, tier: String(data.customerTier).toUpperCase() }));
@@ -1172,34 +1175,39 @@ export default function CheckoutModal({
         cashbackPoints: Number(data.cashbackPoints) || 0,
         freeProductName: String(data.freeProductName || "")
       });
+      return true;
     } catch (err: any) {
-      if (version === promoValidationVersion.current) setPromoError("We couldn't check this code right now. Please try again.");
+      if (version === promoValidationVersion.current) { setAppliedPromo(null); setPromoError("We couldn't check this code right now. Please try again."); }
+      return false;
     } finally {
       if (version === promoValidationVersion.current) setIsCheckingPromo(false);
     }
   };
 
   const handleRemovePromo = () => {
+    promoValidationVersion.current++;
     setAppliedPromo(null);
     setPromoError("");
+    setPromoCodeInput("");
   };
 
   // Referral Code Validation Handler
-  const handleApplyReferral = async (version = referralValidationVersion.current) => {
+  const handleApplyReferral = async (version = referralValidationVersion.current): Promise<boolean> => {
     const cleanCode = referralCodeInput.trim().toUpperCase();
     if (!cleanCode) {
       setReferralError("Please enter a referral code.");
-      return;
+      return false;
     }
     setIsCheckingReferral(true);
     setReferralError("");
     setReferralSuccess("");
     try {
       const data = await callServerless<any>("validateReferral", { referralCode: cleanCode });
-      if (version !== referralValidationVersion.current) return;
+      if (version !== referralValidationVersion.current) return false;
       if (!data?.valid) {
+        setAppliedReferral(null);
         setReferralError(data.error || "Invalid referral code.");
-        return;
+        return false;
       }
       setAppliedReferral({
         code: data.referrerMemberId,
@@ -1207,18 +1215,43 @@ export default function CheckoutModal({
         referrerMemberId: data.referrerMemberId
       });
       setReferralSuccess(`Referred by ${data.referrerName} (${data.referrerMemberId}). ${data.message || "Bonus requires completed orders from both members."}`);
+      return true;
     } catch (err: any) {
-      if (version === referralValidationVersion.current) setReferralError(err.message || "Failed to validate referral code.");
+      if (version === referralValidationVersion.current) { setAppliedReferral(null); setReferralError(err.message || "Failed to validate referral code."); }
+      return false;
     } finally {
       if (version === referralValidationVersion.current) setIsCheckingReferral(false);
     }
   };
 
   const handleRemoveReferral = () => {
+    referralValidationVersion.current++;
     setAppliedReferral(null);
     setReferralError("");
     setReferralSuccess("");
     setReferralCodeInput("");
+  };
+
+  const confirmCheckoutCodes = async (returnToCodes = true): Promise<boolean> => {
+    if (checkoutCodeCheckBusy.current) return false;
+    checkoutCodeCheckBusy.current = true;
+    setIsConfirmingCodes(true);
+    try {
+      const promoVersion = ++promoValidationVersion.current;
+      const referralVersion = ++referralValidationVersion.current;
+      const [promoValid, referralValid] = await Promise.all([
+        promoCodeInput.trim() ? handleApplyPromo(promoVersion) : Promise.resolve(true),
+        !existingReferrer && referralCodeInput.trim() ? handleApplyReferral(referralVersion) : Promise.resolve(true),
+      ]);
+      if (!promoValid || !referralValid) {
+        if (returnToCodes) setCurrentStep(4);
+        return false;
+      }
+      return true;
+    } finally {
+      checkoutCodeCheckBusy.current = false;
+      setIsConfirmingCodes(false);
+    }
   };
 
   useEffect(() => {
@@ -1375,6 +1408,9 @@ export default function CheckoutModal({
       // Match the total shown to the customer to the canonical charge, promo,
       // courier, and credit calculation used by createOrder.
       if (!hasTelegramServerlessBridge()) throw new Error("TGCloud checkout is unavailable.");
+      if (!await confirmCheckoutCodes(false)) {
+        throw new Error("The promo or referral code needs review. Check it before submitting. If you already paid, contact the shop before making another payment.");
+      }
       const freshCharges = await callServerless<any[]>("getPublicCharges", {});
       if (!Array.isArray(freshCharges)) throw new Error("The current charge list was unavailable.");
       setActiveCharges(freshCharges);
@@ -2255,7 +2291,8 @@ export default function CheckoutModal({
                             const selected = selectedPaymentMethod?.id === method.id;
                             const qr = method.qrCodeImage || method.qrCode || method.qrImage || method.qr_code_image || "";
                             return <div key={method.id} className="flex min-w-0 flex-col items-center gap-1">
-                              <button type="button" onClick={() => {
+                              <button type="button" disabled={isConfirmingCodes} onClick={() => { void (async () => {
+                                if (!await confirmCheckoutCodes()) return;
                                 if (type === "secured_payment_link" || type === "api" || type === "webhook") {
                                   setGatewayMethodPending(method);
                                   setIsGatewayPromptOpen(true);
@@ -2271,7 +2308,7 @@ export default function CheckoutModal({
                                   setZoomedPaymentMethod(method);
                                   setIsPaymentQrModalOpen(true);
                                 } else setIsPaymentDetailsModalOpen(true);
-                              }} aria-pressed={selected} className={selectorTileClass(selected)} title={method.name}>
+                              })(); }} aria-pressed={selected} className={selectorTileClass(selected)} title={method.name}>
                                 <CheckoutTileLogo reference={String(method.logo || "")} name={method.name} selected={selected} payment />
                                 {type.includes("qr") && <QrCode className="absolute bottom-1 right-1 h-3 w-3 text-slate-500" aria-hidden="true" />}
                               </button>
@@ -2836,8 +2873,8 @@ export default function CheckoutModal({
             {currentStep === 4 && (
               <button
                 type="button"
-                onClick={() => setCurrentStep(5)}
-                disabled={isCheckingPromo || isCheckingReferral || Boolean(promoCodeInput.trim() && !appliedPromo) || Boolean(!existingReferrer && referralCodeInput.trim() && !appliedReferral)}
+                onClick={() => { void confirmCheckoutCodes().then((valid) => { if (valid) setCurrentStep(5); }); }}
+                disabled={isConfirmingCodes || isCheckingPromo || isCheckingReferral || Boolean(promoCodeInput.trim() && !appliedPromo) || Boolean(!existingReferrer && referralCodeInput.trim() && !appliedReferral)}
                 className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs"
               >
                 <span>Continue</span>
@@ -2856,6 +2893,7 @@ export default function CheckoutModal({
                   onClick={handleSubmitOrder}
                   disabled={
                     isSubmittingOrder ||
+                    isConfirmingCodes ||
                     isLoadingCharges ||
                     Boolean(chargesLoadError) ||
                     (!submissionKey && (isAnalyzingReceipt || (!ocrError && !ocrAnalysis) || !selectedPaymentMethod?.id || !uploadedProofImage))
@@ -2884,10 +2922,11 @@ export default function CheckoutModal({
             <p className="pt-2 text-center font-mono text-xs text-slate-700">Would you like to proceed?</p>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => { setIsGatewayPromptOpen(false); setGatewayMethodPending(null); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-heading text-xs font-bold uppercase text-slate-700">No</button>
-              <button type="button" onClick={() => {
+              <button type="button" onClick={() => { void (async () => {
+                if (!await confirmCheckoutCodes()) { setIsGatewayPromptOpen(false); setGatewayMethodPending(null); return; }
                 if (!openSecuredPaymentLink(gatewayMethodPending.paymentLinkUrl)) { setIsGatewayPromptOpen(false); setSubmitError("This payment link is unavailable. Please choose another method or contact the shop."); return; }
                 receiptScanVersion.current++; setSelectedPaymentMethod(gatewayMethodPending); setProofSubmitSuccess(false); setUploadedProofImage(""); setOcrAnalysis(null); setOcrError(""); setIsAnalyzingReceipt(false); setIsGatewayPromptOpen(false); setGatewayMethodPending(null); setIsReceiptModalOpen(true);
-              }} className="rounded-lg bg-slate-900 px-3 py-2 font-heading text-xs font-bold uppercase text-white">Yes</button>
+              })(); }} disabled={isConfirmingCodes} className="rounded-lg bg-slate-900 px-3 py-2 font-heading text-xs font-bold uppercase text-white">Yes</button>
             </div>
           </div>
         </div>

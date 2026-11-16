@@ -580,6 +580,26 @@ body .prime-order-history .font-lato-regular { font-family: 'Lato', sans-serif !
 .command-admin-module--parked { cursor: not-allowed; }
 
 .serverless-orders-panel { padding: 0; }
+.serverless-orders-panel .serverless-panel-header { position: sticky; top: 0; z-index: 30; margin: 0; background: #fff; }
+.serverless-orders-panel .serverless-panel-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+.serverless-orders-panel .serverless-panel-toolbar > * { min-width: 0; }
+.serverless-order-compact { border-left: 4px solid #64748b !important; padding: 8px !important; }
+.serverless-order-compact[data-status="pending"], .serverless-order-compact[data-status="held"], .serverless-order-compact[data-status="failed"] { border-left-color: #d97706 !important; background: #fffbeb !important; }
+.serverless-order-compact[data-status="confirmed"], .serverless-order-compact[data-status="processing"] { border-left-color: #2563eb !important; background: #eff6ff !important; }
+.serverless-order-compact[data-status="ready"], .serverless-order-compact[data-status="packed"] { border-left-color: #0891b2 !important; background: #ecfeff !important; }
+.serverless-order-compact[data-status="dispatched"] { border-left-color: #7c3aed !important; background: #f5f3ff !important; }
+.serverless-order-compact[data-status="completed"], .serverless-order-compact[data-status="delivered"] { border-left-color: #059669 !important; background: #ecfdf5 !important; }
+.serverless-order-compact[data-status="cancelled"], .serverless-order-compact[data-status="expired"] { border-left-color: #dc2626 !important; background: #fef2f2 !important; }
+.serverless-order-compact .serverless-record__summary { padding: 0; }
+.serverless-order-compact .serverless-record__copy { gap: 2px; }
+.serverless-order-compact .serverless-order-status { font-weight: 700; text-transform: uppercase; }
+.serverless-receipt-modal { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: center; background: #020617e8; }
+.serverless-receipt-modal__panel { display: flex; width: 100%; max-width: 430px; height: 100dvh; flex-direction: column; background: #0f172a; color: #fff; }
+.serverless-receipt-modal__panel header, .serverless-receipt-modal__tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; }
+.serverless-receipt-modal__panel header button, .serverless-receipt-modal__panel header a, .serverless-receipt-modal__tools button { border: 1px solid #64748b; border-radius: 4px; padding: 6px 9px; color: #fff; font: 400 12px 'Lato Condensed', 'Lato', sans-serif; }
+.serverless-receipt-modal__panel header svg { display: inline-block; width: 15px; height: 15px; vertical-align: middle; }
+.serverless-receipt-modal__scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; }
+.serverless-receipt-modal__scroll img { display: block; height: auto; max-width: none; }
 .serverless-order-detail { gap: 9px; padding: 0 10px 12px; }
 .serverless-order-detail > section[hidden] { display: none !important; }
 .prime-order-summary { min-width: 0; padding: 12px; border: 1px solid #d7e1ef; border-radius: 12px; background: #fff; box-shadow: 0 3px 12px rgb(15 45 91 / 5%); }

@@ -36,7 +36,7 @@ export function deserializePromo(row) {
     totalUsageLimit: row.totalUsageLimit == null ? undefined : Number(row.totalUsageLimit),
     usageCount: Number(row.usageCount) || 0,
     usageLimitPerCustomer: Number(row.usageLimitPerCustomer) || 1,
-    isActive: row.isActive !== false,
+    isActive: row.isActive === true || row.isActive === 1 || row.isActive === '1',
     startDate: row.startDate || undefined,
     endDate: row.endDate || undefined,
     createdAt: row.createdAt,

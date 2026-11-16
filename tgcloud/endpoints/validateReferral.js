@@ -13,7 +13,7 @@ export default async function (input, ctx) {
   if (!code) return fail('Please enter a referral code.');
   const customer = await db.select().from(customers).where(eq(customers.tgUserId, telegramId)).get();
   if (!customer) return fail('Customer account not found. Please reopen the Mini App and try again.');
-  if (customer.isBanned === true) return fail('This account cannot use referral codes.');
+  if (customer.isBanned === true || customer.isBanned === 1) return fail('This account cannot use referral codes.');
   if (customer.referredByUserId || customer.referredByMemberId) {
     return fail('A referral is already linked to this account.');
   }

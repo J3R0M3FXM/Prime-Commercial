@@ -45,6 +45,13 @@ async function create(id,extra={}) {
 const action=(id,name,input={})=>workflow.applyWorkflowAction(row(id),name,input);
 const paid=(id,amount,extra={})=>action(id,'confirmPayment',{confirmedAmount:amount,providerVerified:true,...extra});
 
+await create('zero-due',{subtotal:0,total_amount:0,payable_now:0,payment_status:'Unpaid',payment_proof_image:null});
+await assert.rejects(action('zero-due','confirmPayment',{confirmedAmount:0}),e=>e.code==='PROVIDER_CONFIRMATION_REQUIRED');
+await action('zero-due','confirmPayment',{confirmedAmount:0,zeroDueApproved:true});
+assert.equal(row('zero-due').status,'Confirmed');
+assert.equal(row('zero-due').reviewStatus,'Zero Upfront Balance Approved');
+await action('zero-due','processing');
+
 await create('flow',{subtotal:1200,delivery_fee:100,payable_on_delivery:100,store_credits_used:200,payable_now:1000,total_amount:1100});
 await assert.rejects(action('flow','confirmPayment',{confirmedAmount:1200}),e=>e.code==='PROVIDER_CONFIRMATION_REQUIRED');
 await assert.rejects(paid('flow',999),e=>e.code==='PAYMENT_SHORT');

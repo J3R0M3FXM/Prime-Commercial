@@ -68,6 +68,39 @@ export default async function (input, ctx) {
         : 'Order milestones could not be reconciled during this refresh.';
     }
     const rows = await db.select().from(orders).orderBy(desc(orders.createdAt)).limit(100).all();
+    const identifiers = await db.all(`SELECT id, order_number AS orderNumber,
+      applied_promo_code AS promoCode,
+      CASE WHEN json_valid(fingerprint_snapshot) THEN json_extract(fingerprint_snapshot,'$.deviceId') END AS deviceId,
+      CASE WHEN json_valid(fingerprint_snapshot) THEN json_extract(fingerprint_snapshot,'$.hardwareId') END AS hardwareId,
+      CASE WHEN json_valid(fingerprint_snapshot) THEN json_extract(fingerprint_snapshot,'$.deviceFingerprintId') END AS fingerprintId FROM orders`);
+    const identityByOrder = new Map(identifiers.map((item) => [String(item.id), item]));
+    const bySignal = new Map();
+    for (const item of identifiers) for (const key of ['deviceId','hardwareId','fingerprintId','promoCode']) {
+      const value = String(item[key] || '').trim();
+      if (!value) continue;
+      const signal = key + ':' + value;
+      if (!bySignal.has(signal)) bySignal.set(signal, []);
+      bySignal.get(signal).push(item);
+    }
+    const matchByOrder = new Map(rows.map((order) => {
+      const self = identityByOrder.get(String(order.id));
+      const matches = new Map();
+      if (self) for (const [key, label] of [['deviceId','Device ID'],['hardwareId','Hardware ID'],['fingerprintId','Fingerprint ID'],['promoCode','Promo code']]) {
+        const value = String(self[key] || '').trim();
+        if (!value) continue;
+        for (const item of bySignal.get(key + ':' + value) || []) {
+          if (String(item.id) === String(order.id)) continue;
+          if (!matches.has(item.id)) matches.set(item.id, { orderNumber: item.orderNumber || item.id, signals: [] });
+          matches.get(item.id).signals.push(label);
+        }
+      }
+      return [String(order.id), Array.from(matches.values()).slice(0, 20)];
+    }));
+    const tierRows = rows.length ? await db.all(`SELECT order_id AS orderId,
+      json_extract(canonical_snapshot,'$.rewardTier') AS tier FROM checkout_operations
+      WHERE order_id IN (${rows.map((_, index) => ':order' + index).join(',')})`,
+      Object.fromEntries(rows.map((row, index) => [':order' + index, row.id]))) : [];
+    const tierByOrder = new Map(tierRows.map((row) => [String(row.orderId), String(row.tier || '')]));
     const telegramIds = Array.from(new Set(rows.map((order) => String(order.tgUserId || '')).filter(Boolean)));
     const profiles = telegramIds.length
       ? await db.select({ tgUserId: customers.tgUserId, tgName: customers.tgName, tgUsername: customers.tgUsername })
@@ -76,6 +109,8 @@ export default async function (input, ctx) {
     const profileByTelegramId = new Map(profiles.map((profile) => [String(profile.tgUserId), profile]));
     return { orders: await Promise.all(rows.map(async (order) => ({
       ...order,
+      tierLevel: tierByOrder.get(String(order.id)) || '',
+      matchingIdentifiers: matchByOrder.get(String(order.id)) || [],
       workflow: await attachWorkflow(order,true),
       telegramName: profileByTelegramId.get(String(order.tgUserId || ''))?.tgName || '',
       telegramUsername: profileByTelegramId.get(String(order.tgUserId || ''))?.tgUsername || '',
@@ -100,7 +135,7 @@ export default async function (input, ctx) {
       const expected=Number(input.expectedPayableNow),actual=Number(currentOrder.payableNow??currentOrder.totalAmount??0);
       if(!Number.isFinite(expected)||!Number.isFinite(actual)||Math.round(expected*100)!==Math.round(actual*100))throw new EndpointError('The amount due changed. Refresh the order and verify the payment again.',{code:'ORDER_CHANGED'});
     }
-    const result=await applyWorkflowAction(currentOrder,workflowAction,{...input,...(action==='approveZeroDue'?{confirmedAmount:0}:{})});
+    const result=await applyWorkflowAction(currentOrder,workflowAction,{...input,...(action==='approveZeroDue'?{confirmedAmount:0,zeroDueApproved:true}:{})});
     const saved=await db.select().from(orders).where(eq(orders.id,orderId)).get();
     if (!result.alreadyApproved && ['markPaid','approveZeroDue','failReceipt','holdOrder','resubmitOrder','startProcessing','cancelOrder','rejectOrder'].includes(action)) {
       await notifyOrderStatusChanged({ ...saved, chatId:saved.tgUserId, orderNumber:saved.orderNumber||saved.id, resubmitExpiresAt:result.resubmitExpiresAt });

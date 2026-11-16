@@ -15,6 +15,7 @@ import { quoteDelivery } from '../lib/delivery.js';
 import { resolveTrustedFingerprint } from '../lib/fingerprints.js';
 import { publicMediaReference } from '../lib/media.js';
 import validatePromo from './validatePromo.js';
+import validateReferral from './validateReferral.js';
 import { notifyAdminOrderCreated, notifyOrderCreated } from '../lib/order-notifications.js';
 import { calculateCustomerTier, calculateOrderRewardPoints } from '../lib/loyalty.js';
 import { addFreeProductToCart } from '../lib/promos.js';
@@ -41,151 +42,76 @@ function validIp(value) {
   return ip;
 }
 
-async function reverseGeocodeWithGeoapify(lat, lon) {
-  const apiKey = await settingKey('geoapify_api_key');
-  if (!apiKey || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))) return null;
+async function reverseGeocodeWithTomTom(lat, lon) {
+  const apiKey = await settingKey('tomtom_api_key');
+  const latitude = Number(lat), longitude = Number(lon);
+  if (!apiKey || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null;
   try {
-    const url = 'https://api.geoapify.com/v1/geocode/reverse?lat=' + encodeURIComponent(String(lat)) +
-      '&lon=' + encodeURIComponent(String(lon)) + '&format=json&apiKey=' + encodeURIComponent(apiKey);
+    const url = 'https://api.tomtom.com/search/2/reverseGeocode/' + latitude + ',' + longitude + '.json?key=' + encodeURIComponent(apiKey);
     const response = await fetch(url);
     if (!response.ok) return null;
     const data = await response.json();
-    const result = Array.isArray(data?.results) ? data.results[0] : null;
-    if (!result?.formatted) return null;
+    const address = data?.addresses?.[0]?.address;
+    if (!address?.freeformAddress) return null;
     return {
-      formatted: text(result.formatted, 500),
-      resultType: text(result.result_type || result.rank?.match_type, 80),
-      street: text(result.street, 180), houseNumber: text(result.housenumber, 40),
-      postcode: text(result.postcode, 24), city: text(result.city || result.suburb || result.county, 120),
-      subdivision: text(result.state || result.state_district, 120), country: text(result.country, 100),
-      matchType: text(result.rank?.match_type, 80),
-      confidence: Number.isFinite(Number(result.rank?.confidence)) ? Number(result.rank.confidence) : null,
-      buildingConfidence: Number.isFinite(Number(result.rank?.confidence_building_level)) ? Number(result.rank.confidence_building_level) : null,
-      houseLevelResult: String(result.result_type || '').toLowerCase() === 'building' && Boolean(result.housenumber),
-      provider: 'Geoapify',
+      formatted: text(address.freeformAddress, 500),
+      street: text(address.streetName || address.street, 180),
+      houseNumber: text(address.buildingNumber || address.streetNumber, 40),
+      postcode: text(address.postalCode, 24),
+      city: text(address.municipality || address.municipalitySubdivision, 120),
+      subdivision: text(address.countrySubdivision, 120),
+      country: text(address.country, 100), provider: 'TomTom',
     };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 async function enrichOrderLocationSignals(fingerprint, deliveryAddress) {
-  const gps = fingerprint?.deviceGps;
-  if (gps) {
-    const geo = await reverseGeocodeWithGeoapify(gps.lat, gps.lon);
-    fingerprint.deviceGps = {
-      ...gps,
-      source: 'Order-time device GPS',
-      reverseGeocodedAddress: geo?.formatted || '',
-      reverseGeocodingProvider: geo?.provider || '',
-      reverseGeocodingDetails: geo,
-    };
+  for (const key of ['deviceGps', 'deviceLocationObservation']) {
+    const point = fingerprint?.[key];
+    if (!point) continue;
+    const geo = await reverseGeocodeWithTomTom(point.lat, point.lon);
+    fingerprint[key] = { ...point, reverseGeocodedAddress: geo?.formatted || point.reverseGeocodedAddress || '',
+      reverseGeocodingProvider: geo ? 'TomTom' : point.reverseGeocodingProvider || '', reverseGeocodingDetails: geo };
   }
-
-  const observation = fingerprint?.deviceLocationObservation;
-  if (observation && Number.isFinite(Number(observation.lat)) && Number.isFinite(Number(observation.lon))) {
-    const geo = await reverseGeocodeWithGeoapify(observation.lat, observation.lon);
-    fingerprint.deviceLocationObservation = {
-      ...observation,
-      source: 'Client-reported app-open device location',
-      reverseGeocodedAddress: geo?.formatted || '',
-      reverseGeocodingProvider: geo?.provider || '',
-      reverseGeocodingDetails: geo,
-    };
-  }
-
-  const addressGeo = await reverseGeocodeWithGeoapify(deliveryAddress?.lat, deliveryAddress?.lon);
-  deliveryAddress.geocodedAddress = addressGeo?.formatted || '';
-  deliveryAddress.geocodingProvider = addressGeo?.provider || '';
+  const addressGeo = await reverseGeocodeWithTomTom(deliveryAddress?.lat, deliveryAddress?.lon);
+  deliveryAddress.geocodedAddress = addressGeo?.formatted || deliveryAddress.geocodedAddress || '';
+  deliveryAddress.geocodingProvider = addressGeo ? 'TomTom' : deliveryAddress.geocodingProvider || '';
   deliveryAddress.geocodingDetails = addressGeo;
 
   const ip = validIp(fingerprint?.clientObservedIp);
-  const geoapifyKey = ip ? await settingKey('geoapify_api_key') : '';
-  if (!ip || !geoapifyKey) {
-    fingerprint.ipLocation = { ip, status: ip ? 'Geoapify key not configured' : 'IP not observed', verified: false, source: 'Browser-observed IP · approximate only' };
+  const ipLocateKey = ip ? await settingKey('iplocate_api_key') : '';
+  if (!ip || !ipLocateKey) {
+    fingerprint.ipLocation = { ip, status: ip ? 'IP lookup unavailable' : 'IP not observed', verified: false,
+      source: 'Browser-observed IP · approximate only' };
     return;
   }
-
-  let geoapifyError = '';
   try {
-    const url = 'https://api.geoapify.com/v1/ipinfo?ip=' + encodeURIComponent(ip) + '&apiKey=' + encodeURIComponent(geoapifyKey);
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Geoapify IP lookup failed.');
+    const response = await fetch('https://www.iplocate.io/api/lookup/' + encodeURIComponent(ip) + '?apikey=' + encodeURIComponent(ipLocateKey));
+    if (!response.ok) throw new Error('IP lookup failed');
     const data = await response.json();
-    const latitude = Number(data?.location?.latitude);
-    const longitude = Number(data?.location?.longitude);
+    const latitude = data?.latitude == null ? NaN : Number(data.latitude);
+    const longitude = data?.longitude == null ? NaN : Number(data.longitude);
+    const areaGeo = Number.isFinite(latitude) && Number.isFinite(longitude)
+      ? await reverseGeocodeWithTomTom(latitude, longitude) : null;
     fingerprint.ipLocation = {
-      ip: text(data?.ip || ip, 64), verified: false,
-      provider: 'Geoapify IP Geolocation', precision: 'Approximate network area; not a street or house location',
-      source: 'Browser-observed IP · Geoapify · approximate network location',
-      country: text(data?.country?.name, 100), countryCode: text(data?.country?.iso_code, 4),
-      city: text(data?.city?.name, 120), subdivision: text(data?.state?.name, 120),
-      postalCode: text(data?.postcode, 24),
+      ip: text(data?.ip || ip, 64), verified: false, provider: 'IPLocate',
+      precision: 'Approximate network area', source: 'Browser-observed IP · approximate network location',
+      country: text(data?.country, 100), countryCode: text(data?.country_code, 4), city: text(data?.city, 120),
+      subdivision: text(data?.subdivision, 120), postalCode: text(data?.postal_code, 24),
       latitude: Number.isFinite(latitude) ? latitude : null, longitude: Number.isFinite(longitude) ? longitude : null,
-      timezone: text(data?.time_zone?.name, 80),
-      status: 'complete',
+      reverseGeocodedAddress: areaGeo?.formatted || '', reverseGeocodingProvider: areaGeo ? 'TomTom' : '',
+      timezone: text(data?.time_zone, 80), asn: text(data?.asn?.asn, 40), route: text(data?.asn?.route, 80),
+      isp: text(data?.company?.name || data?.asn?.name, 180), ispDomain: text(data?.company?.domain || data?.asn?.domain, 160),
+      privacy: {
+        isAbuser: Boolean(data?.privacy?.is_abuser), isAnonymous: Boolean(data?.privacy?.is_anonymous),
+        isProxy: Boolean(data?.privacy?.is_proxy), isTor: Boolean(data?.privacy?.is_tor),
+        isVpn: Boolean(data?.privacy?.is_vpn), isHosting: Boolean(data?.privacy?.is_hosting),
+        isIcloudRelay: Boolean(data?.privacy?.is_icloud_relay), isBogon: Boolean(data?.privacy?.is_bogon),
+      }, status: 'complete',
     };
-    // Keep IPLocate's network/privacy indicators as corroborating metadata,
-    // while Geoapify remains the primary approximate IP-area source.
-    const ipLocateKey = await settingKey('iplocate_api_key');
-    if (ipLocateKey) {
-      try {
-        const networkResponse = await fetch('https://www.iplocate.io/api/lookup/' + encodeURIComponent(ip) + '?apikey=' + encodeURIComponent(ipLocateKey));
-        if (networkResponse.ok) {
-          const network = await networkResponse.json();
-          fingerprint.ipLocation.networkProvider = 'IPLocate';
-          fingerprint.ipLocation.asn = text(network?.asn?.asn, 40);
-          fingerprint.ipLocation.route = text(network?.asn?.route, 80);
-          fingerprint.ipLocation.isp = text(network?.company?.name || network?.asn?.name, 180);
-          fingerprint.ipLocation.ispDomain = text(network?.company?.domain || network?.asn?.domain, 160);
-          fingerprint.ipLocation.privacy = {
-            isAbuser: Boolean(network?.privacy?.is_abuser), isAnonymous: Boolean(network?.privacy?.is_anonymous),
-            isProxy: Boolean(network?.privacy?.is_proxy), isTor: Boolean(network?.privacy?.is_tor),
-            isVpn: Boolean(network?.privacy?.is_vpn), isHosting: Boolean(network?.privacy?.is_hosting),
-            isIcloudRelay: Boolean(network?.privacy?.is_icloud_relay), isBogon: Boolean(network?.privacy?.is_bogon),
-          };
-        }
-      } catch {
-        // IP area capture succeeds independently of optional network metadata.
-      }
-    }
   } catch {
-    geoapifyError = 'Geoapify lookup failed';
-  }
-
-  // Retain the existing IPLocate enrichment as a fallback if Geoapify is
-  // unavailable. Both providers only estimate the network area from an IP.
-  if (geoapifyError) {
-    const ipLocateKey = await settingKey('iplocate_api_key');
-    if (!ipLocateKey) {
-      fingerprint.ipLocation = { ip, provider: 'Geoapify IP Geolocation', status: geoapifyError, verified: false, source: 'Browser-observed IP · approximate only' };
-      return;
-    }
-    try {
-      const response = await fetch('https://www.iplocate.io/api/lookup/' + encodeURIComponent(ip) + '?apikey=' + encodeURIComponent(ipLocateKey));
-      if (!response.ok) throw new Error('IPLocate fallback failed.');
-      const data = await response.json();
-      const latitude = Number(data?.latitude); const longitude = Number(data?.longitude);
-      fingerprint.ipLocation = {
-        ip: text(data?.ip || ip, 64), verified: false, provider: 'IPLocate fallback',
-        precision: 'Approximate network area; not a street or house location',
-        source: 'Browser-observed IP · IPLocate fallback · approximate network location',
-        country: text(data?.country, 100), countryCode: text(data?.country_code, 4), city: text(data?.city, 120),
-        subdivision: text(data?.subdivision, 120), postalCode: text(data?.postal_code, 24),
-        latitude: Number.isFinite(latitude) ? latitude : null, longitude: Number.isFinite(longitude) ? longitude : null,
-        timezone: text(data?.time_zone, 80), asn: text(data?.asn?.asn, 40), route: text(data?.asn?.route, 80),
-        isp: text(data?.company?.name || data?.asn?.name, 180), ispDomain: text(data?.company?.domain || data?.asn?.domain, 160),
-        privacy: {
-          isAbuser: Boolean(data?.privacy?.is_abuser), isAnonymous: Boolean(data?.privacy?.is_anonymous),
-          isProxy: Boolean(data?.privacy?.is_proxy), isTor: Boolean(data?.privacy?.is_tor),
-          isVpn: Boolean(data?.privacy?.is_vpn), isHosting: Boolean(data?.privacy?.is_hosting),
-          isIcloudRelay: Boolean(data?.privacy?.is_icloud_relay), isBogon: Boolean(data?.privacy?.is_bogon),
-        },
-        status: 'complete',
-      };
-    } catch {
-      fingerprint.ipLocation = { ip, provider: 'Geoapify then IPLocate', status: 'IP geolocation lookups failed', verified: false, source: 'Browser-observed IP · approximate only' };
-    }
+    fingerprint.ipLocation = { ip, provider: 'IPLocate', status: 'IP lookup failed', verified: false,
+      source: 'Browser-observed IP · approximate only' };
   }
 }
 const epochSeconds = (value) => {
@@ -271,6 +197,11 @@ function sanitizedRequest(input) {
       deviceId: text(fingerprint.deviceId, 200),
       hardwareId: text(fingerprint.hardwareId, 200),
       deviceFingerprintId: text(fingerprint.deviceFingerprintId, 200),
+      browser: text(fingerprint.browser, 800),
+      browserName: text(fingerprint.browserName, 80),
+      platform: text(fingerprint.platform, 120),
+      graphics: text(fingerprint.graphics, 300),
+      driver: text(fingerprint.driver, 200),
       sessionToken: text(fingerprint.sessionToken, 300),
       deviceGps: fingerprint.deviceGps && typeof fingerprint.deviceGps === 'object' ? {
         lat: Number(fingerprint.deviceGps.lat ?? fingerprint.deviceGps.latitude),
@@ -364,6 +295,9 @@ async function makeCanonicalSnapshot(request, customer, submittedAt) {
     { ':id': String(customer.referredByUserId || ''), ':member': String(customer.referredByMemberId || '') });
     if (linked && String(linked.id) !== String(customer.id)) referrer = { id: linked.id, memberId: linked.memberId || '' };
   } else if (request.referralCode) {
+    const referral = await validateReferral({ referralCode: request.referralCode },
+      { initData: { user: { id: customer.tgUserId } } });
+    if (!referral?.valid) throw new EndpointError(referral?.error || 'Referral code is no longer valid.', { code: 'REFERRAL_INVALID' });
     referrer = await db.select({ id: customers.id, primeMemberId: customers.primeMemberId })
       .from(customers).where(eq(customers.primeMemberId, request.referralCode)).get();
     if (!referrer || referrer.id === customer.id) throw new EndpointError('Referral code is invalid.', { code: 'REFERRAL_INVALID' });
@@ -405,7 +339,8 @@ async function makeCanonicalSnapshot(request, customer, submittedAt) {
     deliveryPaymentMethod: request.deliveryPaymentMethod,
     courier: { id: delivery.courier.id, name: delivery.courier.name, type: delivery.courier.type || 'Standard',
       logo: await publicMediaReference(delivery.courier.logo || '') },
-    deliveryAddress: { ...request.deliveryAddress },
+    deliveryAddress: { ...request.deliveryAddress, courierPaymentMode: request.deliveryPaymentMethod, distanceKm: delivery.distanceKm,
+      estimatedTravelMinutes: delivery.routeTimeMinutes },
     chargesBreakdown: chargeResult.computedCharges,
     chargeTotal,
     promo: promo ? { id: promo.promoId, code: promo.code, discount: promoDiscount,

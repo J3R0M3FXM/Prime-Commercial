@@ -23,9 +23,9 @@ assert.equal((await handleSupport(reply,staff,true)).ticket.status,'waiting_cust
 assert.equal((await handleSupport(reply,staff,true)).ticket.messages.length,2);
 assert.equal((await handleSupport({action:'detail',id:created.id},customer)).ticket.unread,false);
 await assert.rejects(handleSupport({action:'status',id:created.id,requestId:'test-status-00001',status:'resolved'},customer),e=>e.code==='INVALID_STATUS');
-const {ensureFaqs,listFaqs}=load('tgcloud/lib/support-faqs.js',['ensureFaqs','listFaqs']);
+const {ensureFaqs,listFaqs,sanitizeFaqHtml}=load('tgcloud/lib/support-faqs.js',['ensureFaqs','listFaqs','sanitizeFaqHtml']);
 const requireAdmin=async ctx=>{if(ctx?.role!=='staff')throw new EndpointError('Admin access required',{code:'ADMIN_REQUIRED'});return staff;};
-const {handler:manageFaqs}=load('tgcloud/endpoints/manageSupportFaqs.js',['handler'],{requireAdmin,ensureFaqs,listFaqs});
+const {handler:manageFaqs}=load('tgcloud/endpoints/manageSupportFaqs.js',['handler'],{requireAdmin,ensureFaqs,listFaqs,sanitizeFaqHtml});
 await assert.rejects(manageFaqs({action:'list'},{}),e=>e.code==='ADMIN_REQUIRED');
 await ensureFaqs();await ensureFaqs();
 for(let i=0;i<500;i++)await manageFaqs({action:'create',id:'faq-test-'+i,question:'Question '+i,answer:'Answer '+i},{role:'staff'});

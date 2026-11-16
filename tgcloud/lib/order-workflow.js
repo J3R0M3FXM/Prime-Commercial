@@ -167,8 +167,9 @@ export async function applyWorkflowAction(order,action,input={}) {
     return {success:true,orderId:id};
   }
   if(action==='confirmPayment'||action==='revalidatePayment') {
-    if(input.providerVerified!==true)fail('Confirm that the transaction was verified directly with the payment provider.','PROVIDER_CONFIRMATION_REQUIRED');
     const amount=Number(input.confirmedAmount),cents=Math.round(amount*100),due=Math.round(Number(order.payableNow??order.totalAmount??0)*100);
+    const zeroDueApproval=action==='confirmPayment'&&due===0&&cents===0&&input.zeroDueApproved===true&&!String(order.paymentProofImage||'').trim();
+    if(input.providerVerified!==true&&!zeroDueApproval)fail('Confirm that the transaction was verified directly with the payment provider.','PROVIDER_CONFIRMATION_REQUIRED');
     if(!Number.isFinite(amount)||amount<0||!Number.isSafeInteger(cents)||Math.abs(amount*100-cents)>0.00001)fail('Enter the exact provider-confirmed amount with at most two decimal places.','INVALID_AMOUNT');
     if(String(order.paymentStatus).toLowerCase()==='paid') {
       if(cents!==Math.round(Number(order.paymentReceivedAmount??order.confirmedPaidAmount??0)*100))fail('Payment was already verified for a different amount.','PAYMENT_CONFLICT');
@@ -178,7 +179,7 @@ export async function applyWorkflowAction(order,action,input={}) {
     const cancelled=action==='revalidatePayment';
     if(cancelled&&due>0&&cents===0)fail('No provider payment was received. Do not confirm payment or issue a cash refund.','PAYMENT_NOT_RECEIVED');
     if(cancelled&&input.refundMethod==='original'&&cents===0)fail('There is no external payment to return. Select Store Credits for an internally funded order.','NO_EXTERNAL_PAYMENT');
-    if((cancelled?stage!=='Cancelled':stage!=='Pending')||!String(order.paymentProofImage||'').trim())fail('A submitted receipt awaiting payment validation is required.');
+    if((cancelled?stage!=='Cancelled':stage!=='Pending')||(!zeroDueApproval&&!String(order.paymentProofImage||'').trim()))fail('A submitted receipt awaiting payment validation is required.');
     if(!cancelled&&(!['pending review','unpaid'].includes(String(order.paymentStatus).toLowerCase())||flow.edit_state==='pending'||flow.cancellation_requested))fail('Resolve outstanding requests before confirming payment.');
     if(!cancelled&&cents<due)fail('The verified payment is below the store amount due.','PAYMENT_SHORT');
     const method=cancelled&&input.refundMethod==='original'?'original':'credits';
@@ -186,12 +187,12 @@ export async function applyWorkflowAction(order,action,input={}) {
     // Lock the refund method before payment changes; the payment write below is guarded by this value.
     if(cancelled)await db.run("UPDATE order_workflow SET refund_method=:method,updated_at=unixepoch() WHERE order_id=:id AND EXISTS(SELECT 1 FROM orders WHERE id=:id AND status=:status AND payment_status=:payment)",{...params,':method':method});
     const result=await db.run(`UPDATE orders SET payment_status='Paid',status=:next,confirmed_paid_amount=:due,payment_received_amount=:received,
-      review_status='Provider Payment Verified',requires_manual_review=0,updated_at=unixepoch()
-      WHERE id=:id AND status=:status AND payment_status=:payment AND payment_proof_image=:proof
+      review_status=:review_status,requires_manual_review=0,updated_at=unixepoch()
+      WHERE id=:id AND status=:status AND payment_status=:payment AND coalesce(payment_proof_image,'')=coalesce(:proof,'')
       AND coalesce(staff_edit_version,0)=:version
       AND EXISTS(SELECT 1 FROM order_workflow WHERE order_id=:id AND refund_method=:method
         AND (:cancelled=1 OR (edit_state<>'pending' AND cancellation_requested=0))) RETURNING id`,
-      {...params,':next':cancelled?'Cancelled':'Confirmed',':due':due/100,':received':cents/100,':proof':order.paymentProofImage,':version':Number(order.staffEditVersion||0),':method':method,':cancelled':cancelled?1:0});
+      {...params,':next':cancelled?'Cancelled':'Confirmed',':due':due/100,':received':cents/100,':proof':order.paymentProofImage,':review_status':zeroDueApproval?'Zero Upfront Balance Approved':'Provider Payment Verified',':version':Number(order.staffEditVersion||0),':method':method,':cancelled':cancelled?1:0});
     if(!Number(result?.rowsAffected))fail('The order changed. Refresh before verifying payment.','ORDER_CHANGED');
     return {success:true,orderId:id,status:cancelled?'Cancelled':'Confirmed',paymentStatus:'Paid',refundMethod:method};
   }

@@ -1,11 +1,20 @@
 import { db } from 'sdk';
-import { and, asc, eq, isNull, or } from 'sdk/db';
+import { and, asc, eq, isNull, or, sql } from 'sdk/db';
 import { calculateCustomerTier } from '../lib/loyalty.js';
 import { resolveTrustedFingerprint } from '../lib/fingerprints.js';
 import { calculatePromoDiscount, deserializePromo } from '../lib/promos.js';
 import { customers, orders, promoRedemptions, promos } from '../schema.js';
 
 const fail = (error) => ({ valid: false, error });
+const dateMillis = (value) => {
+  if (value == null || value === '') return null;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'number' || /^\d+$/.test(String(value))) {
+    const numeric = Number(value);
+    return numeric < 1e11 ? numeric * 1000 : numeric;
+  }
+  return new Date(value).getTime();
+};
 
 export default async function (input, ctx) {
   const telegramId = ctx?.initData?.user?.id == null ? '' : String(ctx.initData.user.id);
@@ -23,10 +32,15 @@ export default async function (input, ctx) {
   if (promo.isActive === false) return fail('This promo code is currently inactive.');
 
   const now = new Date();
-  if (promo.startDate && new Date(promo.startDate).getTime() > now.getTime()) {
+  const startsAt = dateMillis(promo.startDate);
+  const endsAt = dateMillis(promo.endDate);
+  if ((startsAt !== null && !Number.isFinite(startsAt)) || (endsAt !== null && !Number.isFinite(endsAt))) {
+    return fail('This promo has an invalid active date. Please contact the shop.');
+  }
+  if (startsAt !== null && startsAt > now.getTime()) {
     return fail('This promo is not active yet.');
   }
-  if (promo.endDate && new Date(promo.endDate).getTime() < now.getTime()) {
+  if (endsAt !== null && endsAt < now.getTime()) {
     return fail('This promo code has expired.');
   }
 
@@ -109,21 +123,26 @@ export default async function (input, ctx) {
       !promo.allowedCourierIds.includes('all') && !promo.allowedCourierIds.includes(courierId)) {
     return fail('This voucher is not applicable to the selected delivery courier.');
   }
-  if (promo.totalUsageLimit && promo.totalUsageLimit > 0 && Number(promo.usageCount || 0) >= promo.totalUsageLimit) {
-    return fail('This promo code has reached its total usage limit.');
-  }
-
   const fingerprint = resolveTrustedFingerprint(customer, {
     deviceId: input?.deviceId,
     hardwareId: input?.hardwareId,
     deviceFingerprintId: input?.deviceFingerprintId,
     sessionToken: input?.sessionToken,
   });
-  const redemptions = await db.select().from(promoRedemptions)
-    .where(and(eq(promoRedemptions.promoCode, code), isNull(promoRedemptions.releasedAt))).all();
+  const [redemptions, claims] = await Promise.all([
+    db.select().from(promoRedemptions).where(and(or(eq(promoRedemptions.promoCode, code), eq(promoRedemptions.promoId, promo.id)), isNull(promoRedemptions.releasedAt))).all(),
+    db.all(sql`SELECT customer_id AS customerId, device_id AS deviceId, hardware_id AS hardwareId,
+        device_fingerprint_id AS deviceFingerprintId FROM promo_claims
+      WHERE (promo_id=${String(promo.id)} OR promo_code=${code})
+        AND (status='redeemed' OR (status='held' AND expires_at>unixepoch()))`),
+  ]);
+  const uses = [...redemptions, ...claims];
+  if (promo.totalUsageLimit && uses.length >= promo.totalUsageLimit) {
+    return fail('This promo code has reached its total usage limit.');
+  }
 
   if (fingerprint.deviceId || fingerprint.hardwareId || fingerprint.deviceFingerprintId) {
-    const deviceMatches = redemptions.filter((redemption) =>
+    const deviceMatches = uses.filter((redemption) =>
       (fingerprint.deviceId && redemption.deviceId && String(redemption.deviceId).trim() === fingerprint.deviceId) ||
       (fingerprint.hardwareId && redemption.hardwareId && String(redemption.hardwareId).trim() === fingerprint.hardwareId) ||
       (fingerprint.deviceFingerprintId && redemption.deviceFingerprintId &&
@@ -134,7 +153,7 @@ export default async function (input, ctx) {
     }
   }
 
-  const customerRedemptions = redemptions.filter((redemption) => redemption.customerId === customer.id);
+  const customerRedemptions = uses.filter((redemption) => redemption.customerId === customer.id);
   const perCustomerLimit = Number(promo.usageLimitPerCustomer) || 1;
   if (customerRedemptions.length >= perCustomerLimit) {
     return fail('You have already redeemed this promo code (limit: ' + perCustomerLimit + ' use' + (perCustomerLimit > 1 ? 's' : '') + ' per customer).');

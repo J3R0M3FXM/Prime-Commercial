@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, Clock3, Download, ExternalLink, Eye, Loader2, Minus, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, Truck, X } from "lucide-react";
+import { ArrowLeft, Clock3, Download, ExternalLink, Loader2, Minus, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import { callServerless, getTelegramServerlessSession, resolveTelegramMedia } from "@/lib/telegram-serverless-client";
 import OrderWorkflowController,{type OrderWorkflow} from './order-workflow-controller';
@@ -17,6 +17,8 @@ type ServerlessOrder = {
   telegramName: string;
   telegramUsername: string;
   primeMemberId: string;
+  tierLevel: string;
+  matchingIdentifiers: { orderNumber: string; signals: string[] }[];
   items: any[];
   subtotal: number;
   discountAmount: number;
@@ -63,7 +65,7 @@ type ServerlessOrder = {
 };
 
 type RawOrder = Record<string, any>;
-type OrderDetailTab = "overview" | "fulfillment" | "payment" | "evidence";
+type OrderDetailTab = "items" | "fulfillment" | "snapshot" | "flags";
 
 function field(row: RawOrder, camel: string, snake: string, fallback: any = "") {
   return row[camel] ?? row[snake] ?? fallback;
@@ -87,6 +89,8 @@ function normalizeOrder(row: RawOrder): ServerlessOrder {
     telegramName: String(field(row, "telegramName", "telegram_name")),
     telegramUsername: String(field(row, "telegramUsername", "telegram_username")),
     primeMemberId: String(field(row, "primeMemberId", "prime_member_id")),
+    tierLevel: String(field(row, "tierLevel", "tier_level")),
+    matchingIdentifiers: Array.isArray(row.matchingIdentifiers) ? row.matchingIdentifiers : [],
     items: Array.isArray(items) ? items : [],
     subtotal: Number(field(row, "subtotal", "subtotal", 0)) || 0,
     discountAmount: Number(field(row, "discountAmount", "discount_amount", 0)) || 0,
@@ -267,9 +271,9 @@ export default function TelegramServerlessOrdersPanel({
   const [reconciliationWarning, setReconciliationWarning] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [queueFilter, setQueueFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(initialOrderId || null);
-  const [orderDetailTab, setOrderDetailTab] = useState<OrderDetailTab>("overview");
+  const [orderDetailTab, setOrderDetailTab] = useState<OrderDetailTab>("items");
   const [receiptUrl, setReceiptUrl] = useState("");
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptZoom, setReceiptZoom] = useState(1);
@@ -350,10 +354,11 @@ export default function TelegramServerlessOrdersPanel({
 
   useEffect(() => {
     setReceiptOpen(false);
-    setOrderDetailTab("overview");
+    setOrderDetailTab("items");
   }, [selectedId]);
 
   const selectedOrder = orders.find((order) => order.id === selectedId || order.orderNumber === selectedId) || null;
+  const identifierMatches = selectedOrder?.matchingIdentifiers || [];
 
   useEffect(() => {
     let current = true;
@@ -403,19 +408,16 @@ export default function TelegramServerlessOrdersPanel({
       const matchesStatus = statusFilter === "all" || (order.workflow?.stage||order.status).toLowerCase() === statusFilter;
       const status = order.status.toLowerCase();
       const payment = order.paymentStatus.toLowerCase();
-      const matchesQueue = queueFilter === "all"
-        || (queueFilter === "queue" && ((status === "pending" && ["unpaid", "pending review"].includes(payment))||(status==='confirmed'&&payment==='paid')))
-        || (queueFilter === "review" && status === "pending" && (payment === "pending review" || order.payableNow <= 0))
-        || (queueFilter === "awaiting_payment" && status === "pending" && payment === "unpaid" && order.payableNow > 0 && !order.paymentProofImage)
-        || (queueFilter === "fulfillment" && ["confirmed","processing", "ready", "packed"].includes(status))
-        || (queueFilter === "courier" && status === "dispatched")
-        || (queueFilter === "completed" && ["completed", "delivered"].includes(status));
       const matchesSearch = !needle || [order.orderNumber, order.telegramName, order.telegramUsername, order.customerName, order.customerPhone,
         order.tgUserId, order.primeMemberId, order.paymentMethodName, order.status]
         .some((value) => String(value || "").toLowerCase().includes(needle));
-      return matchesStatus && matchesQueue && matchesSearch;
+      return matchesStatus && matchesSearch;
     });
-  }, [orders, search, statusFilter, queueFilter]);
+  }, [orders, search, statusFilter]);
+  useEffect(() => { setPage(1); }, [search, statusFilter]);
+  const pageCount = Math.max(1, Math.ceil(filteredOrders.length / 15));
+  const currentPage = Math.min(page, pageCount);
+  const pageOrders = filteredOrders.slice((currentPage - 1) * 15, currentPage * 15);
 
   const runAction = async (order: ServerlessOrder, action: string, extra: Record<string, any> = {}) => {
     setBusyAction(`${order.id}:${action}`);
@@ -535,19 +537,14 @@ export default function TelegramServerlessOrdersPanel({
   return (
     <section className="serverless-admin-panel serverless-orders-panel text-slate-900" aria-label="Telegram Serverless order management">
       <div className="space-y-2">
-        <header className="serverless-panel-header">
+        <header className="serverless-panel-header sticky top-0 z-20 bg-white">
           <div className="flex items-center gap-2 min-w-0">
             <button type="button" onClick={selectedOrder ? () => setSelectedId(null) : onBack}
               className="p-2 border border-slate-200 hover:bg-slate-100" aria-label={selectedOrder ? "Back to orders" : "Back to dashboard"}>
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-emerald-700 font-bold">
-                <ShieldCheck className="w-3.5 h-3.5" /> Verified Telegram staff
-              </div>
-              <h1 className="font-heading font-black uppercase text-base sm:text-lg truncate">
-                {selectedOrder ? `Order #${selectedOrder.orderNumber || selectedOrder.id}` : "Orders"}
-              </h1>
+              <h1 className="font-heading font-normal uppercase text-base sm:text-lg truncate">ORDERS</h1>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -557,24 +554,6 @@ export default function TelegramServerlessOrdersPanel({
             </button>
           </div>
         </header>
-
-        {authorized && !selectedOrder && <section aria-label="Orders needing staff attention" className="border-b border-slate-200 bg-slate-50 p-2">
-          <h2 className="mb-1.5 font-heading text-xs font-bold uppercase tracking-wider text-slate-700">Work Queue</h2>
-          <div className="grid grid-cols-2 gap-1.5">
-            {[
-              { key: "review", label: "Check payment", count: queueCounts.review, description: "Receipt or no upfront payment" },
-              { key: "awaiting_payment", label: "Waiting for payment", count: queueCounts.awaitingPayment, description: "Customer has not sent a receipt" },
-              { key: "fulfillment", label: "Prepare order", count: queueCounts.fulfillment, description: "Payment confirmed" },
-              { key: "courier", label: "With courier", count: queueCounts.courier, description: "Delivery in progress" },
-            ].map((tile) => <button key={tile.key} type="button"
-              onClick={() => { setQueueFilter(queueFilter === tile.key ? "all" : tile.key); setStatusFilter("all"); }}
-              aria-pressed={queueFilter === tile.key}
-              className={`flex min-h-[68px] min-w-0 flex-col justify-center border px-2.5 py-2 text-left ${queueFilter === tile.key ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-900"}`}>
-              <span className="flex items-center justify-between gap-2 text-[11px] font-bold leading-tight"><span>{tile.label}</span><strong className="font-mono text-base">{tile.count}</strong></span>
-              <small className={`mt-1 text-[10px] leading-tight ${queueFilter === tile.key ? "text-slate-200" : "text-slate-500"}`}>{tile.description}</small>
-            </button>)}
-          </div>
-        </section>}
 
         {error && <div role="alert" className="border border-red-200 bg-red-50 text-red-800 p-3 text-sm">{error}</div>}
         {reconciliationWarning && <div role="status" className="border border-amber-200 bg-amber-50 text-amber-900 p-3 text-sm">{reconciliationWarning} The order list is still available.</div>}
@@ -590,37 +569,32 @@ export default function TelegramServerlessOrdersPanel({
           <div className="serverless-record-list serverless-order-detail">
             <section className="prime-order-summary" aria-label="Order summary">
               <div className="prime-order-summary__top">
-                <div><span>Order Total</span><strong>{formatPHP(selectedOrder.totalAmount ?? selectedOrder.subtotal)}</strong></div>
-                <div className="prime-order-summary__badges"><span data-tone={status}>{selectedOrder.status}</span><span data-tone={payment}>{selectedOrder.paymentStatus}</span></div>
+                <div><span>Order No.</span><strong>#{selectedOrder.orderNumber || selectedOrder.id}</strong></div>
+                <div className="prime-order-summary__badges"><span data-tone={status}>{selectedOrder.workflow?.stage || selectedOrder.status}</span></div>
               </div>
               <div className="prime-order-summary__facts">
-                <div><span>Customer</span><strong>{selectedOrder.customerName || selectedOrder.telegramName || "Customer unavailable"}</strong></div>
-                <div><span>Payment</span><strong>{selectedOrder.paymentMethodName || "Not recorded"}</strong></div>
-                <div><span>Delivery</span><strong>{selectedOrder.courierName || (selectedOrder.deliveryFee > 0 ? "Delivery" : "Pickup / not recorded")}</strong></div>
+                <div><span>Amount</span><strong>{formatPHP(selectedOrder.totalAmount)}</strong></div>
+                <div><span>Placed</span><strong>{displayDate(selectedOrder.createdAt)}</strong></div>
+                <div><span>Telegram</span><strong>{selectedOrder.telegramUsername ? `@${selectedOrder.telegramUsername}` : "—"}</strong></div>
+                <div><span>PRIME™ Member ID</span><strong>{selectedOrder.primeMemberId || "—"}</strong></div>
+                <div><span>Tier</span><strong>{selectedOrder.tierLevel || "—"}</strong></div>
               </div>
-              {!canVerifyPayment && !canApproveZeroDue && !canReady && !canDispatch && !canComplete && <p className="prime-order-summary__guidance">{lifecycle?.message}</p>}
             </section>
-            {!["cancelled", "expired"].includes(status) && <div className="prime-order-progress"><ol aria-label="Order progress">
-              {["Placed", "Processing", "Ready", "Dispatched", "Completed"].map((step, index) => {
-                const done = index < stageIndex || (stageIndex === 4 && index === 4);
-                const current = index === stageIndex && stageIndex < 4;
-                return <li key={step} className={done ? "is-done" : current ? "is-current" : ""} aria-current={current ? "step" : undefined}>
-                  <span>{done ? "✓" : index + 1}</span><small>{step}</small>
-                </li>;
-              })}
-            </ol></div>}
-            {["cancelled", "expired"].includes(status) && <div className="prime-order-closed-state">This order is {status}. The normal fulfillment sequence is closed.</div>}
+            <OrderWorkflowController key={selectedOrder.id} order={selectedOrder} busy={busyAction!==''} receiptReady={Boolean(receiptUrl)} onAction={(action,extra)=>runAction(selectedOrder,action,extra)} onModify={()=>{beginEdit(selectedOrder);setOrderDetailTab('items');}} onReceipt={()=>{setReceiptZoom(1);setReceiptOpen(true);}}/>
             <nav className="prime-order-tabs" role="tablist" aria-label="Order details">
-              {(["overview", "fulfillment", "payment", "evidence"] as const).map((tab) => <button key={tab} type="button" role="tab"
+              {(["items", "fulfillment", "snapshot", "flags"] as const).map((tab) => <button key={tab} type="button" role="tab"
                 aria-selected={orderDetailTab === tab} onClick={() => setOrderDetailTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}
             </nav>
-            <section hidden={orderDetailTab !== "evidence"}>
+            <section hidden={orderDetailTab !== "flags"}>
+            {identifierMatches.map((match, index) => <div key={`${match.orderNumber}-${index}`} className="border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950">{match.signals.join(', ')} match · Order #{match.orderNumber}</div>)}
+            {(selectedOrder.fingerprintSnapshot?.ipLocation?.privacy?.isVpn || selectedOrder.fingerprintSnapshot?.ipLocation?.privacy?.isProxy) && <div className="border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950">Network privacy signal: {[selectedOrder.fingerprintSnapshot.ipLocation.privacy.isVpn && 'VPN', selectedOrder.fingerprintSnapshot.ipLocation.privacy.isProxy && 'Proxy'].filter(Boolean).join(', ')}</div>}
             {(selectedOrder.reviewStatus === "Flagged for Forensics Review" || (Array.isArray(selectedOrder.ocrAnalysis?.forensicsFlags) && selectedOrder.ocrAnalysis.forensicsFlags.length > 0)) && <section role="alert" className="border border-rose-300 bg-rose-50 p-3 text-xs text-rose-950">
               <b className="block uppercase tracking-wide">Extra Receipt Checks Needed</b>
               <span>A receipt image may have been reused or changed. This is a review signal, not proof of fraud. Check the payment in the provider account before approving it.</span>
             </section>}
             </section>
-            <section hidden={orderDetailTab !== "overview"}>
+            <section hidden={orderDetailTab !== "flags"}>{identifierMatches.length === 0 && !selectedOrder.ocrAnalysis?.forensicsFlags?.length && !selectedOrder.fingerprintSnapshot?.ipLocation?.privacy?.isVpn && !selectedOrder.fingerprintSnapshot?.ipLocation?.privacy?.isProxy && <p className="p-3 text-xs text-slate-500">No matching identifiers or receipt flags found.</p>}</section>
+            <section hidden={orderDetailTab !== "items"}>
             {(["pending", "confirmed"].includes(status)) && <details className="serverless-disclosure">
               <summary>Change order items, discount, or delivery fee</summary>
               <div className="serverless-disclosure__body space-y-2">
@@ -652,9 +626,9 @@ export default function TelegramServerlessOrdersPanel({
 
             </section>
 
-            <section hidden={orderDetailTab !== "evidence"}>
-            <details className="serverless-disclosure">
-              <summary>Optional Technical Details · Device and Location</summary>
+            <section hidden={orderDetailTab !== "snapshot"}>
+            <details className="serverless-disclosure" open>
+              <summary>Device and Location</summary>
               <div className="serverless-disclosure__body space-y-3 text-xs">
                 <p className="text-slate-600">Use these details only when an order needs extra review. Device and location signals can be incomplete or inaccurate; they do not prove fraud.</p>
                 {(() => {
@@ -662,38 +636,28 @@ export default function TelegramServerlessOrdersPanel({
                   const ip = fp.ipLocation || {};
                   const gps = fp.deviceGps || {};
                   const observation = fp.deviceLocationObservation || {};
-                  const observationGeo = observation.reverseGeocodingDetails || {};
-                  const privacy = ip.privacy || {};
-                  const flags = Object.entries(privacy).filter(([, active]) => active === true).map(([name]) => name.replace(/^is/, "").replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`).trim());
-                  const coords = (lat: unknown, lon: unknown) => Number.isFinite(Number(lat)) && Number.isFinite(Number(lon)) ? `${Number(lat).toFixed(6)}, ${Number(lon).toFixed(6)}` : "Not captured";
+                  const coords = (lat: unknown, lon: unknown) => lat != null && lon != null && lat !== '' && lon !== '' && Number.isFinite(Number(lat)) && Number.isFinite(Number(lon)) ? `${Number(lat).toFixed(6)}, ${Number(lon).toFixed(6)}` : "Not captured";
                   return <>
-                    <div><b className="block uppercase text-slate-700">Device Fingerprint</b><div className="mt-1 grid grid-cols-2 gap-2"><div><span>Fingerprint ID</span><strong className="block break-all">{fp.deviceFingerprintId || "Not captured"}</strong></div><div><span>Device / Hardware ID</span><strong className="block break-all">{[fp.deviceId, fp.hardwareId].filter(Boolean).join(" · ") || "Not captured"}</strong></div><div><span>Platform / Browser</span><strong className="block break-words">{[fp.platform, fp.browser || fp.userAgent].filter(Boolean).join(" · ") || "Not captured"}</strong></div><div><span>Screen / Timezone</span><strong className="block break-words">{[fp.screenResolution, fp.timezone].filter(Boolean).join(" · ") || "Not captured"}</strong></div></div></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">IP and Approximate Network Location</b><p className="mt-1 break-all"><b>Browser-Observed IP:</b> {ip.ip || fp.clientObservedIp || "Not captured"}</p><p className="mt-0.5 text-[10px] text-amber-800">Client-reported IP; network location is approximate and not independently verified.</p><p className="mt-1 break-words"><b>Provider / Precision:</b> {[ip.provider, ip.precision].filter(Boolean).join(" · ") || ip.status || "Not available"}</p><p className="break-words"><b>Approximate IP Area:</b> {[ip.city, ip.subdivision, ip.country, ip.postalCode].filter(Boolean).join(", ") || "Not available"}</p><p className="break-words"><b>Network:</b> {[ip.isp, ip.asn, ip.ispDomain].filter(Boolean).join(" · ") || "Not available"}</p><p><b>IP Coordinates:</b> {coords(ip.latitude, ip.longitude)} · approximate</p><p><b>Privacy Flags:</b> {flags.length ? flags.join(", ") : ip.status === "complete" ? "No flags reported" : ip.status || "Not available"}</p></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">App-Open Device Location · Client-Reported</b><p className="mt-1"><b>Coordinates:</b> {coords(observation.lat, observation.lon)}</p><p><b>Accuracy:</b> {Number.isFinite(Number(observation.accuracy)) ? `±${Math.round(Number(observation.accuracy))} m` : "Not captured"} · <b>Captured:</b> {observation.capturedAt ? displayDate(observation.capturedAt) : "Not recorded"}</p><p className="break-words"><b>Geoapify Reverse-Geocoded Result:</b> {observation.reverseGeocodedAddress || "Not available"}</p><p><b>Geoapify Result Level:</b> {observationGeo.resultType || "Not reported"} · <b>House-Level:</b> {observationGeo.houseLevelResult === true ? "Building + house number found" : "Not confirmed"}</p><p><b>Building Confidence:</b> {Number.isFinite(Number(observationGeo.buildingConfidence)) ? `${Math.round(Number(observationGeo.buildingConfidence) * 100)}%` : "Not reported"}</p><p className="text-[10px] text-amber-800">The app requests permission at launch and attaches a fresh reading to an order if available. Location and address are client-reported evidence; neither proves who placed the order or guarantees house-level accuracy.</p></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Checkout-Selected Device GPS</b><p className="mt-1"><b>Coordinates:</b> {coords(gps.lat, gps.lon)}</p><p><b>Accuracy:</b> {Number.isFinite(Number(gps.accuracy)) ? `±${Math.round(Number(gps.accuracy))} m` : "Not captured"} · <b>Captured:</b> {gps.capturedAt ? displayDate(gps.capturedAt) : "Not recorded"}</p><p className="break-words"><b>Geoapify Reverse-Geocoded Result:</b> {gps.reverseGeocodedAddress || "Not available"}</p></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Delivery Pin Address</b><p className="mt-1 break-words">{selectedOrder.deliveryAddress?.geocodedAddress || selectedOrder.deliveryAddress?.formatted || "Not available"}</p><p className="break-words text-slate-500">{selectedOrder.deliveryAddress?.unitDetails || "No unit or landmark details"}</p></div>
+                    <div><b className="block uppercase text-slate-700">Device Fingerprint</b><div className="mt-1 grid grid-cols-2 gap-2"><div><span>Fingerprint ID</span><strong className="block break-all">{fp.deviceFingerprintId || "Not captured"}</strong></div><div><span>Device / Hardware ID</span><strong className="block break-all">{[fp.deviceId, fp.hardwareId].filter(Boolean).join(" · ") || "Not captured"}</strong></div><div><span>Platform / Browser</span><strong className="block break-words">{[fp.platform, fp.browser || fp.userAgent].filter(Boolean).join(" · ") || "Not captured"}</strong></div><div><span>Graphics</span><strong className="block break-words">{fp.graphics || "Not captured"}</strong></div><div><span>Driver</span><strong className="block break-words">{fp.driver || "Not captured"}</strong></div></div></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">IP and Approximate Network Location</b><p className="mt-1 break-all"><b>Browser-Observed IP:</b> {ip.ip || fp.clientObservedIp || "Not captured"}</p><p className="mt-0.5 text-[10px] text-amber-800">Client-reported IP; network location is approximate and not independently verified.</p><p className="mt-1 break-words"><b>Provider / Precision:</b> {[ip.provider === "IPLocate" ? "IPLocate" : ip.provider ? "Previous snapshot" : "", ip.precision].filter(Boolean).join(" · ") || "Not available"}</p><p className="break-words"><b>Approximate IP Area:</b> {[ip.city, ip.subdivision, ip.country, ip.postalCode].filter(Boolean).join(", ") || "Not available"}</p><p className="break-words"><b>Network:</b> {[ip.isp, ip.asn, ip.ispDomain].filter(Boolean).join(" · ") || "Not available"}</p><p><b>IP Coordinates:</b> {coords(ip.latitude, ip.longitude)} · approximate</p><p><b>TomTom approximate address:</b> {ip.reverseGeocodingProvider === "TomTom" ? ip.reverseGeocodedAddress : "Not available"}</p><p><b>VPN / Proxy:</b> {ip.privacy ? `${ip.privacy.isVpn ? "VPN" : "No VPN reported"} · ${ip.privacy.isProxy ? "Proxy" : "No proxy reported"}` : "Not available"}</p></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">App-Open Device Location · Client-Reported</b><p className="mt-1"><b>Coordinates:</b> {coords(observation.lat, observation.lon)}</p><p><b>Accuracy:</b> {Number.isFinite(Number(observation.accuracy)) ? `±${Math.round(Number(observation.accuracy))} m` : "Not captured"} · <b>Captured:</b> {observation.capturedAt ? displayDate(observation.capturedAt) : "Not recorded"}</p><p className="break-words"><b>TomTom address:</b> {observation.reverseGeocodingProvider === "TomTom" ? observation.reverseGeocodedAddress : "Not available"}</p><p className="text-[10px] text-amber-800">The app requests permission at launch and attaches a fresh reading to an order if available. Location and address are client-reported evidence; neither proves who placed the order or guarantees house-level accuracy.</p></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Checkout-Selected Device GPS</b><p className="mt-1"><b>Coordinates:</b> {coords(gps.lat, gps.lon)}</p><p><b>Accuracy:</b> {Number.isFinite(Number(gps.accuracy)) ? `±${Math.round(Number(gps.accuracy))} m` : "Not captured"} · <b>Captured:</b> {gps.capturedAt ? displayDate(gps.capturedAt) : "Not recorded"}</p><p className="break-words"><b>TomTom address:</b> {gps.reverseGeocodingProvider === "TomTom" ? gps.reverseGeocodedAddress : "Not available"}</p></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Delivery Pin Address</b><p className="mt-1 break-words">{selectedOrder.deliveryAddress?.geocodingProvider === "TomTom" ? selectedOrder.deliveryAddress.geocodedAddress : selectedOrder.deliveryAddress?.formatted || "Not available"}</p><p className="break-words text-slate-500">{selectedOrder.deliveryAddress?.unitDetails || "No unit or landmark details"}</p></div>
                   </>;
                 })()}
               </div>
             </details>
             </section>
 
-            <section hidden={orderDetailTab !== "payment"}>
-            <details className="serverless-disclosure">
-              <summary>Customer and Payment Details</summary>
+            <section hidden={orderDetailTab !== "snapshot"}>
+            <details className="serverless-disclosure" open>
+              <summary>Customer Identity</summary>
               <div className="serverless-disclosure__body"><div className="serverless-fields text-xs">
                 <div><span>Telegram Name</span><strong>{selectedOrder.telegramName || "Name unavailable"}</strong></div>
                 <div><span>Telegram Handle</span>{/^[A-Za-z0-9_]{5,32}$/.test(selectedOrder.telegramUsername) ? <a href={`https://t.me/${encodeURIComponent(selectedOrder.telegramUsername)}`} target="_blank" rel="noreferrer" className="font-bold text-sky-700 underline">@{selectedOrder.telegramUsername}</a> : <strong>No Public Handle</strong>}</div>
                 <div><span>Telegram ID</span><strong>{selectedOrder.tgUserId || "—"}</strong></div>
                 <div><span>PRIME ID</span><strong>{selectedOrder.primeMemberId || "—"}</strong></div>
-                <div><span>Order Status</span><strong>{selectedOrder.status}</strong></div>
-                <div><span>Payment Status</span><strong>{selectedOrder.paymentStatus}</strong></div>
-                {selectedOrder.paymentReceivedAmount != null && <div><span>Provider Verified</span><strong>{formatPHP(selectedOrder.paymentReceivedAmount)}</strong></div>}
-                {selectedOrder.confirmedPaidAmount != null && <div><span>Applied to Order</span><strong>{formatPHP(selectedOrder.confirmedPaidAmount)}</strong></div>}
-                <div><span>Placed</span><strong>{displayDate(selectedOrder.createdAt)}</strong></div>
-                <div><span>Payment Method</span><strong>{selectedOrder.paymentMethodName || "—"}</strong></div>
-                {status === "pending" && selectedOrder.payableNow > 0 && paymentDeadlineMs(selectedOrder) !== null && <div><span>Payment Deadline</span><strong className="text-amber-700">{displayDate(paymentDeadlineMs(selectedOrder))}</strong></div>}
-                {status === "expired" && <div><span>Payment Window Ended</span><strong>{paymentDeadlineMs(selectedOrder) === null ? "time unavailable" : displayDate(paymentDeadlineMs(selectedOrder))}</strong></div>}
+                <div><span>Tier status</span><strong>{selectedOrder.tierLevel || "—"}</strong></div>
               </div></div>
             </details>
 
@@ -715,15 +679,21 @@ export default function TelegramServerlessOrdersPanel({
             </section>
 
             <section hidden={orderDetailTab !== "fulfillment"}>
-            <OrderWorkflowController key={selectedOrder.id} order={selectedOrder} busy={busyAction!==''} onAction={(action,extra)=>runAction(selectedOrder,action,extra)} onModify={()=>{beginEdit(selectedOrder);setOrderDetailTab('overview');}}/>
-            <details className="serverless-disclosure">
-              <summary>Dispatch Details</summary>
+            <details className="serverless-disclosure" open>
+              <summary>Delivery Details</summary>
               <div className="serverless-disclosure__body"><div className="serverless-fields text-xs">
+                {copyField("Telegram name", selectedOrder.telegramName, "telegram-name")}
+                {copyField("Telegram handle", selectedOrder.telegramUsername ? `@${selectedOrder.telegramUsername}` : "", "telegram-handle")}
+                {copyField("PRIME™ Member ID", selectedOrder.primeMemberId, "member-id")}
+                <div><span>Tier</span><strong>{selectedOrder.tierLevel || "—"}</strong></div>
                 {copyField("Receiver name", receiverName, "receiver-name")}
                 {copyField("Receiver phone", receiverPhone, "receiver-phone")}
                 {copyField("Delivery address", [addressText(selectedOrder.deliveryAddress), selectedOrder.deliveryAddress?.unitDetails].filter(Boolean).join(" · "), "delivery-address")}
                 {copyField("Delivery notes / instructions", deliveryNotes, "delivery-notes")}
                 <div><span>Courier</span><strong>{selectedOrder.courierName || "—"}</strong></div>
+                <div><span>Courier payment</span><strong>{selectedOrder.deliveryAddress?.courierPaymentMode === "upon_delivery" || (!selectedOrder.deliveryAddress?.courierPaymentMode && selectedOrder.payableOnDelivery > 0) ? "PUD · pay on arrival" : "PUC · paid at checkout"}</strong></div>
+                <div><span>Estimated travel time</span><strong>{selectedOrder.deliveryAddress?.estimatedTravelMinutes != null ? `${selectedOrder.deliveryAddress.estimatedTravelMinutes} min` : "—"}</strong></div>
+                <div><span>Estimated distance</span><strong>{selectedOrder.deliveryAddress?.distanceKm != null ? `${selectedOrder.deliveryAddress.distanceKm} km` : "—"}</strong></div>
                 <div><span>Tracking Number</span><strong>{selectedOrder.trackingNumber || "—"}</strong></div>
                 {selectedOrder.trackingUrl && <div className="serverless-order-tracking"><span>Customer Tracking Link</span><a href={selectedOrder.trackingUrl} target="_blank" rel="noreferrer"><ExternalLink /> Open tracking URL</a></div>}
                 <div><span>Dispatched</span><strong>{displayDate(selectedOrder.dispatchedAt)}</strong></div>
@@ -732,7 +702,7 @@ export default function TelegramServerlessOrdersPanel({
             </details>
             </section>
 
-            <section hidden={orderDetailTab !== "overview"}>
+            <section hidden={orderDetailTab !== "items"}>
             <details className="serverless-disclosure" open>
               <summary>Items and Totals</summary>
               <div className="serverless-disclosure__body">
@@ -771,15 +741,7 @@ export default function TelegramServerlessOrdersPanel({
             </details>
             </section>
 
-            <section hidden={orderDetailTab !== "payment"}>
-            {selectedOrder.paymentProofImage && (
-              <section className="serverless-disclosure"><div className="serverless-disclosure__body serverless-order-receipt-row">
-                <div><b>Payment Receipt Attached</b><small>Open only when you need to inspect the proof.</small></div>
-                <button type="button" disabled={!receiptUrl} onClick={() => { setReceiptZoom(1); setReceiptOpen(true); }}><Eye /> View Receipt</button>
-              </div></section>
-            )}
-            </section>
-            <section hidden={orderDetailTab !== "evidence"}>
+            <section hidden={orderDetailTab !== "flags"}>
             {selectedOrder.ocrAnalysis && <details className="serverless-disclosure"><summary>Receipt Check Details</summary><div className="serverless-disclosure__body space-y-1 text-xs">
               <b>Automated image checks · staff payment verification still required</b>
               {selectedOrder.ocrAnalysis.forensicsResult && <p>{selectedOrder.ocrAnalysis.forensicsResult}</p>}
@@ -790,7 +752,7 @@ export default function TelegramServerlessOrdersPanel({
               <p className="font-bold text-amber-800">Image matches are review clues only. They do not prove payment or image tampering. Verify the transaction directly with the payment provider.</p>
             </div></details>}
             </section>
-            <section hidden={orderDetailTab !== "overview"}>
+            <section hidden={orderDetailTab !== "fulfillment"}>
             {selectedOrder.notes && <details className="serverless-disclosure"><summary>Order Notes</summary><div className="serverless-disclosure__body text-xs">{selectedOrder.notes}</div></details>}
             </section>
 
@@ -844,23 +806,27 @@ export default function TelegramServerlessOrdersPanel({
 
         {authorized && !selectedOrder && (
           <div className="space-y-2">
-            <div className="serverless-panel-toolbar grid grid-cols-1 sm:grid-cols-2">
-              <label className="serverless-search"><Search aria-hidden="true" className="w-4 h-4" /><input aria-label="Search orders" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search order, customer, Telegram ID" /></label>
-              <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setQueueFilter("all"); }} className="w-full min-w-0 border border-slate-200 px-3 py-2 text-xs">
+            <div className="serverless-panel-toolbar grid grid-cols-2 gap-1.5">
+              <label className="serverless-search min-w-0"><Search aria-hidden="true" className="w-4 h-4 shrink-0" /><input aria-label="Search orders" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label>
+              <select aria-label="Status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full min-w-0 border border-slate-200 px-2 py-2 text-xs font-mono">
                 <option value="all">All Statuses</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="failed">Failed</option><option value="held">Held</option><option value="processing">Processing</option><option value="ready">Ready</option><option value="packed">Packed</option><option value="dispatched">Dispatched</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="expired">Expired</option>
               </select>
             </div>
             {filteredOrders.length === 0 && !loading ? (
               <div className="bg-white border border-slate-200 p-8 text-center text-sm text-slate-500"><Clock3 className="w-6 h-6 mx-auto mb-2 text-slate-300" />No Serverless orders match this filter.</div>
-            ) : filteredOrders.map((order) => (
-              <article key={order.id} className="serverless-record">
+            ) : pageOrders.map((order) => (
+              <article key={order.id} className="serverless-record serverless-order-compact" data-status={String(order.workflow?.stage || order.status).toLowerCase()}>
                 <button type="button" onClick={() => setSelectedId(order.id)} className="serverless-record__summary w-full text-left">
-              <span className="serverless-record__copy"><strong>#{order.orderNumber || order.id} · {formatPHP(order.totalAmount ?? order.subtotal)}</strong><small>{order.telegramName || "Telegram user"} · {order.status} / {order.paymentStatus}</small><small>{displayDate(order.createdAt)} · {order.items.map((item: any) => item.name || item.productName || "Item").join(", ") || "No item details"}</small></span>
-                  {order.paymentProofImage && <span className="text-[9px] text-emerald-700 font-bold uppercase">Receipt</span>}
+                  <span className="serverless-record__copy">
+                    <strong className="flex justify-between gap-2 font-mono"><span>#{order.orderNumber || order.id}</span><span>{formatPHP(order.totalAmount)}</span></strong>
+                    <small className="flex justify-between gap-2"><span>{order.customerName || order.telegramName || "—"}</span><b className="serverless-order-status">{order.workflow?.stage || order.status}</b></small>
+                    <small className="font-mono">{order.telegramUsername ? `@${order.telegramUsername}` : "No handle"} · {order.primeMemberId || "No PRIME™ ID"}</small>
+                    <small className="font-mono">{order.courierName || "Courier —"} · {order.deliveryAddress?.courierPaymentMode === "upon_delivery" || (!order.deliveryAddress?.courierPaymentMode && order.payableOnDelivery > 0) ? "PUD" : "PUC"}</small>
+                  </span>
                 </button>
-                <details className="serverless-disclosure serverless-record__details"><summary>Order Overview</summary><div className="serverless-disclosure__body"><div className="serverless-fields text-xs"><div><span>Payment Method</span><strong>{order.paymentMethodName || "—"}</strong></div><div><span>Payment Deadline</span><strong>{paymentDeadlineMs(order) === null ? "—" : displayDate(paymentDeadlineMs(order))}</strong></div><div><span>Delivery Address</span><strong>{addressText(order.deliveryAddress)}</strong></div><div><span>Total</span><strong>{formatPHP(order.totalAmount ?? order.subtotal)}</strong></div></div></div></details>
               </article>
             ))}
+            {filteredOrders.length > 15 && <nav className="flex items-center justify-between gap-2 p-2 text-xs font-mono" aria-label="Order pages"><button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Previous</button><span>{currentPage}/{pageCount}</span><button type="button" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Next</button></nav>}
           </div>
         )}
       </div>

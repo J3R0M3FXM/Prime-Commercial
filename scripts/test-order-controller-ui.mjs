@@ -19,23 +19,30 @@ const button=label=>[...document.querySelectorAll('button')].find(node=>node.tex
 async function render(stage,extra={}) {
   const order={id:'order-'+stage,status:['Failed','Held'].includes(stage)?'Pending':stage,controlState:stage.toLowerCase(),paymentStatus:['Confirmed','Processing','Ready','Dispatched'].includes(stage)?'Paid':'Pending Review',payableNow:100,paymentProofImage:'proof',workflow:{stage,actions:expected[stage],receiptFailures:stage==='Held'?1:0,resubmitExpiresAt:null,editState:'',refundedCredits:0,...extra}};
   assert.deepEqual(workflowActions(order),expected[stage]);
-  await act(async()=>root.render(createElement(Component,{key:stage,order,busy:false,onModify:()=>calls.push({action:'modify'}),onAction:async(action,input)=>{calls.push({action,input});return true;}})));
+  await act(async()=>root.render(createElement(Component,{key:stage,order,busy:false,onModify:()=>calls.push({action:'modify'}),onReceipt:()=>calls.push({action:'receipt'}),onAction:async(action,input)=>{calls.push({action,input});return true;}})));
   return order;
 }
 for(const stage of Object.keys(expected)) {
   await render(stage);
-  for(const [label,action] of [['Review','review'],['Hold','hold'],['Modify','modify'],['Cancel','cancel']])assert.equal(button(label).disabled,!expected[stage].includes(action),stage+' '+label);
-  for(const node of document.querySelectorAll('section[aria-label="Order Controller"] button')) assert.ok(node.classList.contains('prime-workflow-button'),'All controller buttons share the progression style');
+  if (['Pending','Failed','Held'].includes(stage)) {
+    for(const [label,action] of [['Validate','review'],['Hold','hold'],['Modify','modify'],['Cancel','cancel']])assert.equal(button(label).disabled,!expected[stage].includes(action),stage+' '+label);
+  } else if (stage==='Confirmed') assert.equal(button('Processing').disabled,false);
+  for(const node of document.querySelectorAll('section[aria-label="Order actions"] button')) assert.ok(node.classList.contains('prime-workflow-button'),'All controller buttons share the progression style');
   assert.equal(Boolean(document.querySelector('input[type="url"]')),stage==='Ready','Tracking is entered only at dispatch');
   assert.equal(document.querySelectorAll('table').length,0);
 }
-await render('Pending');await act(async()=>button('Review').click());
+await render('Pending');await act(async()=>button('Validate').click());
 assert.equal(document.querySelector('input[type="number"]'),null,'Exact confirmation requires no amount entry');
-assert.match(document.querySelector('section[aria-label="Order Controller"]').textContent,/after checking the provider transaction/i);
+assert.match(document.querySelector('section[aria-label="Order actions"]').textContent,/Verify the transaction with the provider/i);
 assert.equal(button('Confirm Payment').disabled,false);
 await act(async()=>button('Confirm Payment').click());
 assert.deepEqual(calls.at(-1),{action:'markPaid',input:{confirmedAmount:100,expectedPayableNow:100,providerVerified:true}},'One click confirms only the displayed exact amount');
-await render('Pending');await act(async()=>button('Review').click());
+await act(async()=>root.render(createElement(Component,{key:'zero-due',order:{id:'zero-due',status:'Pending',paymentStatus:'Unpaid',payableNow:0,paymentProofImage:'',workflow:{stage:'Pending',actions:expected.Pending,receiptFailures:0,resubmitExpiresAt:null,editState:'',refundedCredits:0}},busy:false,onModify:()=>{},onReceipt:()=>{},onAction:async(action,input)=>{calls.push({action,input});return true;}})));
+await act(async()=>button('Validate').click());
+assert.equal(button('Confirm Payment'),undefined,'No receipt means no provider payment action');
+await act(async()=>button('Approve Zero Due').click());
+assert.equal(calls.at(-1).action,'approveZeroDue');
+await render('Pending');await act(async()=>button('Validate').click());
 await act(async()=>button('Overpayment').click());
 assert.ok(document.querySelector('input[type="number"]'),'Only overpayments request an amount');
 assert.equal(button('Confirm Payment').disabled,true,'Exact confirmation is locked while entering an overpayment');
@@ -49,7 +56,7 @@ await render('Held');await act(async()=>button('Request Resubmit · One Hour').c
 await render('Held',{resubmitExpiresAt:Date.now()+3600000});assert.equal(button('Request Resubmit · One Hour').disabled,true);
 await render('Dispatched');await act(async()=>button('Completed').click());assert.equal(calls.at(-1).action,'complete');
 await render('Completed');
-assert.ok([...document.querySelectorAll('section[aria-label="Order Controller"] button')].every(node=>node.matches(':disabled')),'All completed-order staff controls are disabled');
+assert.ok([...document.querySelectorAll('section[aria-label="Order actions"] button')].every(node=>node.matches(':disabled')),'All completed-order staff controls are disabled');
 await render('Confirmed',{editState:'pending',editRequest:{receiverName:'<script>Not HTML</script>',receiverPhone:'09123456789',deliveryAddress:{unitDetails:'Unit 1'}}});
 assert.equal(button('Processing').disabled,true);assert.equal(document.querySelectorAll('script').length,0);
 await act(async()=>button('Approve Edit').click());assert.equal(calls.at(-1).action,'approveCustomerEdit');
@@ -57,7 +64,7 @@ const panel=readFileSync('app/components/admin/telegram-serverless-orders-panel.
 const style=readFileSync('app/admin/admin-portrait.css','utf8');
 assert.match(style,/prime-workflow-button[\s\S]*?font-family:\s*'Roboto Condensed'[\s\S]*?font-weight:\s*600[\s\S]*?text-transform:\s*uppercase/);
 assert.match(style,/prime-workflow-button:disabled/);
-assert.ok(panel.indexOf('<OrderWorkflowController')>panel.indexOf('hidden={orderDetailTab !== "fulfillment"}'));
+assert.ok(panel.indexOf('<OrderWorkflowController')<panel.indexOf('<nav className="prime-order-tabs"'));
 assert.doesNotMatch(panel,/NEXT Action/,'The duplicate global controller was removed');
 const checkout=readFileSync('app/components/checkout-modal.tsx','utf8'),tree=ts.createSourceFile('checkout.tsx',checkout,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
 let scanGuard;

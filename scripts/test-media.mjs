@@ -682,7 +682,7 @@ assert.equal(gallery.paginateMedia(fixtures, 0).page, 1);
 globalThis.fetch = originalFetch;
 assert.match(
   readFileSync("app/components/video-gallery.css", "utf8"),
-  /repeat\(3,\s*minmax\(0,\s*1fr\)\)/,
+  /repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
 );
 console.log(
   "PASS: offline streamed persistence, account isolation, incomplete-copy rejection, removal and pagination clamps.",

@@ -14,7 +14,7 @@ export function normalizeDeliveryRate(raw) {
     nightDifferential: money(raw?.nightDifferential ?? raw?.night_differential),
     timeBasedFeePerMinute: money(raw?.timeBasedFeePerMinute ?? raw?.time_based_fee_per_minute),
     maxDistanceKm: Number.isFinite(Number(raw?.maxDistanceKm)) && Number(raw.maxDistanceKm) > 0 ? Number(raw.maxDistanceKm) : null,
-    pricingBands: bands.map((band) => ({ fromKm: Math.max(0, Number(band?.fromKm) || 0), toKm: Number.isFinite(Number(band?.toKm)) ? Number(band.toKm) : null, ratePerKm: money(band?.ratePerKm) })).filter((band) => band.ratePerKm >= 0).sort((a,b) => a.fromKm-b.fromKm),
+    pricingBands: bands.map((band) => ({ fromKm: Math.max(0, Number(band?.fromKm) || 0), toKm: band?.toKm == null || band.toKm === '' ? null : Number(band.toKm), ratePerKm: money(band?.ratePerKm) })).filter((band) => band.ratePerKm >= 0).sort((a,b) => a.fromKm-b.fromKm),
   };
 }
 
