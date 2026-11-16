@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
+import { Fingerprint } from 'lucide-react';
 
 interface SplashScreenProps { title?: string; subtitle?: string; }
 
@@ -23,14 +24,19 @@ export default function SplashScreen({ title = 'INITIALIZING SECURE SESSION', su
         <div className="prime-splash-network" aria-label="Secure connection loading illustration">
           <div className="prime-splash-artwork">
             <img src="/prime-splash-connection.png" alt="Phone securely connecting to PRIME servers" />
-            <div className="prime-splash-phone-progress" aria-label={`Loading ${progress}%`}>
-              <div className="prime-splash-phone-progress__fill" style={{ width: `${progress}%` }}><span>{progress}%</span></div>
+            <div className="prime-splash-phone-auth" aria-label="Fingerprint scan in progress">
+              <Fingerprint aria-hidden="true" />
+              <span className="prime-splash-fingerprint-scan" aria-hidden="true" />
+              <span className="prime-splash-fingerprint-dots" aria-hidden="true"><i /><i /><i /></span>
             </div>
             <div className="prime-splash-connection-flow" aria-hidden="true"><i /><i /><i /></div>
             <div className="prime-splash-server-lights" aria-hidden="true">
               {['green','green','blue','green','orange','green','red','green','green','blue','green','orange'].map((color, index) => <i key={index} className={`prime-splash-server-light prime-splash-server-light--${color}`} />)}
             </div>
           </div>
+        </div>
+        <div className="prime-splash-progress" aria-label={`Loading ${progress}%`}>
+          <div className="prime-splash-progress__fill" style={{ width: `${progress}%` }}><span>{progress}%</span></div>
         </div>
         <div className="text-center space-y-1.5 z-10 px-4">
           <h1 className="font-heading text-base sm:text-lg font-bold uppercase tracking-wider text-slate-900 break-words">{title}</h1>
