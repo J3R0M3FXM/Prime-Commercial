@@ -2523,7 +2523,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   background: #f4f6f9 url('/prime-header-art.png') center / 100% 100% no-repeat !important;
 }
 #mobile-portrait-viewport .prime-identity-header__logo {
-  width: 42%; max-width: 42%; height: 100%; flex: 0 1 auto;
+  width: calc(42% - 2px); max-width: calc(42% - 2px); height: 100%; flex: 0 1 auto;
   object-fit: contain; object-position: left center; align-self: center;
   margin-left: -6px !important;
   transform: none !important;
