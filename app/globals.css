@@ -939,8 +939,32 @@ body.splash-active #system-wide-proprietary-footer {
   display: none !important;
 }
 
-/* Light network handoff animation used by the web app and the APK shell. */
-.prime-splash-network { width: min(100%, 340px); margin: 0 auto 18px; }
+/* Secure-session illustration. The uploaded artwork stays intact; live state is layered only over its embedded demo bar. */
+.prime-splash-network { width: min(100%, 390px); margin: 0 auto 14px; }
+.prime-splash-artwork { position: relative; isolation: isolate; }
+.prime-splash-artwork > img { display: block; width: 100%; height: auto; }
+.prime-splash-artwork::before { content: ''; position: absolute; z-index: 1; left: 14.9%; top: 58.2%; width: 17.2%; height: 14.3%; background: #fff; }
+.prime-splash-phone-progress { position: absolute; z-index: 2; left: 15.55%; top: 67.4%; width: 15.65%; height: 3.55%; overflow: hidden; border-radius: 999px; background: #bed8f2; box-shadow: inset 0 1px 2px rgb(15 23 42 / 14%); }
+.prime-splash-phone-progress__fill { display: grid; height: 100%; min-width: 22%; place-items: center; overflow: hidden; border-radius: inherit; background: #17bd63; transition: width .25s ease-out; }
+.prime-splash-phone-progress__fill span { color: #fff; font: 800 clamp(5px, 1.65vw, 7px) 'Lato Condensed', 'Lato', sans-serif; line-height: 1; text-shadow: 0 1px 1px rgb(0 80 38 / 45%); }
+.prime-splash-connection-flow { position: absolute; z-index: 2; left: 36.2%; top: 30%; width: 28%; height: 42%; pointer-events: none; }
+.prime-splash-connection-flow i { position: absolute; width: 5.2%; aspect-ratio: 1; border-radius: 50%; background: #147be8; box-shadow: 0 0 7px rgb(20 123 232 / 65%); animation: prime-splash-packet 2.1s linear infinite; }
+.prime-splash-connection-flow i:nth-child(1) { left: 7%; top: 17%; }
+.prime-splash-connection-flow i:nth-child(2) { right: 5%; top: 24%; animation-delay: -.7s; }
+.prime-splash-connection-flow i:nth-child(3) { left: 46%; bottom: 13%; animation-delay: -1.4s; }
+.prime-splash-server-lights { position: absolute; z-index: 2; inset: 0; pointer-events: none; }
+.prime-splash-server-light { position: absolute; width: 2.35%; aspect-ratio: 1; border-radius: 50%; opacity: .84; box-shadow: 0 0 5px currentColor; animation: prime-splash-light-blink 1.8s ease-in-out infinite; }
+.prime-splash-server-light--green { color: #32df1f; background: #32df1f; }
+.prime-splash-server-light--red { color: #ff4854; background: #ff4854; animation-delay: -.35s; }
+.prime-splash-server-light--blue { color: #38bdf8; background: #38bdf8; animation-delay: -.9s; }
+.prime-splash-server-light--orange { color: #ff9f24; background: #ff9f24; animation-delay: -1.3s; }
+.prime-splash-server-light:nth-child(3n + 1) { left: 79.35%; }
+.prime-splash-server-light:nth-child(3n + 2) { left: 81.55%; }
+.prime-splash-server-light:nth-child(3n) { left: 83.75%; }
+.prime-splash-server-light:nth-child(-n + 3) { top: 30.1%; }
+.prime-splash-server-light:nth-child(n + 4):nth-child(-n + 6) { top: 44.1%; }
+.prime-splash-server-light:nth-child(n + 7):nth-child(-n + 9) { top: 58.1%; }
+.prime-splash-server-light:nth-child(n + 10) { top: 72.1%; }
 #mobile-portrait-viewport .prime-splash-copyright, #mobile-portrait-viewport .prime-splash-copyright div { font-family: 'Lato', sans-serif !important; font-weight: 400 !important; }
 .prime-splash-server-art { display: block; width: 100%; height: auto; overflow: visible; }
 .prime-splash-cloud { animation: prime-splash-cloud-drift 6s ease-in-out infinite alternate; }
@@ -953,8 +977,9 @@ body.splash-active #system-wide-proprietary-footer {
 .prime-splash-light--blue { fill: #38bdf8; }
 @keyframes prime-splash-cloud-drift { from { transform: translate(0, 0); } to { transform: translate(2px, -2px); } }
 @keyframes prime-splash-light-blink { 0%, 100% { opacity: .3; } 45% { opacity: 1; } }
+@keyframes prime-splash-packet { 0%, 100% { opacity: .15; transform: scale(.65); } 45% { opacity: 1; transform: scale(1.25); } }
 @media (prefers-reduced-motion: reduce) {
-  .prime-splash-cloud, .prime-splash-light { animation: none; }
+  .prime-splash-cloud, .prime-splash-light, .prime-splash-server-light, .prime-splash-connection-flow i { animation: none; }
 }
 
 
@@ -2678,7 +2703,6 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 @media (prefers-reduced-motion: reduce) { .prime-upload-scan span, .prime-success-check { animation: none; } }
 
 /* Uploaded brand image: displayed unchanged, only sized and framed for each surface. */
-.prime-splash-network { width: min(100%, 390px); margin: 0 auto 18px; }
 .prime-splash-brand, .prime-splash-footer-brand { display: block; width: 100%; height: auto; object-fit: contain; filter: drop-shadow(0 3px 8px rgb(15 23 42 / 22%)); }
 .prime-splash-footer-brand { width: min(100%, 300px); }
 
