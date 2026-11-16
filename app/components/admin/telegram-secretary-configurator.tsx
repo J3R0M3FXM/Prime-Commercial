@@ -136,7 +136,6 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [chats, setChats] = useState<any[]>([]);
   const [selected, setSelected] = useState<Flow | null>(null);
-  const [expandedButton, setExpandedButton] = useState("");
   const [stepTab, setStepTab] = useState<"trigger" | "reply" | "buttons">("trigger");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -362,7 +361,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
         </div>
         <div className="secretary-header-actions">
           <button type="button" onClick={() => window.location.reload()}><RefreshCw className="w-4 h-4" /> Reload</button>
-          <button type="button" disabled={busy || uploadingPhoto} onClick={() => { setSection("steps"); setSelected(makeFlow()); setExpandedButton(""); setStepTab("trigger"); setNotice(""); }}><Plus className="w-4 h-4" /> New Step</button>
+          <button type="button" disabled={busy || uploadingPhoto} onClick={() => { setSection("steps"); setSelected(makeFlow()); setStepTab("trigger"); setNotice(""); }}><Plus className="w-4 h-4" /> New Step</button>
         </div>
       </header>
 
@@ -434,7 +433,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
         {loading ? <div className="admin-empty"><p>Loading Secretary steps…</p></div> : displayedFlows.length === 0 ? <div className="admin-empty"><MessageSquare className="admin-empty__icon" /><strong>No Steps Configured</strong><p>Add a step to begin building the reply flow.</p></div> : displayedFlows.map((flow) => {
           const isOpen = selected?.id === flow.id;
           const inbound = flows.reduce((sum, item) => sum + item.buttons.filter((button) => button.targetFlowId === flow.id).length, 0);
-          return <details key={flow.id} open={isOpen} className="secretary-step-card" onToggle={(event) => { const open = event.currentTarget.open; if (open && selected?.id !== flow.id) { setSelected(flow); setExpandedButton(""); setStepTab("trigger"); } else if (!open && selected?.id === flow.id) setSelected(null); }}>
+          return <details key={flow.id} open={isOpen} className="secretary-step-card" onToggle={(event) => { const open = event.currentTarget.open; if (open && selected?.id !== flow.id) { setSelected(flow); setStepTab("trigger"); } else if (!open && selected?.id === flow.id) setSelected(null); }}>
             <summary className="secretary-step-summary">
               <span className={`secretary-step-indicator ${flow.active ? "is-active" : ""}`} />
               <span className="min-w-0 flex-1"><strong>{flow.name}</strong><small>{inbound} incoming · {flow.buttons.length} buttons{settings.welcomeFlowId === flow.id ? " · Welcome" : ""}</small></span>
@@ -472,18 +471,19 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
                 <div className="secretary-step-intro"><strong>Add optional reply buttons</strong><p>Buttons are attached below the message. Choose whether each one opens another step, edits this reply, or opens a website.</p></div>
                 <div className="space-y-2">
                   {selected.buttons.map((button, index) => {
-                    const open = expandedButton === button.id;
                     const bytes = callbackBytes(selected.id || "new", button.id);
                     return <div key={button.id} className="secretary-button-card">
-                      <label className="block"><span className="label-mini">Button {index + 1} · Label</span><span className="secretary-help">Short text displayed on the button in Telegram.</span><input value={button.text} onChange={(event) => updateButton(index, { text: event.target.value })} className="control-mini w-full" placeholder="Button label" /></label>
-                      <label className="block"><span className="label-mini">Button Action</span><span className="secretary-help">Open a saved step, replace the current message with another reply, or open a web link.</span><select value={button.action} onChange={(event) => updateButton(index, { action: event.target.value as Action })} className="control-mini w-full"><option value="flow">Open Another Step</option><option value="reply">Edit This Message</option><option value="url">Open A Link</option></select></label>
-                      <button type="button" aria-expanded={open} onClick={() => setExpandedButton(open ? "" : button.id)} className="text-[10px] font-bold uppercase text-slate-700">{open ? "Hide Action Settings" : "Show Action Settings"}</button>
-                      {open && <div className="space-y-2">
-                        {button.action === "flow" && <label className="block"><span className="label-mini">Target Step</span><span className="secretary-help">The step customers open after pressing this button.</span><select value={button.targetFlowId} onChange={(event) => updateButton(index, { targetFlowId: event.target.value })} className="control-mini w-full"><option value="">Select Next Step</option>{flows.filter((item) => item.id !== selected.id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
-                        {button.action === "reply" && <label className="block"><span className="label-mini">In-Place Response</span><span className="secretary-help">New text that replaces the message in the same chat bubble when pressed.</span><textarea value={button.response} onChange={(event) => updateButton(index, { response: event.target.value })} className="control-mini min-h-[72px] w-full resize-y" placeholder="The same message bubble is edited." /></label>}
-                        {button.action === "url" && <label className="block"><span className="label-mini">Destination URL</span><span className="secretary-help">A complete website address opened when customers press this button.</span><input value={button.url} onChange={(event) => updateButton(index, { url: event.target.value })} className="control-mini w-full" placeholder="https://…" /></label>}
-                        <div className="flex items-center justify-between gap-2"><span className={`text-[10px] font-mono ${bytes > 64 ? "text-red-600 font-bold" : "text-slate-400"}`}>Callback {bytes}/64 Bytes</span><button type="button" onClick={() => removeButton(index)} className="h-7 px-2 border border-red-200 text-red-600 text-[10px] font-bold uppercase">Remove Button</button></div>
-                      </div>}
+                      <div className="secretary-button-card__heading"><strong>Button {index + 1}</strong><span>Telegram reply control</span></div>
+                      <div className="secretary-button-card__basics">
+                        <label className="block"><span className="label-mini">Label</span><input value={button.text} onChange={(event) => updateButton(index, { text: event.target.value })} className="control-mini w-full" placeholder="Button label" /></label>
+                        <label className="block"><span className="label-mini">Action</span><select value={button.action} onChange={(event) => updateButton(index, { action: event.target.value as Action })} className="control-mini w-full"><option value="flow">Open Another Step</option><option value="reply">Edit This Message</option><option value="url">Open A Link</option></select></label>
+                      </div>
+                      <div className="secretary-button-card__action">
+                        {button.action === "flow" && <label className="block"><span className="label-mini">Target Step</span><select value={button.targetFlowId} onChange={(event) => updateButton(index, { targetFlowId: event.target.value })} className="control-mini w-full"><option value="">Select Next Step</option>{flows.filter((item) => item.id !== selected.id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+                        {button.action === "reply" && <label className="block"><span className="label-mini">Replacement Reply</span><textarea value={button.response} onChange={(event) => updateButton(index, { response: event.target.value })} className="control-mini min-h-[72px] w-full resize-y" placeholder="The same message bubble is edited." /></label>}
+                        {button.action === "url" && <label className="block"><span className="label-mini">Destination URL</span><input value={button.url} onChange={(event) => updateButton(index, { url: event.target.value })} className="control-mini w-full" placeholder="https://…" /></label>}
+                      </div>
+                      <div className="secretary-button-card__footer"><span className={`text-[10px] font-mono ${bytes > 64 ? "text-red-600 font-bold" : "text-slate-400"}`}>Callback {bytes}/64 bytes</span><button type="button" onClick={() => removeButton(index)} className="h-7 px-2 border border-red-200 text-red-600 text-[10px] font-bold uppercase">Remove</button></div>
                     </div>;
                   })}
                   <button type="button" onClick={addButton} className="h-9 w-full border border-dashed border-slate-300 text-[10px] font-bold uppercase flex items-center justify-center gap-1"><Plus className="h-3 w-3" /> Add Button</button>
