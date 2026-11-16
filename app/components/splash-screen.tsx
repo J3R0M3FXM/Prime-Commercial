@@ -13,7 +13,7 @@ export default function SplashScreen({ title = 'INITIALIZING SECURE SESSION', su
     <div className="w-full max-w-[430px] mx-auto flex flex-col items-center justify-between flex-1 py-8 relative">
       <div className="flex flex-col items-center justify-center pt-4">
         <div className="prime-splash-network">
-          <img src="/prime-global-brand.png" alt="PRIME" className="prime-splash-brand" />
+          <img src="/prime-global-brand-transparent.png" alt="PRIME" className="prime-splash-brand" />
         </div>
         <div className="text-center space-y-1.5 z-10 px-4">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-mono tracking-[0.2em] uppercase mb-1 animate-pulse">AUTHENTICATING</div>
@@ -22,7 +22,7 @@ export default function SplashScreen({ title = 'INITIALIZING SECURE SESSION', su
         </div>
       </div>
       <div className="flex flex-col items-center justify-center w-full pb-4">
-        <div className="flex items-center justify-center mb-4"><img src="/prime-global-brand.png" alt="PRIME Logo" className="prime-splash-footer-brand" /></div>
+        <div className="flex items-center justify-center mb-4"><img src="/prime-global-brand-transparent.png" alt="PRIME Logo" className="prime-splash-footer-brand" /></div>
         <div className="prime-splash-copyright text-center uppercase tracking-[0.14em] text-[9.5px] sm:text-[10.5px] leading-relaxed text-slate-600"><div>© 2026 PRIME BUSINESS VENTURES, LLC.</div><div>All rights reserved.</div><div>DEVELOPED, MANAGED, AND MAINTAINED BY</div><div>PRIMO</div></div>
       </div>
     </div>

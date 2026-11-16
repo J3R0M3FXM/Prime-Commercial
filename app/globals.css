@@ -2527,9 +2527,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   object-fit: contain; object-position: left center; align-self: center;
   margin-left: -6px !important;
   transform: none !important;
-  filter: drop-shadow(0 1px 2px rgb(15 23 42 / 35%)) !important;
-  border: 1px solid rgb(255 255 255 / 58%);
-  border-radius: 2px;
+  filter: drop-shadow(0 2px 3px rgb(15 23 42 / 48%)) !important;
 }
 #mobile-portrait-viewport .prime-live-clock {
   flex: 0 0 clamp(164px, 52vw, 218px) !important;
@@ -2680,5 +2678,5 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 
 /* Uploaded brand image: displayed unchanged, only sized and framed for each surface. */
 .prime-splash-network { width: min(100%, 390px); margin: 0 auto 18px; }
-.prime-splash-brand, .prime-splash-footer-brand { display: block; width: 100%; height: auto; object-fit: contain; border: 1px solid rgb(15 23 42 / 18%); border-radius: 4px; box-shadow: 0 3px 10px rgb(15 23 42 / 18%); }
+.prime-splash-brand, .prime-splash-footer-brand { display: block; width: 100%; height: auto; object-fit: contain; filter: drop-shadow(0 3px 8px rgb(15 23 42 / 22%)); }
 .prime-splash-footer-brand { width: min(100%, 300px); }
