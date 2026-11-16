@@ -41,6 +41,7 @@ export default function Shopfront() {
   const [authorized, setAuthorized] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [bootProgress, setBootProgress] = useState(5);
   const [routingToAdmin, setRoutingToAdmin] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [catalogError, setCatalogError] = useState("");
@@ -151,26 +152,19 @@ export default function Shopfront() {
     async function checkAuth() {
       const previewMode = import.meta.env.VITE_UI_PREVIEW === "1";
       if (previewMode) {
+        setBootProgress(100);
         setAuthorized(true);
         setChecking(false);
         setProducts([VISUAL_PREVIEW_PRODUCT]);
         setSelectedProduct(null);
         return;
       }
-      const startTime = Date.now();
-      const ensure10Sec = async () => {
-        const elapsed = Date.now() - startTime;
-        const remaining = Math.max(0, 10000 - elapsed);
-        if (remaining > 0) {
-          await new Promise(r => setTimeout(r, remaining));
-        }
-      };
-
       try {
         let initDataRaw = "";
 
         // Wait for the next tick to ensure Telegram has injected the data
         await new Promise(resolve => setTimeout(resolve, 100));
+        setBootProgress(18);
 
         // PRIME Shopfront is Telegram-only. Do not accept copied/pasted initData
         // from URL hashes or query strings: a native browser must not authenticate
@@ -201,24 +195,26 @@ export default function Shopfront() {
         if (!initDataRaw) {
           throw new Error("Valid Telegram WebApp session is required. Open PRIME from Telegram.");
         }
+        setBootProgress(36);
 
         // Open the customer media library for Telegram media deep links.
         if (telegramWebApp.initDataUnsafe?.start_param === "media") {
           setActiveTab("media");
         }
 
+        setBootProgress(52);
         const authData = await getTelegramServerlessSession();
 
         if (authData?.authenticated) {
 
           // If connection is from authorized Telegram Admin
           if (authData.isAdmin) {
+            setBootProgress(100);
             setRoutingToAdmin(true);
             if (typeof window !== 'undefined') {
               const hash = window.location.hash;
               const startParam = String(telegramWebApp?.initDataUnsafe?.start_param || '');
               const adminOrder = startParam.match(/^admin_order_(.+)$/i)?.[1] || '';
-              await ensure10Sec();
               const adminTarget = adminOrder
                 ? `/admin?view=order-detail&order=${encodeURIComponent(adminOrder)}`
                 : '/admin';
@@ -266,8 +262,10 @@ export default function Shopfront() {
             }
           }
 
+          setBootProgress(72);
           setAuthorized(true);
           await loadCatalog();
+          setBootProgress(100);
         } else {
           throw new Error(authData?.error || 'Telegram session could not be verified.');
         }
@@ -275,7 +273,8 @@ export default function Shopfront() {
         console.error("Auth check failed", e);
         setErrorMsg(e.message || String(e));
       } finally {
-        await ensure10Sec();
+        setBootProgress(100);
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
         setChecking(false);
       }
     }
@@ -292,10 +291,10 @@ export default function Shopfront() {
   );
 
   if (routingToAdmin) {
-    return <SplashScreen title="ADMIN CREDENTIALS VERIFIED" subtitle="ROUTING TO SECURE ADMIN CONSOLE..." />;
+    return <SplashScreen title="ADMIN CREDENTIALS VERIFIED" subtitle="ROUTING TO SECURE ADMIN CONSOLE..." progress={100} />;
   }
 
-  if (checking) return <SplashScreen title="CONNECTING TO PRIME PRIVATE SERVERS" subtitle="Please wait while we are initializing your secure session..." />;
+  if (checking) return <SplashScreen title="CONNECTING TO PRIME PRIVATE SERVERS" subtitle="Please wait while we are initializing your secure session..." progress={bootProgress} />;
 
   if (!authorized) {
     return (

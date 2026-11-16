@@ -1,21 +1,14 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Fingerprint } from 'lucide-react';
 
-interface SplashScreenProps { title?: string; subtitle?: string; }
+interface SplashScreenProps { title?: string; subtitle?: string; progress?: number; }
 
-export default function SplashScreen({ title = 'INITIALIZING SECURE SESSION', subtitle = 'ESTABLISHING ENCRYPTED TELEGRAM LINK...' }: SplashScreenProps) {
-  const [progress, setProgress] = useState(8);
+export default function SplashScreen({ title = 'INITIALIZING SECURE SESSION', subtitle = 'ESTABLISHING ENCRYPTED TELEGRAM LINK...', progress = 0 }: SplashScreenProps) {
+  const displayedProgress = Math.max(0, Math.min(100, Math.round(progress)));
   useEffect(() => {
     document.body.classList.add('splash-active');
     return () => document.body.classList.remove('splash-active');
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setProgress((current) => current >= 92 ? current : Math.min(92, current + (current < 55 ? 6 : 2)));
-    }, 260);
-    return () => window.clearInterval(timer);
   }, []);
 
   return <div className="relative z-[9999] min-h-screen w-full bg-white flex flex-col items-center justify-between p-6 text-slate-950 font-sans antialiased select-none">
@@ -35,8 +28,8 @@ export default function SplashScreen({ title = 'INITIALIZING SECURE SESSION', su
             </div>
           </div>
         </div>
-        <div className="prime-splash-progress" aria-label={`Loading ${progress}%`}>
-          <div className="prime-splash-progress__fill" style={{ width: `${progress}%` }}><span>{progress}%</span></div>
+        <div className="prime-splash-progress" aria-label={`Loading ${displayedProgress}%`}>
+          <div className="prime-splash-progress__fill" style={{ width: `${displayedProgress}%` }}><span>{displayedProgress}%</span></div>
         </div>
         <div className="text-center space-y-1.5 z-10 px-4">
           <h1 className="font-heading text-base sm:text-lg font-bold uppercase tracking-wider text-slate-900 break-words">{title}</h1>

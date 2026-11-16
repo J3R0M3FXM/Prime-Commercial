@@ -30,11 +30,11 @@ const modules: Array<{ id: ModuleId; name: string; icon: any; accent: string; de
 function AdminGate() { return <main className="admin-shell mx-auto flex min-h-screen max-w-[430px] flex-col bg-slate-50 p-3 text-slate-900"><div className="m-auto w-full border border-slate-200 bg-white p-4 text-center"><PrimeIdentityHeader accessLabel="CORE ADMIN ACCESS" /><h1 className="mt-5 font-heading text-xl font-semibold">Open Admin in Telegram</h1><p className="mt-2 text-sm text-slate-600">Verified Telegram staff access is required. Reopen PRIME from Telegram to continue.</p><a className="mt-5 inline-flex min-h-11 w-full items-center justify-center bg-slate-900 px-4 text-sm font-bold text-white" href="https://t.me/primenetworkphbot?startapp=admin">Open PRIME in Telegram</a></div></main>; }
 
 export default function AdminPage() {
-  const [checking, setChecking] = useState(true); const [authorized, setAuthorized] = useState(false); const [screen, setScreen] = useState<Screen>(null); const [logisticsSection, setLogisticsSection] = useState<"warehouse" | "courier">("warehouse");
+  const [checking, setChecking] = useState(true); const [bootProgress, setBootProgress] = useState(10); const [authorized, setAuthorized] = useState(false); const [screen, setScreen] = useState<Screen>(null); const [logisticsSection, setLogisticsSection] = useState<"warehouse" | "courier">("warehouse");
   const [publicOrderQueue, setPublicOrderQueue] = useState<PublicOrderQueue | null>(null);
   const [dashboardOrders, setDashboardOrders] = useState<any[] | null>(null);
   const [lowStockCount, setLowStockCount] = useState<number | null>(null);
-  useEffect(() => { let cancelled = false; void getTelegramServerlessSession().then(async (session) => { if (cancelled) return; if (session?.authenticated && session.isAdmin) { setAuthorized(true); void callServerless("setShopMenuButton").catch(() => undefined); } }).catch(() => undefined).finally(() => { if (!cancelled) setChecking(false); }); return () => { cancelled = true; }; }, []);
+  useEffect(() => { let cancelled = false; void (async () => { setBootProgress(45); try { const session = await getTelegramServerlessSession(); if (cancelled) return; if (session?.authenticated && session.isAdmin) { setBootProgress(78); setAuthorized(true); void callServerless("setShopMenuButton").catch(() => undefined); } } catch {} finally { if (!cancelled) { setBootProgress(100); await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); if (!cancelled) setChecking(false); } } })(); return () => { cancelled = true; }; }, []);
   useEffect(() => {
     if (!authorized) return;
     let cancelled = false;
@@ -72,7 +72,7 @@ export default function AdminPage() {
   }, [authorized]);
   const pathOrder = useMemo(() => { const params = new URLSearchParams(window.location.search); return params.get("view") === "order-detail" ? params.get("order") || undefined : undefined; }, []);
   useEffect(() => { if (authorized && pathOrder) setScreen({ module: "orders", orderId: pathOrder }); }, [authorized, pathOrder]);
-  if (checking) return <SplashScreen title="ADMIN ACCESS" subtitle="VERIFYING TELEGRAM ADMIN SESSION..." />; if (!authorized) return <AdminGate />;
+  if (checking) return <SplashScreen title="ADMIN ACCESS" subtitle="VERIFYING TELEGRAM ADMIN SESSION..." progress={bootProgress} />; if (!authorized) return <AdminGate />;
   const back = () => setScreen(null); const open = (id: ModuleId) => { if (id === "warehouse" || id === "couriers") setLogisticsSection(id === "warehouse" ? "warehouse" : "courier"); setScreen({ module: id }); };
   const withAdminShell = (content: ReactNode) => <div className="prime-admin-app"><header className="prime-admin-global-header"><PrimeIdentityHeader accessLabel="CORE ADMIN ACCESS" /><PrimeOrderQueue queue={publicOrderQueue} /></header>{content}</div>;
   if (screen?.module === "orders") return withAdminShell(<TelegramServerlessOrdersPanel initialOrderId={screen.orderId || null} onBack={back} />);

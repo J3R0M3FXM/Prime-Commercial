@@ -943,11 +943,11 @@ body.splash-active #system-wide-proprietary-footer {
 .prime-splash-network { width: min(100%, 390px); margin: 0 auto 14px; }
 .prime-splash-artwork { position: relative; isolation: isolate; }
 .prime-splash-artwork > img { display: block; width: 100%; height: auto; }
-.prime-splash-artwork::before { content: ''; position: absolute; z-index: 1; left: 14.9%; top: 58.2%; width: 17.2%; height: 14.3%; background: #fff; }
+.prime-splash-artwork::before { content: ''; position: absolute; z-index: 1; left: 14.9%; top: 58.2%; width: 17.2%; height: 14.3%; border-radius: 11% 11% 7% 7%; background: linear-gradient(130deg, #eff8ff 0%, #dceeff 100%); }
 .prime-splash-phone-auth { position: absolute; z-index: 2; left: 15.5%; top: 59.4%; width: 16%; height: 11.5%; display: grid; place-items: center; overflow: hidden; color: #1378d7; }
-.prime-splash-phone-auth svg { width: 43%; height: auto; stroke-width: 1.75; animation: prime-splash-fingerprint-pulse 1.5s ease-in-out infinite; }
-.prime-splash-fingerprint-scan { position: absolute; left: 28%; right: 28%; top: 22%; height: 2px; border-radius: 999px; background: #20bd64; box-shadow: 0 0 5px rgb(32 189 100 / 70%); animation: prime-splash-fingerprint-scan 1.45s ease-in-out infinite; }
-.prime-splash-fingerprint-dots { position: absolute; bottom: 8%; display: flex; gap: 3px; }
+.prime-splash-phone-auth svg { width: 57%; height: auto; stroke-width: 1.75; animation: prime-splash-fingerprint-pulse 1.5s ease-in-out infinite; }
+.prime-splash-fingerprint-scan { position: absolute; left: 20%; right: 20%; top: 18%; height: 2px; border-radius: 999px; background: #20bd64; box-shadow: 0 0 5px rgb(32 189 100 / 70%); animation: prime-splash-fingerprint-scan 1.45s ease-in-out infinite; }
+.prime-splash-fingerprint-dots { position: absolute; bottom: 3%; display: flex; gap: 3px; }
 .prime-splash-fingerprint-dots i { width: 3px; height: 3px; border-radius: 50%; background: #20bd64; animation: prime-splash-dot 1.1s ease-in-out infinite; }
 .prime-splash-fingerprint-dots i:nth-child(2) { animation-delay: .15s; }.prime-splash-fingerprint-dots i:nth-child(3) { animation-delay: .3s; }
 .prime-splash-progress { width: min(100% - 40px, 330px); height: 18px; margin: 2px auto 12px; overflow: hidden; border: 1px solid #a8d8bc; border-radius: 999px; background: #e8f4ec; box-shadow: inset 0 1px 2px rgb(15 23 42 / 12%); }
