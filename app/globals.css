@@ -2700,7 +2700,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 }
 #mobile-portrait-viewport .prime-product-card__name {
   font-family: 'Roboto Condensed', sans-serif !important;
-  font-size: 15px !important;
+  font-size: 13px !important;
   font-weight: 400 !important;
   letter-spacing: 0 !important;
 }
