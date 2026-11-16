@@ -2538,15 +2538,16 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 }
 #mobile-portrait-viewport .prime-live-clock__time:not(.prime-live-clock__placeholder) {
   display: grid !important;
-  grid-template-columns: 98px 8px 82px !important;
+  grid-template-columns: 98px 8px max-content !important;
   justify-content: end !important;
   align-items: center !important;
   box-sizing: border-box !important;
-  width: 188px !important;
-  max-width: 188px !important;
+  width: max-content !important;
+  max-width: none !important;
   height: 16px !important;
   min-height: 16px !important;
   margin-left: auto !important;
+  margin-right: -4px !important;
   text-align: right !important;
   font-size: 13px !important;
   font-family: 'Saira Condensed', sans-serif !important;
@@ -2573,12 +2574,12 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   grid-column: 3 !important;
   display: inline-flex !important;
   align-items: center !important;
-  justify-content: flex-end !important;
-  width: 82px !important;
-  min-width: 82px !important;
-  max-width: 82px !important;
+  justify-content: flex-start !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: none !important;
   box-sizing: border-box !important;
-  padding-right: 8px !important;
+  padding-right: 0 !important;
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
   font-feature-settings: 'tnum' 1, 'lnum' 1 !important;
