@@ -146,6 +146,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
   const [testChatId, setTestChatId] = useState("");
   const [monoMode, setMonoMode] = useState(false);
   const [section, setSection] = useState<"steps" | "settings" | "preview" | "guide" | "scheduler">("steps");
+  const [workspace, setWorkspace] = useState<"tree" | "editor" | "buttons" | "simulator" | "controls">("tree");
 
   async function requestAutomation(action: string, payload: Record<string, unknown> = {}, _legacyRequest?: RequestInit, _legacyUrl?: string) {
     if (!serverless) throw new Error("Telegram Serverless Secretary access is required.");
@@ -361,17 +362,28 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
         </div>
         <div className="secretary-header-actions">
           <button type="button" onClick={() => window.location.reload()}><RefreshCw className="w-4 h-4" /> Reload</button>
-          <button type="button" disabled={busy || uploadingPhoto} onClick={() => { setSection("steps"); setSelected(makeFlow()); setStepTab("trigger"); setNotice(""); }}><Plus className="w-4 h-4" /> New Step</button>
+          <button type="button" disabled={busy || uploadingPhoto} onClick={() => { setSection("steps"); setWorkspace("editor"); setSelected(makeFlow()); setStepTab("trigger"); setNotice(""); }}><Plus className="w-4 h-4" /> New Step</button>
         </div>
       </header>
 
-      <nav className="secretary-section-tabs" aria-label="Secretary Sections">
-        {([["steps", "Reply Steps"], ["settings", "Settings"], ["preview", "Preview"], ["guide", "Guide"], ["scheduler", "Scheduler"]] as const).map(([id, label]) => <button type="button" key={id} aria-current={section === id ? "page" : undefined} onClick={() => setSection(id)}>{label}</button>)}
+      <nav className="secretary-section-tabs" aria-label="Secretary workspace">
+        {([
+          ["tree", "Menu Tree"],
+          ["editor", "Node Editor"],
+          ["buttons", "Buttons"],
+          ["simulator", "Simulator"],
+          ["controls", "Controls"],
+        ] as const).map(([id, label]) => <button type="button" key={id} aria-current={workspace === id ? "page" : undefined} onClick={() => {
+          setWorkspace(id);
+          if (id === "simulator") { setSection("preview"); return; }
+          if (id === "controls") { setSection("settings"); return; }
+          setSection("steps");
+          if (id !== "tree") { setSelected((current) => current || flows[0] || makeFlow()); setStepTab(id === "buttons" ? "buttons" : "trigger"); }
+          else setSelected(null);
+        }}>{label}</button>)}
       </nav>
 
-      {section === "scheduler" && serverless && <SecretarySchedulerPanel/>}
-
-      <div hidden={section !== "guide"}>
+      <div hidden={workspace !== "controls"}>
       <AdminDisclosure title="How The Secretary Works" meta="Quick Guide" defaultOpen>
         <div className="secretary-help-card">
           <p><strong>1. Create a reply step.</strong> Give it a name, choose what customer message should trigger it, and write the reply.</p>
@@ -423,7 +435,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
       </AdminDisclosure>
       </div>
 
-      <section className="secretary-steps-section" hidden={section !== "steps"}>
+      <section className={`secretary-steps-section ${workspace === "tree" ? "" : "is-focused"}`} hidden={section !== "steps"}>
         <div className="flex items-center justify-between gap-2 px-0.5">
             <div><h2 className="text-lg font-normal uppercase tracking-wide">Reply Steps</h2><p className="text-xs text-slate-500">Each step matches an incoming message and sends its saved reply. Open one step at a time to edit it.</p></div>
           <span className="shrink-0 text-[10px] font-mono text-slate-500">{displayedFlows.length} Total</span>
@@ -433,7 +445,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
         {loading ? <div className="admin-empty"><p>Loading Secretary steps…</p></div> : displayedFlows.length === 0 ? <div className="admin-empty"><MessageSquare className="admin-empty__icon" /><strong>No Steps Configured</strong><p>Add a step to begin building the reply flow.</p></div> : displayedFlows.map((flow) => {
           const isOpen = selected?.id === flow.id;
           const inbound = flows.reduce((sum, item) => sum + item.buttons.filter((button) => button.targetFlowId === flow.id).length, 0);
-          return <details key={flow.id} open={isOpen} className="secretary-step-card" onToggle={(event) => { const open = event.currentTarget.open; if (open && selected?.id !== flow.id) { setSelected(flow); setStepTab("trigger"); } else if (!open && selected?.id === flow.id) setSelected(null); }}>
+          return <details key={flow.id} open={isOpen} className="secretary-step-card" onToggle={(event) => { const open = event.currentTarget.open; if (open && selected?.id !== flow.id) { setSelected(flow); setWorkspace("editor"); setStepTab("trigger"); } else if (!open && selected?.id === flow.id) setSelected(null); }}>
             <summary className="secretary-step-summary">
               <span className={`secretary-step-indicator ${flow.active ? "is-active" : ""}`} />
               <span className="min-w-0 flex-1"><strong>{flow.name}</strong><small>{inbound} incoming · {flow.buttons.length} buttons{settings.welcomeFlowId === flow.id ? " · Welcome" : ""}</small></span>
@@ -445,7 +457,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
                   ["trigger", "1. Trigger"],
                   ["reply", "2. Reply"],
                   ["buttons", "3. Inline Buttons"],
-                ] as const).map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={stepTab === id} onClick={() => setStepTab(id)} className={stepTab === id ? "is-active" : ""}>{label}</button>)}
+                ] as const).map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={stepTab === id} onClick={() => { setStepTab(id); setWorkspace(id === "buttons" ? "buttons" : "editor"); }} className={stepTab === id ? "is-active" : ""}>{label}</button>)}
               </nav>
 
               {stepTab === "trigger" && <section className="secretary-step-fields" role="tabpanel">
@@ -514,6 +526,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
         {chats.length === 0 ? <p className="text-[10px] text-slate-500">No customer chats yet.</p> : <div className="space-y-1.5">{chats.map((chat) => <div key={chat.business_connection_id + ":" + chat.chat_id} className="secretary-chat-card"><div className="min-w-0 flex-1"><strong>Chat {chat.chat_id}</strong><small>Last customer: {chat.last_customer_message_at ? new Date(chat.last_customer_message_at).toLocaleString() : "—"}</small></div><button type="button" onClick={() => void toggleChat(chat)} className="shrink-0"><span>{chat.bot_paused ? "Resume" : "Pause"}</span></button></div>)}</div>}
       </AdminDisclosure>
       </div>
+      {section === "settings" && serverless && <SecretarySchedulerPanel/>}
     </div>
   );
 }
