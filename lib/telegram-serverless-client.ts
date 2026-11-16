@@ -682,7 +682,11 @@ export async function uploadStoryPhoto(file: File): Promise<string> {
 
 export async function uploadProductImage(file: File): Promise<string> {
   if (file.size > 3 * 1024 * 1024) throw new Error('Product image files must be 3 MB or smaller.');
-  const upload = await prepareJpegUpload(file);
+  const upload = await prepareJpegUpload(file, {
+    maxDimension: 1024,
+    maxBytes: 600_000,
+    preserveTransparency: true,
+  });
   const result = await callServerless<{ success: boolean; reference: string }>('manageMediaAssets', {
     action: 'uploadProductImage', id: upload.id,
     contentType: upload.contentType,
