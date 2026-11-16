@@ -74,11 +74,12 @@ export async function quoteDelivery(destinationLatValue, destinationLonValue, co
     distanceKm = calculateRoadDistanceFallback(Number(warehouse.latitude), Number(warehouse.longitude), destinationLat, destinationLon);
   }
   distanceKm = Math.round(Math.max(0, distanceKm) * 100) / 100;
-  const computedCouriers = (await Promise.all(courierRows.map(async (courier) => {
+  const computedCouriers = [];
+  for (const courier of courierRows) {
     const saved = await getCourierPricing(courier.id);
     const pricing = saved;
     const covered = pricing.maxDistanceKm == null || distanceKm <= pricing.maxDistanceKm;
-    return ({
+    computedCouriers.push({
     id: courier.id,
     name: courier.name,
     logo: courier.logo || '',
@@ -96,7 +97,8 @@ export async function quoteDelivery(destinationLatValue, destinationLonValue, co
     coverageAvailable: covered,
     calculatedFee: covered ? calculateDeliveryFee({ ...courier, ...pricing, timeBasedFeePerMinute: courierTimeRates.get(String(courier.id)) || 0 }, distanceKm, routeTimeMinutes) : null,
     distanceKm,
-  }); }));
+    });
+  }
   const selectedId = String(courierId || '').trim();
   const selectedCourier = selectedId ? computedCouriers.find((row) => String(row.id) === selectedId) : computedCouriers.find((row) => row.coverageAvailable !== false) || computedCouriers[0];
   if (selectedId && (!selectedCourier || selectedCourier.coverageAvailable === false)) throw new EndpointError('The selected courier does not cover this distance.', { code: 'COURIER_OUTSIDE_COVERAGE' });
