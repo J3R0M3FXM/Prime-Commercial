@@ -301,7 +301,8 @@ export default function Shopfront() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
         <AlertCircle className="w-16 h-16 text-red-500 mb-6" />
         <h1 className="text-2xl font-heading font-bold text-gray-900 mb-2 uppercase tracking-wide">Access Denied</h1>
-        <p className="text-gray-600 mb-6 max-w-sm">This shopfront is exclusively secured for use within the Telegram environment.</p>
+        <p className="text-gray-600 mb-2 max-w-sm">This shopfront is exclusively secured for use within the Telegram environment.</p>
+        {errorMsg && <p role="alert" className="mb-6 max-w-sm text-xs leading-relaxed text-red-700">{errorMsg}</p>}
         <button
           type="button"
           onClick={() => {

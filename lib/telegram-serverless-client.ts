@@ -430,15 +430,31 @@ export function recordCurrentDeviceSession(options: { force?: boolean; userId?: 
 
 export async function getTelegramServerlessSession(options: { heartbeat?: boolean } = {}): Promise<TelegramServerlessSession> {
   if (isVisualPreview) return { authenticated: true, sessionReady: true, isAdmin: true, tgUserId: '999000001', tgName: 'Preview Admin', tgUsername: 'prime_preview', primeMemberId: 'PM-PREVIEW', user: { id: 'preview-admin', name: 'Preview Admin', role: 'admin' } };
-  // Telegram can inject Serverless later than initData after Android resumes.
-  for (let attempt = 0; attempt < 50 && !hasTelegramServerlessBridge(); attempt++) {
+  // Serverless can be injected later than initData after Android resumes.
+  for (let attempt = 0; attempt < 150 && !hasTelegramServerlessBridge(); attempt++) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  const fingerprint = await collectSessionFingerprint();
-  const session = await callServerless<TelegramServerlessSession>('getTelegramSession', {
-    ...(fingerprint ? { fingerprint } : {}),
-    ...(options.heartbeat ? { heartbeat: true } : {}),
-  }, 20_000);
+  if (!hasTelegramServerlessBridge()) {
+    throw new Error('Telegram Serverless did not initialize. Please close and reopen PRIME from this chat.');
+  }
+
+  // Login depends only on Telegram’s platform-verified initData. Fingerprint
+  // telemetry is deliberately collected after authentication, so it cannot
+  // delay or reject a valid Mini App session.
+  let session: TelegramServerlessSession | null = null;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      session = await callServerless<TelegramServerlessSession>('getTelegramSession', {
+        ...(options.heartbeat ? { heartbeat: true } : {}),
+      }, 20_000);
+      break;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350));
+    }
+  }
+  if (!session) throw lastError instanceof Error ? lastError : new Error('Telegram session verification failed.');
   if (session.authenticated && session.tgUserId) {
     setMediaOwner(String(session.tgUserId));
     // The bundled advanced collector runs after the verified session is ready.
