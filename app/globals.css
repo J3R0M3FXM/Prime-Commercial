@@ -2688,7 +2688,11 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   border-radius: 10px !important;
   box-shadow: 0 1px 3px rgb(15 23 42 / 10%) !important;
 }
-#mobile-portrait-viewport .prime-product-card__media { aspect-ratio: 4 / 3 !important; }
+#mobile-portrait-viewport .prime-product-card__media {
+  aspect-ratio: 4 / 3 !important;
+  background-color: #f5f8fc !important;
+  border-bottom-color: #e8edf3 !important;
+}
 #mobile-portrait-viewport .prime-product-card__body { padding: 8px !important; gap: 4px !important; }
 #mobile-portrait-viewport .prime-product-card__category,
 #mobile-portrait-viewport .prime-product-card__availability {
