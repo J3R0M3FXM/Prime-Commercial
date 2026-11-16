@@ -2547,7 +2547,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   height: 16px !important;
   min-height: 16px !important;
   margin-left: auto !important;
-  margin-right: -4px !important;
+  margin-right: 1px !important;
   text-align: right !important;
   font-size: 13px !important;
   font-family: 'Saira Condensed', sans-serif !important;
