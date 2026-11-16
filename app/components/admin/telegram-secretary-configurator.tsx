@@ -356,8 +356,8 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
         <div className="min-w-0">
           {onBack && <button type="button" onClick={onBack} className="mb-2 border border-slate-300 bg-white px-3 py-2 text-xs font-bold uppercase text-slate-700">← Admin</button>}
           <div className="secretary-eyebrow">Telegram Business · {serverless ? "Serverless Secretary" : "Automation"}</div>
-          <h1>Secretary Configurator</h1>
-          <p>Manage reply steps, inline buttons, and customer previews.</p>
+          <h1>Telegram Secretary</h1>
+          <p>Reply flows · inline buttons · customer previews</p>
         </div>
         <div className="secretary-header-actions">
           <button type="button" onClick={() => window.location.reload()}><RefreshCw className="w-4 h-4" /> Reload</button>
