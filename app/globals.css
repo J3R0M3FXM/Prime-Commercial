@@ -2573,10 +2573,12 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   grid-column: 3 !important;
   display: inline-flex !important;
   align-items: center !important;
-  justify-content: flex-start !important;
+  justify-content: flex-end !important;
   width: 82px !important;
   min-width: 82px !important;
   max-width: 82px !important;
+  box-sizing: border-box !important;
+  padding-right: 8px !important;
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
   font-feature-settings: 'tnum' 1, 'lnum' 1 !important;
