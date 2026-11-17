@@ -41,6 +41,7 @@ run('node', ['scripts/test-voucher-generator.mjs'], 'voucher generation and PNG 
 run('node', ['scripts/test-voucher-delivery.mjs'], 'voucher delivery authorization and retries');
 run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
 run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
+run('node', ['scripts/test-pos-ui.mjs'], 'rendered POS register controls');
 run('node', ['scripts/test-checkout-idempotency.mjs'], 'checkout and POS collision/retry hardening');
 run('node', ['scripts/test-credit-operations.mjs'], 'points conversion and Store Credit transfer safety');
 run('node', ['scripts/test-account-staff-view.mjs'], 'staff account view authorization and customer parity');

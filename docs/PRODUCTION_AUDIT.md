@@ -1,5 +1,15 @@
 # Production Reconstruction Audit
 
+## POS register and delivery checkout — validated — 2026-11-17
+
+POS now has Catalog/Ticket workspaces, a current-sale ticket, cash tender/change, itemized server quotes, configured and manual fixed/percentage charges, staff discounts, customer vouchers, and explicitly entered existing-customer Store Credits. Delivery uses existing address autocomplete and authoritative courier routing/pricing/coverage, with checkout versus courier-on-delivery fee collection and separate payable amounts. Mobile430px containment and existing typography are retained.
+
+`createPosOrder` uses immutable canonical pricing snapshots and existing inventory, promo claim and credit reservation/compensation helpers. Persisted orders retain discount, delivery split, credit and reward fields; retries settle saved vouchers/credits before completing. The final INSERT requires current inventory holds, credit ownership and an unexpired voucher claim. Customer POS payment notifications report the amount received now. Previously saved pending POS snapshots remain recoverable.
+
+Sandbox `npm run validate:miniapp` passed all required checks and the production build (2,399 modules). Focused actual-SQLite tests additionally cover composed charges/discounts, delivery due later, exactly-once POS credit debit, failed-sale credit return, voucher claim redemption/retry and limits. `scripts/test-pos-ui.mjs` passed rendered register navigation/cart/manual-charge/customer-credit/delivery controls and is added to the release gate. Backend syntax and diff whitespace checks passed after the final recovery edits. No live sale, customer message or business-record mutation was used for testing. No new API/Supabase/Vercel/preview paths were introduced.
+
+Promote only these committed changes and the exact Sandbox dist; deploy the new `tgcloud/lib/pos-pricing.js`, changed `tgcloud/endpoints/createPosOrder.js`, and static build from clean Checkout. Prior live baseline: app8830494959 revision528,107 static files current. Real Telegram staff/device review and actual courier/payment transactions remain unverified. Deployment evidence will be recorded after release.
+
 ## Orders, courier configurator and checkout validation — deployed — 2026-11-17
 
 Owner authorized promotion and deployment of the current Orders, uniform courier configurator, and promo/referral checkout work. The full `npm run validate:miniapp` passed in Sandbox, including 2,399 transformed modules and the production build. Source commits `6f1adb3` and `0cf888b` were promoted to clean Checkout as `1e34b18` and `7c8c6c8`; the 27 release files match Sandbox byte for byte. The branches retain pre-existing unrelated native-auth/Android scaffold differences. The exact 107-file Sandbox `dist` was copied to Checkout without rebuilding.

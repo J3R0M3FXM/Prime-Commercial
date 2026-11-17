@@ -5,7 +5,7 @@ import { build } from 'rolldown';
 
 const sqlite=new DatabaseSync(':memory:');
 const schema=readFileSync('tgcloud/schema.js','utf8');
-for(const name of ['orders','customers','products','charges','couriers','inventoryReservations','pointTransactions']) {
+for(const name of ['orders','customers','products','charges','couriers','inventoryReservations','pointTransactions','promos','promoRedemptions']) {
   const start=schema.indexOf('export const '+name+' =');
   const end=schema.indexOf('\nexport const ',start+1);
   const segment=schema.slice(start,end<0?undefined:end);
@@ -38,14 +38,29 @@ const inArray=(field,values)=>({text:field+' IN ('+values.map(()=>'?').join(',')
 const operations=load('tgcloud/lib/checkout-operations.js',['beginCheckoutOperation','findCheckoutOperation','canonicalRequest','saveCanonicalCheckoutSnapshot','advanceCheckoutOperation','finishCheckoutOperation','beginCheckoutCompensation','finishCheckoutCompensation','acquireCustomerCheckoutLock','releaseCustomerCheckoutLock']);
 const inventory=load('tgcloud/lib/inventory.js',['reserveInventoryLine','releaseInventoryReservations','activeReservationTotals','withAvailableInventory']);
 const canonical=load('tgcloud/lib/orders.js',['canonicalizeOrderItems'],{inArray,products:table('products')});
-const charges=load('tgcloud/lib/charges.js',['calculateChargesBreakdown']);
-const deps={...operations,...inventory,...canonical,...charges,eq,asc:x=>x,orders:table('orders'),customers:table('customers'),charges:table('charges'),couriers:table('couriers'),requireAdmin:async ctx=>{if(!ctx?.staff)throw new EndpointError('Staff required',{code:'ADMIN_REQUIRED'});return {id:ctx.staff};},notifyAdminOrderCreated:async()=>{},notifyPosOrderCreated:async()=>{}};
+const charges=load('tgcloud/lib/charges.js',['calculateChargesBreakdown','normalizeCharge']);
+const credits=load('tgcloud/lib/credits.js',['reserveStoreCredits','finalizeStoreCredits','compensateStoreCredits']);
+const loyalty=load('tgcloud/lib/loyalty.js',['calculateCustomerTier','calculateOrderRewardPoints']);
+const pricing=load('tgcloud/lib/pos-pricing.js',['pricePosSale'],{...canonical,...charges,...loyalty,eq,asc:x=>x,charges:table('charges'),customers:table('customers'),orders:table('orders'),resolveTrustedFingerprint:()=>({})});
+const deps={...credits,...pricing,...operations,releasePromoClaim:async()=>{},...inventory,...canonical,...charges,eq,asc:x=>x,orders:table('orders'),customers:table('customers'),charges:table('charges'),couriers:table('couriers'),requireAdmin:async ctx=>{if(!ctx?.staff)throw new EndpointError('Staff required',{code:'ADMIN_REQUIRED'});return {id:ctx.staff};},notifyAdminOrderCreated:async()=>{},notifyPosOrderCreated:async()=>{}};
+const ratePricing=load('tgcloud/lib/pos-pricing.js',['pricePosSale'],{...canonical,...charges,...loyalty,eq,asc:x=>x,charges:table('charges'),customers:table('customers'),orders:table('orders'),resolveTrustedFingerprint:()=>({}),quoteDelivery:async()=>({fee:40,courier:{id:'courier'}}),validatePromo:async()=>({valid:true,promoId:'voucher',code:'SAVE',discountType:'fixed',discountAmount:10})});
+sqlite.exec("INSERT INTO charges(id,name,type,rate,is_active,description) VALUES('extra','Packing','fixed',5,1,'{\"isDefault\":false}')");
+const priced=await ratePricing.pricePosSale({mode:'delivery',customerId:'customer',items:[{productId:'multi',quantity:2}],chargeIds:['extra','extra'],manualCharges:[{name:'Handling',amount:10,type:'percentage'}],promoCode:'SAVE',discountMode:'percentage',discountValue:10,storeCreditsUsed:20,deliveryPaymentMethod:'upon_delivery'});
+assert.equal(priced.chargeResult.totalChargesAmount,15,'Selected configured charges are deduplicated; percentages use items subtotal');
+assert.equal(priced.staffDiscount,9,'Staff discount applies after voucher');
+assert.equal(priced.payableNow,76);
+assert.equal(priced.payableOnDelivery,40);
+assert.equal(priced.total,116);
+await assert.rejects(ratePricing.pricePosSale({mode:'store',items:[{productId:'multi',quantity:1}],discountMode:'percentage',discountValue:101}));
+await assert.rejects(ratePricing.pricePosSale({mode:'store',items:[{productId:'multi',quantity:1}],storeCreditsUsed:1}));
+await assert.rejects(ratePricing.pricePosSale({mode:'store',items:[{productId:'multi',quantity:1}],chargeIds:['missing']}));
 const pos=load('tgcloud/endpoints/createPosOrder.js',['handler'],deps).handler;
+sqlite.exec(`CREATE TABLE promo_claims(operation_id TEXT PRIMARY KEY,promo_id TEXT,promo_code TEXT,customer_id TEXT,order_id TEXT,device_id TEXT,hardware_id TEXT,device_fingerprint_id TEXT,server_fingerprint_id TEXT,discount_amount REAL,status TEXT,expires_at INTEGER,created_at INTEGER,updated_at INTEGER);`);
 const request={mode:'store',customerName:'Customer',paymentMethodName:'Cash',items:[{productId:'last',variantId:'default',quantity:1}],expectedTotal:100,operationKey:'a'.repeat(32)};
 await assert.rejects(pos(request,{}),{code:'ADMIN_REQUIRED'});
 await assert.rejects(pos({...request,operationKey:'a'.repeat(129)},{staff:999}),{code:'INVALID_OPERATION_KEY'});
 const first=await Promise.allSettled([pos(request,{staff:999}),pos(request,{staff:999})]);
-assert.ok(first.some(result=>result.status==='fulfilled'),JSON.stringify(first));
+assert.ok(first.some(result=>result.status==='fulfilled'),first.map(result=>result.reason?.stack||result.status).join('\n'));
 assert.equal(sqlite.prepare('SELECT count(*) n FROM orders').get().n,1,'Concurrent same-key POS creates one order');
 assert.equal(sqlite.prepare("SELECT sum(quantity) n FROM inventory_reservations WHERE status<>'released'").get().n,1,'The saved order retains the last unit');
 const original=first.find(result=>result.status==='fulfilled').value;
@@ -61,7 +76,6 @@ assert.equal(inventory.withAvailableInventory({id:'last',stock:1},await inventor
 for(const quantity of [0,1.5,1001,Infinity])await assert.rejects(canonical.canonicalizeOrderItems([{productId:'multi',quantity}]),{code:'INVALID_CART'});
 assert.equal((await canonical.canonicalizeOrderItems([{productId:'multi',quantity:1}])).itemQuantity,1);
 
-const credits=load('tgcloud/lib/credits.js',['reserveStoreCredits','finalizeStoreCredits','compensateStoreCredits']);
 const creditOp=await operations.beginCheckoutOperation({customerId:'customer',requestKey:'c'.repeat(32),requestSnapshot:{},expiresAt:Math.floor(Date.now()/1000)+60});
 const creditRequest={customerId:'customer',operationId:creditOp.operationId,amount:30};
 await Promise.all([credits.reserveStoreCredits(creditRequest),credits.reserveStoreCredits(creditRequest)]);
@@ -71,6 +85,18 @@ await credits.finalizeStoreCredits(creditRequest);
 assert.equal((await credits.reserveStoreCredits(creditRequest)).reused,true,'Retry after finalization cannot debit again');
 assert.equal(sqlite.prepare("SELECT store_credits n FROM customers WHERE id='customer'").get().n,70);
 assert.equal((await operations.beginCheckoutCompensation({operationId:creditOp.operationId,message:'late failure'})).reason,'order_persisted','Compensation is fenced against saved orders');
+
+// POS uses the credit reservation ledger and recovers without charging twice.
+const creditSale={...request,customerId:'customer',items:[{productId:'multi',quantity:1}],storeCreditsUsed:20,expectedTotal:30,operationKey:'p'.repeat(32)};
+const balanceStart=sqlite.prepare("SELECT store_credits n FROM customers WHERE id='customer'").get().n;
+const paid=await pos(creditSale,{staff:999});
+assert.equal(paid.totalAmount,30);
+await pos(creditSale,{staff:999});
+assert.equal(sqlite.prepare("SELECT store_credits n FROM customers WHERE id='customer'").get().n,balanceStart-20);
+assert.equal(sqlite.prepare('SELECT store_credits_used n FROM orders WHERE id=?').get(paid.id).n,20);
+const failing=load('tgcloud/endpoints/createPosOrder.js',['handler'],{...deps,reserveStoreCredits:async args=>{await credits.reserveStoreCredits(args);throw new Error('Simulated disconnect after debit');}}).handler;
+await assert.rejects(failing({...creditSale,operationKey:'q'.repeat(32)},{staff:999}),{code:'POS_CHECKOUT_FAILED'});
+assert.equal(sqlite.prepare("SELECT store_credits n FROM customers WHERE id='customer'").get().n,balanceStart-20,'Failed sale returns its credit reservation');
 
 // POS commit must reject missing or expired reservations, even after a successful hold call.
 const expiring=load('tgcloud/endpoints/createPosOrder.js',['handler'],{...deps,reserveInventoryLine:async line=>{const held=await inventory.reserveInventoryLine(line);sqlite.prepare('UPDATE inventory_reservations SET expires_at=unixepoch()-1 WHERE order_id=?').run(line.orderId);return held;}}).handler;
@@ -96,6 +122,16 @@ assert.equal(sqlite.prepare('SELECT payment_status AS status FROM orders WHERE i
 const response=await storefront.processOperation(await operations.findCheckoutOperation({customerId:'customer',requestKey:'web'.repeat(16)}),{},customer);
 assert.equal(response.orderNumber,'WEB000001');
 assert.equal(sqlite.prepare("SELECT store_credits n FROM customers WHERE id='customer'").get().n,balanceBefore-10,'Completed storefront replay never debits again');
+sqlite.exec("INSERT INTO promos(id,code,is_active,usage_limit_per_customer,total_usage_limit) VALUES('voucher','SAVE',1,1,1)");
+const claims=load('tgcloud/lib/promo-claims.js',['claimPromoUse','redeemPromoClaim','releasePromoClaim']);
+const voucherPos=load('tgcloud/endpoints/createPosOrder.js',['handler'],{...deps,...ratePricing,...claims}).handler;
+const voucherRequest={...request,customerId:'customer',items:[{productId:'multi',quantity:1}],promoCode:'SAVE',expectedTotal:40,operationKey:'v'.repeat(32)};
+const voucherSale=await voucherPos(voucherRequest,{staff:999});
+await voucherPos(voucherRequest,{staff:999});
+assert.equal(sqlite.prepare("SELECT count(*) n FROM promo_claims WHERE status='redeemed'").get().n,1,'Voucher retries redeem one claim');
+assert.equal(sqlite.prepare('SELECT discount_amount n FROM orders WHERE id=?').get(voucherSale.id).n,10);
+await assert.rejects(voucherPos({...voucherRequest,operationKey:'w'.repeat(32)},{staff:999}),{code:'POS_CHECKOUT_FAILED'});
+assert.equal(sqlite.prepare("SELECT count(*) n FROM promo_claims WHERE status='redeemed'").get().n,1,'Per-customer and total voucher limits are enforced');
 sqlite.close();
 
 const bundled=await build({input:'lib/pos-checkout-attempt.ts',write:false,platform:'node',output:{format:'esm'}});
