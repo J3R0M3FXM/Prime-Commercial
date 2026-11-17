@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Clock3, Download, ExternalLink, Loader2, Minus, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, Clock3, Download, ExternalLink, Loader2, Minus, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import { callServerless, getTelegramServerlessSession, resolveTelegramMedia } from "@/lib/telegram-serverless-client";
 import OrderWorkflowController,{type OrderWorkflow} from './order-workflow-controller';
@@ -533,7 +533,7 @@ export default function TelegramServerlessOrdersPanel({
   const receiverName = String(selectedOrder?.deliveryAddress?.receiverName || selectedOrder?.customerName || "");
   const receiverPhone = String(selectedOrder?.deliveryAddress?.receiverPhone || selectedOrder?.customerPhone || "");
   const deliveryNotes = String(selectedOrder?.deliveryAddress?.deliveryNotes || selectedOrder?.deliveryAddress?.notes || selectedOrder?.notes || "");
-  const copyField = (label: string, value: string, key: string) => <div className="serverless-order-copy-field"><span>{label}</span>{value ? <button type="button" className="serverless-order-copy-value" onClick={() => void copyValue(value, key)} aria-label={`Copy ${label}`} title="Tap to copy this value">{value}</button> : <strong>—</strong>}{copiedKey === key && <small role="status">Copied</small>}</div>;
+  const copyField = (label: string, value: string, key: string) => <div className={`serverless-order-copy-field ${['delivery-address', 'delivery-notes'].includes(key) ? 'om-field-wide' : ''}`}><span>{label}</span>{value ? <div className="om-copy-line"><strong className="serverless-order-copy-value">{value}</strong><button type="button" className="om-copy-action" onClick={() => void copyValue(value, key)} aria-label={`Copy ${label}`} title={copiedKey === key ? "Copied" : "Copy"}>{copiedKey === key ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}</button></div> : <strong>—</strong>}</div>;
   const itemSubtotal = selectedOrder?.subtotal || selectedOrder?.items.reduce((sum, item) =>
     sum + (Number(item.price) || 0) * (Number(item.quantity) || 1), 0) || 0;
   const chargesTotal = selectedOrder?.chargesBreakdown.reduce((sum, charge) =>
@@ -645,7 +645,7 @@ export default function TelegramServerlessOrdersPanel({
                   </div>
                   {editItems.length === 0 && <p className="border border-red-200 bg-red-50 p-2 text-xs text-red-800">An order needs at least one item. Cancel or keep an item before saving.</p>}
                   <div className="border-l-4 border-sky-600 bg-sky-50 p-3"><b className="text-xs uppercase">Revised Total Preview</b><dl className="mt-2 space-y-1 text-xs"><div className="flex justify-between"><dt>Items After Item Offers</dt><dd>{formatPHP(editItemSubtotal)}</dd></div>{editOrderDiscount > 0 && <div className="flex justify-between"><dt>Order Discount</dt><dd>−{formatPHP(editOrderDiscount)}</dd></div>}<div className="flex justify-between"><dt>Charges and Delivery</dt><dd>{formatPHP(editChargesTotal + (Number(editDeliveryFee) || 0))}</dd></div><div className="flex justify-between border-t pt-1 font-bold"><dt>Revised Order Total</dt><dd>{formatPHP(editGrandTotal)}</dd></div><div className="flex justify-between font-bold"><dt>Due Before Delivery</dt><dd>{formatPHP(editPayableNow)}</dd></div></dl></div>
-                  <div className="grid grid-cols-2 gap-2"><label className="text-[11px]">Order Discount<select className="w-full border p-2" value={editDiscountMode} onChange={(e) => setEditDiscountMode(e.target.value)}><option value="none">No Discount</option><option value="fixed">Fixed PHP</option><option value="percent">Percent</option></select></label>{editDiscountMode !== "none" && <label className="text-[11px]">Discount Value<input className="w-full border p-2" type="number" min="0" step="0.01" value={editDiscountValue} onChange={(e) => setEditDiscountValue(e.target.value)} /></label>}<label className="text-[11px]">Delivery Fee<input className="w-full border p-2" type="number" min="0" step="0.01" value={editDeliveryFee} onChange={(e) => setEditDeliveryFee(e.target.value)} /></label></div>
+                  <div className="om-edit-fields"><label className="text-[11px]">Order Discount<select className="w-full border p-2" value={editDiscountMode} onChange={(e) => setEditDiscountMode(e.target.value)}><option value="none">No Discount</option><option value="fixed">Fixed PHP</option><option value="percent">Percent</option></select></label>{editDiscountMode !== "none" && <label className="text-[11px]">Discount Value<input className="w-full border p-2" type="number" min="0" step="0.01" value={editDiscountValue} onChange={(e) => setEditDiscountValue(e.target.value)} /></label>}<label className="text-[11px]">Delivery Fee<input className="w-full border p-2" type="number" min="0" step="0.01" value={editDeliveryFee} onChange={(e) => setEditDeliveryFee(e.target.value)} /></label></div>
                   <div className="space-y-2"><b className="text-xs">Current and Additional Charges</b><p className="text-[11px] text-slate-600">The saved charge lines are prefilled below. Edit their name/amount, remove a line, or add tax and other charges.</p>{editCharges.map((charge, index) => <div key={index} className="admin-charge-editor"><input aria-label="Charge name" className="border p-2 text-xs" value={charge.name} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, name: e.target.value } : row))} /><select aria-label="Charge type" className="border p-1 text-xs" value={charge.type} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, type: e.target.value } : row))}><option value="fixed">Fixed PHP</option><option value="percentage">Percent</option></select><input aria-label="Charge amount" className="border p-2 text-xs" type="number" min="0" step="0.01" value={charge.value} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, value: e.target.value } : row))} /><button type="button" aria-label="Remove charge" onClick={() => setEditCharges((rows) => rows.filter((_, i) => i !== index))}>×</button></div>)}<button type="button" className="border px-2 py-1 text-xs" onClick={() => setEditCharges((rows) => [...rows, { name: "", type: "fixed", value: "0" }])}>+ Add a charge</button></div>
                   <p className="text-[11px] text-amber-900">Only reductions are allowed. A higher bill requires a new order. Verify any remaining payment before processing.</p>
                   <div className="flex gap-2"><button type="button" disabled={busyAction !== "" || editItems.length === 0} onClick={() => void runAction(selectedOrder, "edit", { expectedVersion: selectedOrder.staffEditVersion, items: editItems, discountMode: editDiscountMode, discountValue: editDiscountValue, deliveryFee: editDeliveryFee, charges: editCharges }).then((saved) => { if (saved) setEditing(false); })} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">Save Order Changes</button><button type="button" onClick={() => setEditing(false)} className="px-3 py-2 border text-xs font-bold uppercase">Cancel</button></div>
@@ -686,7 +686,7 @@ export default function TelegramServerlessOrdersPanel({
                 <div><span>Telegram Handle</span>{/^[A-Za-z0-9_]{5,32}$/.test(selectedOrder.telegramUsername) ? <a href={`https://t.me/${encodeURIComponent(selectedOrder.telegramUsername)}`} target="_blank" rel="noreferrer" className="font-bold text-sky-700 underline">@{selectedOrder.telegramUsername}</a> : <strong>No Public Handle</strong>}</div>
                 <div><span>Telegram ID</span><strong>{selectedOrder.tgUserId || "—"}</strong></div>
                 <div><span>PRIME ID</span><strong>{selectedOrder.primeMemberId || "—"}</strong></div>
-                <div><span>Tier status</span><strong>{selectedOrder.tierLevel || "—"}</strong></div>
+                <div><span>Tier Status</span><strong>{selectedOrder.tierLevel || "—"}</strong></div>
               </div></div>
             </details>
 
@@ -711,20 +711,22 @@ export default function TelegramServerlessOrdersPanel({
             <details className="serverless-disclosure" open>
               <summary>Delivery Details</summary>
               <div className="serverless-disclosure__body"><div className="serverless-fields text-xs">
-                {copyField("Telegram name", selectedOrder.telegramName, "telegram-name")}
-                {copyField("Telegram handle", selectedOrder.telegramUsername ? `@${selectedOrder.telegramUsername}` : "", "telegram-handle")}
+                {copyField("Telegram Name", selectedOrder.telegramName, "telegram-name")}
+                {copyField("Telegram Handle", selectedOrder.telegramUsername ? `@${selectedOrder.telegramUsername}` : "", "telegram-handle")}
                 {copyField("PRIME™ Member ID", selectedOrder.primeMemberId, "member-id")}
                 <div><span>Tier</span><strong>{selectedOrder.tierLevel || "—"}</strong></div>
-                {copyField("Receiver name", receiverName, "receiver-name")}
-                {copyField("Receiver phone", receiverPhone, "receiver-phone")}
-                {copyField("Delivery address", [addressText(selectedOrder.deliveryAddress), selectedOrder.deliveryAddress?.unitDetails].filter(Boolean).join(" · "), "delivery-address")}
-                {copyField("Delivery notes / instructions", deliveryNotes, "delivery-notes")}
+                {copyField("Receiver Name", receiverName, "receiver-name")}
+                {copyField("Receiver Phone", receiverPhone, "receiver-phone")}
+                {copyField("Delivery Address", [addressText(selectedOrder.deliveryAddress), selectedOrder.deliveryAddress?.unitDetails].filter(Boolean).join(" · "), "delivery-address")}
+                {copyField("Delivery Notes / Instructions", deliveryNotes, "delivery-notes")}
                 <div><span>Courier</span><strong>{selectedOrder.courierName || "—"}</strong></div>
-                <div><span>Courier payment</span><strong>{selectedOrder.deliveryAddress?.courierPaymentMode === "upon_delivery" || (!selectedOrder.deliveryAddress?.courierPaymentMode && selectedOrder.payableOnDelivery > 0) ? "PUD · pay on arrival" : "PUC · paid at checkout"}</strong></div>
-                <div><span>Estimated travel time</span><strong>{selectedOrder.deliveryAddress?.estimatedTravelMinutes != null ? `${selectedOrder.deliveryAddress.estimatedTravelMinutes} min` : "—"}</strong></div>
-                <div><span>Estimated distance</span><strong>{selectedOrder.deliveryAddress?.distanceKm != null ? `${selectedOrder.deliveryAddress.distanceKm} km` : "—"}</strong></div>
+                <div><span>Courier Payment</span><strong>{selectedOrder.deliveryAddress?.courierPaymentMode === "upon_delivery" || (!selectedOrder.deliveryAddress?.courierPaymentMode && selectedOrder.payableOnDelivery > 0) ? "PUD · pay on arrival" : "PUC · paid at checkout"}</strong></div>
+                <div className="om-route-metrics om-field-wide">
+                <div><span>Travel Time</span><strong>{selectedOrder.deliveryAddress?.estimatedTravelMinutes != null ? `${selectedOrder.deliveryAddress.estimatedTravelMinutes} min` : "—"}</strong></div>
+                <div><span>Distance</span><strong>{selectedOrder.deliveryAddress?.distanceKm != null ? `${selectedOrder.deliveryAddress.distanceKm} km` : "—"}</strong></div>
                 <div><span>Tracking Number</span><strong>{selectedOrder.trackingNumber || "—"}</strong></div>
-                {selectedOrder.trackingUrl && <div className="serverless-order-tracking"><span>Customer Tracking Link</span><a href={selectedOrder.trackingUrl} target="_blank" rel="noreferrer"><ExternalLink /> Open tracking URL</a></div>}
+                </div>
+                {selectedOrder.trackingUrl && <div className="serverless-order-tracking om-field-wide"><span>Customer Tracking Link</span><a href={selectedOrder.trackingUrl} target="_blank" rel="noreferrer"><ExternalLink /> Open tracking URL</a></div>}
                 <div><span>Dispatched</span><strong>{displayDate(selectedOrder.dispatchedAt)}</strong></div>
                 <div><span>Completed</span><strong>{displayDate(selectedOrder.deliveredAt)}</strong></div>
               </div></div>

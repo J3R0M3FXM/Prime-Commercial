@@ -35,6 +35,18 @@ assert.match(document.querySelector('[aria-label="Order summary"]').textContent,
 assert.match(document.querySelector('.om-ticket-total').textContent,/105/);
 assert.deepEqual([...document.querySelectorAll('[role="tab"]')].map(tab=>tab.textContent),['Items','Fulfillment','Snapshot','Flags']);
 assert.ok(document.querySelector('[aria-label="Order actions"]'));
+await act(async()=>button('Fulfillment').click());
+const delivery=[...document.querySelectorAll('details')].find(node=>node.querySelector('summary')?.textContent==='Delivery Details');
+assert.equal(window.getComputedStyle(delivery.querySelector('.serverless-fields')).display,'grid');
+assert.equal(window.getComputedStyle(delivery.querySelector('.serverless-fields')).gridTemplateColumns.replaceAll('px','').replaceAll(' ',''),'repeat(2,minmax(0,1fr))');
+assert.equal(window.getComputedStyle(delivery.querySelector('.om-route-metrics')).gridTemplateColumns.replaceAll('px','').replaceAll(' ',''),'repeat(3,minmax(0,1fr))');
+const receiver=delivery.querySelector('[aria-label="Copy Receiver Name"]');
+assert.ok(receiver);assert.equal(receiver.textContent,'','Copy control contains an icon, not a highlighted field value');
+assert.equal(receiver.parentElement.querySelector('strong').textContent,'Customer 0');
+assert.equal(window.getComputedStyle(receiver.parentElement.querySelector('strong')).backgroundColor,'rgba(0, 0, 0, 0)');
+assert.equal(window.getComputedStyle(delivery.querySelector('.om-field-wide')).gridColumn,'1 / -1');
+await act(async()=>button('Items').click());
+
 assert.equal(window.getComputedStyle(button('Validate')).backgroundColor,'rgb(23, 109, 194)');
 assert.equal(window.getComputedStyle(button('Cancel')).backgroundColor,'rgb(189, 36, 52)');
 assert.equal(window.getComputedStyle(document.querySelector('.orders-register')).overflowX,'hidden');

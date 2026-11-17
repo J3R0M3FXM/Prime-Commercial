@@ -62,7 +62,7 @@ assert.equal(button('Processing').disabled,true);assert.equal(document.querySele
 await act(async()=>button('Approve Edit').click());assert.equal(calls.at(-1).action,'approveCustomerEdit');
 const panel=readFileSync('app/components/admin/telegram-serverless-orders-panel.tsx','utf8');
 const style=readFileSync('app/admin/admin-portrait.css','utf8');
-assert.match(style,/prime-workflow-button[\s\S]*?font-family:\s*'Roboto Condensed'[\s\S]*?font-weight:\s*600[\s\S]*?text-transform:\s*uppercase/);
+assert.match(style,/prime-workflow-button[\s\S]*?font-family:\s*'Lato Condensed'[\s\S]*?font-weight:\s*700[\s\S]*?text-transform:\s*none/);
 assert.match(style,/prime-workflow-button:disabled/);
 assert.ok(panel.indexOf('<OrderWorkflowController')<panel.indexOf('<nav className="prime-order-tabs"'));
 assert.doesNotMatch(panel,/NEXT Action/,'The duplicate global controller was removed');

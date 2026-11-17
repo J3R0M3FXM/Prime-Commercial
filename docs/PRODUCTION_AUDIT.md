@@ -1,5 +1,13 @@
 # Production Reconstruction Audit
 
+## POS and Order Detail Field Density Correction — 2026-11-18
+
+Owner reported unnecessarily stacked fields and highlighted Fulfillment values after revision532. The Orders-specific display:flex/flex-direction:column override forced detail fields into one column. Copyable delivery values were buttons, so the new solid action-button palette incorrectly colored the entire field. Detail fields now use two columns, with full-width address/notes/tracking links and a three-column travel-time/distance/tracking group. Copy values are plain text with a separate compact Copy button and in-place copied checkmark. The courier balance row is neutral rather than an amber highlight.
+
+POS now pairs courier and fee-collection selectors, groups discounts/voucher/credits in two columns, and renders manual-charge name/type/amount and payment-method/cash/change in three columns. Change retains its cell while the quote refreshes. Address search/results remain one full-width block. Visible modified labels retain Title Case. Financial actions, amounts, quote inputs, payment/receipt validation and portrait/vertical-scroll constraints are unchanged.
+
+Focused rendered tests cover two/three-column CSS, neutral delivery values, separate copy controls, full-width addresses, three manual-charge/payment fields, paired courier selectors, draft retention and stage navigation. The full Sandbox npm run validate:miniapp gate and2402-module production build passed before promotion. Live revision/hash evidence will follow deployment; phone visual acceptance remains unverified.
+
 ## Assets Library, Orders Controls, Fingerprint Recovery and One-Time GPS — 2026-11-18
 
 Owner authorized correcting Orders density and refresh flicker, adding reusable file storage, restoring fingerprint collection and a single launch location permission, using Title Case admin labels, solid staff/customer order buttons, validation, promotion and deployment. All implementation and validation took place in Sandbox. The pre-release Checkout was clean on app8830494959 revision531,90 backend modules and107 static files. The parked Android/native-auth scaffold and package differences between the worktrees are excluded from this promotion.
