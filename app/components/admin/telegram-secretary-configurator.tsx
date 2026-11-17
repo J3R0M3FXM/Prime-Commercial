@@ -6,6 +6,7 @@ import { AdminDisclosure, AdminSwitch } from "./admin-ui";
 import { callServerless, uploadStaffImage } from "@/lib/telegram-serverless-client";
 import TelegramMediaImage from "@/app/components/telegram-media-image";
 import "./secretary-configurator.css";
+import SecretaryMenuTree from "./secretary-menu-tree";
 import SecretarySchedulerPanel from "./secretary-scheduler-panel";
 
 type Action = "flow" | "reply" | "url";
@@ -132,6 +133,7 @@ function normalizeChat(raw: any) {
 }
 
 export default function TelegramSecretaryConfigurator({ serverless = false, onBack }: { serverless?: boolean; onBack?: () => void }) {
+  const [pendingParentId, setPendingParentId] = useState("");
   const [flows, setFlows] = useState<Flow[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [chats, setChats] = useState<any[]>([]);
@@ -293,7 +295,18 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
           : [...current, saved],
       );
       setSelected(saved);
-      setNotice("Secretary step saved.");
+      if (pendingParentId) {
+        const source = flows.find(flow => flow.id === pendingParentId);
+        if (!source) throw new Error("Submenu Saved. Parent Menu Is Missing.");
+        const linked = {...source, buttons: [...source.buttons.filter(button => button.targetFlowId !== saved.id), {...makeButton(source.buttons.length), text: saved.name, targetFlowId: saved.id}]};
+        const linkedPayload = {...linked, buttons:[...linked.buttons, ...(linked.mediaUrl ? [{id:FLOW_MEDIA_MARKER,mediaUrl:linked.mediaUrl}] : [])]};
+        try {
+          const parentSaved = normalizeFlow(await requestAutomation("update", linkedPayload));
+          setFlows(current => current.map(flow => flow.id === parentSaved.id ? parentSaved : flow));
+          setPendingParentId("");
+        } catch { throw new Error("Submenu Saved. Could Not Link Parent. Retry Save Step To Finish Linking."); }
+      }
+      setNotice("Secretary Step Saved.");
     } catch (error: any) {
       setNotice(error?.message || "Failed to save step.");
     } finally {
@@ -362,7 +375,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
         </div>
         <div className="secretary-header-actions">
           <button type="button" onClick={() => window.location.reload()}><RefreshCw className="w-4 h-4" /> Reload</button>
-          <button type="button" disabled={busy || uploadingPhoto} onClick={() => { setSection("steps"); setWorkspace("editor"); setSelected(makeFlow()); setStepTab("trigger"); setNotice(""); }}><Plus className="w-4 h-4" /> New Step</button>
+          <button type="button" disabled={busy || uploadingPhoto} onClick={() => { setSection("steps"); setWorkspace("editor"); setPendingParentId(""); setSelected(makeFlow()); setStepTab("trigger"); setNotice(""); }}><Plus className="w-4 h-4" /> New Step</button>
           <button type="button" onClick={() => { setWorkspace("controls"); setSection("settings"); }}>Automation</button>
         </div>
       </header>
@@ -378,7 +391,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
           if (id === "simulator") { setSection("preview"); return; }
           setSection("steps");
           if (id !== "tree") { setSelected((current) => current || flows[0] || makeFlow()); setStepTab(id === "buttons" ? "buttons" : "trigger"); }
-          else setSelected(null);
+          else { setSelected(null); setPendingParentId(""); }
         }}>{label}</button>)}
       </nav>
 
@@ -436,12 +449,13 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
 
       <section className={`secretary-steps-section ${workspace === "tree" ? "" : "is-focused"}`} hidden={section !== "steps"}>
         <div className="flex items-center justify-between gap-2 px-0.5">
-            <div><h2 className="text-lg font-normal uppercase tracking-wide">Reply Steps</h2><p className="text-xs text-slate-500">Each step matches an incoming message and sends its saved reply. Open one step at a time to edit it.</p></div>
+            <div><h2 className="text-lg font-normal">Reply Menus</h2></div>
           <span className="shrink-0 text-[10px] font-mono text-slate-500">{displayedFlows.length} Total</span>
         </div>
-        <label className="secretary-main-menu block"><span className="label-mini">Welcome Step · Every 12 Hours</span><span className="secretary-help">Choose the first message to send when a customer becomes eligible again, or leave it off.</span><select value={settings.welcomeFlowId} onChange={(event) => setSettings((current) => ({ ...current, welcomeFlowId: event.target.value }))} className="control-mini w-full"><option value="">No Welcome Step</option>{flows.filter((flow) => flow.active).map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select></label>
+        <label className="secretary-main-menu block"><span className="label-mini">Main Menu · Welcome Every 12 Hours</span><span className="secretary-help">Choose the first message to send when a customer becomes eligible again, or leave it off.</span><select value={settings.welcomeFlowId} onChange={(event) => setSettings((current) => ({ ...current, welcomeFlowId: event.target.value }))} className="control-mini w-full"><option value="">No Welcome Step</option>{flows.filter((flow) => flow.active).map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select></label>
         <button type="button" className="secretary-welcome-save" disabled={busy || loading} onClick={() => void saveSettings()}>{busy ? "Saving…" : "Save Welcome Step"}</button>
-        {loading ? <div className="admin-empty"><p>Loading Secretary steps…</p></div> : displayedFlows.length === 0 ? <div className="admin-empty"><MessageSquare className="admin-empty__icon" /><strong>No Steps Configured</strong><p>Add a step to begin building the reply flow.</p></div> : displayedFlows.map((flow) => {
+        {workspace === "tree" && !loading && <SecretaryMenuTree flows={flows} mainMenuId={settings.welcomeFlowId} onEdit={id => { setPendingParentId(""); setSelected(flows.find(flow => flow.id === id) || null); setWorkspace("editor"); setStepTab("trigger"); }} onAdd={id => { setPendingParentId(id); setSelected({...makeFlow(),name:"New Submenu",triggerType:"callback"}); setWorkspace("editor"); setStepTab("reply"); }} />}
+        {workspace !== "tree" && (loading ? <div className="admin-empty"><p>Loading Secretary steps…</p></div> : displayedFlows.length === 0 ? <div className="admin-empty"><MessageSquare className="admin-empty__icon" /><strong>No Steps Configured</strong><p>Add a step to begin building the reply flow.</p></div> : displayedFlows.map((flow) => {
           const isOpen = selected?.id === flow.id;
           const inbound = flows.reduce((sum, item) => sum + item.buttons.filter((button) => button.targetFlowId === flow.id).length, 0);
           return <details key={flow.id} open={isOpen} className="secretary-step-card" onToggle={(event) => { const open = event.currentTarget.open; if (open && selected?.id !== flow.id) { setSelected(flow); setWorkspace("editor"); setStepTab("trigger"); } else if (!open && selected?.id === flow.id) setSelected(null); }}>
@@ -451,6 +465,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
               <ChevronRight className="h-4 w-4 shrink-0 transition-transform" />
             </summary>
             {isOpen && selected && <div className="secretary-step-content">
+              {pendingParentId && <p className="secretary-help">New Submenu Of {flows.find(flow => flow.id === pendingParentId)?.name} · Save To Link</p>}
               <nav className="secretary-step-tabs" role="tablist" aria-label="Secretary step settings">
                 {([
                   ["trigger", "1. Trigger"],
@@ -459,7 +474,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
                 ] as const).map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={stepTab === id} onClick={() => { setStepTab(id); setWorkspace(id === "buttons" ? "buttons" : "editor"); }} className={stepTab === id ? "is-active" : ""}>{label}</button>)}
               </nav>
 
-              {stepTab === "trigger" && <section className="secretary-step-fields" role="tabpanel">
+              {stepTab === "trigger" && <section className="secretary-step-fields secretary-trigger-grid" role="tabpanel">
                 <div className="secretary-step-intro"><strong>Choose when this reply runs</strong><p>Set the internal name and the customer message or button event that should activate this step.</p></div>
                 <label className="block"><span className="label-mini">Step Name</span><span className="secretary-help">Private label for organizing your flow. Customers do not see this name.</span><input value={selected.name} onChange={(event) => updateSelected({ name: event.target.value })} className="control-mini w-full" placeholder="Welcome / Products" /></label>
                 <label className="block"><span className="label-mini">Priority</span><span className="secretary-help">When multiple steps match, the lower number is checked first.</span><input type="number" min="1" value={selected.priority} onChange={(event) => updateSelected({ priority: Number(event.target.value) || 100 })} className="control-mini w-full" /></label>
@@ -480,6 +495,10 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
 
               {stepTab === "buttons" && <section className="secretary-step-fields" role="tabpanel">
                 <div className="secretary-step-intro"><strong>Add optional reply buttons</strong><p>Buttons are attached below the message. Choose whether each one opens another step, edits this reply, or opens a website.</p></div>
+                <div className="secretary-tree-nav">
+                  <button type="button" disabled={!parent} onClick={() => { if(parent) updateSelected({buttons:[...selected.buttons,{...makeButton(selected.buttons.length),text:"Back",targetFlowId:parent.id}]}); }}>Add Back Button</button>
+                  <button type="button" disabled={!settings.welcomeFlowId || settings.welcomeFlowId === selected.id} onClick={() => updateSelected({buttons:[...selected.buttons,{...makeButton(selected.buttons.length),text:"Main Menu",targetFlowId:settings.welcomeFlowId}]})}>Add Main Menu Button</button>
+                </div>
                 <div className="space-y-2">
                   {selected.buttons.map((button, index) => {
                     const bytes = callbackBytes(selected.id || "new", button.id);
@@ -507,7 +526,7 @@ export default function TelegramSecretaryConfigurator({ serverless = false, onBa
               </div>
             </div>}
           </details>;
-        })}
+        }))}
       </section>
 
       <div hidden={section !== "preview"}>

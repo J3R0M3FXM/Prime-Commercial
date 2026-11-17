@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "mapbox-gl/mapbox-gl.css";
+@import "./components/mapbox-view.css";
 #mobile-portrait-viewport .prime-shopfront-bottom-nav,
 #mobile-portrait-viewport.admin-viewport .prime-admin-bottom-nav {
   background: #f1f3f7 !important;
@@ -2808,10 +2810,24 @@ body,
 }
 
 /* Customer purchase controls share the solid staff action palette. */
-.prime-order-history button, .prime-customer-order-actions button { background:#176dc2 !important; border-color:#155aa1 !important; color:#fff !important; font-family:'Lato Condensed','Lato',sans-serif !important; text-transform:none !important; opacity:1; }
-.prime-order-history button:is([class*="bg-emerald"],.order-control--success), .prime-customer-order-actions .order-control--success { background:#087b4d !important; border-color:#06673f !important; }
-.prime-order-history button.order-control--modify, .prime-customer-order-actions .order-control--modify { background:#087d86 !important; border-color:#06656d !important; }
-.prime-order-history button:is([class*="text-rose"],[class*="text-red"],.order-control--danger), .prime-customer-order-actions .order-control--danger { background:#bd2434 !important; border-color:#9f1c2a !important; }
-.prime-order-history button:disabled, .prime-customer-order-actions button:disabled { background:#64748b !important; border-color:#536478 !important; color:#fff !important; opacity:1 !important; cursor:not-allowed; }
-.prime-order-history button:not(:disabled):active, .prime-customer-order-actions button:not(:disabled):active { filter:brightness(.85); }
-.prime-order-history button:focus-visible, .prime-customer-order-actions button:focus-visible { outline:2px solid #0f172a; outline-offset:2px; }
+.prime-customer-order-actions button { background:#176dc2 !important; border-color:#155aa1 !important; color:#fff !important; font-family:'Lato Condensed','Lato',sans-serif !important; text-transform:none !important; opacity:1; }
+.prime-customer-order-actions .order-control--success { background:#087b4d !important; border-color:#06673f !important; }
+.prime-customer-order-actions .order-control--modify { background:#087d86 !important; border-color:#06656d !important; }
+.prime-customer-order-actions .order-control--danger { background:#bd2434 !important; border-color:#9f1c2a !important; }
+.prime-customer-order-actions button:disabled { background:#64748b !important; border-color:#536478 !important; color:#fff !important; opacity:1 !important; cursor:not-allowed; }
+.prime-customer-order-actions button:not(:disabled):active { filter:brightness(.85); }
+.prime-customer-order-actions button:focus-visible { outline:2px solid #0f172a; outline-offset:2px; }
+
+/* Address results preserve the provider's casing and use the body font. */
+#mobile-portrait-viewport .prime-checkout button.prime-address-suggestion,
+#mobile-portrait-viewport .prime-checkout button.prime-address-suggestion *,
+#mobile-portrait-viewport .prime-admin-app button.prime-address-suggestion,
+#mobile-portrait-viewport .prime-admin-app button.prime-address-suggestion * {
+  font-family:'Lato Condensed','Lato',sans-serif !important; font-weight:400 !important;
+  text-transform:none !important; letter-spacing:normal !important;
+}
+
+/* History navigation and cards stay neutral; order actions retain their own palette. */
+.prime-order-history .order-history__card { background:#fff; border-color:#e2e8f0; color:#0f172a; }
+.prime-order-history .order-history__utility { background:transparent !important; border-color:#cbd5e1 !important; color:#64748b !important; box-shadow:none !important; }
+.prime-order-history .order-history__utility:hover { background:#f1f5f9 !important; color:#334155 !important; }

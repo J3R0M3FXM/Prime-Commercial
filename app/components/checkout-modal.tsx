@@ -39,13 +39,14 @@ import {
 } from "lucide-react";
 import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import { calculateChargesBreakdown, type ComputedCharge } from "@/lib/charges";
-import { getClientFingerprint, getOrCreateSessionToken, getFreshClientLocation } from "./fingerprint-collector";
+import { getClientFingerprint, getOrCreateSessionToken, getFreshClientLocation, getLatestPhysicalGpsLocation } from "./fingerprint-collector";
 import { validateAddressLocally, type AddressValidationResult } from "@/lib/address-validation";
 import TelegramMediaImage from "./telegram-media-image";
 import SecuredPaymentLink, { openSecuredPaymentLink } from "./secured-payment-link";
 import { readCheckoutDraft, saveCheckoutDraft, clearCheckoutDraft } from "@/lib/checkout-draft";
 import {
   callServerless,
+  getClientObservedPublicIp,
   clearPendingServerlessCheckoutKey,
   getOrCreateServerlessCheckoutKey,
   replacePendingServerlessCheckoutKey,
@@ -1424,7 +1425,8 @@ export default function CheckoutModal({
       const reviewPayableNow = Math.max(0, reviewPayableBeforeCredits - reviewCredits);
       const reviewPayableOnDelivery = deliveryPaymentMethod === "upon_delivery" ? reviewEffectiveDeliveryFee : 0;
       const reviewTotal = reviewPayableNow + reviewPayableOnDelivery;
-      const fpData = await getClientFingerprint();
+      const [fpData, clientObservedIp] = await Promise.all([getClientFingerprint(), getClientObservedPublicIp()]);
+      const deviceLocationObservation = getLatestPhysicalGpsLocation();
 
       // Precise location is optional and only exists when the customer explicitly
       // used "Use My Location". No geolocation request is made at order submission.
@@ -1509,6 +1511,8 @@ export default function CheckoutModal({
         coordinates: `${coords.lat}, ${coords.lon}`,
         deviceSnapshot: {
           ...fpData,
+          clientObservedIp,
+          deviceLocationObservation: deviceLocationObservation?.source === 'Precise GPS' ? deviceLocationObservation : null,
           deviceGps: orderLocationSnapshot,
           deviceId: fpData.deviceId,
           sessionToken: fpData.sessionToken || getOrCreateSessionToken(fpData.deviceId, tgCustomer.id),
@@ -1756,7 +1760,7 @@ export default function CheckoutModal({
                 </div>
               )}
 
-              {/* Address Search with Geoapify Autocomplete */}
+              {/* Address Search with TomTom Autocomplete */}
               <div className="space-y-1 relative z-50">
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-700 font-heading">
                   Search Street Address / Landmark
@@ -1787,7 +1791,7 @@ export default function CheckoutModal({
                         key={idx}
                         type="button"
                         onClick={() => handleSelectSuggestion(item)}
-                        className="w-full text-left px-3.5 py-2 hover:bg-gray-50 transition-colors flex items-start gap-2.5 cursor-pointer"
+                        className="prime-address-suggestion w-full text-left px-3.5 py-2 hover:bg-gray-50 transition-colors flex items-start gap-2.5 cursor-pointer"
                       >
                         <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">

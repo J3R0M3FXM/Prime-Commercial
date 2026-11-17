@@ -15,6 +15,7 @@ declare global {
 }
 
 const mediaUrlCache = new Map<string, Promise<string>>();
+let mediaCacheOwner = "";
 const isVisualPreview = import.meta.env.VITE_UI_PREVIEW === '1';
 
 function visualPreviewResponse(name: string, input: Record<string, unknown>): unknown {
@@ -203,37 +204,37 @@ export async function resumePendingServerlessCheckout<T = Record<string, unknown
   return result;
 }
 
-export async function resolveTelegramMedia(reference: string): Promise<string> {
+export async function resolveTelegramMedia(reference: string, options: { fresh?: boolean } = {}): Promise<string> {
   const value = String(reference || '').trim();
   if (!value.startsWith('tgmedia:')) return value;
   const id = value.slice('tgmedia:'.length).trim();
   if (!id) return '';
-
+  if (options.fresh) mediaUrlCache.delete(id);
   const existing = mediaUrlCache.get(id);
   if (existing) return existing;
-
   const pending = (async () => {
-    const media = await callServerless<{ contentType: string; base64: string }>(
-      'getMediaContent',
-      { id },
-      20_000,
-    );
-    if (!media?.base64 || !/^image\/(jpeg|png|webp)$/.test(media.contentType || '')) {
-      throw new Error('The product image could not be loaded.');
+    type ImagePart = { contentType: string; base64: string; size?: number; chunkIndex?: number; chunkCount?: number };
+    const first = await callServerless<ImagePart>('getMediaContent', { id, chunkIndex: 0 }, 30_000);
+    if (!first?.base64 || !/^image\/(jpeg|png|webp)$/.test(first.contentType || '')) throw new Error('The image could not be loaded.');
+    const parts = [first.base64];
+    if (first.chunkCount != null) {
+      const size = Number(first.size), count = Number(first.chunkCount), chunkSize = 192 * 1024;
+      if (!Number.isSafeInteger(size) || size < 1 || size > 20 * 1024 * 1024 || count !== Math.ceil(size / chunkSize) || first.chunkIndex !== 0) throw new Error('Invalid image transfer.');
+      if (atob(first.base64).length !== Math.min(size, chunkSize)) throw new Error('Incomplete image transfer.');
+      for (let index = 1; index < count; index += 1) {
+        const part = await callServerless<ImagePart>('getMediaContent', { id, chunkIndex: index }, 30_000);
+        if (part.contentType !== first.contentType || part.size !== size || part.chunkCount !== count || part.chunkIndex !== index || atob(part.base64).length !== Math.min(chunkSize, size - index * chunkSize)) throw new Error('Incomplete image transfer. Retry the receipt.');
+        parts.push(part.base64);
+      }
     }
-    const binary = atob(media.base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    return URL.createObjectURL(new Blob([bytes], { type: media.contentType }));
+    // Cached image URLs must survive consumers unmounting. Data URLs have no
+    // shared revokeObjectURL ownership, unlike the previous cached blob URLs.
+    return 'data:' + first.contentType + ';base64,' + parts.join('');
   })();
-
+  if (mediaUrlCache.size >= 64) mediaUrlCache.delete(mediaUrlCache.keys().next().value!);
   mediaUrlCache.set(id, pending);
-  try {
-    return await pending;
-  } catch (error) {
-    mediaUrlCache.delete(id);
-    throw error;
-  }
+  try { return await pending; }
+  catch (error) { if (mediaUrlCache.get(id) === pending) mediaUrlCache.delete(id); throw error; }
 }
 
 /** Download a public media reference only after resolving Telegram-backed assets. */
@@ -462,6 +463,7 @@ export async function getTelegramServerlessSession(options: { heartbeat?: boolea
   }
   if (!session) throw lastError instanceof Error ? lastError : new Error('Telegram session verification failed.');
   if (session.authenticated && session.tgUserId) {
+    if (mediaCacheOwner !== String(session.tgUserId)) { mediaUrlCache.clear(); mediaCacheOwner = String(session.tgUserId); }
     setMediaOwner(String(session.tgUserId));
     // The bundled advanced collector runs after the verified session is ready.
     void recordCurrentDeviceSession({ userId: String(session.tgUserId) }).catch(error => {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Copy, Clock3, Download, ExternalLink, Loader2, Minus, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import { callServerless, getTelegramServerlessSession, resolveTelegramMedia } from "@/lib/telegram-serverless-client";
+import SnapshotLocationMap from "./snapshot-location-map";
 import OrderWorkflowController,{type OrderWorkflow} from './order-workflow-controller';
 
 type ServerlessOrder = {
@@ -281,6 +282,10 @@ export default function TelegramServerlessOrdersPanel({
   const [selectedId, setSelectedId] = useState<string | null>(initialOrderId || null);
   const [orderDetailTab, setOrderDetailTab] = useState<OrderDetailTab>("items");
   const [receiptUrl, setReceiptUrl] = useState("");
+  const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptError, setReceiptError] = useState("");
+  const receiptSource = useRef("");
+  const receiptRequest = useRef(0);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptZoom, setReceiptZoom] = useState(1);
   const [copiedKey, setCopiedKey] = useState("");
@@ -379,25 +384,23 @@ export default function TelegramServerlessOrdersPanel({
   const identifierMatches = selectedOrder?.matchingIdentifiers || [];
 
   useEffect(() => {
-    let current = true;
-    let objectUrl = "";
-    setReceiptUrl("");
-    if (!selectedOrder?.paymentProofImage) return;
-    resolveTelegramMedia(selectedOrder.paymentProofImage)
-      .then((url) => {
-        if (!current) {
-          if (url.startsWith("blob:")) URL.revokeObjectURL(url);
-          return;
-        }
-        objectUrl = url.startsWith("blob:") ? url : "";
-        setReceiptUrl(url);
-      })
-      .catch(() => { if (current) setReceiptUrl(selectedOrder.paymentProofImage); });
-    return () => {
-      current = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    receiptRequest.current += 1;
+    setReceiptUrl(""); setReceiptError(""); setReceiptLoading(false); setReceiptOpen(false);
+    return () => { receiptRequest.current += 1; };
   }, [selectedOrder?.id, selectedOrder?.paymentProofImage]);
+
+  const openReceipt = async (reference = selectedOrder?.paymentProofImage || "", fresh = false) => {
+    receiptSource.current = reference;
+    const request = ++receiptRequest.current;
+    setReceiptOpen(true); setReceiptZoom(1); setReceiptUrl(""); setReceiptError(""); setReceiptLoading(true);
+    try {
+      const url = await resolveTelegramMedia(reference, { fresh });
+      if (!url || url.startsWith('tgmedia:')) throw new Error('The receipt image could not be resolved.');
+      if (receiptRequest.current === request) setReceiptUrl(url);
+    } catch (err: any) {
+      if (receiptRequest.current === request) setReceiptError(err?.message || 'The receipt could not be loaded. Retry to fetch it again.');
+    } finally { if (receiptRequest.current === request) setReceiptLoading(false); }
+  };
 
   const queueCounts = useMemo(() => {
     const counts = { queued: 0, review: 0, awaitingPayment: 0, fulfillment: 0, courier: 0, completed: 0 };
@@ -609,7 +612,7 @@ export default function TelegramServerlessOrdersPanel({
               {selectedOrder.payableOnDelivery>0 && <div className="om-courier-due"><span>Pay Courier on Delivery</span><strong>{formatPHP(selectedOrder.payableOnDelivery)}</strong></div>}
               <small className="om-action-feedback" role="status" aria-live="polite">{busyAction ? "Saving action…" : detailLoading ? "Refreshing transaction…" : ""}</small>
             </section>
-            <OrderWorkflowController key={selectedOrder.id} order={selectedOrder} busy={busyAction!=='' || detailLoading || Boolean(detailError)} receiptReady={Boolean(receiptUrl)} onAction={(action,extra)=>runAction(selectedOrder,action,extra)} onModify={()=>{beginEdit(selectedOrder);setOrderDetailTab('items');}} onReceipt={()=>{setReceiptZoom(1);setReceiptOpen(true);}}/>
+            <OrderWorkflowController key={selectedOrder.id} order={selectedOrder} busy={busyAction!=='' || detailLoading || Boolean(detailError)} receiptReady={!receiptLoading} onAction={(action,extra)=>runAction(selectedOrder,action,extra)} onModify={()=>{beginEdit(selectedOrder);setOrderDetailTab('items');}} onReceipt={()=>{void openReceipt();}}/>
             <nav className="prime-order-tabs" role="tablist" aria-label="Order details">
               {(["items", "fulfillment", "snapshot", "flags"] as const).map((tab) => <button key={tab} type="button" role="tab"
                 aria-selected={orderDetailTab === tab} onClick={() => setOrderDetailTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}
@@ -668,9 +671,9 @@ export default function TelegramServerlessOrdersPanel({
                   const coords = (lat: unknown, lon: unknown) => lat != null && lon != null && lat !== '' && lon !== '' && Number.isFinite(Number(lat)) && Number.isFinite(Number(lon)) ? `${Number(lat).toFixed(6)}, ${Number(lon).toFixed(6)}` : "Not captured";
                   return <>
                     <div><b className="block uppercase text-slate-700">Device Fingerprint</b><div className="mt-1 grid grid-cols-2 gap-2"><div><span>Fingerprint ID</span><strong className="block break-all">{fp.deviceFingerprintId || "Not captured"}</strong></div><div><span>Device / Hardware ID</span><strong className="block break-all">{[fp.deviceId, fp.hardwareId].filter(Boolean).join(" · ") || "Not captured"}</strong></div><div><span>Platform / Browser</span><strong className="block break-words">{[fp.platform, fp.browser || fp.userAgent].filter(Boolean).join(" · ") || "Not captured"}</strong></div><div><span>Graphics</span><strong className="block break-words">{fp.graphics || "Not captured"}</strong></div><div><span>Driver</span><strong className="block break-words">{fp.driver || "Not captured"}</strong></div></div></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">IP and Approximate Network Location</b><p className="mt-1 break-all"><b>Browser-Observed IP:</b> {ip.ip || fp.clientObservedIp || "Not captured"}</p><p className="mt-0.5 text-[10px] text-amber-800">Client-reported IP; network location is approximate and not independently verified.</p><p className="mt-1 break-words"><b>Provider / Precision:</b> {[ip.provider === "IPLocate" ? "IPLocate" : ip.provider ? "Previous snapshot" : "", ip.precision].filter(Boolean).join(" · ") || "Not available"}</p><p className="break-words"><b>Approximate IP Area:</b> {[ip.city, ip.subdivision, ip.country, ip.postalCode].filter(Boolean).join(", ") || "Not available"}</p><p className="break-words"><b>Network:</b> {[ip.isp, ip.asn, ip.ispDomain].filter(Boolean).join(" · ") || "Not available"}</p><p><b>IP Coordinates:</b> {coords(ip.latitude, ip.longitude)} · approximate</p><p><b>TomTom approximate address:</b> {ip.reverseGeocodingProvider === "TomTom" ? ip.reverseGeocodedAddress : "Not available"}</p><p><b>VPN / Proxy:</b> {ip.privacy ? `${ip.privacy.isVpn ? "VPN" : "No VPN reported"} · ${ip.privacy.isProxy ? "Proxy" : "No proxy reported"}` : "Not available"}</p></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">App-Open Device Location · Client-Reported</b><p className="mt-1"><b>Coordinates:</b> {coords(observation.lat, observation.lon)}</p><p><b>Accuracy:</b> {Number.isFinite(Number(observation.accuracy)) ? `±${Math.round(Number(observation.accuracy))} m` : "Not captured"} · <b>Captured:</b> {observation.capturedAt ? displayDate(observation.capturedAt) : "Not recorded"}</p><p className="break-words"><b>TomTom address:</b> {observation.reverseGeocodingProvider === "TomTom" ? observation.reverseGeocodedAddress : "Not available"}</p><p className="text-[10px] text-amber-800">The app requests permission at launch and attaches a fresh reading to an order if available. Location and address are client-reported evidence; neither proves who placed the order or guarantees house-level accuracy.</p></div>
-                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Checkout-Selected Device GPS</b><p className="mt-1"><b>Coordinates:</b> {coords(gps.lat, gps.lon)}</p><p><b>Accuracy:</b> {Number.isFinite(Number(gps.accuracy)) ? `±${Math.round(Number(gps.accuracy))} m` : "Not captured"} · <b>Captured:</b> {gps.capturedAt ? displayDate(gps.capturedAt) : "Not recorded"}</p><p className="break-words"><b>TomTom address:</b> {gps.reverseGeocodingProvider === "TomTom" ? gps.reverseGeocodedAddress : "Not available"}</p></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">IP and Approximate Network Location</b><p className="mt-1 break-all"><b>Browser-Observed IP:</b> {ip.ip || fp.clientObservedIp || "Not captured"}</p><p className="mt-0.5 text-[10px] text-amber-800">Client-reported IP; network location is approximate and not independently verified.</p><p className="mt-1 break-words"><b>Provider / Precision:</b> {[ip.provider === "IPLocate" ? "IPLocate" : ip.provider ? "Previous snapshot" : "", ip.precision].filter(Boolean).join(" · ") || "Not available"}</p><p className="break-words"><b>Approximate IP Area:</b> {[ip.city, ip.subdivision, ip.country, ip.postalCode].filter(Boolean).join(", ") || "Not available"}</p><p className="break-words"><b>Network:</b> {[ip.isp, ip.asn, ip.ispDomain].filter(Boolean).join(" · ") || "Not available"}</p><p><b>IP Coordinates:</b> {coords(ip.latitude, ip.longitude)} · approximate</p>{orderDetailTab === 'snapshot' && <SnapshotLocationMap lat={ip.latitude} lon={ip.longitude} label="Approximate IP Location" approximate />}<p><b>TomTom approximate address:</b> {ip.reverseGeocodingProvider === "TomTom" ? ip.reverseGeocodedAddress : "Not available"}</p><p><b>VPN / Proxy:</b> {ip.privacy ? `${ip.privacy.isVpn ? "VPN" : "No VPN reported"} · ${ip.privacy.isProxy ? "Proxy" : "No proxy reported"}` : "Not available"}</p></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">App-Open Device Location · Client-Reported</b><p className="mt-1"><b>Coordinates:</b> {coords(observation.lat, observation.lon)}</p>{orderDetailTab === 'snapshot' && <SnapshotLocationMap lat={observation.lat} lon={observation.lon} label="App-Open GPS Location" />}<p><b>Accuracy:</b> {Number.isFinite(Number(observation.accuracy)) ? `±${Math.round(Number(observation.accuracy))} m` : "Not captured"} · <b>Captured:</b> {observation.capturedAt ? displayDate(observation.capturedAt) : "Not recorded"}</p><p className="break-words"><b>TomTom address:</b> {observation.reverseGeocodingProvider === "TomTom" ? observation.reverseGeocodedAddress : "Not available"}</p><p className="text-[10px] text-amber-800">The app requests permission at launch and attaches a fresh reading to an order if available. Location and address are client-reported evidence; neither proves who placed the order or guarantees house-level accuracy.</p></div>
+                    <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Checkout-Selected Device GPS</b><p className="mt-1"><b>Coordinates:</b> {coords(gps.lat, gps.lon)}</p>{orderDetailTab === 'snapshot' && <SnapshotLocationMap lat={gps.lat} lon={gps.lon} label="Checkout GPS Location" />}<p><b>Accuracy:</b> {Number.isFinite(Number(gps.accuracy)) ? `±${Math.round(Number(gps.accuracy))} m` : "Not captured"} · <b>Captured:</b> {gps.capturedAt ? displayDate(gps.capturedAt) : "Not recorded"}</p><p className="break-words"><b>TomTom address:</b> {gps.reverseGeocodingProvider === "TomTom" ? gps.reverseGeocodedAddress : "Not available"}</p></div>
                     <div className="border-t border-slate-200 pt-2"><b className="block uppercase text-slate-700">Delivery Pin Address</b><p className="mt-1 break-words">{selectedOrder.deliveryAddress?.geocodingProvider === "TomTom" ? selectedOrder.deliveryAddress.geocodedAddress : selectedOrder.deliveryAddress?.formatted || "Not available"}</p><p className="break-words text-slate-500">{selectedOrder.deliveryAddress?.unitDetails || "No unit or landmark details"}</p></div>
                   </>;
                 })()}
@@ -697,7 +700,7 @@ export default function TelegramServerlessOrdersPanel({
                   <p className="text-xs">Additional amount: {formatPHP(selectedOrder.adjustmentDue)} · {selectedOrder.adjustmentStatus.replace(/_/g, " ")}</p>
                   {selectedOrder.adjustmentRevisedTotal != null && <p className="text-xs">Revised total: {formatPHP(selectedOrder.adjustmentRevisedTotal)}</p>}
                   {selectedOrder.adjustmentPaymentMethodName && <p className="text-xs">Customer payment method: {selectedOrder.adjustmentPaymentMethodName}</p>}
-                  {selectedOrder.adjustmentProofImage && <button type="button" className="px-3 py-2 border text-xs font-bold" onClick={async () => { try { setReceiptUrl(await resolveTelegramMedia(selectedOrder.adjustmentProofImage)); setReceiptOpen(true); } catch (err: any) { setError(err?.message || "Could not open the adjustment receipt."); } }}>View Adjustment Receipt</button>}
+                  {selectedOrder.adjustmentProofImage && <button type="button" className="px-3 py-2 border text-xs font-bold" onClick={() => { void openReceipt(selectedOrder.adjustmentProofImage); }}>View Adjustment Receipt</button>}
                   {selectedOrder.adjustmentStatus.toLowerCase() === "pending_review" && <button type="button" disabled={busyAction !== ""} onClick={() => void runAction(selectedOrder, "approveAdjustmentPayment")} className="block px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">Approve Verified Extra Payment</button>}
                 </> : <>
                   <p className="text-xs">Edit the order and save it to recalculate any top-up from the updated items and charges. Verify the customer’s separate receipt before marking the order Ready.</p>
@@ -827,11 +830,15 @@ export default function TelegramServerlessOrdersPanel({
           </section>
         </div>}
 
-        {receiptOpen && receiptUrl && <div className="serverless-receipt-modal" role="dialog" aria-modal="true" aria-label="Payment receipt viewer" onClick={() => setReceiptOpen(false)}>
+        {receiptOpen && <div className="serverless-receipt-modal" role="dialog" aria-modal="true" aria-label="Payment receipt viewer" onClick={() => setReceiptOpen(false)}>
           <div className="serverless-receipt-modal__panel" onClick={(event) => event.stopPropagation()}>
-            <header><strong>Payment Receipt</strong><a href={receiptUrl} download={`receipt-${selectedOrder?.orderNumber || "order"}`}><Download /> Download</a><button type="button" onClick={() => setReceiptOpen(false)} aria-label="Close receipt viewer"><X /></button></header>
+            <header><strong>Payment Receipt</strong>{receiptUrl && <a href={receiptUrl} download={`receipt-${selectedOrder?.orderNumber || "order"}`}><Download /> Download</a>}<button type="button" onClick={() => setReceiptOpen(false)} aria-label="Close receipt viewer"><X /></button></header>
             <div className="serverless-receipt-modal__tools"><button type="button" onClick={() => setReceiptZoom((zoom) => Math.max(0.5, zoom - 0.25))}>−</button><span>{Math.round(receiptZoom * 100)}%</span><button type="button" onClick={() => setReceiptZoom((zoom) => Math.min(4, zoom + 0.25))}>+</button><button type="button" onClick={() => setReceiptZoom(1)}>Reset</button></div>
-            <div className="serverless-receipt-modal__scroll"><img src={receiptUrl} alt="Uploaded payment receipt" style={{ width: `${receiptZoom * 100}%`, maxWidth: "none" }} /></div>
+            <div className="serverless-receipt-modal__scroll">
+              {receiptLoading && <p role="status" className="p-4 text-sm">Loading Receipt…</p>}
+              {receiptError && <div role="alert" className="p-4 text-sm"><p>{receiptError}</p><button type="button" onClick={() => void openReceipt(receiptSource.current, true)}>Retry Receipt</button></div>}
+              {receiptUrl && <img src={receiptUrl} alt="Uploaded payment receipt" onError={() => { setReceiptUrl(""); setReceiptError("The receipt image could not be displayed. Retry to download a fresh copy."); }} style={{ width: `${receiptZoom * 100}%`, maxWidth: "none" }} />}
+            </div>
           </div>
         </div>}
 

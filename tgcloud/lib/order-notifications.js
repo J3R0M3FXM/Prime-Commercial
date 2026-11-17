@@ -154,6 +154,14 @@ export async function notifyOrderCreated(order) {
   return notifyCustomerOrder({ ...order, status: 'Pending' }, 'order-created:' + String(order.orderNumber));
 }
 
+/** Telegram preformatted text preserves padding and prevents proportional colon drift. */
+export function formatAdminOrderNotification(title, fields) {
+  const plain = value => String(value ?? '').replace(/\s+/g, ' ').trim() || '—';
+  const width = fields.reduce((length, field) => Math.max(length, String(field[0]).length), 0);
+  return '<pre>' + escapeHtml(title) + '\n' + fields.map(([label, value]) =>
+    escapeHtml(String(label).padEnd(width) + ' : ' + plain(value))).join('\n') + '</pre>';
+}
+
 /** Notify the configured Admin independently of the customer delivery result. */
 export async function notifyAdminOrderCreated(order) {
   const number = String(order?.orderNumber || '').trim();
@@ -176,31 +184,28 @@ export async function notifyAdminOrderCreated(order) {
       FROM orders o LEFT JOIN customers c ON c.id=o.customer_id
       LEFT JOIN payment_methods p ON p.id=o.payment_method_id
       WHERE o.order_number=:number`, { ':number': number });
-    const field = (label, value) => `${label.padEnd(13)}: <code>${escapeHtml(value || '—')}</code>`;
     const username = String(stored?.username || order?.username || '').replace(/^@/, '').trim();
     const paymentName = stored?.paymentName || stored?.configuredPaymentName || order?.paymentMethodName || 'Pending Payment';
     const amount = Number(order?.totalAmount);
     const formattedAmount = 'P' + new Intl.NumberFormat('en-PH', {
       minimumFractionDigits: 2, maximumFractionDigits: 2,
     }).format(Number.isFinite(amount) ? amount : 0);
-    const message = isPos ? formatMessage([
-      '<b>PRIME™ NEW ORDER</b>',
-      `Order No.: <code>${escapeHtml(number)}</code>`,
-      'Source: POS',
-      `Customer: ${escapeHtml(order?.customerName || 'Customer')}`,
-      `Total: <b>${money(order?.totalAmount)}</b>`,
-      `Payment: ${escapeHtml(order?.paymentStatus || 'Unpaid')}`,
-      'Open Order Management to review this order.',
-    ]) : '<b>NEW SHOPFRONT ORDER</b>\n\n' + [
-      field('Order No.', number),
-      field('Customer', username ? '@' + username : '—'),
-      field('Member ID', stored?.memberId || order?.memberId),
-      field('Order Amount', formattedAmount),
-      field('Receiver', stored?.receiverName || order?.receiverName),
-      field('Phone', stored?.phone || order?.receiverPhone),
-      field('Courier', stored?.courier || order?.courier?.name),
-      field('Payment', paymentName),
-    ].join('\n');
+    const message = formatAdminOrderNotification(isPos ? 'New POS Order' : 'New Shopfront Order', isPos ? [
+      ['Order No.', number],
+      ['Source', 'POS'],
+      ['Customer', order?.customerName || 'Customer'],
+      ['Order Amount', formattedAmount],
+      ['Payment', order?.paymentStatus || 'Unpaid'],
+    ] : [
+      ['Order No.', number],
+      ['Customer', username ? '@' + username : '—'],
+      ['Member ID', stored?.memberId || order?.memberId],
+      ['Order Amount', formattedAmount],
+      ['Receiver', stored?.receiverName || order?.receiverName],
+      ['Phone', stored?.phone || order?.receiverPhone],
+      ['Courier', stored?.courier || order?.courier?.name],
+      ['Payment', paymentName],
+    ]);
     const results = await Promise.all(recipients.map(async (chatId) => {
       try {
         return await send(chatId, message, number, isPos ? 'Open Admin Order' : 'VIEW IN ADMIN PANEL',

@@ -744,9 +744,9 @@ export default function OrderHistoryModal({
           </div>
         </div>
         <PrimePageHeading icon={<Package />} title={selectedOrder ? "ORDER DETAILS" : "PURCHASES"} actions={<>
-          {selectedOrder && <button type="button" onClick={() => { setSelectedOrderId(null); setReceiptViewerUrl(null); setProofSuccess(false); setProofImage(""); setProofError(""); setDirectReceiptOrderId(null); }} aria-label="Back to purchases" className="flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /></button>}
-          <button type="button" onClick={loadOrders} aria-label="Refresh orders" className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-black" : ""}`} /></button>
-          <button type="button" onClick={onClose} aria-label="Close purchases" className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><X className="w-5 h-5" /></button>
+          {selectedOrder && <button type="button" onClick={() => { setSelectedOrderId(null); setReceiptViewerUrl(null); setProofSuccess(false); setProofImage(""); setProofError(""); setDirectReceiptOrderId(null); }} aria-label="Back to purchases" className="order-history__utility flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /></button>}
+          <button type="button" onClick={loadOrders} aria-label="Refresh orders" className="order-history__utility flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-black" : ""}`} /></button>
+          <button type="button" onClick={onClose} aria-label="Close purchases" className="order-history__utility flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><X className="w-5 h-5" /></button>
         </>} />
 
         {/* ================= MODAL BODY ================= */}
@@ -843,7 +843,7 @@ export default function OrderHistoryModal({
                         key={orderKey}
                         type="button"
                         onClick={() => setSelectedOrderId(orderKey)}
-                        className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left shadow-xs transition-colors hover:border-slate-400 active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700"
+                        className="order-history__card w-full rounded-lg border border-slate-200 bg-white p-3 text-left shadow-xs transition-colors hover:border-slate-400 active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700"
                       >
                         <span className="flex min-w-0 items-start justify-between gap-2">
                           <span className="min-w-0">
@@ -892,7 +892,7 @@ export default function OrderHistoryModal({
                         <button
                           type="button"
                           onClick={() => copyToClipboard(selectedOrder.orderNumber || selectedOrder.id, "orderId")}
-                          className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+                          className="order-history__utility p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
                           aria-label="Copy order number"
                           title="Copy order number"
                         >
@@ -1292,13 +1292,13 @@ export default function OrderHistoryModal({
                                   {selectedPaymentMethod.accountName && (
                                     <div className="border border-slate-200 p-2.5 flex items-center justify-between gap-2">
                                       <div className="min-w-0"><span className="block text-[8px] uppercase text-slate-400 font-bold">Account Name</span><strong className="block text-[11px] truncate">{selectedPaymentMethod.accountName}</strong></div>
-                                      <button type="button" onClick={() => copyToClipboard(selectedPaymentMethod.accountName, "acc_name")} className="px-2 py-1 border border-slate-200 bg-slate-50 text-[9px] font-bold uppercase shrink-0">{copiedKey === "acc_name" ? "Copied" : "Copy"}</button>
+                                      <button type="button" onClick={() => copyToClipboard(selectedPaymentMethod.accountName, "acc_name")} className="order-history__utility px-2 py-1 border border-slate-200 bg-slate-50 text-[9px] font-bold uppercase shrink-0">{copiedKey === "acc_name" ? "Copied" : "Copy"}</button>
                                     </div>
                                   )}
                                   {selectedPaymentMethod.accountNumber && (
                                     <div className="border border-slate-200 p-2.5 flex items-center justify-between gap-2">
                                       <div className="min-w-0"><span className="block text-[8px] uppercase text-slate-400 font-bold">Account / Mobile</span><strong className="block text-[11px] truncate">{selectedPaymentMethod.accountNumber}</strong></div>
-                                      <button type="button" onClick={() => copyToClipboard(selectedPaymentMethod.accountNumber, "acc_num")} className="px-2 py-1 border border-slate-200 bg-slate-50 text-[9px] font-bold uppercase shrink-0">{copiedKey === "acc_num" ? "Copied" : "Copy"}</button>
+                                      <button type="button" onClick={() => copyToClipboard(selectedPaymentMethod.accountNumber, "acc_num")} className="order-history__utility px-2 py-1 border border-slate-200 bg-slate-50 text-[9px] font-bold uppercase shrink-0">{copiedKey === "acc_num" ? "Copied" : "Copy"}</button>
                                     </div>
                                   )}
                                 </div>

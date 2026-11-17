@@ -12,7 +12,7 @@ for (const key of ['window','document','navigator','localStorage','HTMLElement',
   Object.defineProperty(globalThis, key, { value: dom.window[key], configurable: true });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const calls = [];
-let broadcastResult = 'sent';
+let broadcastResult = 'sent', failParentLink=false;
 window.confirm = () => true;
 const original = { id:'welcome', name:'Welcome / pRiMe', active:true, triggerType:'message', triggerValue:'hello', matchMode:'contains', responseText:'Hi {{name}}, pRiMe says hello.', mediaUrl:'', priority:100, buttons:[{id:'link',text:'pRiMe Shop',action:'url',url:'https://example.com',response:'',targetFlowId:''}] };
 globalThis.__secretaryUI = async (name,input) => {
@@ -23,6 +23,7 @@ globalThis.__secretaryUI = async (name,input) => {
   }
   assert.equal(name, 'manageAutomation');
   if (input.action === 'list') return { flows:[original], settings:{enabled:true,welcomeFlowId:'welcome',businessConnectionId:'connected'}, chats:[{businessConnectionId:'connected',chatId:123,first_name:'Customer'}] };
+  if (failParentLink && input.action === 'update' && input.id === 'welcome') throw Error('Link failed');
   if (input.action === 'update' || input.action === 'create') return {...input,id:input.id || 'created'};
   if (input.action === 'settings') return input;
   return {success:true};
@@ -47,8 +48,9 @@ await act(async()=>root.render(createElement(Secretary,{serverless:true,onBack()
 const buttons=()=>[...document.querySelectorAll('button')];
 const click=async label=>{const button=buttons().find(node=>node.textContent.trim()===label);assert.ok(button,'Missing button '+label);await act(async()=>button.click());};
 assert.equal(document.querySelector('[aria-current=page]').textContent,'Flows');
-assert.equal(document.querySelectorAll('.secretary-step-card').length,1);
-assert.ok(document.body.textContent.includes('Welcome Step · Every 12 Hours'));
+assert.ok(document.querySelector('[aria-label="Secretary Menu Hierarchy"]'));
+assert.equal(document.querySelectorAll('.secretary-tree-row').length,1);
+assert.ok(document.body.textContent.includes('Main Menu · Welcome Every 12 Hours'));
 assert.equal(document.querySelector('.secretary-configurator').getBoundingClientRect().width<=430,true);
 await click('Edit');
 assert.equal(document.querySelector('[aria-current=page]').textContent,'Edit');
@@ -77,5 +79,30 @@ for(const width of [360,390,430]){
 }
 await click('Flows');
 assert.equal(document.querySelector('[aria-current=page]').textContent,'Flows');
+await click('Main Menu');
+assert.match(document.querySelector('.secretary-tree-heading').textContent,/Welcome/);
+await click('Add Submenu');
+assert.ok(document.querySelector('.secretary-step-content'));
+assert.match(document.body.textContent,/New Submenu Of/);
+failParentLink=true;await click('Save Step');assert.match(document.body.textContent,/Submenu Saved. Could Not Link Parent/);
+failParentLink=false;await click('Save Step');assert.equal(calls.filter(call=>call.input.action==='create').length,1,'Retrying parent linking does not duplicate the saved submenu');
+assert.ok(calls.some(call=>call.input.action==='create'&&call.input.triggerType==='callback'));
+assert.ok(calls.some(call=>call.input.action==='update'&&call.input.id==='welcome'&&call.input.buttons.some(button=>button.targetFlowId==='created')),'Saving a submenu links the parent through existing callbacks');
+await click('Flows');
+await click('Main Menu');
+await click('New SubmenuActive · 0 Options›');
+assert.match(document.querySelector('.secretary-tree-heading').textContent,/New Submenu/);
+await click('← Back');assert.match(document.querySelector('.secretary-tree-heading').textContent,/Welcome/);
+await click('Forward →');assert.match(document.querySelector('.secretary-tree-heading').textContent,/New Submenu/);
 await act(async()=>root.unmount());
 console.log('PASS: Secretary Flows/Edit/Simulator, compact preview, 430px typography, draft save and customer casing.');
+
+const treeBundle=await build({input:resolve('app/components/admin/secretary-menu-tree.tsx'),platform:'node',write:false,tsconfig:false,transform:{jsx:{runtime:'automatic'}},onLog(level,log,handler){if(log.code!=='MODULE_LEVEL_DIRECTIVE')handler(level,log);},plugins:[{name:'react',resolveId(id){if(id==='react'||id.startsWith('react/'))return {id:pathToFileURL(require.resolve(id)).href,external:true};}}],output:{format:'esm'}});
+const Tree=(await import('data:text/javascript;base64,'+Buffer.from(treeBundle.output[0].code).toString('base64'))).default;
+const menus=Array.from({length:81},(_,i)=>({id:'menu'+i,name:'Menu '+i,active:true,buttons:i<80?[{id:'next',text:'Next Level',action:'flow',targetFlowId:'menu'+(i+1)}]:[{id:'home',text:'Return Home',action:'flow',targetFlowId:'menu0'}]}));
+const treeRoot=createRoot(document.getElementById('root'));await act(async()=>treeRoot.render(createElement(Tree,{flows:menus,mainMenuId:'menu0',onEdit(){},onAdd(){}})));
+await click('Main Menu');for(let depth=0;depth<80;depth++)await click('Next LevelActive · 1 Options›');
+assert.match(document.querySelector('.secretary-tree-heading').textContent,/Menu 80Level 81/);
+await click('Return HomeActive · 1 Options›');assert.match(document.querySelector('.secretary-tree-heading').textContent,/Menu 0Level 82/,'Cycles are navigated without recursive expansion');
+await click('← Back');assert.match(document.querySelector('.secretary-tree-heading').textContent,/Menu 80/);await click('Forward →');assert.match(document.querySelector('.secretary-tree-heading').textContent,/Menu 0/);
+await act(async()=>treeRoot.unmount());console.log('PASS: 81 menu levels, cyclic return links, Back/Forward history and retry-safe parent linking.');

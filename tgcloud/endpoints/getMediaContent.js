@@ -122,6 +122,17 @@ export default async function (input, ctx) {
     throw new EndpointError('Media size verification failed.', { code: 'MEDIA_SIZE_MISMATCH' });
   }
 
+  if (input?.chunkIndex != null) {
+    const chunkSize = 192 * 1024; // Divisible by three: image base64 parts can be joined safely.
+    const index = Number(input.chunkIndex);
+    const count = Math.ceil(bytes.length / chunkSize);
+    if (!/^image\/(jpeg|png|webp)$/.test(asset.contentType || '') || !Number.isInteger(index) || index < 0 || index >= count) {
+      throw new EndpointError('Invalid image transfer part.', { code: 'INVALID_INPUT' });
+    }
+    return { id: asset.id, contentType: asset.contentType, size: bytes.length, chunkIndex: index, chunkCount: count,
+      base64: encodeBase64(bytes.subarray(index * chunkSize, (index + 1) * chunkSize)) };
+  }
+
   return {
     id: asset.id,
     contentType: asset.contentType || 'application/octet-stream',

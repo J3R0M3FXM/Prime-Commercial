@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ vars.PRIME_AUTOMATION_REF }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

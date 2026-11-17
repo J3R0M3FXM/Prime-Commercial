@@ -16,6 +16,7 @@ assert.equal(workflow.on.schedule[0].cron,'2-57/5 * * * *');
 assert.equal(workflow.permissions.contents,'read');assert.equal(workflow.concurrency['cancel-in-progress'],false);
 assert.match(workflow.jobs.reconcile.if,/PRIME_ORDER_AUTOMATION_ENABLED/);assert.match(workflow.jobs.reconcile.if,/PRIME_AUTOMATION_REF/);
 assert.equal(workflow.jobs.reconcile.steps[0].with['persist-credentials'],false);
+assert.equal(workflow.jobs.reconcile.steps[0].with.ref,'${{ vars.PRIME_AUTOMATION_REF }}','Scheduled jobs must check out the validated dependency manifest, not stale default-branch source');
 const step=workflow.jobs.reconcile.steps.find(step=>step.env?.TGCLOUD_TOKEN);
 assert.equal(step.env.TGCLOUD_TOKEN,'${{ secrets.TGCLOUD_TOKEN }}');
 assert.match(step.run,/app8830494959/);assert.match(step.run,/tgcloud run endpoints\/orderMilestones/);

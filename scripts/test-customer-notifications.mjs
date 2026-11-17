@@ -78,3 +78,14 @@ await Promise.all([sender.ensureNotificationOutbox(),sender.ensureNotificationOu
 assert.ok(sqlite.prepare("SELECT name FROM sqlite_master WHERE name='telegram_notification_outbox'").get(),'Missing legacy notification storage is created without a schema migration');
 sqlite.close();
 console.log('PASS: status-specific PRIME Core messages, real saved-order recipients, exact inline destinations, deadline timing, cancellation reasons, leased retries, stale-message suppression and staff-only outbox management.');
+
+const admin=load('tgcloud/lib/order-notifications.js',['formatAdminOrderNotification']);
+for(const title of ['New Shopfront Order','New POS Order']) {
+  const message=admin.formatAdminOrderNotification(title,[['Order No.','123'],['Customer','A & B <Shop>'],['Order Amount','P125.00'],['Receiver','First\nSecond']]);
+  assert.ok(message.startsWith('<pre>'+title+'\n')&&message.endsWith('</pre>'));
+  assert.doesNotMatch(message,/\n\n/,'Admin fields have no blank line spacing');
+  assert.match(message,/A &amp; B &lt;Shop&gt;/);assert.match(message,/First Second/);
+  const rows=message.slice(5,-6).split('\n').slice(1);
+  assert.equal(new Set(rows.map(row=>row.indexOf(':'))).size,1,'Every admin colon occupies the same monospace column');
+}
+console.log('PASS: compact preformatted admin order fields, aligned colons and escaped values.');

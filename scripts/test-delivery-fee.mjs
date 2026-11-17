@@ -42,3 +42,13 @@ assert.equal(calculateRoadDistanceFallback(14.5, 121, 14.5, 121), 0, 'Same origi
 const oneDegree = calculateRoadDistanceFallback(0, 0, 1, 0);
 assert.ok(oneDegree > 140 && oneDegree < 150, 'Fallback road distance must be a 1.3x straight-line estimate');
 console.log('Delivery fee tests passed.');
+
+// Saved Standard/Priority band shapes audited from production on 2026-11-18.
+for (const [name,baseFare,timeBasedFeePerMinute,rates,expected] of [
+  ['Standard',55,.75,[6.5,6.25,6,5.75,5],[82,107,125,154,179]],
+  ['Priority',90,.95,[7.5,6.75,6.5,5.75,5.25],[122,149,169,197,224]],
+]) {
+  const bounds=[0,3,7,10,15,null];
+  const rate={baseFare,timeBasedFeePerMinute,pricingBands:rates.map((ratePerKm,i)=>({fromKm:bounds[i],toKm:bounds[i+1],ratePerKm}))};
+  [3,7,10,15,20].forEach((distance,i)=>assert.equal(calculateDeliveryFee(rate,distance,10),expected[i],name+' cumulative band and time fee at '+distance+' km'));
+}

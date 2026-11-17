@@ -16,23 +16,8 @@ import {
   Route
 } from "lucide-react";
 
-// Dynamically import Leaflet components with SSR disabled to prevent window is not defined errors
-const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false }
-);
-const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false }
-);
-const Marker = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Marker),
-  { ssr: false }
-);
-const Popup = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Popup),
-  { ssr: false }
-);
+const MapboxView = dynamic(() => import('./mapbox-view'), { ssr: false });
+import { validMapCoordinates } from '@/lib/mapbox-config';
 
 interface StaticOrderMapProps {
   lat?: number | null;
@@ -61,9 +46,9 @@ export function StaticOrderMap({
   }, []);
 
   // Default coordinates: Metro Manila, Philippines (14.5995, 120.9842) if none provided
-  const validLat = typeof lat === "number" && !isNaN(lat) && lat !== 0 ? lat : 14.5995;
-  const validLon = typeof lon === "number" && !isNaN(lon) && lon !== 0 ? lon : 120.9842;
-  const hasValidCoords = Boolean(typeof lat === "number" && !isNaN(lat) && lat !== 0 && typeof lon === "number" && !isNaN(lon) && lon !== 0);
+  const hasValidCoords = validMapCoordinates(lat, lon);
+  const validLat = hasValidCoords ? lat! : 14.5995;
+  const validLon = hasValidCoords ? lon! : 120.9842;
 
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${validLat},${validLon}`;
   const wazeUrl = `https://waze.com/ul?ll=${validLat},${validLon}&navigate=yes`;
@@ -85,7 +70,7 @@ export function StaticOrderMap({
   }
 
   return (
-    <div className={`space-y-2 transition-all duration-300 ${isExpanded ? "fixed inset-4 z-50 bg-white p-4 rounded-2xl shadow-2xl border border-slate-300 flex flex-col" : "relative"}`}>
+    <div className={`space-y-2 transition-all duration-300 ${isExpanded ? "fixed inset-y-4 left-1/2 -translate-x-1/2 w-[calc(100%-16px)] max-w-[430px] z-50 bg-white p-3 rounded-lg shadow-2xl border border-slate-300 flex flex-col" : "relative"}`}>
       {/* Map Header & Controls */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -140,54 +125,13 @@ export function StaticOrderMap({
 
       {/* Map Container View */}
       <div className={`relative overflow-hidden rounded-xl border border-slate-200 shadow-2xs ${isExpanded ? "flex-1 min-h-[350px]" : "h-56"}`}>
-        <MapContainer
-          center={[validLat, validLon]}
-          zoom={15}
-          scrollWheelZoom={false}
-          className="w-full h-full z-0"
-          style={{ height: "100%", width: "100%" }}
-        >
-          {mapType === "standard" ? (
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-          ) : (
-            <TileLayer
-              attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            />
-          )}
-
-          <Marker position={[validLat, validLon]}>
-            <Popup>
-              <div className="p-1 font-mono text-xs space-y-1">
-                <p className="font-bold text-slate-900 border-b border-slate-100 pb-1">
-                  {orderNumber ? `Order #${orderNumber}` : "Delivery Destination"}
-                </p>
-                {receiverName && (
-                  <p className="text-[11px] text-slate-700">
-                    <strong>Receiver:</strong> {receiverName}
-                  </p>
-                )}
-                {addressText && (
-                  <p className="text-[10px] text-slate-500 leading-tight">
-                    {addressText}
-                  </p>
-                )}
-                <p className="text-[10px] text-indigo-600 font-bold pt-0.5">
-                  GPS: {validLat.toFixed(5)}, {validLon.toFixed(5)}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        </MapContainer>
+        <MapboxView lat={validLat} lon={validLon} mapStyle={mapType === 'satellite' ? 'satellite' : 'street'} showMarker={hasValidCoords} label="Order Delivery Mapbox Map" />
 
         {/* Floating Route Info Badge */}
-        <div className="absolute bottom-2.5 left-2.5 right-2.5 z-10 pointer-events-none">
+        <div className="absolute top-12 left-2 right-2 z-10 pointer-events-none">
           <div className="p-2.5 bg-white/95 backdrop-blur-md rounded-xl border border-slate-200 shadow-md pointer-events-auto flex items-center justify-between gap-2 text-xs font-mono">
             <div className="flex items-center gap-2 min-w-0">
-              <MapPin className="w-4 h-4 text-red-600 shrink-0 animate-bounce" />
+              <MapPin className="w-4 h-4 text-red-600 shrink-0" />
               <div className="min-w-0">
                 <p className="font-heading font-bold text-[10.5px] uppercase tracking-wider text-slate-900 truncate">
                   {addressText || "Delivery Address Pinpoint"}

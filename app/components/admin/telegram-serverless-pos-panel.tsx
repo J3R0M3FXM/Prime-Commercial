@@ -320,7 +320,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
                     <label className="pos-field" htmlFor="pos-delivery-address">Delivery Address</label>
                     <input id="pos-delivery-address" className="pos-address-input" value={deliveryAddress} onChange={event=>{setDeliveryAddress(event.target.value);setDestination(null);setCourierId('');setDeliveryQuote(null);}} maxLength={240} placeholder="Search street, building or barangay" autoComplete="off" aria-controls="pos-address-results" aria-expanded={suggestions.length>0}/>
                     {addressBusy && <p role="status" className="pos-hint">Searching addresses…</p>}
-                    {suggestions.length>0 && <div id="pos-address-results" className="pos-address-results" aria-label="Address suggestions">{suggestions.map((item,index)=><button type="button" key={index} onClick={()=>{setDeliveryAddress(item.formatted);setDestination({lat:Number(item.lat),lon:Number(item.lon)});setSuggestions([]);}}>{item.formatted}<ChevronRight/></button>)}</div>}
+                    {suggestions.length>0 && <div id="pos-address-results" className="pos-address-results" aria-label="Address suggestions">{suggestions.map((item,index)=><button type="button" className="prime-address-suggestion" key={index} onClick={()=>{setDeliveryAddress(item.formatted);setDestination({lat:Number(item.lat),lon:Number(item.lon)});setSuggestions([]);}}>{item.formatted}<ChevronRight/></button>)}</div>}
                     {destination && <p className="pos-address-selected"><Check/>Address selected</p>}
                   </div>
                   {deliveryBusy && <p role="status" className="pos-hint">Calculating courier rates…</p>}
