@@ -1,6 +1,6 @@
 # Production Reconstruction Audit
 
-## POS register and delivery checkout — validated — 2026-11-17
+## POS register and delivery checkout — deployed — 2026-11-17
 
 POS now has Catalog/Ticket workspaces, a current-sale ticket, cash tender/change, itemized server quotes, configured and manual fixed/percentage charges, staff discounts, customer vouchers, and explicitly entered existing-customer Store Credits. Delivery uses existing address autocomplete and authoritative courier routing/pricing/coverage, with checkout versus courier-on-delivery fee collection and separate payable amounts. Mobile430px containment and existing typography are retained.
 
@@ -8,7 +8,9 @@ POS now has Catalog/Ticket workspaces, a current-sale ticket, cash tender/change
 
 Sandbox `npm run validate:miniapp` passed all required checks and the production build (2,399 modules). Focused actual-SQLite tests additionally cover composed charges/discounts, delivery due later, exactly-once POS credit debit, failed-sale credit return, voucher claim redemption/retry and limits. `scripts/test-pos-ui.mjs` passed rendered register navigation/cart/manual-charge/customer-credit/delivery controls and is added to the release gate. Backend syntax and diff whitespace checks passed after the final recovery edits. No live sale, customer message or business-record mutation was used for testing. No new API/Supabase/Vercel/preview paths were introduced.
 
-Promote only these committed changes and the exact Sandbox dist; deploy the new `tgcloud/lib/pos-pricing.js`, changed `tgcloud/endpoints/createPosOrder.js`, and static build from clean Checkout. Prior live baseline: app8830494959 revision528,107 static files current. Real Telegram staff/device review and actual courier/payment transactions remain unverified. Deployment evidence will be recorded after release.
+Source `4e769df` was promoted as Checkout `ad14858`; all seven reviewed files and the exact107-file Sandbox dist matched byte for byte. Deployed only `tgcloud/lib/pos-pricing.js`, `tgcloud/endpoints/createPosOrder.js`, and static build from clean Checkout. TGCloud push succeeded for both modules and eight changed static files. Fresh fetch/status confirms app8830494959 revision **529**,90 modules (one new POS pricing module), webhook synced, backend working directory clean and107 static files current. No schema/handler changes or unrelated deployments were included.
+
+Public root HTML and entry JS/CSS match Sandbox byte for byte. SHA-256: root `0cc822c7a03fa53e70778c65d562438d3228218bfc6f93c71f4a56810086d050`; `index-BuM0wdvN.js` `0bbd48df4279f2ea7f2c3a75cbab07106e7d07d5ee9964aa931c242c6cb700af`; `index-CUDkm-wv.css` `c92d82ad5cbaea50952502eca49c690a1eddb1790f46411a73514fc97db76e5b`. Real Telegram staff/device review and actual courier/payment transactions remain unverified. Previous Checkout dist is retained under the Termux temporary artifacts folder.
 
 ## Orders, courier configurator and checkout validation — deployed — 2026-11-17
 
