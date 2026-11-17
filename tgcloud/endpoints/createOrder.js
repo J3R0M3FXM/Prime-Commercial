@@ -11,6 +11,7 @@ import { claimPromoUse, redeemPromoClaim, releasePromoClaim } from '../lib/promo
 import { reserveInventoryLine, releaseInventoryReservations } from '../lib/inventory.js';
 import { canonicalizeOrderItems } from '../lib/orders.js';
 import { calculateChargesBreakdown } from '../lib/charges.js';
+import { readDeliveryQuote } from '../lib/delivery-quotes.js';
 import { quoteDelivery } from '../lib/delivery.js';
 import { resolveTrustedFingerprint } from '../lib/fingerprints.js';
 import { publicMediaReference } from '../lib/media.js';
@@ -182,6 +183,7 @@ function sanitizedRequest(input) {
       lat: Number(address.lat), lon: Number(address.lon),
       unitDetails: text(address.unitDetails, 250),
     },
+    deliveryQuoteId: text(input?.deliveryQuoteId, 120),
     courierId: text(typeof input?.courier === 'string' ? input.courier : input?.courier?.id, 100),
     deliveryPaymentMethod: text(input?.deliveryPaymentMethod || input?.deliveryFeePaymentMethod, 40).toLowerCase(),
     receiverName: text(input?.receiverName, 120).toUpperCase(),
@@ -255,7 +257,8 @@ async function makeCanonicalSnapshot(request, customer, submittedAt) {
   const canonicalItems = await Promise.all(cart.items.map(async (item) => ({
     ...item, imageUrl: await publicMediaReference(item.imageUrl || ''),
   })));
-  const delivery = await quoteDelivery(request.deliveryAddress.lat, request.deliveryAddress.lon, request.courierId);
+  const delivery = await readDeliveryQuote(request.deliveryQuoteId, customer.tgUserId, request.deliveryAddress.lat, request.deliveryAddress.lon, request.courierId)
+    || await quoteDelivery(request.deliveryAddress.lat, request.deliveryAddress.lon, request.courierId);
   const chargeRows = await db.select().from(chargeTable).where(eq(chargeTable.isActive, true)).orderBy(asc(chargeTable.sortOrder)).all();
   const chargeResult = calculateChargesBreakdown(chargeRows, cart.subtotal, new Date());
   const fingerprint = resolveTrustedFingerprint(customer, request.fingerprint);

@@ -360,6 +360,7 @@ export default function CheckoutModal({
     cashbackPoints?: number;
     freeProductName?: string;
   } | null>(null);
+  const confirmedPromo = useRef<typeof appliedPromo>(null);
   const [isCheckingPromo, setIsCheckingPromo] = useState<boolean>(false);
   const [promoError, setPromoError] = useState<string>("");
   const [isConfirmingCodes, setIsConfirmingCodes] = useState(false);
@@ -962,7 +963,9 @@ export default function CheckoutModal({
       if (selectedCourierId && !couriersList.some((courier: any) => String(courier.id) === selectedCourierId)) {
         setSelectedCourierId("");
         setDeliveryPaymentMethod("");
+        return false;
       }
+      return couriersList.length > 0;
     } catch (err: any) {
       if (requestId !== courierQuoteRequestRef.current) return;
       console.error("Courier pricing error:", err);
@@ -1162,7 +1165,7 @@ export default function CheckoutModal({
         setTgCustomer(prev => ({ ...prev, tier: String(data.customerTier).toUpperCase() }));
       }
 
-      setAppliedPromo({
+      const validatedPromo = {
         code: data.code,
         title: data.title || data.code,
         promoId: data.promoId,
@@ -1175,7 +1178,9 @@ export default function CheckoutModal({
         shippingSubsidy: Number(data.shippingSubsidy) || 0,
         cashbackPoints: Number(data.cashbackPoints) || 0,
         freeProductName: String(data.freeProductName || "")
-      });
+      };
+      confirmedPromo.current = validatedPromo;
+      setAppliedPromo(validatedPromo);
       return true;
     } catch (err: any) {
       if (version === promoValidationVersion.current) { setAppliedPromo(null); setPromoError("We couldn't check this code right now. Please try again."); }
@@ -1238,6 +1243,13 @@ export default function CheckoutModal({
     checkoutCodeCheckBusy.current = true;
     setIsConfirmingCodes(true);
     try {
+      if (!selectedCourier?.deliveryQuoteId || Number(selectedCourier.deliveryQuoteExpiresAt) <= Date.now() / 1000 + (returnToCodes ? 15 * 60 : 0)) {
+        const refreshed = await fetchCouriersForLocation(coords.lat, coords.lon);
+        setCurrentStep(refreshed ? 4 : 3);
+        setSubmitError(refreshed ? "The delivery quote was refreshed. Review the updated amount before continuing. If you already paid, contact the shop before paying again." : "Choose an available courier before continuing.");
+        return false;
+      }
+      if (!promoCodeInput.trim()) { confirmedPromo.current = null; setAppliedPromo(null); }
       const promoVersion = ++promoValidationVersion.current;
       const referralVersion = ++referralValidationVersion.current;
       const [promoValid, referralValid] = await Promise.all([
@@ -1245,9 +1257,11 @@ export default function CheckoutModal({
         !existingReferrer && referralCodeInput.trim() ? handleApplyReferral(referralVersion) : Promise.resolve(true),
       ]);
       if (!promoValid || !referralValid) {
+        setSubmitError("Check the promo or referral code before continuing.");
         if (returnToCodes) setCurrentStep(4);
         return false;
       }
+      setSubmitError("");
       return true;
     } finally {
       checkoutCodeCheckBusy.current = false;
@@ -1410,21 +1424,28 @@ export default function CheckoutModal({
       // courier, and credit calculation used by createOrder.
       if (!hasTelegramServerlessBridge()) throw new Error("TGCloud checkout is unavailable.");
       if (!await confirmCheckoutCodes(false)) {
-        throw new Error("The promo or referral code needs review. Check it before submitting. If you already paid, contact the shop before making another payment.");
+        return;
       }
       const freshCharges = await callServerless<any[]>("getPublicCharges", {});
       if (!Array.isArray(freshCharges)) throw new Error("The current charge list was unavailable.");
       setActiveCharges(freshCharges);
       setChargesLoadError("");
       const freshChargeBreakdown = calculateChargesBreakdown(freshCharges, itemsSubtotal);
-      const reviewEffectiveDeliveryFee = appliedPromo?.isFreeShipping ? 0
-        : Math.max(0, courierDeliveryFee - Number(appliedPromo?.shippingSubsidy || 0));
-      const reviewPayableBeforeCredits = Math.max(0, itemsSubtotal - promoDiscountAmount) + freshChargeBreakdown.totalChargesAmount +
+      const reviewPromo = confirmedPromo.current;
+      const shippingPromo = ['free_shipping', 'shipping_discount'].includes(String(reviewPromo?.discountType || '').toLowerCase());
+      const reviewDiscount = shippingPromo ? 0 : Math.round(Math.min(itemsSubtotal, Number(reviewPromo?.discountAmount || 0)) * 100) / 100;
+      const reviewEffectiveDeliveryFee = Math.max(0, courierDeliveryFee - (shippingPromo ? Math.round(Number(reviewPromo?.shippingSubsidy || 0) * 100) / 100 : 0));
+      const reviewPayableBeforeCredits = Math.max(0, itemsSubtotal - reviewDiscount) + freshChargeBreakdown.totalChargesAmount +
         (deliveryPaymentMethod === "upon_checkout" ? reviewEffectiveDeliveryFee : 0);
       const reviewCredits = Math.min(useStoreCredits ? (creditAmountInput === "max" ? Infinity : Math.max(0, Math.floor((Number(creditAmountInput) || 0) * 100) / 100)) : 0, availableStoreCredits, reviewPayableBeforeCredits);
       const reviewPayableNow = Math.max(0, reviewPayableBeforeCredits - reviewCredits);
       const reviewPayableOnDelivery = deliveryPaymentMethod === "upon_delivery" ? reviewEffectiveDeliveryFee : 0;
       const reviewTotal = reviewPayableNow + reviewPayableOnDelivery;
+      if (Math.abs(reviewPayableNow - payableNow) > 0.01 || Math.abs(reviewPayableOnDelivery - payableOnDelivery) > 0.01) {
+        setCurrentStep(4);
+        setSubmitError("Checkout was updated. Review the promo, charges and credits before continuing. If you already paid, contact the shop before paying again.");
+        return;
+      }
       const [fpData, clientObservedIp] = await Promise.all([getClientFingerprint(), getClientObservedPublicIp()]);
       const deviceLocationObservation = getLatestPhysicalGpsLocation();
 
@@ -1473,6 +1494,7 @@ export default function CheckoutModal({
           rate: c.rate,
           type: c.type,
         })),
+        deliveryQuoteId: selectedCourier.deliveryQuoteId,
         deliveryFee: courierDeliveryFee,
         deliveryFeePaymentMethod: normalizedDeliveryPaymentMethod,
         receiverName: receiverName.trim().toUpperCase(),
@@ -1497,11 +1519,11 @@ export default function CheckoutModal({
         expectedTotalAmount: reviewTotal,
         expectedPayableNow: reviewPayableNow,
         expectedPayableOnDelivery: reviewPayableOnDelivery,
-        promoCode: appliedPromo ? appliedPromo.code : null,
-        promoDiscount: promoDiscountAmount,
-        promoTitle: appliedPromo?.title || null,
-        promoId: appliedPromo?.promoId || null,
-        isFreeShipping: Boolean(appliedPromo?.isFreeShipping),
+        promoCode: reviewPromo?.code || null,
+        promoDiscount: reviewDiscount,
+        promoTitle: reviewPromo?.title || null,
+        promoId: reviewPromo?.promoId || null,
+        isFreeShipping: Boolean(reviewPromo?.isFreeShipping),
         appliedStoreCredits: reviewCredits,
         storeCreditsUsed: reviewCredits,
         referralCode: appliedReferral?.code || (existingReferrer?.memberId || null),
