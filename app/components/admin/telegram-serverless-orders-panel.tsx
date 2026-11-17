@@ -272,6 +272,7 @@ export default function TelegramServerlessOrdersPanel({
   const [loading, setLoading] = useState(false);
   const loadingRef = useRef(false);
   const [busyAction, setBusyAction] = useState("");
+  const actionInFlight = useRef(false);
   const [error, setError] = useState("");
   const [reconciliationWarning, setReconciliationWarning] = useState("");
   const [search, setSearch] = useState("");
@@ -348,10 +349,10 @@ export default function TelegramServerlessOrdersPanel({
   }, [authorized, loadOrders]);
 
   useEffect(() => {
-    if (!authorized) return;
+    if (!authorized || selectedId || busyAction) return;
     const timer = window.setInterval(() => { void loadOrders(); }, 15_000);
     return () => window.clearInterval(timer);
-  }, [authorized, loadOrders]);
+  }, [authorized, loadOrders, selectedId, busyAction]);
 
   useEffect(() => {
     if (initialOrderId) setSelectedId(initialOrderId);
@@ -373,7 +374,7 @@ export default function TelegramServerlessOrdersPanel({
       .catch((err:any)=>{if(active)setDetailError(err?.message || 'Could not load this order.');})
       .finally(()=>{if(active)setDetailLoading(false);});
     return ()=>{active=false;};
-  },[authorized,selectedId,orders,detailRetry]);
+  },[authorized,selectedId,detailRetry]);
   const selectedOrder = detailOrder && (detailOrder.id===selectedId || detailOrder.orderNumber===selectedId) ? detailOrder : null;
   const identifierMatches = selectedOrder?.matchingIdentifiers || [];
 
@@ -437,17 +438,28 @@ export default function TelegramServerlessOrdersPanel({
   const pageOrders = filteredOrders.slice((currentPage - 1) * 15, currentPage * 15);
 
   const runAction = async (order: ServerlessOrder, action: string, extra: Record<string, any> = {}) => {
-    if(busyAction || detailLoading || detailError)return false;
+    if(actionInFlight.current || busyAction || detailLoading || detailError)return false;
+    actionInFlight.current = true;
     setBusyAction(`${order.id}:${action}`);
     setError("");
     try {
       await callServerless("manageOrders", { action, orderId: order.id, ...extra });
+      // Keep the action locked until fresh workflow permissions arrive.
+      try {
+        const response = await callServerless<unknown>("manageOrders", { action: "get", orderId: order.id }, 30_000);
+        const unpacked = unpackOrderList(response);
+        if (!unpacked || unpacked.rows.length !== 1) throw new Error("The updated order details could not be read.");
+        setDetailOrder(normalizeOrder(unpacked.rows[0]));
+      } catch (err: any) {
+        setDetailError(err?.message || "Refresh this order to confirm the completed action.");
+      }
       await loadOrders();
       return true;
     } catch (err: any) {
       setError(err?.message || "The order action could not be completed.");
       return false;
     } finally {
+      actionInFlight.current = false;
       setBusyAction("");
     }
   };
@@ -562,7 +574,7 @@ export default function TelegramServerlessOrdersPanel({
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div className="min-w-0">
-              <h1 className="font-heading font-normal uppercase text-base sm:text-lg truncate">ORDERS</h1>
+              <h1 className="font-heading font-normal text-base sm:text-lg truncate">Orders</h1>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -592,10 +604,10 @@ export default function TelegramServerlessOrdersPanel({
             <section className="prime-order-summary om-ticket" aria-label="Order summary">
               <div className="om-ticket-heading"><div><small>Transaction</small><strong className="font-mono">#{selectedOrder.orderNumber || selectedOrder.id}</strong></div><span className="om-status" data-status={String(selectedOrder.workflow?.stage || selectedOrder.status).toLowerCase()}>{selectedOrder.workflow?.stage || selectedOrder.status}</span></div>
               <div className="om-ticket-customer"><h2>{selectedOrder.customerName || selectedOrder.telegramName || 'Customer'}</h2><small>{displayDate(selectedOrder.createdAt)}</small></div>
-              <div className="om-ticket-total"><span>Order total</span><strong>{formatPHP(selectedOrder.totalAmount)}</strong></div>
+              <div className="om-ticket-total"><span>Order Total</span><strong>{formatPHP(selectedOrder.totalAmount)}</strong></div>
               <div className="om-payment-state"><span>{selectedOrder.paymentMethodName || 'Payment'}</span><strong>{selectedOrder.paymentStatus}</strong></div>
-              {selectedOrder.payableOnDelivery>0 && <div className="om-courier-due"><span>Pay courier on delivery</span><strong>{formatPHP(selectedOrder.payableOnDelivery)}</strong></div>}
-              {detailLoading && <small role="status">Refreshing transaction…</small>}
+              {selectedOrder.payableOnDelivery>0 && <div className="om-courier-due"><span>Pay Courier on Delivery</span><strong>{formatPHP(selectedOrder.payableOnDelivery)}</strong></div>}
+              <small className="om-action-feedback" role="status" aria-live="polite">{busyAction ? "Saving action…" : detailLoading ? "Refreshing transaction…" : ""}</small>
             </section>
             <OrderWorkflowController key={selectedOrder.id} order={selectedOrder} busy={busyAction!=='' || detailLoading || Boolean(detailError)} receiptReady={Boolean(receiptUrl)} onAction={(action,extra)=>runAction(selectedOrder,action,extra)} onModify={()=>{beginEdit(selectedOrder);setOrderDetailTab('items');}} onReceipt={()=>{setReceiptZoom(1);setReceiptOpen(true);}}/>
             <nav className="prime-order-tabs" role="tablist" aria-label="Order details">
@@ -613,7 +625,7 @@ export default function TelegramServerlessOrdersPanel({
             <section hidden={orderDetailTab !== "flags"}>{identifierMatches.length === 0 && !selectedOrder.ocrAnalysis?.forensicsFlags?.length && !selectedOrder.fingerprintSnapshot?.ipLocation?.privacy?.isVpn && !selectedOrder.fingerprintSnapshot?.ipLocation?.privacy?.isProxy && <p className="p-3 text-xs text-slate-500">No matching identifiers or receipt flags found.</p>}</section>
             <section hidden={orderDetailTab !== "items"}>
             {selectedOrder.workflow?.actions?.includes("modify") && <details className="serverless-disclosure" open={editing || undefined}>
-              <summary>Change order items, discount, or delivery fee</summary>
+              <summary>Change Order Items, Discount, or Delivery Fee</summary>
               <div className="serverless-disclosure__body space-y-2">
                 <strong className="text-xs uppercase">Staff Changes · {selectedOrder.status} / {selectedOrder.paymentStatus}</strong>
                 {!editing ? <button type="button" onClick={() => beginEdit(selectedOrder)} className="px-3 py-2 bg-slate-900 text-white text-xs font-bold uppercase">Edit Items and Charges</button> : <div className="space-y-3">
@@ -829,7 +841,7 @@ export default function TelegramServerlessOrdersPanel({
                 <option value="all">All Statuses</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="failed">Failed</option><option value="held">Held</option><option value="processing">Processing</option><option value="ready">Ready</option><option value="packed">Packed</option><option value="dispatched">Dispatched</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="expired">Expired</option>
               </select>
             </div>
-            {!error && !loading && <div className="om-list-caption"><span>{statusFilter==='all'?'All orders':statusFilter[0].toUpperCase()+statusFilter.slice(1)}</span><small>{filteredOrders.length ? `${(currentPage-1)*15+1}–${Math.min(currentPage*15,filteredOrders.length)} of ${filteredOrders.length}` : '0 orders'}</small></div>}
+            {!error && <div className="om-list-caption"><span>{statusFilter==='all'?'All Orders':statusFilter[0].toUpperCase()+statusFilter.slice(1)}</span><small>{filteredOrders.length ? `${(currentPage-1)*15+1}–${Math.min(currentPage*15,filteredOrders.length)} of ${filteredOrders.length}` : '0 orders'}</small></div>}
             {filteredOrders.length === 0 && !loading && !error ? (
               <div className="bg-white border border-slate-200 p-8 text-center text-sm text-slate-500"><Clock3 className="w-6 h-6 mx-auto mb-2 text-slate-300" />No orders match this filter.</div>
             ) : pageOrders.map((order) => (

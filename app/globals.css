@@ -2806,3 +2806,12 @@ body,
   font-family: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif !important;
   font-weight: 800 !important;
 }
+
+/* Customer purchase controls share the solid staff action palette. */
+.prime-order-history button, .prime-customer-order-actions button { background:#176dc2 !important; border-color:#155aa1 !important; color:#fff !important; font-family:'Lato Condensed','Lato',sans-serif !important; text-transform:none !important; opacity:1; }
+.prime-order-history button:is([class*="bg-emerald"],.order-control--success), .prime-customer-order-actions .order-control--success { background:#087b4d !important; border-color:#06673f !important; }
+.prime-order-history button.order-control--modify, .prime-customer-order-actions .order-control--modify { background:#087d86 !important; border-color:#06656d !important; }
+.prime-order-history button:is([class*="text-rose"],[class*="text-red"],.order-control--danger), .prime-customer-order-actions .order-control--danger { background:#bd2434 !important; border-color:#9f1c2a !important; }
+.prime-order-history button:disabled, .prime-customer-order-actions button:disabled { background:#64748b !important; border-color:#536478 !important; color:#fff !important; opacity:1 !important; cursor:not-allowed; }
+.prime-order-history button:not(:disabled):active, .prime-customer-order-actions button:not(:disabled):active { filter:brightness(.85); }
+.prime-order-history button:focus-visible, .prime-customer-order-actions button:focus-visible { outline:2px solid #0f172a; outline-offset:2px; }

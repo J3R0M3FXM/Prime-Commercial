@@ -1,0 +1,28 @@
+.asset-library { min-width:0; overflow-x:hidden; font-family:'Lato Condensed','Lato',sans-serif; }
+.asset-library h1 { font-family:'Roboto Condensed',sans-serif; font-weight:400; font-size:18px; }
+.asset-library svg { width:16px; height:16px; flex-shrink:0; }
+.asset-controls { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; margin:6px 0; }
+.asset-controls select { width:100%; min-width:0; border:1px solid #cbd5e1; padding:6px; font:inherit; font-size:12px; background:white; }
+.asset-upload { display:flex; align-items:center; gap:8px; padding:6px 0; }
+.asset-upload small { flex:1; min-width:0; color:#64748b; font-size:11px; }
+.asset-message { margin:6px 0; padding:8px; font-size:12px; overflow-wrap:anywhere; background:#f1f5f9; }
+.asset-error { background:#fef2f2; color:#991b1b; }
+.asset-caption { margin:6px 0; font-size:11px; color:#64748b; }
+.asset-row { display:flex; align-items:center; gap:7px; padding:6px 0; border-bottom:1px solid #e2e8f0; min-width:0; }
+.asset-preview { display:grid; place-items:center; flex:0 0 42px; width:42px; height:42px; background:#f1f5f9; border:1px solid #e2e8f0; }
+.asset-preview img { width:100%; height:100%; object-fit:contain; }
+.asset-copy { min-width:0; flex:1; }
+.asset-copy strong,.asset-copy small { display:block; overflow-wrap:anywhere; }
+.asset-copy strong { font-size:12px; font-weight:400; }
+.asset-copy small { color:#64748b; font-size:10px; }
+.asset-pagination { display:flex; justify-content:space-between; align-items:center; margin:8px 0; font-size:12px; }
+.asset-library progress { width:100%; }
+.asset-picker-backdrop,.asset-preview-backdrop { position:fixed; inset:0; z-index:220; display:flex; justify-content:center; align-items:center; background:rgba(2,6,23,.85); padding:8px; }
+.asset-picker-dialog,.asset-preview-dialog { width:100%; max-width:430px; max-height:calc(100dvh - 16px); min-width:0; background:#fff; overflow-y:auto; overflow-x:hidden; }
+.asset-picker-dialog .asset-library { padding:8px; max-height:calc(100dvh - 16px); }
+.asset-preview-dialog header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; font-size:12px; }
+.asset-preview-dialog strong { min-width:0; overflow-wrap:anywhere; font-weight:400; }
+.asset-preview-dialog :is(img,video,audio) { display:block; width:100%; max-width:100%; max-height:75dvh; object-fit:contain; }
+
+.serverless-admin-panel div:has(> .asset-picker-trigger) { flex-wrap:wrap; }
+.asset-picker-trigger { white-space:normal; font-size:11px; }

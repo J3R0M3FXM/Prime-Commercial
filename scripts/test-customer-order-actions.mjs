@@ -15,12 +15,15 @@ const {createElement,act}=await import('react'),{createRoot}=await import('react
 const root=createRoot(document.getElementById('root'));
 const calls=[];window.Telegram={WebApp:{openLink:url=>calls.push(url)}};
 const callbacks={onEdit:()=>calls.push('edit'),onCancel:()=>calls.push('cancel'),onReceived:()=>calls.push('received')};
+const style=document.createElement('style');style.textContent=readFileSync('app/globals.css','utf8').split('/* Customer purchase controls share the solid staff action palette. */')[1];document.head.append(style);
 const expected={Pending:[false,false,true,true],Confirmed:[false,false,true,true],Processing:[true,false,true,true],Ready:[true,true,true,true],Dispatched:[true,true,false,false],Completed:[true,true,true,true],Delivered:[true,true,true,true],Cancelled:[true,true,true,true]};
 for(const [status,locks] of Object.entries(expected)) {
   await act(async()=>root.render(createElement(Component,{order:{status,trackingUrl:'https://courier.example/track',workflow:{}},busy:false,receiptBusy:false,preview:false,...callbacks})));
   const buttons=[...document.querySelectorAll('button')];
-  assert.deepEqual(buttons.map(button=>button.textContent),['EDIT ORDER','CANCEL ORDER','TRACK COURIER','RECEIVED']);
+  assert.deepEqual(buttons.map(button=>button.textContent),['Edit Order','Cancel Order','Track Courier','Received']);
   assert.deepEqual(buttons.map(button=>button.disabled),locks,status);
+  const colors=['rgb(8, 125, 134)','rgb(189, 36, 52)','rgb(23, 109, 194)','rgb(8, 123, 77)'];
+  buttons.forEach((button,index)=>assert.equal(window.getComputedStyle(button).backgroundColor,locks[index]?'rgb(100, 116, 139)':colors[index],'Solid color and legible disabled state: '+button.textContent));
   const before=calls.length;
   await act(async()=>buttons.forEach(button=>button.click()));
   if(status==='Dispatched')assert.deepEqual(calls.slice(before),['https://courier.example/track','received']);

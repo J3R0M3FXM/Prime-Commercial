@@ -115,9 +115,12 @@ async function advancedFingerprint(): Promise<Record<string, unknown>> {
     const agent = await module.load({ monitoring: false });
     const result = await agent.get();
     return { fingerprintId: result.visitorId, fingerprintProvider: 'FingerprintJS', fingerprintVersion: result.version, fingerprintStatus: 'Available' };
-  }).catch(() => ({ fingerprintId: '', fingerprintProvider: 'FingerprintJS', fingerprintStatus: 'Unavailable' }));
+  }).catch(() => {
+    advancedPromise = undefined;
+    return { fingerprintId: '', fingerprintProvider: 'FingerprintJS', fingerprintStatus: 'Unavailable' };
+  });
   let timer: ReturnType<typeof setTimeout> | undefined;
-  try { return await Promise.race([advancedPromise, new Promise<Record<string, unknown>>(resolve => { timer = setTimeout(() => resolve({ fingerprintStatus: 'Unavailable' }), 2500); })]); }
+  try { return await Promise.race([advancedPromise, new Promise<Record<string, unknown>>(resolve => { timer = setTimeout(() => resolve({ fingerprintStatus: 'Unavailable' }), 10_000); })]); }
   finally { if (timer) clearTimeout(timer); }
 }
 

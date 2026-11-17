@@ -52,6 +52,8 @@ run('node', ['scripts/test-payment-method-links.mjs'], 'Admin payment link runti
 run('node', ['scripts/test-order-history-dates.mjs'], 'customer order history dates and ordering');
 run('node', ['scripts/test-order-confirmation.mjs'], 'order confirmation display and payment states');
 run('node', ['scripts/test-device-security.mjs'], 'device recognition ownership, privacy and persistence');
+run('node', ['scripts/test-device-collection.mjs'], 'launch GPS and fingerprint recovery');
+run('node', ['scripts/test-asset-library.mjs'], 'Assets picker and storage integration');
 run('node', ['scripts/test-device-security-ui.mjs'], 'device security customer and staff controls');
 run('node', ['scripts/test-media.mjs'], 'media upload/gallery/offline/playlist safety');
 run('node', ['scripts/test-secretary-ui.mjs'], 'Secretary configurator layout/navigation/save regressions');

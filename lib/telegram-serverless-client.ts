@@ -420,7 +420,13 @@ export function recordCurrentDeviceSession(options: { force?: boolean; userId?: 
   const promise = (async () => {
     const { getClientFingerprint } = await import('@/app/components/fingerprint-collector');
     const fingerprint = await getClientFingerprint();
-    return callServerless<DeviceEnrollment>('manageDeviceSecurity', { action: 'record', fingerprint }, 20_000);
+    try {
+      return await callServerless<DeviceEnrollment>('manageDeviceSecurity', { action: 'record', fingerprint }, 20_000);
+    } catch (error) {
+      // Preserve customer captures even when the security-history endpoint fails.
+      await callServerless('getTelegramSession', { fingerprint }, 20_000);
+      throw error;
+    }
   })();
   const entry = { startedAt: Date.now(), promise };
   deviceEnrollments.set(owner, entry);
@@ -458,7 +464,9 @@ export async function getTelegramServerlessSession(options: { heartbeat?: boolea
   if (session.authenticated && session.tgUserId) {
     setMediaOwner(String(session.tgUserId));
     // The bundled advanced collector runs after the verified session is ready.
-    void recordCurrentDeviceSession({ userId: String(session.tgUserId) }).catch(() => {});
+    void recordCurrentDeviceSession({ userId: String(session.tgUserId) }).catch(error => {
+      console.warn('[PRIME device] Security history recording failed; customer capture fallback was attempted:', error);
+    });
   }
   return session;
 }

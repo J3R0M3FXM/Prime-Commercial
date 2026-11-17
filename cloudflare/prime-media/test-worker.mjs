@@ -18,7 +18,7 @@ const bucket = {
     return { size: value.length, body: value, json: async () => JSON.parse(value.toString()) };
   },
   async head(key) { const value = objects.get(key); return value ? { size: value.length } : null; },
-  async put(key, value) { objects.set(key, Buffer.from(value)); },
+  async put(key, value) { objects.set(key, Buffer.from(value instanceof ReadableStream ? await new Response(value).arrayBuffer() : value)); },
   async delete(keys) { for (const key of Array.isArray(keys) ? keys : [keys]) objects.delete(key); },
   async list({ prefix }) { return { objects: [...objects.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })), truncated: false }; },
   async createMultipartUpload(key) { return { uploadId: 'test-upload', key }; },
@@ -78,3 +78,29 @@ await call(`/videos/${id}`,{method:'PATCH',body:{isPublished:false}});
 assert.equal((await call(streamPath,{id:456})).status,404,'Unpublish must revoke previously issued playback URLs');
 assert.equal((await call(`/stream/${id}?token=bad`, { id: 456 })).status, 403);
 console.log('R2 Worker auth, signing, privacy and range checks passed.');
+
+async function uploadAsset(id, bytes, type, name, owner = 123) {
+  return worker.fetch(new Request(`https://worker.example/assets/${id}?name=${encodeURIComponent(name)}`, { method: 'POST', headers: { Origin: 'https://app.example', 'X-Telegram-Init-Data': initData(owner), 'Content-Type': type, 'Content-Length': String(bytes.length) }, body: bytes }), env);
+}
+const imageId='c'.repeat(32), documentId='d'.repeat(32);
+assert.equal((await call('/assets', {id:456})).status,403);
+assert.equal((await uploadAsset(imageId,Buffer.from('image'),'image/png','Logo.png',456)).status,403);
+const assetUpload=await uploadAsset(imageId,Buffer.from('image'),'image/png','Logo.png');
+assert.equal(assetUpload.status,200);assert.equal((await assetUpload.json()).asset.isPublic,true);
+assert.equal((await uploadAsset(imageId,Buffer.from('image'),'image/png','Logo.png')).status,200,'Retry returns the same asset');
+assert.equal((await uploadAsset(imageId,Buffer.from('different'),'image/png','Logo.png')).status,409,'Existing file cannot be overwritten');
+assert.equal((await call(`/assets/${imageId}/content`,{init:''})).status,200,'Reusable image URLs do not expire');
+assert.equal((await (await call('/assets')).json()).assets.length,1);
+const privateUpload=await uploadAsset(documentId,Buffer.from('<script>alert(1)</script>'),'text/html','Test.html');
+assert.equal((await privateUpload.json()).asset.isPublic,false);
+assert.equal((await call(`/assets/${documentId}/content`,{id:456})).status,404);
+assert.equal((await call(`/assets/${documentId}/grant`,{method:'POST',id:456})).status,403);
+const access=await (await call(`/assets/${documentId}/grant`,{method:'POST'})).json();
+const accessPath=new URL(access.url).pathname+new URL(access.url).search;
+const download=await call(accessPath,{init:''});
+assert.equal(download.status,200);assert.match(download.headers.get('Content-Disposition'),/^attachment/);
+assert.equal(download.headers.get('X-Content-Type-Options'),'nosniff');
+assert.equal((await call(accessPath,{init:'',range:'bytes=0-5'})).status,206);
+assert.equal((await call(`/assets/${documentId}/content?token=bad`,{init:''})).status,404);
+assert.equal((await uploadAsset('e'.repeat(32),Buffer.alloc(0),'text/plain','Empty')).status,400);
+console.log('PASS: reusable R2 files, admin-only uploads/list/grants, private attachments, persistent image URLs, range reads and retry conflicts.');

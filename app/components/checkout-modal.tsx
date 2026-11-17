@@ -870,7 +870,7 @@ export default function CheckoutModal({
     }
   };
 
-  // "Use My Location" is the only point where precise location is requested.
+  // "Use My Location" requests a fresh checkout reading after launch permission.
   // The exact coordinate is snapshotted here and attached to the order.
   const handleUseMyLocation = async () => {
     setIsLocating(true);

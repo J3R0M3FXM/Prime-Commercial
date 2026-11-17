@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Edit2, Loader2, Plus, RefreshCw, Save, Trash2, Upload, X } from "lucide-react";
+import { AssetPickerButton } from "./asset-library-panel";
 import { callServerless, getTelegramServerlessSession, resolveTelegramMedia, uploadStaffImage } from "@/lib/telegram-serverless-client";
 import dynamic from "@/lib/browser-dynamic";
 
@@ -292,7 +293,7 @@ export default function TelegramServerlessLogisticsPanel({ onBack, initialSectio
               <label className="serverless-field">Preview Distance · km<input type="number" min="0" step="0.01" value={previewKm} onChange={(e)=>setPreviewKm(e.target.value)}/></label>
             </div>
             <p className="border border-slate-200 bg-slate-50 px-3 py-2 text-xs">Distance fare: <strong>{previewCourierFare(courierForm,previewKm)}</strong><span className="block text-[10px] text-slate-600">Preview excludes the time fee.</span></p>
-            <details className="serverless-disclosure"><summary>Courier Logo</summary><div className="serverless-disclosure__body flex items-center gap-2"><CourierLogo reference={courierForm.logo}/><label className="serverless-action flex-1 cursor-pointer justify-center"><Upload className="h-4 w-4"/>{busy?"Uploading…":courierForm.logo?"Replace Logo":"Upload Logo"}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy} onChange={(e)=>{const file=e.target.files?.[0];e.currentTarget.value="";void uploadCourierLogo(file);}}/></label></div></details>
+            <details className="serverless-disclosure"><summary>Courier Logo</summary><div className="serverless-disclosure__body flex items-center gap-2"><CourierLogo reference={courierForm.logo}/><label className="serverless-action flex-1 cursor-pointer justify-center"><Upload className="h-4 w-4"/>{busy?"Uploading…":courierForm.logo?"Replace Logo":"Upload Logo"}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy} onChange={(e)=>{const file=e.target.files?.[0];e.currentTarget.value="";void uploadCourierLogo(file);}}/></label><AssetPickerButton disabled={busy} onSelect={logo=>setCourierForm(current=>({...current,logo}))}/></div></details>
           </div>
           <footer className="serverless-dialog__footer"><button type="button" onClick={()=>setCourierFormOpen(false)} className="serverless-action">Cancel</button><button disabled={busy||!courierForm.name.trim()} className="serverless-action serverless-action--primary"><Save className="h-4 w-4"/>Save Courier</button></footer>
         </form>

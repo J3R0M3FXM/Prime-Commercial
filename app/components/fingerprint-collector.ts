@@ -234,8 +234,19 @@ export function startPhysicalGpsTelemetry(): void {
     // Ignore Telegram initialization issues.
   }
 
-  // Location is requested only after a customer taps the location action in
-  // checkout. App startup and Telegram resume must never prompt for GPS.
+  // Persist before asking: WebViews may be recreated when Telegram resumes.
+  // Later launches use only an already-granted permission, never another prompt.
+  const key = 'prime_launch_location_requested_v1';
+  let requested = false;
+  for (const storage of ['localStorage', 'sessionStorage'] as const) {
+    try { requested = window[storage].getItem(key) === '1' || requested; } catch {}
+  }
+  for (const storage of ['localStorage', 'sessionStorage'] as const) {
+    try { window[storage].setItem(key, '1'); } catch {}
+  }
+  void refreshPhysicalGpsTelemetry(!requested).catch(error => {
+    console.warn('[PRIME GPS] Launch location request failed:', error);
+  });
 }
 
 export function stopPhysicalGpsTelemetry(): void {

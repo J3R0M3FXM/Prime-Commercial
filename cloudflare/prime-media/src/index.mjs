@@ -1,4 +1,5 @@
 import { AwsClient } from 'aws4fetch';
+import { handleAssets } from './assets.mjs';
 
 const BUCKET = 'prime-media-preview';
 const PART_SIZE = 10 * 1024 * 1024;
@@ -94,6 +95,9 @@ async function handle(request, env) {
   if (!env.MEDIA_BUCKET || !env.STREAM_SIGNING_KEY) return respond({ error: 'Storage service is not configured.' }, 503);
   const userId = await identity(request, env);
   const admin = isAdmin(userId, env);
+
+  const assetResponse = await handleAssets(request, env, { url, admin, respond, cors, readJson, writeJson, bearer, validBearer });
+  if (assetResponse) return assetResponse;
 
   if (url.pathname === '/health' && request.method === 'GET') {
     if (!admin) return respond({ error: 'Admin access required.' }, 403);
