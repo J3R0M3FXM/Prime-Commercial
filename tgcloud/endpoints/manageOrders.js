@@ -1,10 +1,10 @@
 import { db, EndpointError } from 'sdk';
-import { desc, inArray, eq } from 'sdk/db';
+import { desc, inArray, eq, or } from 'sdk/db';
 import { customers, orders, products } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
 import { markOrderCompleted, markOrderDispatched, markOrderReady, reconcileOrderMilestones } from '../lib/order-lifecycle.js';
 import { notifyOrderStatusChanged } from '../lib/order-notifications.js';
-import { attachWorkflow, applyWorkflowAction, workflowFor,ensureOrderWorkflow } from '../lib/order-workflow.js';
+import { attachWorkflow, applyWorkflowAction, workflowFor,ensureOrderWorkflow,workflowStage } from '../lib/order-workflow.js';
 import { calculateCustomerTier,calculateOrderRewardPoints } from '../lib/loyalty.js';
 
 function timestampMs(value, depth = 0) {
@@ -55,10 +55,10 @@ export default async function (input, ctx) {
   const staff = await requireAdmin(ctx);
   await ensureOrderWorkflow();
   const action = String(input?.action || 'list');
-  if (action === 'list') {
+  if (action === 'list' || action === 'get') {
     let reconciliationWarning = '';
     try {
-      const reconciliation=await reconcileOrderMilestones({ limit: 20 });
+      const reconciliation=action === 'list' ? await reconcileOrderMilestones({ limit: 20 }) : {};
       if(reconciliation.deferredCompletions)reconciliationWarning='Some overdue completions were deferred. Review locked credit ledgers or unresolved order data.';
     } catch (error) {
       // Listing orders must remain available even if request-driven milestone recovery fails.
@@ -67,7 +67,44 @@ export default async function (input, ctx) {
         ? 'Order milestones could not be reconciled during this refresh: ' + detail
         : 'Order milestones could not be reconciled during this refresh.';
     }
-    const rows = await db.select().from(orders).orderBy(desc(orders.createdAt)).limit(100).all();
+    let rows;
+    if (action === 'list') {
+      rows = await db.select({
+        id: orders.id, orderNumber: orders.orderNumber, customerName: orders.customerName,
+        customerPhone: orders.customerPhone, customerId: orders.customerId, tgUserId: orders.tgUserId,
+        primeMemberId: orders.primeMemberId, totalAmount: orders.totalAmount, subtotal: orders.subtotal,
+        payableNow: orders.payableNow, payableOnDelivery: orders.payableOnDelivery,
+        paymentStatus: orders.paymentStatus, paymentMethodName: orders.paymentMethodName,
+        status: orders.status, controlState: orders.controlState, courierName: orders.courierName,
+        deliveryAddress: orders.deliveryAddress, createdAt: orders.createdAt, updatedAt: orders.updatedAt,
+      }).from(orders).orderBy(desc(orders.createdAt)).limit(100).all();
+    } else {
+      const id = String(input?.orderId || input?.id || '').trim();
+      if (!id) throw new EndpointError('Order ID is required.', { code: 'INVALID_INPUT' });
+      const order = await db.select().from(orders).where(or(eq(orders.id,id),eq(orders.orderNumber,id))).get();
+      if (!order) throw new EndpointError('Order not found.', { code: 'NOT_FOUND' });
+      const {paymentProofData, ...detail} = order;
+      rows = [detail];
+    }
+    const telegramIds = Array.from(new Set(rows.map(order => String(order.tgUserId || '')).filter(Boolean)));
+    const profiles = telegramIds.length
+      ? await db.select({tgUserId:customers.tgUserId,tgName:customers.tgName,tgUsername:customers.tgUsername})
+        .from(customers).where(inArray(customers.tgUserId,telegramIds)).all() : [];
+    const profileByTelegramId = new Map(profiles.map(profile => [String(profile.tgUserId),profile]));
+    // Queue refreshes must not transfer every receipt, OCR result and device snapshot.
+    if (action === 'list') return {orders: rows.map(order => ({
+      id: order.id, orderNumber: order.orderNumber, customerName: order.customerName,
+      customerPhone: order.customerPhone, customerId: order.customerId, tgUserId: order.tgUserId,
+      primeMemberId: order.primeMemberId, totalAmount: order.totalAmount, subtotal: order.subtotal,
+      payableNow: order.payableNow, payableOnDelivery: order.payableOnDelivery,
+      paymentStatus: order.paymentStatus, paymentMethodName: order.paymentMethodName,
+      status: order.status, courierName: order.courierName,
+      deliveryAddress: {courierPaymentMode:order.deliveryAddress?.courierPaymentMode || ''},
+      workflow: {stage:workflowStage(order)},
+      telegramName:profileByTelegramId.get(String(order.tgUserId || ''))?.tgName || '',
+      telegramUsername:profileByTelegramId.get(String(order.tgUserId || ''))?.tgUsername || '',
+      createdAt:timestampIso(order.createdAt),updatedAt:timestampIso(order.updatedAt),
+    })), reconciliationWarning};
     const identifiers = await db.all(`SELECT id, order_number AS orderNumber,
       applied_promo_code AS promoCode,
       CASE WHEN json_valid(fingerprint_snapshot) THEN json_extract(fingerprint_snapshot,'$.deviceId') END AS deviceId,
@@ -97,16 +134,10 @@ export default async function (input, ctx) {
       return [String(order.id), Array.from(matches.values()).slice(0, 20)];
     }));
     const tierRows = rows.length ? await db.all(`SELECT order_id AS orderId,
-      json_extract(canonical_snapshot,'$.rewardTier') AS tier FROM checkout_operations
+      CASE WHEN json_valid(canonical_snapshot) THEN json_extract(canonical_snapshot,'$.rewardTier') END AS tier FROM checkout_operations
       WHERE order_id IN (${rows.map((_, index) => ':order' + index).join(',')})`,
       Object.fromEntries(rows.map((row, index) => [':order' + index, row.id]))) : [];
     const tierByOrder = new Map(tierRows.map((row) => [String(row.orderId), String(row.tier || '')]));
-    const telegramIds = Array.from(new Set(rows.map((order) => String(order.tgUserId || '')).filter(Boolean)));
-    const profiles = telegramIds.length
-      ? await db.select({ tgUserId: customers.tgUserId, tgName: customers.tgName, tgUsername: customers.tgUsername })
-        .from(customers).where(inArray(customers.tgUserId, telegramIds)).all()
-      : [];
-    const profileByTelegramId = new Map(profiles.map((profile) => [String(profile.tgUserId), profile]));
     return { orders: await Promise.all(rows.map(async (order) => ({
       ...order,
       tierLevel: tierByOrder.get(String(order.id)) || '',

@@ -21,7 +21,7 @@ class EndpointError extends Error {constructor(message,{code}){super(message);th
 let index=0;
 function sql(strings,...values){const params={};let text=strings[0];values.forEach((value,i)=>{if(value&&typeof value==='object'&&value.text!=null){text+=value.text;Object.assign(params,value.params);}else{const key=':p'+index++;params[key]=value;text+=key;}text+=strings[i+1];});return {text,params};}
 function load(file,names,deps={}){return new Function('db','EndpointError',...Object.keys(deps),readFileSync(file,'utf8').replace(/^import[^\n]*\n/gm,'').replace(/export default async function/,'async function handler').replace(/export /g,'')+'\nreturn {'+names.join(',')+'};')(db,EndpointError,...Object.values(deps));}
-const workflow=load('tgcloud/lib/order-workflow.js',['ensureOrderWorkflow','workflowFor','applyWorkflowAction','attachWorkflow','expireReceiptResubmissions','workflowActions','orderWorkflowColumns','customerWorkflowColumns','workflowDefinitions'],{notifyOrderStatusChanged:async()=>{}});
+const workflow=load('tgcloud/lib/order-workflow.js',['ensureOrderWorkflow','workflowFor','applyWorkflowAction','attachWorkflow','expireReceiptResubmissions','workflowActions','orderWorkflowColumns','customerWorkflowColumns','workflowDefinitions','workflowStage'],{notifyOrderStatusChanged:async()=>{}});
 await workflow.ensureOrderWorkflow();
 const readiness=load('automation/order-workflow-readiness.js',['handler'],workflow).handler;
 assert.equal((await readiness()).ready,true);
@@ -141,8 +141,9 @@ assert.equal(row('unpaid-dispatched').status,'Dispatched');
 
 const loyalty=load('tgcloud/lib/loyalty.js',['calculateCustomerTier','calculateOrderRewardPoints']);
 const eq=(field,value)=>({text:field+'=?',params:[value]});
+const or=(...conditions)=>({text:'('+conditions.map(condition=>condition.text).join(' OR ')+')',params:conditions.flatMap(condition=>condition.params)});
 const requireAdmin=async ctx=>{if(!ctx?.testStaff)throw new EndpointError('Admin required',{code:'ADMIN_REQUIRED'});return {id:999};};
-const manage=load('tgcloud/endpoints/manageOrders.js',['handler'],{requireAdmin,eq,desc:x=>x,inArray:(field,values)=>({text:field+' IN ('+values.map(()=>'?').join(',')+')',params:values}),orders:table('orders'),customers:table('customers'),products:table('products'),...workflow,...lifecycle,...loyalty,notifyOrderStatusChanged:async()=>{}}).handler;
+const manage=load('tgcloud/endpoints/manageOrders.js',['handler'],{requireAdmin,eq,or,desc:x=>x,inArray:(field,values)=>({text:field+' IN ('+values.map(()=>'?').join(',')+')',params:values}),orders:table('orders'),customers:table('customers'),products:table('products'),...workflow,...lifecycle,...loyalty,notifyOrderStatusChanged:async()=>{}}).handler;
 await assert.rejects(manage({action:'markPaid',orderId:'busy',admin:true},{}),e=>e.code==='ADMIN_REQUIRED');
 sqlite.exec("INSERT INTO products(id,name,price,is_active,bundle_config) VALUES('sku','Product',60,1,'{}')");
 await create('endpoint-edit',{subtotal:120,store_credits_used:20,items:JSON.stringify([{productId:'sku',variantId:'default',quantity:2,price:60}])});
@@ -172,5 +173,16 @@ const deferred=await lifecycle.reconcileOrderMilestones();assert.equal(deferred.
 assert.equal(row('healthy-auto').status,'Completed');assert.equal(row('blocked-auto').status,'Dispatched','A busy credit ledger must not falsely complete or block healthy orders');
 sqlite.exec("UPDATE customers SET store_credits_operation_id=NULL WHERE id='customer'");
 assert.equal((await lifecycle.reconcileOrderMilestones()).autoCompleted,1);
+// Receipt bytes must not make the queue exceed TGCloud's serialized-result limit.
+for(let index=0;index<6;index++)await create('large-proof-'+index,{payment_proof_data:'x'.repeat(500000),payment_proof_image:'tgmedia:proof-'+index,items:JSON.stringify([{productId:'sku',quantity:1,price:100}])});
+const summaries=await manage({action:'list'},{testStaff:true});
+assert.ok(JSON.stringify(summaries).length<100000,'Queue returns bounded summaries instead of all binary receipt data');
+assert.ok(summaries.orders.every(order=>!('paymentProofData' in order)&&!('paymentProofImage' in order)&&!('ocrAnalysis' in order)&&!('fingerprintSnapshot' in order)&&!('items' in order)));
+const detail=await manage({action:'get',orderId:'large-proof-0'},{testStaff:true});
+assert.equal(detail.orders.length,1);assert.equal(detail.orders[0].items.length,1);assert.equal(detail.orders[0].paymentProofImage,'tgmedia:proof-0');
+assert.equal('paymentProofData' in detail.orders[0],false,'Detail never transfers the unused receipt binary copy');
+assert.ok(detail.orders[0].workflow.actions.includes('review'));
+await assert.rejects(manage({action:'get',orderId:'large-proof-0'},{}),error=>error.code==='ADMIN_REQUIRED');
+await assert.rejects(manage({action:'get',orderId:'missing'},{testStaff:true}),error=>error.code==='NOT_FOUND');
 sqlite.close();
 console.log('Order workflow: review/confirm/process, one receipt retry, deadlines, approval gates, paid cancellation, atomic/idempotent refunds, tracking and six-hour exactly-once rewards passed.');

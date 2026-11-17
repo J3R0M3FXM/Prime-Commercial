@@ -29,6 +29,7 @@ run('npm', ['run', 'typecheck:miniapp'], 'production Mini App type-check');
 run('node', ['scripts/check-telegram-serverless-contracts.mjs'], 'Serverless contracts');
 run('node', ['scripts/test-receipt-deadlines.mjs'], 'staff-requested receipt expiry');
 run('node', ['scripts/test-order-workflow.mjs'], 'order controller, refunds and scheduled completion');
+run('node', ['scripts/test-orders-register-ui.mjs'], 'Orders register and bounded detail loading');
 run('node', ['scripts/test-order-controller-ui.mjs'], 'rendered order controller and action locks');
 run('node', ['scripts/test-customer-notifications.mjs'], 'customer status messages and Telegram delivery');
 run('node', ['scripts/test-customer-order-actions.mjs'], 'customer action locks and notification destinations');

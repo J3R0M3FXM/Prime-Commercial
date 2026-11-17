@@ -263,6 +263,11 @@ export default function TelegramServerlessOrdersPanel({
   const [authorized, setAuthorized] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [orders, setOrders] = useState<ServerlessOrder[]>([]);
+  const [detailOrder, setDetailOrder] = useState<ServerlessOrder | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [detailRetry, setDetailRetry] = useState(0);
+  const panelRef = useRef<HTMLElement | null>(null);
   const [publicQueueStats, setPublicQueueStats] = useState<{ ordersInQueue: number; ordersInProcessing: number; averageReadyMinutes: number | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const loadingRef = useRef(false);
@@ -355,9 +360,21 @@ export default function TelegramServerlessOrdersPanel({
   useEffect(() => {
     setReceiptOpen(false);
     setOrderDetailTab("items");
+    setEditing(false);setEditingItemIndex(null);setItemDraft(null);
+    if(panelRef.current) panelRef.current.scrollTop=0;
   }, [selectedId]);
 
-  const selectedOrder = orders.find((order) => order.id === selectedId || order.orderNumber === selectedId) || null;
+  useEffect(() => {
+    if (!authorized || !selectedId) {setDetailOrder(null);setDetailError('');setDetailLoading(false);return;}
+    let active=true;
+    setDetailLoading(true);setDetailError('');
+    callServerless<unknown>('manageOrders',{action:'get',orderId:selectedId},30_000)
+      .then(response=>{const unpacked=unpackOrderList(response);if(!unpacked || unpacked.rows.length!==1)throw new Error('The order details could not be read.');if(active)setDetailOrder(normalizeOrder(unpacked.rows[0]));})
+      .catch((err:any)=>{if(active)setDetailError(err?.message || 'Could not load this order.');})
+      .finally(()=>{if(active)setDetailLoading(false);});
+    return ()=>{active=false;};
+  },[authorized,selectedId,orders,detailRetry]);
+  const selectedOrder = detailOrder && (detailOrder.id===selectedId || detailOrder.orderNumber===selectedId) ? detailOrder : null;
   const identifierMatches = selectedOrder?.matchingIdentifiers || [];
 
   useEffect(() => {
@@ -420,6 +437,7 @@ export default function TelegramServerlessOrdersPanel({
   const pageOrders = filteredOrders.slice((currentPage - 1) * 15, currentPage * 15);
 
   const runAction = async (order: ServerlessOrder, action: string, extra: Record<string, any> = {}) => {
+    if(busyAction || detailLoading || detailError)return false;
     setBusyAction(`${order.id}:${action}`);
     setError("");
     try {
@@ -436,7 +454,7 @@ export default function TelegramServerlessOrdersPanel({
 
   const beginEdit = (order: ServerlessOrder) => {
     setEditItems(order.items.map((item: any) => ({ ...item, reservedQuantity: Number(item.quantity) || 1, price: Number(item.originalPrice ?? item.price) || 0, offerMode: item.offerMode || "none", offerValue: Number(item.offerValue) || 0 })));
-    setEditDiscountMode(String(order.staffDiscountMode || "none"));
+    setEditDiscountMode(order.staffDiscountMode === "percentage" ? "percent" : String(order.staffDiscountMode || "none"));
     setEditDiscountValue(String(Number(order.staffDiscountValue) || 0));
     setEditDeliveryFee(String(order.deliveryFee));
     setEditCharges(order.chargesBreakdown.map((charge: any) => ({ name: charge.name, type: charge.type || "fixed", value: Number(charge.rate ?? charge.value) || 0 })));
@@ -535,12 +553,12 @@ export default function TelegramServerlessOrdersPanel({
     : status === "processing" ? 1 : 0;
 
   return (
-    <section className="serverless-admin-panel serverless-orders-panel text-slate-900" aria-label="Telegram Serverless order management">
+    <section ref={panelRef} className="serverless-admin-panel serverless-orders-panel orders-register mx-auto w-full max-w-[430px] text-slate-900" aria-label="Telegram Serverless order management">
       <div className="space-y-2">
         <header className="serverless-panel-header sticky top-0 z-20 bg-white">
           <div className="flex items-center gap-2 min-w-0">
-            <button type="button" onClick={selectedOrder ? () => setSelectedId(null) : onBack}
-              className="p-2 border border-slate-200 hover:bg-slate-100" aria-label={selectedOrder ? "Back to orders" : "Back to dashboard"}>
+            <button type="button" onClick={selectedId ? () => setSelectedId(null) : onBack} disabled={busyAction!==""}
+              className="p-2 border border-slate-200 hover:bg-slate-100" aria-label={selectedId ? "Back to orders" : "Back to dashboard"}>
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div className="min-w-0">
@@ -548,7 +566,7 @@ export default function TelegramServerlessOrdersPanel({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => void loadOrders()} disabled={!authorized || loading || busyAction !== ""}
+            <button type="button" aria-label="Refresh orders" onClick={() => {void loadOrders();setDetailRetry(value=>value+1);}} disabled={!authorized || loading || busyAction !== ""}
               className="p-2 border border-slate-200 hover:bg-slate-100 disabled:opacity-50" title="Refresh Serverless orders">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -565,22 +583,21 @@ export default function TelegramServerlessOrdersPanel({
           <div className="bg-white border border-slate-200 p-5 text-sm text-slate-600">Open the Admin Panel from the PRIME Telegram Mini App using the configured staff Telegram account.</div>
         )}
 
+        {authorized && selectedId && detailLoading && !selectedOrder && <div className="om-empty" role="status"><Loader2 className="animate-spin"/><p>Opening transaction…</p></div>}
+        {authorized && selectedId && detailError && <div className="om-load-error" role="alert"><h2>Could not open this order</h2><p>{detailError}</p><button type="button" onClick={()=>setDetailRetry(value=>value+1)}>Retry order</button></div>}
+        {authorized && !selectedId && error && !orders.length && <div className="om-load-error"><h2>Orders could not be loaded</h2><p>Retry to reconnect to the order queue.</p><button type="button" disabled={loading} onClick={()=>void loadOrders()}>Retry orders</button></div>}
+
         {authorized && selectedOrder && (
           <div className="serverless-record-list serverless-order-detail">
-            <section className="prime-order-summary" aria-label="Order summary">
-              <div className="prime-order-summary__top">
-                <div><span>Order No.</span><strong>#{selectedOrder.orderNumber || selectedOrder.id}</strong></div>
-                <div className="prime-order-summary__badges"><span data-tone={status}>{selectedOrder.workflow?.stage || selectedOrder.status}</span></div>
-              </div>
-              <div className="prime-order-summary__facts">
-                <div><span>Amount</span><strong>{formatPHP(selectedOrder.totalAmount)}</strong></div>
-                <div><span>Placed</span><strong>{displayDate(selectedOrder.createdAt)}</strong></div>
-                <div><span>Telegram</span><strong>{selectedOrder.telegramUsername ? `@${selectedOrder.telegramUsername}` : "—"}</strong></div>
-                <div><span>PRIME™ Member ID</span><strong>{selectedOrder.primeMemberId || "—"}</strong></div>
-                <div><span>Tier</span><strong>{selectedOrder.tierLevel || "—"}</strong></div>
-              </div>
+            <section className="prime-order-summary om-ticket" aria-label="Order summary">
+              <div className="om-ticket-heading"><div><small>Transaction</small><strong className="font-mono">#{selectedOrder.orderNumber || selectedOrder.id}</strong></div><span className="om-status" data-status={String(selectedOrder.workflow?.stage || selectedOrder.status).toLowerCase()}>{selectedOrder.workflow?.stage || selectedOrder.status}</span></div>
+              <div className="om-ticket-customer"><h2>{selectedOrder.customerName || selectedOrder.telegramName || 'Customer'}</h2><small>{displayDate(selectedOrder.createdAt)}</small></div>
+              <div className="om-ticket-total"><span>Order total</span><strong>{formatPHP(selectedOrder.totalAmount)}</strong></div>
+              <div className="om-payment-state"><span>{selectedOrder.paymentMethodName || 'Payment'}</span><strong>{selectedOrder.paymentStatus}</strong></div>
+              {selectedOrder.payableOnDelivery>0 && <div className="om-courier-due"><span>Pay courier on delivery</span><strong>{formatPHP(selectedOrder.payableOnDelivery)}</strong></div>}
+              {detailLoading && <small role="status">Refreshing transaction…</small>}
             </section>
-            <OrderWorkflowController key={selectedOrder.id} order={selectedOrder} busy={busyAction!==''} receiptReady={Boolean(receiptUrl)} onAction={(action,extra)=>runAction(selectedOrder,action,extra)} onModify={()=>{beginEdit(selectedOrder);setOrderDetailTab('items');}} onReceipt={()=>{setReceiptZoom(1);setReceiptOpen(true);}}/>
+            <OrderWorkflowController key={selectedOrder.id} order={selectedOrder} busy={busyAction!=='' || detailLoading || Boolean(detailError)} receiptReady={Boolean(receiptUrl)} onAction={(action,extra)=>runAction(selectedOrder,action,extra)} onModify={()=>{beginEdit(selectedOrder);setOrderDetailTab('items');}} onReceipt={()=>{setReceiptZoom(1);setReceiptOpen(true);}}/>
             <nav className="prime-order-tabs" role="tablist" aria-label="Order details">
               {(["items", "fulfillment", "snapshot", "flags"] as const).map((tab) => <button key={tab} type="button" role="tab"
                 aria-selected={orderDetailTab === tab} onClick={() => setOrderDetailTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}
@@ -595,7 +612,7 @@ export default function TelegramServerlessOrdersPanel({
             </section>
             <section hidden={orderDetailTab !== "flags"}>{identifierMatches.length === 0 && !selectedOrder.ocrAnalysis?.forensicsFlags?.length && !selectedOrder.fingerprintSnapshot?.ipLocation?.privacy?.isVpn && !selectedOrder.fingerprintSnapshot?.ipLocation?.privacy?.isProxy && <p className="p-3 text-xs text-slate-500">No matching identifiers or receipt flags found.</p>}</section>
             <section hidden={orderDetailTab !== "items"}>
-            {(["pending", "confirmed"].includes(status)) && <details className="serverless-disclosure">
+            {selectedOrder.workflow?.actions?.includes("modify") && <details className="serverless-disclosure" open={editing || undefined}>
               <summary>Change order items, discount, or delivery fee</summary>
               <div className="serverless-disclosure__body space-y-2">
                 <strong className="text-xs uppercase">Staff Changes · {selectedOrder.status} / {selectedOrder.paymentStatus}</strong>
@@ -618,7 +635,7 @@ export default function TelegramServerlessOrdersPanel({
                   <div className="border-l-4 border-sky-600 bg-sky-50 p-3"><b className="text-xs uppercase">Revised Total Preview</b><dl className="mt-2 space-y-1 text-xs"><div className="flex justify-between"><dt>Items After Item Offers</dt><dd>{formatPHP(editItemSubtotal)}</dd></div>{editOrderDiscount > 0 && <div className="flex justify-between"><dt>Order Discount</dt><dd>−{formatPHP(editOrderDiscount)}</dd></div>}<div className="flex justify-between"><dt>Charges and Delivery</dt><dd>{formatPHP(editChargesTotal + (Number(editDeliveryFee) || 0))}</dd></div><div className="flex justify-between border-t pt-1 font-bold"><dt>Revised Order Total</dt><dd>{formatPHP(editGrandTotal)}</dd></div><div className="flex justify-between font-bold"><dt>Due Before Delivery</dt><dd>{formatPHP(editPayableNow)}</dd></div></dl></div>
                   <div className="grid grid-cols-2 gap-2"><label className="text-[11px]">Order Discount<select className="w-full border p-2" value={editDiscountMode} onChange={(e) => setEditDiscountMode(e.target.value)}><option value="none">No Discount</option><option value="fixed">Fixed PHP</option><option value="percent">Percent</option></select></label>{editDiscountMode !== "none" && <label className="text-[11px]">Discount Value<input className="w-full border p-2" type="number" min="0" step="0.01" value={editDiscountValue} onChange={(e) => setEditDiscountValue(e.target.value)} /></label>}<label className="text-[11px]">Delivery Fee<input className="w-full border p-2" type="number" min="0" step="0.01" value={editDeliveryFee} onChange={(e) => setEditDeliveryFee(e.target.value)} /></label></div>
                   <div className="space-y-2"><b className="text-xs">Current and Additional Charges</b><p className="text-[11px] text-slate-600">The saved charge lines are prefilled below. Edit their name/amount, remove a line, or add tax and other charges.</p>{editCharges.map((charge, index) => <div key={index} className="admin-charge-editor"><input aria-label="Charge name" className="border p-2 text-xs" value={charge.name} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, name: e.target.value } : row))} /><select aria-label="Charge type" className="border p-1 text-xs" value={charge.type} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, type: e.target.value } : row))}><option value="fixed">Fixed PHP</option><option value="percentage">Percent</option></select><input aria-label="Charge amount" className="border p-2 text-xs" type="number" min="0" step="0.01" value={charge.value} onChange={(e) => setEditCharges((rows) => rows.map((row, i) => i === index ? { ...row, value: e.target.value } : row))} /><button type="button" aria-label="Remove charge" onClick={() => setEditCharges((rows) => rows.filter((_, i) => i !== index))}>×</button></div>)}<button type="button" className="border px-2 py-1 text-xs" onClick={() => setEditCharges((rows) => [...rows, { name: "", type: "fixed", value: "0" }])}>+ Add a charge</button></div>
-                  <p className="text-[11px] text-amber-900">Pending: customer must pay the revised due and staff approves it. Processing: verify any top-up before Ready; refund a lower total as Store Credits at Ready.</p>
+                  <p className="text-[11px] text-amber-900">Only reductions are allowed. A higher bill requires a new order. Verify any remaining payment before processing.</p>
                   <div className="flex gap-2"><button type="button" disabled={busyAction !== "" || editItems.length === 0} onClick={() => void runAction(selectedOrder, "edit", { expectedVersion: selectedOrder.staffEditVersion, items: editItems, discountMode: editDiscountMode, discountValue: editDiscountValue, deliveryFee: editDeliveryFee, charges: editCharges }).then((saved) => { if (saved) setEditing(false); })} className="px-3 py-2 bg-emerald-700 text-white text-xs font-bold uppercase disabled:opacity-50">Save Order Changes</button><button type="button" onClick={() => setEditing(false)} className="px-3 py-2 border text-xs font-bold uppercase">Cancel</button></div>
                 </div>}
               </div>
@@ -731,7 +748,7 @@ export default function TelegramServerlessOrdersPanel({
                     {selectedOrder.chargesBreakdown.map((charge: any, index) => <p key={`${charge.id || charge.name || "charge"}-${index}`}><span>{charge.name || "Additional charge"}</span><b>{formatPHP(Number(charge.computedAmount ?? charge.amount) || 0)}</b></p>)}
                     {selectedOrder.deliveryFee > 0 && <p><span>Delivery Fee</span><b>{formatPHPWhole(selectedOrder.deliveryFee)}</b></p>}
                     {selectedOrder.discountAmount > 0 && <p><span>Promo Discount{selectedOrder.appliedPromoCode ? ` · ${selectedOrder.appliedPromoCode}` : ""}</span><b>−{formatPHP(selectedOrder.discountAmount)}</b></p>}
-                    {selectedOrder.staffDiscountAmount > 0 && <p><span>Staff Discount · {selectedOrder.staffDiscountMode === "percent" ? `${selectedOrder.staffDiscountValue}%` : selectedOrder.staffDiscountMode === "fixed" ? formatPHP(selectedOrder.staffDiscountValue) : "manual"}</span><b>−{formatPHP(selectedOrder.staffDiscountAmount)}</b></p>}
+                    {selectedOrder.staffDiscountAmount > 0 && <p><span>Staff Discount · {["percent","percentage"].includes(selectedOrder.staffDiscountMode) ? `${selectedOrder.staffDiscountValue}%` : selectedOrder.staffDiscountMode === "fixed" ? formatPHP(selectedOrder.staffDiscountValue) : "manual"}</span><b>−{formatPHP(selectedOrder.staffDiscountAmount)}</b></p>}
                     {selectedOrder.pointsDiscount > 0 && <p><span>Points Discount</span><b>−{formatPHP(selectedOrder.pointsDiscount)}</b></p>}
                     {selectedOrder.promoShippingSubsidy > 0 && <p><span>Shipping Promo</span><b>−{formatPHP(selectedOrder.promoShippingSubsidy)}</b></p>}
                     {selectedOrder.storeCreditsUsed > 0 && <p><span>Store Credits Used</span><b>−{formatPHP(selectedOrder.storeCreditsUsed)}</b></p>}
@@ -804,7 +821,7 @@ export default function TelegramServerlessOrdersPanel({
           </div>
         </div>}
 
-        {authorized && !selectedOrder && (
+        {authorized && !selectedId && (
           <div className="space-y-2">
             <div className="serverless-panel-toolbar grid grid-cols-2 gap-1.5">
               <label className="serverless-search min-w-0"><Search aria-hidden="true" className="w-4 h-4 shrink-0" /><input aria-label="Search orders" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label>
@@ -812,21 +829,19 @@ export default function TelegramServerlessOrdersPanel({
                 <option value="all">All Statuses</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="failed">Failed</option><option value="held">Held</option><option value="processing">Processing</option><option value="ready">Ready</option><option value="packed">Packed</option><option value="dispatched">Dispatched</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="expired">Expired</option>
               </select>
             </div>
-            {filteredOrders.length === 0 && !loading ? (
-              <div className="bg-white border border-slate-200 p-8 text-center text-sm text-slate-500"><Clock3 className="w-6 h-6 mx-auto mb-2 text-slate-300" />No Serverless orders match this filter.</div>
+            {!error && !loading && <div className="om-list-caption"><span>{statusFilter==='all'?'All orders':statusFilter[0].toUpperCase()+statusFilter.slice(1)}</span><small>{filteredOrders.length ? `${(currentPage-1)*15+1}–${Math.min(currentPage*15,filteredOrders.length)} of ${filteredOrders.length}` : '0 orders'}</small></div>}
+            {filteredOrders.length === 0 && !loading && !error ? (
+              <div className="bg-white border border-slate-200 p-8 text-center text-sm text-slate-500"><Clock3 className="w-6 h-6 mx-auto mb-2 text-slate-300" />No orders match this filter.</div>
             ) : pageOrders.map((order) => (
-              <article key={order.id} className="serverless-record serverless-order-compact" data-status={String(order.workflow?.stage || order.status).toLowerCase()}>
-                <button type="button" onClick={() => setSelectedId(order.id)} className="serverless-record__summary w-full text-left">
-                  <span className="serverless-record__copy">
-                    <strong className="flex justify-between gap-2 font-mono"><span>#{order.orderNumber || order.id}</span><span>{formatPHP(order.totalAmount)}</span></strong>
-                    <small className="flex justify-between gap-2"><span>{order.customerName || order.telegramName || "—"}</span><b className="serverless-order-status">{order.workflow?.stage || order.status}</b></small>
-                    <small className="font-mono">{order.telegramUsername ? `@${order.telegramUsername}` : "No handle"} · {order.primeMemberId || "No PRIME™ ID"}</small>
-                    <small className="font-mono">{order.courierName || "Courier —"} · {order.deliveryAddress?.courierPaymentMode === "upon_delivery" || (!order.deliveryAddress?.courierPaymentMode && order.payableOnDelivery > 0) ? "PUD" : "PUC"}</small>
-                  </span>
+              <article key={order.id} className="serverless-record serverless-order-compact om-order" data-status={String(order.workflow?.stage || order.status).toLowerCase()}>
+                <button type="button" onClick={()=>setSelectedId(order.id)} className="om-order-button" aria-label={`Open order ${order.orderNumber || order.id}`}>
+                  <div className="om-order-top"><span className="font-mono">#{order.orderNumber || order.id}</span><span className="om-status" data-status={String(order.workflow?.stage || order.status).toLowerCase()}>{order.workflow?.stage || order.status}</span></div>
+                  <div className="om-order-main"><strong>{order.customerName || order.telegramName || 'Customer'}</strong><span className="font-mono">{formatPHP(order.totalAmount)}</span></div>
+                  <div className="om-order-bottom"><span>{order.courierName ? `${order.courierName} · ${order.deliveryAddress?.courierPaymentMode==='upon_delivery' || order.payableOnDelivery>0?'PUD':'PUC'}` : 'Store sale'} · {order.paymentStatus}</span><small>{timestampMs(order.createdAt)!==null ? new Date(timestampMs(order.createdAt)!).toLocaleDateString('en-PH',{timeZone:'Asia/Manila',month:'short',day:'numeric'}) : '—'}</small></div>
                 </button>
               </article>
             ))}
-            {filteredOrders.length > 15 && <nav className="flex items-center justify-between gap-2 p-2 text-xs font-mono" aria-label="Order pages"><button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Previous</button><span>{currentPage}/{pageCount}</span><button type="button" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Next</button></nav>}
+            {filteredOrders.length > 15 && <nav className="om-pagination font-mono" aria-label="Order pages"><button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Previous</button><span>{currentPage}/{pageCount}</span><button type="button" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Next</button></nav>}
           </div>
         )}
       </div>
