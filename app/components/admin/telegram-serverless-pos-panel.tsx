@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronRight, Loader2, Minus, Package, Plus, RefreshCw, Search, ShieldCheck, ShoppingCart, Store, Truck, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Loader2, Minus, Plus, RefreshCw, Search, ShoppingCart, Store, Truck, X } from "lucide-react";
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { isChargeApplicable } from "@/lib/charges";
 import { formatPHP } from "@/lib/currency";
@@ -61,7 +61,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   const [storeCreditsUsed, setStoreCreditsUsed] = useState('0');
   const [bill, setBill] = useState<any>(null);
   const [cashReceived, setCashReceived] = useState('');
-  const [workspaceTab, setWorkspaceTab] = useState<'catalog'|'sale'>('catalog');
+  const [workspaceTab, setWorkspaceTab] = useState<'catalog'|'sale'|'payment'>('catalog');
   const [retryKey, setRetryKey] = useState("");
   const [lastSale, setLastSale] = useState<{ orderNumber: string; totalAmount: number; mode: string } | null>(null);
 
@@ -114,7 +114,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   }, [authorized, mode, deliveryAddress, destination]);
   useEffect(() => {
     setDeliveryQuote(null);
-    if (!destination || mode !== 'delivery') return;
+    if (!destination || mode !== 'delivery') {setDeliveryBusy(false);return;}
     let active=true; setDeliveryBusy(true);
     callServerless<any>('createPosOrder',{action:'deliveryQuote',mode,destination},30000)
       .then(result=>{if(active){setDeliveryQuote(result);setCourierId(result.courier?.id || '');}})
@@ -146,16 +146,6 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   const normalizedSearch = search.trim().toLowerCase();
   const categories = useMemo(() => Array.from(new Set(products.map((product) => String(product.category || "General").trim() || "General")))
     .sort((a, b) => a.localeCompare(b)), [products]);
-  const visibleCategories = useMemo(() => categories.filter((category) => !normalizedSearch ||
-    category.toLowerCase().includes(normalizedSearch) || products.some((product) =>
-      (String(product.category || "General").trim() || "General") === category &&
-      `${product.name} ${productVariants(product).map((variant) => variant.name || "").join(" ")}`.toLowerCase().includes(normalizedSearch)
-    )), [categories, normalizedSearch, products]);
-  const categoryProducts = useMemo(() => products.filter((product) =>
-    (String(product.category || "General").trim() || "General") === selectedCategory &&
-    (!normalizedSearch || `${product.name} ${productVariants(product).map((variant) => variant.name || "").join(" ")}`.toLowerCase().includes(normalizedSearch))
-  ), [products, selectedCategory, normalizedSearch]);
-  const selectedProduct = categoryProducts.find((product) => product.id === selectedProductId) || null;
   const subtotal = cart.reduce((sum, line) => sum + line.price * line.quantity, 0);
   const total = cart.length && quoteResult.key === quoteKey ? quoteResult.total : 0;
 
@@ -231,127 +221,156 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
     finally { submissionBusy.current=false;setSaving(false); }
   };
 
-  return <main className="serverless-admin-panel mx-auto w-full max-w-[430px] pb-6" aria-label="Point of sale">
-    <header className="serverless-panel-header">
-      <button type="button" onClick={onBack} className="serverless-action" aria-label="Back to Admin modules"><ArrowLeft className="h-4 w-4"/></button>
-      <div className="serverless-panel-header__copy"><h1>Point of Sale</h1><p><ShieldCheck className="mr-1 inline h-3 w-3 text-emerald-700"/>Register · live inventory</p></div>
-      <button type="button" onClick={() => void load()} disabled={!authorized || loading || saving} className="serverless-action" aria-label="Refresh POS data"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}/></button>
+  const panelRef = useRef<HTMLElement | null>(null);
+  const goTo = (tab: 'catalog' | 'sale' | 'payment') => {
+    setWorkspaceTab(tab);
+    if (panelRef.current) panelRef.current.scrollTop = 0;
+  };
+  const goToPayment = () => {
+    if (!cart.length) { goTo('catalog'); return; }
+    if (!customerName.trim() || (customerType === 'existing' && !selectedCustomerId)) {
+      setError('Add the customer details before payment.'); goTo('sale'); return;
+    }
+    if (mode === 'delivery' && (!destination || !courierId)) {
+      setError('Select a delivery address and courier before payment.'); goTo('sale'); return;
+    }
+    setError(''); goTo('payment');
+  };
+  const itemCount = cart.reduce((sum, line) => sum + line.quantity, 0);
+  const currentBill = quoteResult.key === quoteKey ? bill : null;
+  const account = customerType === 'existing' ? customers.find(customer => customer.id === selectedCustomerId) : null;
+  const matchingProducts = products.filter(product => (!selectedCategory || (String(product.category || 'General').trim() || 'General') === selectedCategory) &&
+    (!normalizedSearch || `${product.name} ${productVariants(product).map(variant => variant.name || '').join(' ')}`.toLowerCase().includes(normalizedSearch)));
+  const activeProduct = products.find(product => product.id === selectedProductId);
+  const automaticCharges = chargeOptions.filter(charge => isChargeApplicable(charge));
+  const optionalCharges = chargeOptions.filter(charge => !isChargeApplicable(charge));
+  const savingsCount = (discountMode !== 'none' ? 1 : 0) + (promoCode.trim() ? 1 : 0) + (Number(storeCreditsUsed) > 0 ? 1 : 0);
+
+  return <main ref={panelRef} className="serverless-admin-panel serverless-pos-panel mx-auto w-full max-w-[430px]" aria-label="Point of sale">
+    <header className="serverless-panel-header pos-header">
+      <button type="button" onClick={onBack} className="pos-icon" aria-label="Back to Admin modules"><ArrowLeft/></button>
+      <div className="serverless-panel-header__copy"><h1>Point of Sale</h1><p>{mode === 'delivery' ? 'Delivery' : 'Store sale'} · {itemCount} {itemCount === 1 ? 'item' : 'items'}</p></div>
+      <button type="button" onClick={() => void load()} disabled={!authorized || loading || saving} className="pos-icon" aria-label="Refresh POS data"><RefreshCw className={loading ? 'animate-spin' : ''}/></button>
     </header>
-    {(error || notice) && <div role={error ? "alert" : "status"} className={`my-2 border p-2 text-xs ${error ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>{error || notice}</div>}
-    {checkingAuth && <div className="my-2 flex justify-center border bg-white p-5"><Loader2 className="h-5 w-5 animate-spin"/></div>}
+    {(error || notice) && <div role={error ? 'alert' : 'status'} className={`pos-message ${error ? 'pos-message--error' : ''}`}>{error || notice}</div>}
+    {checkingAuth && <div className="pos-empty"><Loader2 className="animate-spin"/><p>Opening register…</p></div>}
     {authorized && <>
-      {pendingSale&&<section className="my-2 border p-2"><p className="text-xs">An earlier sale is awaiting confirmation. Retry it before starting another sale.</p><button type="button" className="serverless-action" disabled={saving} onClick={()=>void checkout()}>Retry Pending Sale</button></section>}
-      <fieldset disabled={saving||Boolean(pendingSale)} className="min-w-0 border-0 p-0">
-      <div className="grid grid-cols-2 gap-2 py-2">
-        <button type="button" onClick={() => { setMode("store"); setRetryKey(""); }} className={`flex min-h-11 items-center justify-center gap-2 border text-xs font-bold uppercase ${mode === "store" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700"}`}><Store className="h-4 w-4"/>Store Sale</button>
-        <button type="button" onClick={() => { setMode("delivery"); setRetryKey(""); }} className={`flex min-h-11 items-center justify-center gap-2 border text-xs font-bold uppercase ${mode === "delivery" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700"}`}><Truck className="h-4 w-4"/>Delivery</button>
-      </div>
-      <div className="sticky top-0 z-10 grid grid-cols-2 gap-1 rounded-xl bg-slate-900 p-1 text-sm text-white">
-        <button type="button" className={`min-h-11 rounded-lg ${workspaceTab==='catalog'?'bg-white text-slate-900':''}`} onClick={()=>setWorkspaceTab('catalog')}>Catalog</button>
-        <button type="button" className={`min-h-11 rounded-lg ${workspaceTab==='sale'?'bg-white text-slate-900':''}`} onClick={()=>setWorkspaceTab('sale')}>Ticket · {cart.reduce((n,l)=>n+l.quantity,0)} items</button>
-      </div>
-      <div hidden={workspaceTab!=='sale'}>
-      <section className="my-2 rounded-xl border border-slate-200 bg-white p-3" aria-label="POS customer">
-        <div className="mb-2"><strong className="text-xs font-bold uppercase tracking-wide text-slate-700">Customer</strong><p className="mt-0.5 text-[10px] text-slate-500">Choose an account or enter a Telegram ID for order updates.</p></div>
-        <div className="mb-2 grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => { setCustomerType("existing"); setSelectedCustomerId(""); setTelegramId(""); setCustomerName(""); setCustomerPhone(""); setRetryKey(""); }} className={`min-h-10 border px-2 text-[10px] font-bold uppercase ${customerType === "existing" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700"}`}>Existing Customer</button>
-          <button type="button" onClick={() => { setCustomerType("guest"); setSelectedCustomerId(""); setTelegramId(""); setCustomerName(""); setCustomerPhone(""); setRetryKey(""); }} className={`min-h-10 border px-2 text-[10px] font-bold uppercase ${customerType === "guest" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700"}`}>New / Guest</button>
-        </div>
-        {customerType === "existing" ? <label className="serverless-field">Select Customer<select value={selectedCustomerId} onChange={(event) => {
-          const customer = customers.find((row) => row.id === event.target.value);
-          setSelectedCustomerId(event.target.value); setRetryKey("");
-          setCustomerName(customer?.tgName || customer?.tgUsername || ""); setCustomerPhone(customer?.phoneNumber || "");
-        }}><option value="">Choose a Customer</option>{customers.map((customer) => <option key={customer.id} value={customer.id} disabled={customer.isBanned === true}>{customer.tgName || "Telegram customer"}{customer.tgUsername ? ` · @${customer.tgUsername}` : ""} · {customer.tgUserId || "No Telegram ID"}{customer.isBanned ? " · Restricted" : ""}</option>)}</select></label> : <label className="serverless-field">Telegram ID for Bot Notifications (Optional)<input value={telegramId} onChange={(event) => { setTelegramId(event.target.value.replace(/[^0-9]/g, "").slice(0, 20)); setRetryKey(""); }} maxLength={20} inputMode="numeric" placeholder="Customer Telegram user ID"/><small className="text-[10px] leading-snug text-slate-500">The customer must have opened the bot before it can send them a message.</small></label>}
-        {customerType === "existing" && selectedCustomerId && !customers.find((customer) => customer.id === selectedCustomerId)?.tgUserId && <p className="mt-1 text-[10px] text-amber-700">This account has no Telegram ID on file, so bot notifications cannot be delivered.</p>}
-      </section>
-      </div>
-      <div hidden={workspaceTab!=='catalog'}>
-      <label className="serverless-search my-2"><Search aria-hidden="true" className="h-4 w-4"/><input aria-label="Search categories or products" value={search} onChange={(event) => { setSearch(event.target.value); setSelectedProductId(null); }} placeholder="Search categories or products"/></label>
-      {loading && !products.length ? <div className="flex justify-center border bg-white p-6"><Loader2 className="h-5 w-5 animate-spin"/></div> : <section className="my-2 border border-slate-200 bg-white" aria-label="Live product picker">
-        {selectedCategory === null ? <>
-          <div className="border-b border-slate-200 px-3 py-2"><strong className="text-xs font-bold uppercase tracking-wide text-slate-700">Choose a Category</strong><p className="mt-0.5 text-[10px] text-slate-500">{visibleCategories.length} categories · live catalog</p></div>
-          {visibleCategories.length ? <div className="grid max-h-[34vh] grid-cols-3 gap-2 overflow-y-auto p-2" aria-label="Product categories">
-            {visibleCategories.map((category) => {
-              const count = products.filter((product) => (String(product.category || "General").trim() || "General") === category).length;
-              return <button key={category} type="button" onClick={() => { setSelectedCategory(category); setSelectedProductId(null); }} className="flex min-h-[82px] flex-col items-start justify-between border border-slate-200 bg-slate-50 p-2 text-left hover:border-emerald-700 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-700">
-                <Package className="h-4 w-4 text-emerald-800"/><span className="line-clamp-2 w-full text-[11px] font-bold leading-tight text-slate-900">{category}</span><span className="font-mono text-[9px] text-slate-500">{count} {count === 1 ? "item" : "items"}</span>
-              </button>;
-            })}
-          </div> : <p className="p-4 text-center text-xs text-slate-500">No matching categories.</p>}
-        </> : selectedProduct === null ? <>
-          <div className="flex items-center gap-2 border-b border-slate-200 px-2 py-2"><button type="button" onClick={() => { setSelectedCategory(null); setSelectedProductId(null); }} className="serverless-action min-h-9 px-2" aria-label="Back to categories"><ArrowLeft className="h-4 w-4"/></button><div className="min-w-0"><strong className="block truncate text-xs font-bold uppercase tracking-wide">{selectedCategory}</strong><span className="text-[10px] text-slate-500">Choose a Product</span></div></div>
-          <div className="max-h-[34vh] overflow-y-auto" aria-label={`${selectedCategory} products`}>
-            {categoryProducts.length ? categoryProducts.map((product) => <button key={product.id} type="button" onClick={() => setSelectedProductId(product.id)} className="flex min-h-14 w-full items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-0 hover:bg-slate-50">
-              <span className="min-w-0"><strong className="block truncate text-xs text-slate-900">{product.name}</strong><small className="font-mono text-[10px] text-slate-500">{productVariants(product).length ? `${productVariants(product).length} options` : `${formatPHP(Number(product.price) || 0)} · ${Number(product.stock) || 0} available`}</small></span><ChevronRight className="h-4 w-4 shrink-0 text-slate-400"/>
-            </button>) : <p className="p-4 text-center text-xs text-slate-500">No products in this category match your search.</p>}
+      {pendingSale && <section className="pos-message" aria-label="Pending sale"><p>This sale is awaiting confirmation. Retry before collecting another payment.</p><button type="button" className="pos-primary" disabled={saving} onClick={() => void checkout()}>Retry Pending Sale</button></section>}
+      <fieldset disabled={saving || Boolean(pendingSale)} className="pos-workspace">
+        <nav className="pos-tabs" aria-label="POS workspace">
+          <button type="button" aria-current={workspaceTab === 'catalog' ? 'step' : undefined} onClick={() => goTo('catalog')}>Catalog</button>
+          <button type="button" aria-current={workspaceTab === 'sale' ? 'step' : undefined} onClick={() => goTo('sale')}>Ticket <span>{itemCount}</span></button>
+          <button type="button" aria-current={workspaceTab === 'payment' ? 'step' : undefined} disabled={!cart.length} onClick={goToPayment}>Payment</button>
+        </nav>
+
+        <div hidden={workspaceTab !== 'catalog'} className="pos-page" aria-label="Catalog workspace">
+          <label className="pos-search"><Search/><input aria-label="Search products" value={search} onChange={event => {setSearch(event.target.value);setSelectedProductId(null);}} placeholder="Search products"/></label>
+          <div className="pos-categories" aria-label="Product categories">
+            <button type="button" aria-pressed={!selectedCategory} onClick={() => {setSelectedCategory(null);setSelectedProductId(null);}}>All</button>
+            {categories.map(category => <button key={category} type="button" aria-pressed={selectedCategory === category} onClick={() => {setSelectedCategory(category);setSelectedProductId(null);}}>{category}</button>)}
           </div>
-        </> : <>
-          <div className="flex items-center gap-2 border-b border-slate-200 px-2 py-2"><button type="button" onClick={() => setSelectedProductId(null)} className="serverless-action min-h-9 px-2" aria-label={`Back to ${selectedCategory} products`}><ArrowLeft className="h-4 w-4"/></button><div className="min-w-0"><span className="block truncate text-[10px] text-slate-500">{selectedCategory}</span><strong className="block truncate text-xs font-bold">{selectedProduct.name}</strong></div></div>
-          {productVariants(selectedProduct).length ? <div className="max-h-[34vh] overflow-y-auto p-2" aria-label={`${selectedProduct.name} available variants`}><p className="px-1 pb-2 text-[10px] text-slate-500">Choose an available option</p><div className="grid grid-cols-2 gap-2">{productVariants(selectedProduct).map((variant) => {
-            const stock = Math.max(0, Number(variant.stock) || 0);
-            return <button key={String(variant.id)} type="button" disabled={saving || stock < 1} onClick={() => addItem(selectedProduct, variant)} className="flex min-h-[68px] flex-col items-start justify-between border border-slate-200 p-2 text-left hover:border-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45"><span className="line-clamp-2 text-[11px] font-bold leading-tight">{String(variant.name || variant.id)}</span><span className="w-full font-mono text-[10px] text-slate-600">{formatPHP(Number(variant.price ?? selectedProduct.price) || 0)} <span className="float-right">{stock ? `${stock} left` : "Out of stock"}</span></span></button>;
-          })}</div></div> : <div className="p-3"><div className="mb-3 flex items-center justify-between gap-2"><div><strong className="text-xs">{formatPHP(Number(selectedProduct.price) || 0)}</strong><p className="font-mono text-[10px] text-slate-500">{Number(selectedProduct.stock) || 0} available</p></div></div><button type="button" disabled={saving || Number(selectedProduct.stock) < 1} onClick={() => addItem(selectedProduct)} className="serverless-action serverless-action--primary min-h-11 w-full justify-center"><Plus className="h-4 w-4"/>Add to Sale</button></div>}
-        </>}
-      </section>}
+          {loading && !products.length ? <div className="pos-empty"><Loader2 className="animate-spin"/><p>Loading products…</p></div> : activeProduct && productVariants(activeProduct).length ? <section className="pos-card" aria-label="Product options">
+            <div className="pos-card-heading"><button type="button" className="pos-icon" onClick={() => setSelectedProductId(null)} aria-label="Back to products"><ArrowLeft/></button><h2>{activeProduct.name}</h2></div>
+            <div className="pos-product-list">{productVariants(activeProduct).map(variant => {
+              const stock = Math.max(0, Number(variant.stock) || 0);
+              return <button key={String(variant.id)} type="button" className="pos-product" disabled={stock < 1} onClick={() => addItem(activeProduct, variant)}><span><strong>{String(variant.name || variant.id)}</strong><small>{stock ? `${stock} available` : 'Out of stock'}</small></span><span className="pos-product-price">{formatPHP(Number(variant.price ?? activeProduct.price) || 0)}<Plus/></span></button>;
+            })}</div>
+          </section> : <section className="pos-card" aria-label="Live product picker">
+            <div className="pos-card-heading"><h2>{selectedCategory || 'Products'}</h2><small>{matchingProducts.length} available</small></div>
+            <div className="pos-product-list">{matchingProducts.map(product => {
+              const variants = productVariants(product);
+              const stock = Math.max(0, Number(product.stock) || 0);
+              return <button type="button" key={product.id} className="pos-product" disabled={!variants.length && stock < 1} onClick={() => variants.length ? setSelectedProductId(product.id) : addItem(product)}>
+                <span><strong>{product.name}</strong><small>{variants.length ? `${variants.length} options` : stock ? `${stock} available` : 'Out of stock'}</small></span>
+                <span className="pos-product-price">{variants.length ? 'Choose' : formatPHP(Number(product.price) || 0)}{variants.length ? <ChevronRight/> : <Plus/>}</span>
+              </button>;
+            })}</div>
+            {!matchingProducts.length && <p className="pos-hint pos-empty">No matching products.</p>}
+          </section>}
+          <div className="pos-footer"><div><small>Current sale</small><strong className="font-mono">{formatPHP(subtotal)}</strong></div><button type="button" className="pos-primary" disabled={!cart.length} onClick={() => goTo('sale')}>Review ticket <ChevronRight/></button></div>
+        </div>
 
-      <button type="button" onClick={()=>setWorkspaceTab('sale')} className="serverless-action serverless-action--primary my-2 min-h-12 w-full justify-between">Review ticket <span className="font-mono">{cart.reduce((n,l)=>n+l.quantity,0)} items · {formatPHP(subtotal)}</span></button>
-      </div>
-      <div hidden={workspaceTab!=='sale'}>
-      <section className="my-2 rounded-xl border border-slate-200 bg-white" aria-label="Sale cart">
-        <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2"><strong className="flex items-center gap-2 text-xs uppercase"><ShoppingCart className="h-4 w-4"/>Current Sale</strong><span className="font-mono text-[10px] text-slate-500">{cart.reduce((sum, line) => sum + line.quantity, 0)} Items</span></div>
-        {cart.map((line) => <div key={line.key} className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 last:border-0"><div className="min-w-0 flex-1"><strong className="block truncate text-[11px]">{line.name}</strong><small className="font-mono text-[10px] text-slate-500">{formatPHP(line.price)} each</small></div><button type="button" aria-label={`Remove one ${line.name}`} onClick={() => changeQuantity(line.key, -1)} className="serverless-action"><Minus className="h-3 w-3"/></button><span className="w-5 text-center font-mono text-xs">{line.quantity}</span><button type="button" aria-label={`Add one ${line.name}`} disabled={line.quantity >= line.stock} onClick={() => changeQuantity(line.key, 1)} className="serverless-action"><Plus className="h-3 w-3"/></button><strong className="w-16 text-right font-mono text-xs">{formatPHP(line.price * line.quantity)}</strong></div>)}
-        {!cart.length && <p className="p-3 text-center text-xs text-slate-500">Add products from the live catalog.</p>}
-        <div className="flex justify-between bg-slate-50 px-3 py-2 text-xs"><span>Subtotal</span><strong className="font-mono">{formatPHP(subtotal)}</strong></div>
+        <div hidden={workspaceTab !== 'sale'} className="pos-page" aria-label="Ticket workspace">
+          {!cart.length ? <div className="pos-empty"><ShoppingCart/><h2>Your ticket is empty</h2><p>Add products to start a sale.</p><button type="button" className="pos-primary" onClick={() => goTo('catalog')}>Browse catalog</button></div> : <>
+            <section className="pos-card" aria-label="Sale cart">
+              <div className="pos-card-heading"><h2>Current sale</h2><button type="button" className="pos-text-action" onClick={() => goTo('catalog')}>Add items <Plus/></button></div>
+              {cart.map(line => <div key={line.key} className="pos-cart-line"><div className="pos-line-copy"><strong>{line.name}</strong><small>{formatPHP(line.price)} each</small></div><div className="pos-quantity"><button type="button" aria-label={`Remove one ${line.name}`} onClick={() => changeQuantity(line.key, -1)}><Minus/></button><span>{line.quantity}</span><button type="button" aria-label={`Add one ${line.name}`} disabled={line.quantity >= line.stock} onClick={() => changeQuantity(line.key, 1)}><Plus/></button></div><strong className="pos-line-total font-mono">{formatPHP(line.price * line.quantity)}</strong></div>)}
+              <div className="pos-totals-row pos-subtotal"><span>Items subtotal</span><strong>{formatPHP(subtotal)}</strong></div>
+            </section>
 
-      </section>
+            <section className="pos-card" aria-label="POS customer">
+              <div className="pos-card-heading"><h2>Customer</h2>{account && <small>Account linked</small>}</div>
+              <div className="pos-card-body">
+                <div className="pos-choice" aria-label="Customer type">
+                  <button type="button" aria-pressed={customerType === 'guest'} onClick={() => {if(customerType==='guest')return;setCustomerType('guest');setSelectedCustomerId('');setTelegramId('');setCustomerName('');setCustomerPhone('');}}>New / Guest</button>
+                  <button type="button" aria-pressed={customerType === 'existing'} onClick={() => {if(customerType==='existing')return;setCustomerType('existing');setSelectedCustomerId('');setTelegramId('');setCustomerName('');setCustomerPhone('');}}>Existing Customer</button>
+                </div>
+                {customerType === 'existing' && <label className="pos-field">Customer account<select value={selectedCustomerId} onChange={event => {const customer=customers.find(row=>row.id===event.target.value);setSelectedCustomerId(event.target.value);setCustomerName(customer?.tgName || customer?.tgUsername || '');setCustomerPhone(customer?.phoneNumber || '');}}><option value="">Choose a customer</option>{customers.map(customer => <option key={customer.id} value={customer.id} disabled={customer.isBanned}>{customer.tgName || customer.tgUsername || 'Telegram customer'} · {customer.primeMemberId || customer.tgUserId || customer.id}{customer.isBanned ? ' · Restricted' : ''}</option>)}</select></label>}
+                <div className="pos-contact-fields"><label className="pos-field">Customer name<input value={customerName} onChange={event=>setCustomerName(event.target.value)} maxLength={120} placeholder="Name for the order" autoComplete="name"/></label><label className="pos-field">Phone <small>Optional</small><input value={customerPhone} onChange={event=>setCustomerPhone(event.target.value)} maxLength={40} inputMode="tel" autoComplete="tel" placeholder="Contact number"/></label></div>
+                {customerType === 'guest' ? <details className="pos-inline-details"><summary>Telegram order updates <span>Optional</span></summary><label className="pos-field">Telegram user ID<input value={telegramId} onChange={event=>setTelegramId(event.target.value.replace(/[^0-9]/g,'').slice(0,20))} inputMode="numeric" maxLength={20} placeholder="Numeric Telegram ID"/><small>The customer must have opened the bot.</small></label></details> : account && !account.tgUserId && <p className="pos-hint">This account has no Telegram ID for order updates.</p>}
+              </div>
+            </section>
 
-      <section className="serverless-fields my-2">
-        <label className="serverless-field">Customer Name<input value={customerName} onChange={(event) => { setCustomerName(event.target.value); setRetryKey(""); }} maxLength={120} placeholder="Name for this order"/></label>
-        <label className="serverless-field">Phone (Optional)<input value={customerPhone} onChange={(event) => { setCustomerPhone(event.target.value); setRetryKey(""); }} maxLength={40} inputMode="tel" placeholder="Contact number"/></label>
-        {mode === "delivery" && <>
-          <label className="serverless-field">Delivery address<input value={deliveryAddress} onChange={event=>{setDeliveryAddress(event.target.value);setDestination(null);setCourierId('');setDeliveryQuote(null);}} maxLength={240} placeholder="Search street, building or barangay"/></label>
-          {addressBusy && <p role="status" className="text-xs">Searching addresses…</p>}
-          {suggestions.length>0 && <div className="max-h-48 overflow-auto rounded-lg border bg-white">{suggestions.map((item,index)=><button key={index} type="button" className="block min-h-11 w-full border-b p-3 text-left text-xs" onClick={()=>{setDeliveryAddress(item.formatted);setDestination({lat:Number(item.lat),lon:Number(item.lon)});setSuggestions([]);}}>{item.formatted}</button>)}</div>}
-          {destination && <p className="font-mono text-xs text-emerald-700">Address selected · {destination.lat.toFixed(5)}, {destination.lon.toFixed(5)}</p>}
-          {deliveryBusy && <p role="status" className="text-xs">Calculating courier rates…</p>}
-          {deliveryQuote && <><p className="font-mono text-xs text-slate-500">{deliveryQuote.distanceKm} km · {deliveryQuote.routeTimeMinutes ? `${deliveryQuote.routeTimeMinutes} min` : 'Travel time unavailable'}{deliveryQuote.estimated ? ' · Estimated route' : ''}</p>
-          <label className="serverless-field">Courier<select value={courierId} onChange={event=>setCourierId(event.target.value)}><option value="">Choose courier</option>{(deliveryQuote.couriers || []).map((courier:Courier)=><option key={courier.id} value={courier.id} disabled={courier.coverageAvailable===false}>{courier.name} · {courier.coverageAvailable===false?'Outside coverage':formatPHP(Number(courier.calculatedFee))}</option>)}</select></label></>}
-          <label className="serverless-field">Delivery fee collection<select value={deliveryPaymentMethod} onChange={event=>setDeliveryPaymentMethod(event.target.value)}><option value="upon_checkout">Collect at checkout</option><option value="upon_delivery">Customer pays courier on delivery</option></select></label>
+            <section className="pos-card" aria-label="POS fulfilment">
+              <div className="pos-card-heading"><h2>Fulfilment</h2></div>
+              <div className="pos-card-body">
+                <div className="pos-choice" aria-label="Sale type"><button type="button" aria-pressed={mode==='store'} onClick={()=>setMode('store')}><Store/>Store sale</button><button type="button" aria-pressed={mode==='delivery'} onClick={()=>setMode('delivery')}><Truck/>Delivery</button></div>
+                {mode === 'delivery' && <div className="pos-delivery-fields">
+                  <div className="pos-address-search">
+                    <label className="pos-field" htmlFor="pos-delivery-address">Delivery address</label>
+                    <input id="pos-delivery-address" className="pos-address-input" value={deliveryAddress} onChange={event=>{setDeliveryAddress(event.target.value);setDestination(null);setCourierId('');setDeliveryQuote(null);}} maxLength={240} placeholder="Search street, building or barangay" autoComplete="off" aria-controls="pos-address-results" aria-expanded={suggestions.length>0}/>
+                    {addressBusy && <p role="status" className="pos-hint">Searching addresses…</p>}
+                    {suggestions.length>0 && <div id="pos-address-results" className="pos-address-results" aria-label="Address suggestions">{suggestions.map((item,index)=><button type="button" key={index} onClick={()=>{setDeliveryAddress(item.formatted);setDestination({lat:Number(item.lat),lon:Number(item.lon)});setSuggestions([]);}}>{item.formatted}<ChevronRight/></button>)}</div>}
+                    {destination && <p className="pos-address-selected"><Check/>Address selected</p>}
+                  </div>
+                  {deliveryBusy && <p role="status" className="pos-hint">Calculating courier rates…</p>}
+                  {deliveryQuote && <><label className="pos-field">Courier<select value={courierId} onChange={event=>setCourierId(event.target.value)}><option value="">Choose courier</option>{(deliveryQuote.couriers || []).map((courier:Courier)=><option key={courier.id} value={courier.id} disabled={courier.coverageAvailable===false}>{courier.name} · {courier.coverageAvailable===false?'Outside coverage':formatPHP(Number(courier.calculatedFee))}</option>)}</select></label><p className="pos-hint font-mono">{deliveryQuote.distanceKm} km{deliveryQuote.routeTimeMinutes?` · ${deliveryQuote.routeTimeMinutes} min`:''}{deliveryQuote.estimated?' · Estimated route':''}</p></>}
+                  <label className="pos-field">Collect delivery fee<select value={deliveryPaymentMethod} onChange={event=>setDeliveryPaymentMethod(event.target.value)}><option value="upon_checkout">At checkout</option><option value="upon_delivery">On delivery · pay courier</option></select></label>
+                </div>}
+              </div>
+            </section>
+            <button type="button" className="pos-primary pos-wide" onClick={goToPayment}>Continue to payment <ChevronRight/></button>
+          </>}
+        </div>
 
-        </>}
-      </section>
-      <section className="my-2 space-y-3 rounded-xl border bg-white p-3" aria-label="Bill adjustments">
-        <h2 className="font-heading text-lg">Charges & savings</h2>
-        <p className="text-xs text-slate-500">Default and scheduled charges apply automatically. Select extra configured charges below.</p>
-        <div className="space-y-2">{chargeOptions.map(c=><label key={c.id} className="flex min-h-10 items-center gap-2 text-xs"><input type="checkbox" disabled={isChargeApplicable(c)} checked={isChargeApplicable(c)||chargeIds.includes(c.id)} onChange={event=>setChargeIds(ids=>event.target.checked?[...ids,c.id]:ids.filter(id=>id!==c.id))}/><span>{c.name}{isChargeApplicable(c)?' (automatic)':''} · {c.type==='percentage'?`${c.rate}%`:formatPHP(Number(c.rate))}</span></label>)}</div>
-        {manualCharges.map((c,index)=><div key={index} className="space-y-2 rounded-lg bg-slate-50 p-2"><label className="serverless-field">Charge name<input value={c.name} maxLength={100} onChange={event=>setManualCharges(rows=>rows.map((row,i)=>i===index?{...row,name:event.target.value}:row))}/></label><div className="grid grid-cols-2 gap-2"><label className="serverless-field">Type<select value={c.type} onChange={event=>setManualCharges(rows=>rows.map((row,i)=>i===index?{...row,type:event.target.value}:row))}><option value="fixed">PHP</option><option value="percentage">Percent</option></select></label><label className="serverless-field">Amount<input type="number" min="0" step="0.01" value={c.amount} onChange={event=>setManualCharges(rows=>rows.map((row,i)=>i===index?{...row,amount:event.target.value}:row))}/></label></div><button type="button" className="serverless-action" onClick={()=>setManualCharges(rows=>rows.filter((_,i)=>i!==index))}>Remove charge</button></div>)}
-        <button type="button" className="serverless-action min-h-10" disabled={manualCharges.length>=20} onClick={()=>setManualCharges(rows=>[...rows,{name:'Additional service',type:'fixed',amount:'0'}])}><Plus className="h-4 w-4"/>Manual charge</button>
-        <div className="grid grid-cols-2 gap-2"><label className="serverless-field">Staff discount<select value={discountMode} onChange={event=>setDiscountMode(event.target.value)}><option value="none">None</option><option value="fixed">PHP amount</option><option value="percentage">Percentage</option></select></label>{discountMode!=='none' && <label className="serverless-field">Discount value<input type="number" min="0" step="0.01" max={discountMode==='percentage'?100:undefined} value={discountValue} onChange={event=>setDiscountValue(event.target.value)}/></label>}</div>
-        {customerType==='existing' && selectedCustomerId ? <><label className="serverless-field">Voucher code<input value={promoCode} onChange={event=>setPromoCode(event.target.value.toUpperCase())} placeholder="Enter voucher code" maxLength={100}/></label><label className="serverless-field">Store Credits to apply<input type="number" min="0" step="0.01" value={storeCreditsUsed} onChange={event=>setStoreCreditsUsed(event.target.value)}/><small className="font-mono">Available: {formatPHP(Number(customers.find(c=>c.id===selectedCustomerId)?.storeCredits)||0)} · Applied: {formatPHP(bill?.creditsUsed || 0)}</small></label></>:<p className="text-xs text-slate-500">Select an existing customer to use their vouchers and Store Credits.</p>}
-      </section>
-      <section className="serverless-fields my-2">
-        <label className="serverless-field">Payment Received By<select value={paymentMethodName} onChange={(event) => { setPaymentMethodName(event.target.value); setRetryKey(""); }}><option value="Cash">Cash</option>{tenders.map((tender) => <option key={tender.id} value={tender.name}>{tender.name}</option>)}</select></label>
-      </section>
+        <div hidden={workspaceTab !== 'payment'} className="pos-page" aria-label="Payment workspace">
+          {cart.length>0 && <>
+            <section className="pos-card pos-receipt" aria-label="Sale summary">
+              <div className="pos-card-heading"><div><h2>{customerName || 'Current sale'}</h2><small>{mode==='delivery'?'Delivery':'Store sale'} · {itemCount} {itemCount===1?'item':'items'}</small></div><button type="button" className="pos-text-action" onClick={()=>goTo('sale')}>Edit ticket</button></div>
+              {currentBill ? <div className="pos-card-body">
+                <div className="pos-totals-row"><span>Items subtotal</span><span>{formatPHP(currentBill.cart.subtotal)}</span></div>
+                <details className="pos-receipt-charges"><summary><span>Charges <small>{currentBill.chargeResult.computedCharges.length}</small></span><span>{formatPHP(currentBill.chargeResult.totalChargesAmount || 0)}</span></summary><div>{currentBill.chargeResult.computedCharges.map((charge:any)=><div key={charge.id} className="pos-totals-row"><span>{charge.name}</span><span>{formatPHP(charge.computedAmount)}</span></div>)}</div></details>
+                {currentBill.deliveryFee>0 && <div className="pos-totals-row"><span>Delivery</span><span>{formatPHP(currentBill.deliveryFee)}</span></div>}
+                {[['Voucher',currentBill.promoDiscount],['Delivery voucher',currentBill.shippingSubsidy],['Staff discount',currentBill.staffDiscount],['Store Credits',currentBill.creditsUsed]].map(([label,value])=>Number(value)>0?<div key={String(label)} className="pos-totals-row pos-saving"><span>{label}</span><span>−{formatPHP(Number(value))}</span></div>:null)}
+                {currentBill.cart.items.filter((item:any)=>item.isFree).map((item:any)=><div key={item.id} className="pos-totals-row pos-saving"><span>{item.name}</span><span>Free</span></div>)}
+                <div className="pos-due"><span>Due now</span><strong>{formatPHP(currentBill.payableNow)}</strong></div>
+                {currentBill.payableOnDelivery>0 && <div className="pos-courier-due"><span>Pay courier on delivery</span><strong>{formatPHP(currentBill.payableOnDelivery)}</strong></div>}
+              </div>:<p className="pos-card-body pos-hint" role="status">Updating bill…</p>}
+            </section>
 
-      <div className="mt-2 border border-slate-200 bg-white p-3">
-        <h2 className="mb-3 font-heading text-lg">Payment</h2>
-        {quoteResult.key===quoteKey && bill ? <div className="mb-3 space-y-2 text-xs font-mono">
-          <div className="flex justify-between"><span>Items</span><span>{formatPHP(bill.cart.subtotal)}</span></div>
-          {bill.chargeResult.computedCharges.map((c:any)=><div key={c.id} className="flex justify-between gap-2"><span>{c.name}</span><span>{formatPHP(c.computedAmount)}</span></div>)}
-          {bill.cart.items.filter((item:any)=>item.isFree).map((item:any)=><div key={item.id} className="flex justify-between text-emerald-700"><span>{item.name}</span><span>Free</span></div>)}
-          {bill.rewardPointsAmount>0 && <div className="text-slate-500">{bill.rewardPointsAmount} points pending completion</div>}
-          {bill.deliveryFee>0 && <div className="flex justify-between"><span>Delivery</span><span>{formatPHP(bill.deliveryFee)}</span></div>}
-          {[['Voucher',bill.promoDiscount],['Delivery voucher',bill.shippingSubsidy],['Staff discount',bill.staffDiscount],['Store Credits',bill.creditsUsed]].map(([label,value])=>Number(value)>0?<div key={String(label)} className="flex justify-between text-emerald-700"><span>{label}</span><span>−{formatPHP(Number(value))}</span></div>:null)}
-          <div className="flex justify-between border-t pt-2 text-lg"><span>Due now</span><strong>{formatPHP(bill.payableNow)}</strong></div>
-          {bill.payableOnDelivery>0 && <div className="flex justify-between text-amber-800"><span>Due to courier on delivery</span><strong>{formatPHP(bill.payableOnDelivery)}</strong></div>}
-        </div>:<p className="mb-3 text-xs text-slate-500">{cart.length?'Waiting for a valid bill…':'Add items to start a sale.'}</p>}
-        {paymentMethodName==='Cash' && <label className="serverless-field mb-3">Cash received<input type="number" min="0" step="0.01" value={cashReceived} onChange={event=>setCashReceived(event.target.value)}/><small className="font-mono">Change: {formatPHP(Math.max(0,Number(cashReceived)-(bill?.payableNow || 0)))}</small></label>}
-        <button type="button" onClick={() => void checkout()} disabled={saving || !cart.length || !customerName.trim() || quoteResult.key!==quoteKey} className="serverless-action serverless-action--primary min-h-12 w-full justify-center">{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4"/>}{saving ? "Saving sale…" : "Confirm Payment & Create Order"}</button>
-        <p className="mt-2 text-center text-[10px] text-slate-500">Only confirm after payment is received. Stock and orders sync to the Serverless database.</p>
-      </div>
-      </div>
-      {lastSale && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/60 p-2 sm:items-center"><section className="w-full max-w-[430px] border border-slate-200 bg-white p-4 shadow-xl" role="dialog" aria-modal="true" aria-label="Sale saved"><div className="flex items-start justify-between"><div><div className="mb-2 inline-flex items-center gap-2 text-xs font-bold uppercase text-emerald-800"><Check className="h-4 w-4"/>Sale saved</div><h2 className="font-heading text-lg">Order {lastSale.orderNumber}</h2></div><button type="button" onClick={() => setLastSale(null)} className="serverless-action" aria-label="Close"><X className="h-4 w-4"/></button></div><p className="my-3 font-mono text-xl">{formatPHP(lastSale.totalAmount)}</p><p className="mb-3 text-xs text-slate-600">This {lastSale.mode === "store" ? "store sale" : "delivery order"} is now in Admin → Orders.</p><button type="button" onClick={() => setLastSale(null)} className="serverless-action serverless-action--primary w-full justify-center">New Sale</button></section></div>}
+            <div className="pos-adjustments" aria-label="Bill adjustments">
+              <details className="pos-card pos-disclosure" aria-label="Charges editor"><summary><span>Charges</span><small>{chargeIds.length+manualCharges.length ? `${chargeIds.length+manualCharges.length} added` : `${automaticCharges.length} automatic`}</small><ChevronRight/></summary><div className="pos-card-body">
+                {automaticCharges.length>0 && <div className="pos-automatic-charges"><p className="pos-hint">Included automatically</p>{automaticCharges.map(charge=><div key={charge.id} className="pos-totals-row"><span>{charge.name}</span><span>{charge.type==='percentage'?`${charge.rate}%`:formatPHP(Number(charge.rate))}</span></div>)}</div>}
+                {optionalCharges.map(charge=><label key={charge.id} className="pos-charge-option"><input type="checkbox" checked={chargeIds.includes(charge.id)} onChange={event=>setChargeIds(ids=>event.target.checked?[...ids,charge.id]:ids.filter(id=>id!==charge.id))}/><span>{charge.name}</span><small>{charge.type==='percentage'?`${charge.rate}%`:formatPHP(Number(charge.rate))}</small></label>)}
+                {manualCharges.map((charge,index)=><div key={index} className="pos-manual-charge"><div className="pos-card-heading"><span>Manual charge {index+1}</span><button type="button" className="pos-icon" aria-label={`Remove manual charge ${index+1}`} onClick={()=>setManualCharges(rows=>rows.filter((_,i)=>i!==index))}><X/></button></div><label className="pos-field">Charge name<input value={charge.name} maxLength={100} onChange={event=>setManualCharges(rows=>rows.map((row,i)=>i===index?{...row,name:event.target.value}:row))}/></label><div className="pos-contact-fields"><label className="pos-field">Type<select value={charge.type} onChange={event=>setManualCharges(rows=>rows.map((row,i)=>i===index?{...row,type:event.target.value}:row))}><option value="fixed">PHP amount</option><option value="percentage">Percentage</option></select></label><label className="pos-field">Amount<input type="number" min="0" step="0.01" inputMode="decimal" value={charge.amount} onChange={event=>setManualCharges(rows=>rows.map((row,i)=>i===index?{...row,amount:event.target.value}:row))}/></label></div></div>)}
+                <button type="button" className="pos-secondary pos-wide" disabled={manualCharges.length>=20} onClick={()=>setManualCharges(rows=>[...rows,{name:'Additional service',type:'fixed',amount:'0'}])}><Plus/>Add manual charge</button>
+              </div></details>
+              <details className="pos-card pos-disclosure" aria-label="Savings editor"><summary><span>Discounts & credits</span><small>{savingsCount ? `${savingsCount} selected` : 'Optional'}</small><ChevronRight/></summary><div className="pos-card-body">
+                <div className="pos-contact-fields"><label className="pos-field">Staff discount<select value={discountMode} onChange={event=>setDiscountMode(event.target.value)}><option value="none">None</option><option value="fixed">PHP amount</option><option value="percentage">Percentage</option></select></label>{discountMode!=='none' && <label className="pos-field">Discount value<input type="number" min="0" step="0.01" inputMode="decimal" max={discountMode==='percentage'?100:undefined} value={discountValue} onChange={event=>setDiscountValue(event.target.value)}/></label>}</div>
+                {account ? <><label className="pos-field">Voucher code<input value={promoCode} onChange={event=>setPromoCode(event.target.value.toUpperCase())} placeholder="Enter voucher code" maxLength={100}/></label><label className="pos-field">Store Credits to apply<input type="number" min="0" step="0.01" inputMode="decimal" value={storeCreditsUsed} onChange={event=>setStoreCreditsUsed(event.target.value)}/><small className="font-mono">Available: {formatPHP(Number(account.storeCredits)||0)} · Applied: {formatPHP(currentBill?.creditsUsed || 0)}</small></label></>:<p className="pos-hint">Link an existing customer in Ticket to use vouchers and Store Credits.</p>}
+              </div></details>
+            </div>
+
+            <section className="pos-card" aria-label="Payment collection"><div className="pos-card-heading"><h2>Collect payment</h2></div><div className="pos-card-body">
+              <label className="pos-field">Payment method<select value={paymentMethodName} onChange={event=>setPaymentMethodName(event.target.value)}><option value="Cash">Cash</option>{tenders.filter(tender=>tender.name!=='Cash').map(tender=><option key={tender.id} value={tender.name}>{tender.name}</option>)}</select></label>
+              {paymentMethodName==='Cash' && <><label className="pos-field">Cash received<input type="number" min="0" step="0.01" inputMode="decimal" value={cashReceived} onChange={event=>setCashReceived(event.target.value)} placeholder="0.00"/></label>{currentBill && <div className="pos-totals-row"><span>{Number(cashReceived)>0 && Number(cashReceived)<currentBill.payableNow?'Still to collect':'Change'}</span><strong>{formatPHP(Number(cashReceived)>0 && Number(cashReceived)<currentBill.payableNow?currentBill.payableNow-Number(cashReceived):Math.max(0,Number(cashReceived)-currentBill.payableNow))}</strong></div>}</>}
+              <button type="button" className="pos-primary pos-wide" onClick={()=>void checkout()} disabled={saving || !cart.length || !customerName.trim() || !currentBill}>{saving?<Loader2 className="animate-spin"/>:<Check/>}{saving?'Saving sale…':currentBill?`Confirm ${formatPHP(currentBill.payableNow)} received`:'Waiting for bill…'}</button>
+              <p className="pos-hint pos-payment-note">Confirm after verifying payment was received.</p>
+            </div></section>
+          </>}
+        </div>
       </fieldset>
     </>}
+    {lastSale && <div className="pos-dialog-backdrop"><section className="pos-dialog" role="dialog" aria-modal="true" aria-label="Sale saved"><button type="button" onClick={()=>setLastSale(null)} className="pos-icon pos-dialog-close" aria-label="Close"><X/></button><Check className="pos-saving"/><h2>Sale saved</h2><p>Order {lastSale.orderNumber}</p><strong className="pos-saved-total">{formatPHP(lastSale.totalAmount)}</strong><p className="pos-hint">View this {lastSale.mode==='store'?'store sale':'delivery order'} in Orders.</p><button type="button" onClick={()=>setLastSale(null)} className="pos-primary pos-wide">New sale</button></section></div>}
   </main>;
 }
