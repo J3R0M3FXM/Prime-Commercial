@@ -48,6 +48,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const variantDialogRef = useRef<HTMLElement>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -119,6 +120,24 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   }, []);
 
   useEffect(() => { if (authorized) void load(); }, [authorized, load]);
+
+  useEffect(() => {
+    if (!selectedProductId) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const dialog = variantDialogRef.current;
+    const controls = () => Array.from(dialog?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') || []);
+    controls()[0]?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setSelectedProductId(null); }
+      if (event.key === 'Tab') {
+        const buttons = controls(), first = buttons[0], last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => { document.removeEventListener('keydown', handleKey); previousFocus?.focus(); };
+  }, [selectedProductId]);
 
   useEffect(() => {
     if (!authorized || mode !== 'delivery' || destination || deliveryAddress.trim().length < 3) {setSuggestions([]);return;}
@@ -302,13 +321,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
             <button type="button" aria-pressed={!selectedCategory} onClick={() => {setSelectedCategory(null);setSelectedProductId(null);}}>All</button>
             {categories.map(category => <button key={category} type="button" aria-pressed={selectedCategory === category} onClick={() => {setSelectedCategory(category);setSelectedProductId(null);}}>{category}</button>)}
           </div>
-          {loading && !products.length ? <div className="pos-empty"><Loader2 className="animate-spin"/><p>Loading products…</p></div> : activeProduct && productVariants(activeProduct).length ? <section className="pos-card" aria-label="Product options">
-            <div className="pos-card-heading"><button type="button" className="pos-icon" onClick={() => setSelectedProductId(null)} aria-label="Back to products"><ArrowLeft/></button><h2>{activeProduct.name}</h2></div>
-            <div className="pos-product-list">{productVariants(activeProduct).map(variant => {
-              const stock = Math.max(0, Number(variant.stock) || 0);
-              return <button key={String(variant.id)} type="button" className="pos-product" disabled={stock < 1} onClick={() => addItem(activeProduct, variant)}><TelegramMediaImage src={productImage(activeProduct, variant)} fallbackSrc={unavailableImage} alt={`${activeProduct.name} · ${String(variant.name || variant.id)}`} loading="lazy" className="pos-product-image"/><span className="pos-product-copy"><strong>{String(variant.name || variant.id)}</strong><small>{stock ? `${stock} available` : 'Out of stock'}</small></span><span className="pos-product-price">{formatPHP(Number(variant.price ?? activeProduct.price) || 0)}<Plus/></span></button>;
-            })}</div>
-          </section> : <section className="pos-card" aria-label="Live product picker">
+          {loading && !products.length ? <div className="pos-empty"><Loader2 className="animate-spin"/><p>Loading products…</p></div> : <section className="pos-card" aria-label="Live product picker">
             <div className="pos-card-heading"><h2>{selectedCategory || 'Products'}</h2><small>{matchingProducts.length} available</small></div>
             <div className="pos-product-list">{matchingProducts.map(product => {
               const variants = productVariants(product);
@@ -409,6 +422,16 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
             </div></section>
           </>}
         </div>
+        {workspaceTab === 'catalog' && activeProduct && productVariants(activeProduct).length > 0 && <div className="pos-dialog-backdrop" onClick={event => { if (event.target === event.currentTarget) setSelectedProductId(null); }}>
+          <section ref={variantDialogRef} className="pos-dialog pos-variant-dialog" role="dialog" aria-modal="true" aria-labelledby="pos-variant-title">
+            <header className="pos-card-heading"><h2 id="pos-variant-title">{activeProduct.name}</h2><button type="button" className="pos-icon" onClick={() => setSelectedProductId(null)} aria-label="Close variant selector"><X/></button></header>
+            <p className="pos-hint">Select a variant to add to the ticket</p>
+            <div className="pos-product-list">{productVariants(activeProduct).map(variant => {
+              const stock = Math.max(0, Number(variant.stock) || 0);
+              return <button key={String(variant.id)} type="button" className="pos-product" disabled={stock < 1} onClick={() => { addItem(activeProduct, variant); setSelectedProductId(null); }}><TelegramMediaImage src={productImage(activeProduct, variant)} fallbackSrc={unavailableImage} alt={`${activeProduct.name} · ${String(variant.name || variant.id)}`} loading="lazy" className="pos-product-image"/><span className="pos-product-copy"><strong>{String(variant.name || variant.id)}</strong><small>{stock ? `${stock} available` : 'Out of stock'}</small></span><span className="pos-product-price">{formatPHP(Number(variant.price ?? activeProduct.price) || 0)}<Plus/></span></button>;
+            })}</div>
+          </section>
+        </div>}
       </fieldset>
     </>}
     {lastSale && <div className="pos-dialog-backdrop"><section className="pos-dialog" role="dialog" aria-modal="true" aria-label="Sale saved"><button type="button" onClick={()=>setLastSale(null)} className="pos-icon pos-dialog-close" aria-label="Close"><X/></button><Check className="pos-saving"/><h2>Sale saved</h2><p>Order {lastSale.orderNumber}</p><strong className="pos-saved-total">{formatPHP(lastSale.totalAmount)}</strong><p className="pos-hint">View this {lastSale.mode==='store'?'store sale':'delivery order'} in Orders.</p><button type="button" onClick={()=>{setInvoiceOrder({orderNumber:lastSale.orderNumber,paymentMethodId:lastSale.paymentMethodId});setLastSale(null);}} className="pos-primary pos-wide">Customer invoice</button><button type="button" onClick={()=>setLastSale(null)} className="pos-text-action">New sale</button></section></div>}
