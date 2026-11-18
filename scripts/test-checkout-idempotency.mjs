@@ -145,7 +145,7 @@ const invoiceSale=await pos(invoiceRequest,{staff:999});
 const unpaid=sqlite.prepare('SELECT * FROM orders WHERE id=?').get(invoiceSale.id);
 assert.equal(unpaid.status,'Pending');assert.equal(unpaid.payment_status,'Unpaid');
 assert.equal(unpaid.payment_received_amount,0);assert.equal(unpaid.confirmed_paid_amount,0);
-assert.equal(unpaid.payment_method_id,'gcash');assert.ok(unpaid.payment_deadline_at>Math.floor(Date.now()/1000));
+assert.equal(unpaid.payment_method_id,'gcash');assert.equal(unpaid.payment_deadline_at-unpaid.created_at,3600,'Unpaid POS invoices allow exactly one hour for payment');
 assert.equal(sqlite.prepare("SELECT store_credits n FROM customers WHERE id='customer'").get().n,beforeInvoice.n-10);
 assert.deepEqual(await pos(invoiceRequest,{staff:999}),invoiceSale,'Invoice retries return the same saved order');
 await assert.rejects(pos({...invoiceRequest,paymentState:'paid'},{staff:999}),{code:'IDEMPOTENCY_CONFLICT'});

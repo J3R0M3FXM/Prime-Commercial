@@ -187,7 +187,7 @@ export default async function handler(input = {}, ctx) {
       review_status: paymentState==='unpaid'?'POS invoice — Awaiting payment':'Approved - POS payment received', requires_manual_review: paymentState==='unpaid'?1:0,
       delivery_address: JSON.stringify(mode === 'delivery' ? { formatted: addressText, ...request.destination, courierPaymentMode: pricing.deliveryPaymentMethod, distanceKm: pricing.delivery?.distanceKm, estimatedTravelMinutes: pricing.delivery?.routeTimeMinutes } : { formatted: 'Store pickup' }),
       courier_id: courier?.id || '', courier_name: courier?.name || '', notes: `POS · ${mode === 'store' ? 'Store pickup' : 'Delivery'}`,
-      fingerprint_snapshot: JSON.stringify(pricing.fingerprint || {}), payment_deadline_at: paymentState==='unpaid'?now+86400:null, created_at: now, updated_at: now,
+      fingerprint_snapshot: JSON.stringify(pricing.fingerprint || {}), payment_deadline_at: paymentState==='unpaid'?now+3600:null, created_at: now, updated_at: now,
     };
     for (let attempt = 0; attempt < 120; attempt++) {
       row.order_number = number;

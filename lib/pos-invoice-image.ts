@@ -135,7 +135,13 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
         y+=20;
       };
       y+=18;
-      if(!paid)reminder(`PLEASE PAY THE TOTAL AMOUNT DUE OF P${Number(invoice.payableNow || 0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} USING THE QR CODE BELOW THRU YOUR PREFERRED BANKING OR E-WALLET APP.`);
+      if(!paid){
+        textAt('TOTAL AMOUNT DUE',450,y,28,true,navy,'center');y+=46;
+        const amount=`P${Number(invoice.payableNow || 0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+        font(64,true);
+        const amountSize=Math.min(64,64*788/Math.max(1,ctx.measureText(amount).width));
+        textAt(amount,450,y,amountSize,true,navy,'center');y+=amountSize+32;
+      }
       const qrWidth=WIDTH*.7,qrHeight=qrWidth*(Number(qr.height)||1)/(Number(qr.width)||1),left=WIDTH*.15;
       box(left-24,y,qrWidth+48,qrHeight+48,'#dce4ee');box(left-23,y+1,qrWidth+46,qrHeight+46,'#fff');
       if(draw){ctx.imageSmoothingEnabled=false;ctx.drawImage(qr,left,y+24,qrWidth,qrHeight);}
