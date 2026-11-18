@@ -68,19 +68,24 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [catalog, customerRows, courierRows, paymentRows, chargeRows] = await Promise.all([
-        callServerless<Product[]>("getCatalog", {}, 30_000),
-        callServerless<Customer[]>("manageCustomers", { action: "list" }, 30_000),
-        callServerless<Courier[]>("manageCouriers", { action: "list" }, 30_000),
-        callServerless<Tender[]>("managePaymentMethods", { action: "list" }, 30_000),
-        callServerless<any[]>("getPublicCharges", {}, 30_000),
+      const request = async (label: string, name: string, input: Record<string, any>, apply: (rows: any[]) => void) => {
+        try {
+          const rows = await callServerless<any[]>(name, input, 30_000);
+          if (!Array.isArray(rows)) throw new Error('Invalid response.');
+          apply(rows);
+        } catch (err: any) {
+          throw new Error(`${label}: ${err?.message || 'Could not load data.'} Use Refresh to retry.`);
+        }
+      };
+      const results = await Promise.allSettled([
+        request('Products', 'getCatalog', {}, rows => setProducts(rows.filter(row => row.isActive !== false))),
+        request('Customers', 'manageCustomers', { action: 'posList' }, setCustomers),
+        request('Couriers', 'manageCouriers', { action: 'list' }, rows => setCouriers(rows.filter(row => row.isActive !== false))),
+        request('Payment methods', 'managePaymentMethods', { action: 'list' }, rows => setTenders(rows.filter(row => row.isActive !== false))),
+        request('Charges', 'getPublicCharges', {}, setChargeOptions),
       ]);
-      if (!Array.isArray(catalog)) throw new Error("The live product catalog response was invalid.");
-      setChargeOptions(Array.isArray(chargeRows) ? chargeRows : []);
-      setProducts(catalog.filter((product) => product.isActive !== false));
-      setCustomers(Array.isArray(customerRows) ? customerRows : []);
-      setCouriers(Array.isArray(courierRows) ? courierRows.filter((courier) => courier.isActive !== false) : []);
-      setTenders(Array.isArray(paymentRows) ? paymentRows.filter((method) => method.isActive !== false) : []);
+      const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (failures.length) throw new Error(failures.map(result => result.reason.message).join(' '));
     } catch (err: any) { setError(err?.message || "Could not load the live POS data."); }
     finally { setLoading(false); }
   }, []);

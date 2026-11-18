@@ -22,7 +22,7 @@ export default function SplashScreen({ title = 'INITIALIZING SECURE SESSION', su
               <span className="prime-splash-fingerprint-scan" aria-hidden="true" />
               <span className="prime-splash-fingerprint-dots" aria-hidden="true"><i /><i /><i /></span>
             </div>
-            <div className="prime-splash-connection-flow" aria-hidden="true"><i /><i /><i /></div>
+            <div className="prime-splash-connection-flow" aria-hidden="true"><i /><i /><i /><i /><i /></div>
             <div className="prime-splash-server-lights" aria-hidden="true">
               {['green','green','blue','green','orange','green','red','green','green','blue','green','orange'].map((color, index) => <i key={index} className={`prime-splash-server-light prime-splash-server-light--${color}`} />)}
             </div>

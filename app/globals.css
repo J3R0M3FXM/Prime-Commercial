@@ -964,7 +964,7 @@ body.splash-active #system-wide-proprietary-footer {
 /* Secure-session illustration. The uploaded artwork stays intact; live state is layered only over its embedded demo bar. */
 .prime-splash-network { width: min(100%, 390px); margin: 0 auto 14px; }
 .prime-splash-artwork { position: relative; isolation: isolate; }
-.prime-splash-artwork > img { display: block; width: 100%; height: auto; }
+.prime-splash-artwork > img { display: block; width: 100%; height: auto; mask-image: linear-gradient(to right, #000 0 35.5%, transparent 35.5% 64.8%, #000 64.8% 100%); }
 .prime-splash-artwork::before { content: ''; position: absolute; z-index: 1; left: 14.9%; top: 58.2%; width: 17.2%; height: 14.3%; border-radius: 11% 11% 7% 7%; background: linear-gradient(130deg, #eff8ff 0%, #dceeff 100%); }
 .prime-splash-phone-auth { position: absolute; z-index: 2; left: 15.5%; top: 59.4%; width: 16%; height: 11.5%; display: grid; place-items: center; overflow: hidden; color: #1378d7; }
 .prime-splash-phone-auth svg { width: 57%; height: auto; stroke-width: 1.75; animation: prime-splash-fingerprint-pulse 1.5s ease-in-out infinite; }
@@ -975,11 +975,12 @@ body.splash-active #system-wide-proprietary-footer {
 .prime-splash-progress { width: min(100% - 40px, 330px); height: 18px; margin: 2px auto 12px; overflow: hidden; border: 1px solid #a8d8bc; border-radius: 999px; background: #e8f4ec; box-shadow: inset 0 1px 2px rgb(15 23 42 / 12%); }
 .prime-splash-progress__fill { display: grid; height: 100%; min-width: 15%; place-items: center; overflow: hidden; border-radius: inherit; background: #17bd63; transition: width .25s ease-out; }
 .prime-splash-progress__fill span { color: #fff; font: 800 11px 'Lato Condensed', 'Lato', sans-serif; line-height: 1; text-shadow: 0 1px 1px rgb(0 80 38 / 45%); }
-.prime-splash-connection-flow { position: absolute; z-index: 2; left: 36.2%; top: 30%; width: 28%; height: 42%; pointer-events: none; }
-.prime-splash-connection-flow i { position: absolute; width: 5.2%; aspect-ratio: 1; border-radius: 50%; background: #147be8; box-shadow: 0 0 7px rgb(20 123 232 / 65%); animation: prime-splash-packet 2.1s linear infinite; }
-.prime-splash-connection-flow i:nth-child(1) { left: 7%; top: 17%; }
-.prime-splash-connection-flow i:nth-child(2) { right: 5%; top: 24%; animation-delay: -.7s; }
-.prime-splash-connection-flow i:nth-child(3) { left: 46%; bottom: 13%; animation-delay: -1.4s; }
+.prime-splash-connection-flow { position: absolute; z-index: 2; left: 36.2%; top: 49%; width: 27.8%; height: 5%; display: flex; align-items: center; justify-content: space-evenly; pointer-events: none; }
+.prime-splash-connection-flow i { width: 6%; aspect-ratio: 1; border-radius: 50%; background: #147be8; animation: prime-splash-packet 1.5s ease-in-out infinite; }
+.prime-splash-connection-flow i:nth-child(2) { animation-delay: .15s; }
+.prime-splash-connection-flow i:nth-child(3) { animation-delay: .3s; }
+.prime-splash-connection-flow i:nth-child(4) { animation-delay: .45s; }
+.prime-splash-connection-flow i:nth-child(5) { animation-delay: .6s; }
 .prime-splash-server-lights { position: absolute; z-index: 2; inset: 0; pointer-events: none; }
 .prime-splash-server-light { position: absolute; width: 2.35%; aspect-ratio: 1; border-radius: 50%; opacity: .84; box-shadow: 0 0 5px currentColor; animation: prime-splash-light-blink 1.8s ease-in-out infinite; }
 .prime-splash-server-light--green { color: #32df1f; background: #32df1f; }
@@ -2588,11 +2589,12 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   width: clamp(164px, 52vw, 218px) !important;
   align-self: center !important;
   margin-left: auto !important;
-  contain: layout paint !important;
+  contain: layout !important;
 }
 #mobile-portrait-viewport .prime-live-clock__time:not(.prime-live-clock__placeholder) {
   display: grid !important;
   grid-template-columns: 98px 8px max-content !important;
+  overflow: visible !important;
   justify-content: end !important;
   align-items: center !important;
   box-sizing: border-box !important;
@@ -2658,8 +2660,10 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 }
 #mobile-portrait-viewport .prime-live-clock__meridiem {
   display: inline-block !important;
-  width: 1.38em !important;
-  flex: 0 0 1.38em !important;
+  width: auto !important;
+  min-width: 1.65em !important;
+  flex: 0 0 auto !important;
+  padding-right: 2px !important;
   margin-left: .08em !important;
   text-align: right !important;
 }
@@ -2672,7 +2676,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 #mobile-portrait-viewport :is(.prime-shopfront-global-header, .prime-admin-global-header, .command-fixed-header) .prime-identity-header {
   position: relative !important;
   z-index: 2 !important;
-  box-shadow: 0 2px 7px rgb(15 23 42 / 18%) !important;
+  box-shadow: none !important;
 }
 #mobile-portrait-viewport :is(.prime-shopfront-global-header, .prime-admin-global-header, .command-fixed-header) .prime-queue-monitor {
   position: relative !important;
@@ -2787,7 +2791,7 @@ body,
   background: #ffffff !important;
 }
 #mobile-portrait-viewport :is(.prime-shopfront-global-header, .prime-admin-global-header, .command-fixed-header) .prime-identity-header {
-  border-bottom: 2px solid #0b1f36 !important;
+  border-bottom: 1px solid rgb(11 31 54 / 20%) !important;
 }
 #mobile-portrait-viewport .prime-shopfront-bottom-nav,
 #mobile-portrait-viewport.admin-viewport .prime-admin-bottom-nav {

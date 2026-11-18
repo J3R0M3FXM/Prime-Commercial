@@ -8,7 +8,7 @@ const require=createRequire(import.meta.url),dom=new JSDOM('<div id="mobile-port
 for(const key of ['window','document','navigator','HTMLElement','Event','MouseEvent','localStorage'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 globalThis.__posCalls=[];
-const output=await build({input:'app/components/admin/telegram-serverless-pos-panel.tsx',write:false,platform:'node',tsconfig:false,resolve:{alias:{'@':process.cwd()}},transform:{jsx:{runtime:'automatic'}},plugins:[{name:'pos-test',resolveId(id){if(id==='lucide-react'||id==='react'||id.startsWith('react/'))return {id:pathToFileURL(require.resolve(id)).href,external:true};if(id.endsWith('/lib/telegram-serverless-client'))return '\0pos-client';},load(id){if(id==='\0pos-client')return `export async function getTelegramServerlessSession(){return {authenticated:true,isAdmin:true,tgUserId:'999'};} export async function callServerless(name,input){globalThis.__posCalls.push({name,input});if(name==='getCatalog')return [{id:'p',name:'Coffee',category:'Drinks',price:100,stock:5}];if(name==='manageCustomers')return [{id:'c',tgUserId:'111',tgName:'Customer',storeCredits:50}];if(name==='getPublicCharges')return [{id:'packing',name:'Packing',rate:5,amount:5,type:'fixed',isDefault:true}];if(name==='geoapifyAddress')return {results:[{formatted:'Urban Street, Baguio City',lat:16.4,lon:120.6}]};if(name==='createPosOrder' && input.action==='deliveryQuote')return {distanceKm:2,routeTimeMinutes:8,courier:{id:'courier'},couriers:[{id:'courier',name:'Local Rider',calculatedFee:40}]};if(name==='createPosOrder' && input.action==='quote')return {totalAmount:105,payableNow:105,payableOnDelivery:0,cart:{subtotal:100,items:[]},chargeResult:{totalChargesAmount:5,computedCharges:[{id:'packing',name:'Packing',computedAmount:5}]},creditsUsed:0};return [];}`;}}],output:{format:'esm'}});
+const output=await build({input:'app/components/admin/telegram-serverless-pos-panel.tsx',write:false,platform:'node',tsconfig:false,resolve:{alias:{'@':process.cwd()}},transform:{jsx:{runtime:'automatic'}},plugins:[{name:'pos-test',resolveId(id){if(id==='lucide-react'||id==='react'||id.startsWith('react/'))return {id:pathToFileURL(require.resolve(id)).href,external:true};if(id.endsWith('/lib/telegram-serverless-client'))return '\0pos-client';},load(id){if(id==='\0pos-client')return `export async function getTelegramServerlessSession(){return {authenticated:true,isAdmin:true,tgUserId:'999'};} export async function callServerless(name,input){globalThis.__posCalls.push({name,input});if(name==='getCatalog')return [{id:'p',name:'Coffee',category:'Drinks',price:100,stock:5}];if(name==='manageCustomers'){if(globalThis.__posCustomerFailure)throw new Error('Telegram took too long to respond');if(input.action!=='posList')throw new Error('POS must use lightweight customers');await new Promise(resolve=>{globalThis.__resolvePosCustomers=resolve;});return [{id:'c',tgUserId:'111',tgName:'Customer',storeCredits:50}];}if(name==='getPublicCharges')return [{id:'packing',name:'Packing',rate:5,amount:5,type:'fixed',isDefault:true}];if(name==='geoapifyAddress')return {results:[{formatted:'Urban Street, Baguio City',lat:16.4,lon:120.6}]};if(name==='createPosOrder' && input.action==='deliveryQuote')return {distanceKm:2,routeTimeMinutes:8,courier:{id:'courier'},couriers:[{id:'courier',name:'Local Rider',calculatedFee:40}]};if(name==='createPosOrder' && input.action==='quote')return {totalAmount:105,payableNow:105,payableOnDelivery:0,cart:{subtotal:100,items:[]},chargeResult:{totalChargesAmount:5,computedCharges:[{id:'packing',name:'Packing',computedAmount:5}]},creditsUsed:0};return [];}`;}}],output:{format:'esm'}});
 const Component=(await import('data:text/javascript;base64,'+Buffer.from(output.output[0].code).toString('base64'))).default;
 const {createElement,act}=await import('react'),{createRoot}=await import('react-dom/client');
 const root=createRoot(document.getElementById('root'));
@@ -18,6 +18,8 @@ async function wait(milliseconds){await act(async()=>{await new Promise(resolve=
 async function inputValue(input,value){await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});}
 async function selectValue(input,value){await act(async()=>{input.value=value;input.dispatchEvent(new Event('change',{bubbles:true}));});}
 await act(async()=>{root.render(createElement(Component,{onBack(){}}));});
+assert.ok(button('Drinks'), 'Catalog appears while the customer request is still pending');
+await act(async()=>globalThis.__resolvePosCustomers());
 assert.ok(document.querySelector('main').className.includes('max-w-[430px]'));
 await act(async()=>button('Ticket').click());
 assert.match(document.querySelector('[aria-label="Ticket workspace"]').textContent,/Your ticket is empty/);
@@ -84,5 +86,15 @@ await selectValue([...document.querySelectorAll('select')].find(select=>select.q
 await act(async()=>button('Continue to payment').click());
 assert.equal(document.querySelector('.pos-tabs button[aria-current]').textContent,'Payment');
 assert.equal(globalThis.__posCalls.some(call=>call.name==='createPosOrder'&&!['quote','deliveryQuote'].includes(call.input.action)),false,'UI inspection never creates a sale');
-await act(async()=>root.unmount());dom.window.close();
+await act(async()=>root.unmount());
+globalThis.__posCustomerFailure=true;
+const retryRoot=createRoot(document.getElementById('root'));
+await act(async()=>retryRoot.render(createElement(Component,{onBack(){}})));
+assert.ok(button('Drinks'), 'An auxiliary timeout must not hide loaded products');
+assert.match(document.querySelector('[role="alert"]').textContent,/Customers: Telegram took too long to respond/);
+globalThis.__posCustomerFailure=false;
+await act(async()=>document.querySelector('[aria-label="Refresh POS data"]').click());
+await act(async()=>globalThis.__resolvePosCustomers());
+assert.equal(document.querySelector('[role="alert"]'),null,'Refresh recovers from the failed request');
+await act(async()=>retryRoot.unmount());dom.window.close();
 console.log('PASS: staged POS, empty ticket, preserved adjustments, linked credits, address lookup/courier selection, full-width CSS and normal-flow tabs at 360/390/430 widths.');

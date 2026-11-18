@@ -47,6 +47,7 @@ run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
 run('node', ['scripts/test-checkout-promo-state.mjs'], 'fresh promo result before React render');
 run('node', ['scripts/test-checkout-delivery-quotes.mjs'], 'stable checkout quote and promo totals');
 run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
+run('node', ['scripts/test-pos-startup.mjs'], 'stable authentication startup and lightweight POS customers');
 run('node', ['scripts/test-pos-ui.mjs'], 'rendered POS register controls');
 run('node', ['scripts/test-checkout-idempotency.mjs'], 'checkout and POS collision/retry hardening');
 run('node', ['scripts/test-credit-operations.mjs'], 'points conversion and Store Credit transfer safety');

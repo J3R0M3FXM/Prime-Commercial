@@ -160,6 +160,15 @@ function normalizedCustomer(row, customerOrders) {
 export default async function (input = {}, ctx) {
   await requireAdmin(ctx);
   const action = String(input.action || 'list');
+  if (action === 'posList') {
+    // POS needs customer identity and credit balance, never order or device payloads.
+    return await db.select({
+      id: customers.id, tgUserId: customers.tgUserId, tgName: customers.tgName,
+      tgUsername: customers.tgUsername, phoneNumber: customers.phoneNumber,
+      primeMemberId: customers.primeMemberId, isBanned: customers.isBanned,
+      storeCredits: customers.storeCredits,
+    }).from(customers).orderBy(desc(customers.createdAt)).limit(500).all();
+  }
   if (action === 'normalizeTestIdentifiers') return normalizeTestIdentifiers();
   if (action === 'reverseErroneousOverpaymentCredit') {
     const orderId = String(input.orderId || '').trim();
