@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { adminDestination } from '../lib/admin-destination.ts';
+assert.equal(adminDestination('pos'),'/admin?view=pos');
+assert.equal(adminDestination('admin_order_ABC-123'),'/admin?view=order-detail&order=ABC-123');
+assert.equal(adminDestination('shop'),'/admin');
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { useRouter } from '../lib/browser-router.ts';

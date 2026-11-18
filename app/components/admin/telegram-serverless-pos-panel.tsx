@@ -394,7 +394,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
               <button type="button" className="pos-primary pos-wide" onClick={()=>void checkout()} disabled={saving || !cart.length || !customerName.trim() || !currentBill}>{saving?<Loader2 className="animate-spin"/>:<Check/>}{saving?'Saving sale…':currentBill?`Confirm ${formatPHP(currentBill.payableNow)} received`:'Waiting for bill…'}</button>
               <p className="pos-hint pos-payment-note">Confirm after verifying payment was received.</p>
               <button type="button" className="pos-primary pos-wide" disabled={saving || !currentBill || !customerName.trim()} onClick={()=>void checkout('unpaid')}>Save unpaid invoice</button>
-              <p className="pos-hint">Send the invoice image and configured payment QR, then confirm the transfer after it arrives. Invoice payment is due within 24 hours.</p>
+              <p className="pos-hint">Send the invoice image and configured payment QR, then confirm the transfer after it arrives. Invoice payment is due within one hour.</p>
             </div></section>
           </>}
         </div>

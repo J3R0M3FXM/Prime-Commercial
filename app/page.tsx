@@ -1,5 +1,7 @@
 "use client";
 
+import { adminDestination } from '@/lib/admin-destination';
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProductModal from "./components/product-modal";
@@ -214,10 +216,7 @@ export default function Shopfront() {
             if (typeof window !== 'undefined') {
               const hash = window.location.hash;
               const startParam = String(telegramWebApp?.initDataUnsafe?.start_param || '');
-              const adminOrder = startParam.match(/^admin_order_(.+)$/i)?.[1] || '';
-              const adminTarget = adminOrder
-                ? `/admin?view=order-detail&order=${encodeURIComponent(adminOrder)}`
-                : '/admin';
+              const adminTarget = adminDestination(startParam);
               router.replace(`${adminTarget}${hash ? hash : ''}`);
             }
             return;

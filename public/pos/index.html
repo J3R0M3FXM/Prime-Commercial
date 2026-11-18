@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="referrer" content="no-referrer">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="PRIME POS">
+  <title>PRIME POS</title>
+  <link rel="manifest" href="/pos/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/pos/icon-192.png">
+  <link rel="icon" href="/pos/icon-192.png">
+  <link rel="stylesheet" href="/pos/launcher.css">
+  <script src="/pos/launcher.js" defer></script>
+</head>
+<body>
+  <main>
+    <img class="brand" src="/prime-header-brand-refined.png" alt="PRIME" width="310" height="61">
+    <section>
+      <h1>PRIME POS</h1>
+      <p>Open your register directly in Telegram.</p>
+      <button id="install" hidden type="button">Install PRIME POS</button>
+      <p id="install-help" class="hint">To save the shortcut, open this page in Chrome and choose <strong>Add to Home screen → Install</strong> from the menu. On iPhone, use Safari’s <strong>Share → Add to Home Screen</strong>.</p>
+      <a class="primary" id="open-pos" href="tg://resolve?domain=primenetworkphbot&amp;startapp=pos">Open POS</a>
+      <p id="status" role="status">Telegram staff sign-in is required.</p>
+      <a class="fallback" href="https://t.me/primenetworkphbot?startapp=pos">Open Telegram Link</a>
+    </section>
+  </main>
+</body>
+</html>

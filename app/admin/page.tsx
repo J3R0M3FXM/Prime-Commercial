@@ -32,7 +32,7 @@ const modules: Array<{ id: ModuleId; name: string; icon: any; accent: string; de
 function AdminGate() { return <main className="admin-shell mx-auto flex min-h-screen max-w-[430px] flex-col bg-slate-50 p-3 text-slate-900"><div className="m-auto w-full border border-slate-200 bg-white p-4 text-center"><PrimeIdentityHeader accessLabel="CORE ADMIN ACCESS" /><h1 className="mt-5 font-heading text-xl font-semibold">Open Admin in Telegram</h1><p className="mt-2 text-sm text-slate-600">Verified Telegram staff access is required. Reopen PRIME from Telegram to continue.</p><a className="mt-5 inline-flex min-h-11 w-full items-center justify-center bg-slate-900 px-4 text-sm font-bold text-white" href="https://t.me/primenetworkphbot?startapp=admin">Open PRIME in Telegram</a></div></main>; }
 
 export default function AdminPage() {
-  const [checking, setChecking] = useState(true); const [bootProgress, setBootProgress] = useState(10); const [authorized, setAuthorized] = useState(false); const [screen, setScreen] = useState<Screen>(null); const [logisticsSection, setLogisticsSection] = useState<"warehouse" | "courier">("warehouse");
+  const [checking, setChecking] = useState(true); const [bootProgress, setBootProgress] = useState(10); const [authorized, setAuthorized] = useState(false); const [screen, setScreen] = useState<Screen>(() => new URLSearchParams(window.location.search).get('view')==='pos'?{module:'pos'}:null); const [logisticsSection, setLogisticsSection] = useState<"warehouse" | "courier">("warehouse");
   const [publicOrderQueue, setPublicOrderQueue] = useState<PublicOrderQueue | null>(null);
   const [dashboardOrders, setDashboardOrders] = useState<any[] | null>(null);
   const [lowStockCount, setLowStockCount] = useState<number | null>(null);
