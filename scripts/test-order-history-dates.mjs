@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { orderDeliveryPaymentMethod } from '../tgcloud/lib/order-delivery-payment.js';
 import { DatabaseSync } from 'node:sqlite';
 const sqlite=new DatabaseSync(':memory:');
 sqlite.exec("CREATE TABLE orders(id TEXT,order_number TEXT,tg_user_id TEXT,created_at INTEGER); INSERT INTO orders VALUES ('new','091126191100','123',1794220000),('old','311026235319','123',1793000000),('foreign','FOREIGN','999',1795000000)");
@@ -7,16 +8,17 @@ const eq=(field,value)=>({text:field+'=?',values:[value]});
 const or=(...conditions)=>({text:'('+conditions.map(c=>c.text).join(' OR ')+')',values:conditions.flatMap(c=>c.values)});
 const table=name=>new Proxy({_table:name},{get:(t,k)=>k==='_table'?name:String(k).replace(/[A-Z]/g,c=>'_'+c.toLowerCase())});
 const db={
-  select(){let name,conditions,maximum=100;const chain={from(t){name=t._table;return chain;},where(...items){conditions=items;return chain;},orderBy(){return chain;},limit(n){maximum=n;return chain;},async get(){return null;},async all(){return sqlite.prepare('SELECT * FROM '+name+' WHERE '+conditions.map(c=>c.text).join(' AND ')+' ORDER BY created_at DESC LIMIT ?').all(...conditions.flatMap(c=>c.values),maximum).map(row=>({id:row.id,orderNumber:row.order_number,tgUserId:row.tg_user_id,createdAt:{}}));}};return chain;},
+  select(){let name,conditions,maximum=100;const chain={from(t){name=t._table;return chain;},where(...items){conditions=items;return chain;},orderBy(){return chain;},limit(n){maximum=n;return chain;},async get(){return null;},async all(){return sqlite.prepare('SELECT * FROM '+name+' WHERE '+conditions.map(c=>c.text).join(' AND ')+' ORDER BY created_at DESC LIMIT ?').all(...conditions.flatMap(c=>c.values),maximum).map(row=>({id:row.id,orderNumber:row.order_number,tgUserId:row.tg_user_id,createdAt:{},deliveryAddress:row.id==='new'?{courierPaymentMode:'upon_delivery'}:{courierPaymentMode:'upon_checkout'},payableOnDelivery:row.id==='new'?75:0}));}};return chain;},
   all(sql,params){return sqlite.prepare(sql).all(params);}
 };
 class EndpointError extends Error{constructor(message,options){super(message);this.code=options?.code;}}
 const source=readFileSync('tgcloud/endpoints/getMyOrders.js','utf8').replace(/^import[^\n]*\n/gm,'').replace('export default async function','async function handler');
-const handler=new Function('db','EndpointError','asc','desc','eq','or','customers','orders','findMediaAsset','ensureOrderWorkflow','attachWorkflow','expireReceiptResubmissions',source+'\nreturn handler;')(db,EndpointError,x=>x,x=>x,eq,or,table('customers'),table('orders'),async()=>null,async()=>{},async()=>({}),async()=>({cancelled:0}));
+const handler=new Function('orderDeliveryPaymentMethod','db','EndpointError','asc','desc','eq','or','customers','orders','findMediaAsset','ensureOrderWorkflow','attachWorkflow','expireReceiptResubmissions',source+'\nreturn handler;')(orderDeliveryPaymentMethod,db,EndpointError,x=>x,x=>x,eq,or,table('customers'),table('orders'),async()=>null,async()=>{},async()=>({}),async()=>({cancelled:0}));
 const ctx={initData:{user:{id:123}}};
 await assert.rejects(handler({},{}),{code:'AUTH_REQUIRED'});
 const result=await handler({},ctx);
 assert.deepEqual(result.map(row=>row.id),['new','old']);
+assert.equal(result[0].deliveryFeePaymentMethod,'upon_delivery');assert.equal(result[1].deliveryFeePaymentMethod,'upon_checkout');
 assert.equal(result[0].createdAt,1794220000);assert.equal(result[1].createdAt,1793000000);
 assert.equal((await handler({orderId:'FOREIGN'},ctx)).length,0,'Deep links cannot bypass order ownership');
 for(let index=0;index<101;index++)sqlite.prepare('INSERT INTO orders VALUES(?,?,?,?)').run('recent-'+index,'recent-'+index,'123',1796000000+index);

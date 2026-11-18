@@ -54,6 +54,7 @@ run('node', ['scripts/test-account-staff-view.mjs'], 'staff account view authori
 run('node', ['scripts/test-shopfront-queue.mjs'], 'shopfront queue ownership and ordering');
 run('node', ['scripts/test-shopfront-payment-link.mjs'], 'shopfront secure payment link');
 run('node', ['scripts/test-payment-method-links.mjs'], 'Admin payment link runtime and persistence');
+run('node', ['scripts/test-order-delivery-payment.mjs'], 'saved delivery-payment timing in history');
 run('node', ['scripts/test-order-history-dates.mjs'], 'customer order history dates and ordering');
 run('node', ['scripts/test-order-confirmation.mjs'], 'order confirmation display and payment states');
 run('node', ['scripts/test-device-security.mjs'], 'device recognition ownership, privacy and persistence');

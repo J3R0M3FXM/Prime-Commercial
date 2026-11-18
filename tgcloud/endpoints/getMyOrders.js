@@ -1,3 +1,4 @@
+import { orderDeliveryPaymentMethod } from '../lib/order-delivery-payment.js';
 import { db, EndpointError } from 'sdk';
 import { asc, desc, eq, or } from 'sdk/db';
 import { customers, orders } from '../schema.js';
@@ -51,6 +52,7 @@ export default async function (_input, ctx) {
     payableNow: Number(order.payableNow || 0),
     payableOnDelivery: Number(order.payableOnDelivery || 0),
     deliveryFee: Number(order.deliveryFee || 0),
+    deliveryFeePaymentMethod: orderDeliveryPaymentMethod(order),
     deliveryAddress: order.deliveryAddress,
     customerPhone: order.customerPhone,
     items: order.items,

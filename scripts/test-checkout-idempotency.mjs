@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { orderDeliveryPaymentMethod } from '../tgcloud/lib/order-delivery-payment.js';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { build } from 'rolldown';
@@ -42,7 +43,7 @@ const charges=load('tgcloud/lib/charges.js',['calculateChargesBreakdown','normal
 const credits=load('tgcloud/lib/credits.js',['reserveStoreCredits','finalizeStoreCredits','compensateStoreCredits']);
 const loyalty=load('tgcloud/lib/loyalty.js',['calculateCustomerTier','calculateOrderRewardPoints']);
 const pricing=load('tgcloud/lib/pos-pricing.js',['pricePosSale'],{...canonical,...charges,...loyalty,eq,asc:x=>x,charges:table('charges'),customers:table('customers'),orders:table('orders'),resolveTrustedFingerprint:()=>({})});
-const deps={...credits,...pricing,...operations,releasePromoClaim:async()=>{},...inventory,...canonical,...charges,eq,asc:x=>x,orders:table('orders'),customers:table('customers'),charges:table('charges'),couriers:table('couriers'),requireAdmin:async ctx=>{if(!ctx?.staff)throw new EndpointError('Staff required',{code:'ADMIN_REQUIRED'});return {id:ctx.staff};},notifyAdminOrderCreated:async()=>{},notifyPosOrderCreated:async()=>{}};
+const deps={orderDeliveryPaymentMethod,...credits,...pricing,...operations,releasePromoClaim:async()=>{},...inventory,...canonical,...charges,eq,asc:x=>x,orders:table('orders'),customers:table('customers'),charges:table('charges'),couriers:table('couriers'),requireAdmin:async ctx=>{if(!ctx?.staff)throw new EndpointError('Staff required',{code:'ADMIN_REQUIRED'});return {id:ctx.staff};},notifyAdminOrderCreated:async()=>{},notifyPosOrderCreated:async()=>{}};
 const ratePricing=load('tgcloud/lib/pos-pricing.js',['pricePosSale'],{...canonical,...charges,...loyalty,eq,asc:x=>x,charges:table('charges'),customers:table('customers'),orders:table('orders'),resolveTrustedFingerprint:()=>({}),quoteDelivery:async()=>({fee:40,courier:{id:'courier'}}),validatePromo:async()=>({valid:true,promoId:'voucher',code:'SAVE',discountType:'fixed',discountAmount:10})});
 sqlite.exec("INSERT INTO charges(id,name,type,rate,is_active,description) VALUES('extra','Packing','fixed',5,1,'{\"isDefault\":false}')");
 const priced=await ratePricing.pricePosSale({mode:'delivery',customerId:'customer',items:[{productId:'multi',quantity:2}],chargeIds:['extra','extra'],manualCharges:[{name:'Handling',amount:10,type:'percentage'}],promoCode:'SAVE',discountMode:'percentage',discountValue:10,storeCreditsUsed:20,deliveryPaymentMethod:'upon_delivery'});

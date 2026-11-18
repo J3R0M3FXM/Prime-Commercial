@@ -1,3 +1,4 @@
+import { orderDeliveryPaymentMethod } from '../lib/order-delivery-payment.js';
 import { db, EndpointError } from 'sdk';
 import { asc, desc, eq } from 'sdk/db';
 import { fetch } from 'sdk/fetch';
@@ -576,7 +577,7 @@ async function processOperation(operation, request, customer) {
   if (existingOrder) {
     snapshot = snapshot || {
       items: parseJson(existingOrder.items, []), subtotal: Number(existingOrder.subtotal) || 0,
-      deliveryFee: Number(existingOrder.deliveryFee) || 0, deliveryPaymentMethod: Number(existingOrder.payableOnDelivery) > 0 ? 'upon_delivery' : 'upon_checkout',
+      deliveryFee: Number(existingOrder.deliveryFee) || 0, deliveryPaymentMethod: orderDeliveryPaymentMethod(existingOrder),
       chargesBreakdown: parseJson(existingOrder.chargesBreakdown, []),
       promo: existingOrder.appliedPromoCode ? { code: existingOrder.appliedPromoCode, discount: Number(existingOrder.discountAmount) || 0,
         shippingSubsidy: Number(existingOrder.promoShippingSubsidy) || 0, cashbackPoints: Number(existingOrder.cashbackPointsAmount) || 0 } : null,

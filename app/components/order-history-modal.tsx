@@ -30,6 +30,7 @@ import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import TelegramMediaImage from "./telegram-media-image";
 import SecuredPaymentLink from "./secured-payment-link";
 import PrimePageHeading from "./prime-page-heading";
+import { orderDeliveryPaymentMethod } from "@/tgcloud/lib/order-delivery-payment.js";
 import CustomerOrderActions from "./customer-order-actions";
 
 interface OrderHistoryModalProps {
@@ -58,7 +59,7 @@ function normalizeOrder(raw: any) {
     trackingNumber: raw.trackingNumber || raw.tracking_number || "",
     trackingUrl: raw.trackingUrl || raw.tracking_url || "",
     deliveryFee: raw.deliveryFee ?? raw.delivery_fee ?? 0,
-    deliveryFeePaymentMethod: raw.deliveryFeePaymentMethod || raw.delivery_fee_payment_method || "",
+    deliveryFeePaymentMethod: orderDeliveryPaymentMethod(raw),
     discountAmount: Number(raw.discountAmount ?? raw.discount_amount ?? raw.promoDiscount ?? raw.promo_discount ?? 0) || 0,
     promoDiscount: Number(raw.promoDiscount ?? raw.promo_discount ?? raw.discountAmount ?? raw.discount_amount ?? 0) || 0,
     pointsDiscount: Number(raw.pointsDiscount ?? raw.points_discount ?? 0) || 0,
@@ -1037,14 +1038,14 @@ export default function OrderHistoryModal({
                     <div>
                       <span className="order-detail-label">Delivery Fee ({selectedOrder.courier?.name || selectedOrder.courierName || "Courier"}):</span>
                       {selectedOrder.deliveryFeePaymentMethod === "upon_delivery" ? (
-                        <span className="order-detail-label block text-[10px] text-amber-700 font-bold uppercase tracking-wider">
-                          PAY UPON DELIVERY (COD)
+                        <span className="order-detail-label block text-[10px] text-slate-600">
+                          Pay Upon Delivery (PUD)
                         </span>
-                      ) : (
-                        <span className="order-detail-label block text-[10px] text-emerald-700 font-bold uppercase tracking-wider">
-                          PAY UPON CHECKOUT
+                      ) : selectedOrder.deliveryFeePaymentMethod === "upon_checkout" ? (
+                        <span className="order-detail-label block text-[10px] text-slate-600">
+                          Pay Upon Checkout
                         </span>
-                      )}
+                      ) : <span className="order-detail-label block text-[10px] text-slate-500">Payment Timing Not Recorded</span>}
                     </div>
                     {Boolean(selectedOrder.isDeliveryFeeFree || Number(selectedOrder.deliveryFee) === 0) ? (
                       <span className="order-detail-value order-history__charge-amount text-emerald-600">WAIVED / FREE</span>
