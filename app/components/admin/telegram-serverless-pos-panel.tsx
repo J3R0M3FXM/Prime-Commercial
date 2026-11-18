@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronRight, Loader2, Minus, Plus, RefreshCw, Search, ShoppingCart, Store, Truck, X } from "lucide-react";
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { isChargeApplicable } from "@/lib/charges";
+import PosInvoiceDialog from "./pos-invoice-dialog";
 import { formatPHP } from "@/lib/currency";
 import { beginPosCheckoutAttempt, readPosCheckoutAttempt, finishPosCheckoutAttempt, type PosCheckoutAttempt } from '@/lib/pos-checkout-attempt';
 
@@ -45,6 +46,9 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   const [courierId, setCourierId] = useState("");
   const [deliveryFee, setDeliveryFee] = useState("0");
   const [paymentMethodName, setPaymentMethodName] = useState("Cash");
+  const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [unpaidInvoices,setUnpaidInvoices]=useState<Array<{orderNumber:string;customerName:string;amountDue:number;paymentMethodId:string;deadline:number}>>([]);
+  const [invoiceOrder, setInvoiceOrder] = useState<{orderNumber:string;paymentMethodId:string}|null>(null);
   const [quoteResult, setQuoteResult] = useState<{ key: string; total: number }>({ key: "", total: 0 });
   const [destination, setDestination] = useState<{lat:number;lon:number}|null>(null);
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -63,7 +67,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   const [cashReceived, setCashReceived] = useState('');
   const [workspaceTab, setWorkspaceTab] = useState<'catalog'|'sale'|'payment'>('catalog');
   const [retryKey, setRetryKey] = useState("");
-  const [lastSale, setLastSale] = useState<{ orderNumber: string; totalAmount: number; mode: string } | null>(null);
+  const [lastSale, setLastSale] = useState<{ orderNumber: string; totalAmount: number; mode: string; paymentMethodId: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -83,6 +87,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
         request('Couriers', 'manageCouriers', { action: 'list' }, rows => setCouriers(rows.filter(row => row.isActive !== false))),
         request('Payment methods', 'managePaymentMethods', { action: 'list' }, rows => setTenders(rows.filter(row => row.isActive !== false))),
         request('Charges', 'getPublicCharges', {}, setChargeOptions),
+        request('Unpaid invoices', 'sendPosInvoice', {action:'list'}, setUnpaidInvoices),
       ]);
       const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
       if (failures.length) throw new Error(failures.map(result => result.reason.message).join(' '));
@@ -176,7 +181,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
     }));
   };
 
-  const checkout = async () => {
+  const checkout = async (paymentState: 'paid'|'unpaid' = 'paid') => {
     if(submissionBusy.current)return;
     let attempt:PosCheckoutAttempt|null;
     try {attempt=readPosCheckoutAttempt(staffId);}catch(err:any){setError(err?.message||'Could not restore the pending sale.');return;}
@@ -190,8 +195,9 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
       setError("Enter the delivery address, choose a courier, and check the delivery fee."); return;
     }
     if(quoteResult.key!==quoteKey){setError('Wait for the current bill.');return;}
-    if(paymentMethodName==='Cash' && bill?.payableNow > 0 && (!Number.isFinite(Number(cashReceived)) || Number(cashReceived)<bill.payableNow)){setError('Enter enough cash received to cover the amount due now.');return;}
-    if (!window.confirm(`Confirm ${formatPHP(bill?.payableNow ?? total)} received by ${paymentMethodName} and save this ${mode === "store" ? "store sale" : "delivery order"}?`)) return;
+    if(paymentState==='unpaid' && !(customerType==='existing'?customers.find(customer=>customer.id===selectedCustomerId)?.tgUserId:telegramId.trim())){setError('Enter the customer Telegram ID on Ticket before creating an invoice.');goTo('sale');return;}
+    if(paymentState==='paid' && paymentMethodName==='Cash' && bill?.payableNow > 0 && (!Number.isFinite(Number(cashReceived)) || Number(cashReceived)<bill.payableNow)){setError('Enter enough cash received to cover the amount due now.');return;}
+    if (!window.confirm(paymentState==='unpaid'?`Save an unpaid invoice for ${formatPHP(bill?.payableNow ?? total)} by ${paymentMethodName}? Payment will remain unconfirmed.`:`Confirm ${formatPHP(bill?.payableNow ?? total)} received by ${paymentMethodName} and save this ${mode === "store" ? "store sale" : "delivery order"}?`)) return;
     if(quoteResult.key!==quoteKey||!Number.isFinite(total)){setError('Wait for the current sale total before confirming.');return;}
     }
     submissionBusy.current=true;
@@ -202,7 +208,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
         ...quoteRequest, action: undefined, mode, customerName: customerName.trim(), customerPhone: customerPhone.trim(), expectedTotal:total, expectedPayableNow:bill?.payableNow,
         customerId: customerType === "existing" ? selectedCustomerId : "",
         telegramId: customerType==='guest'?telegramId.trim():'',
-        paymentMethodName, deliveryAddress: deliveryAddress.trim(), courierId,
+        paymentMethodName, paymentMethodId, paymentState, deliveryAddress: deliveryAddress.trim(), courierId,
         deliveryFee: 0,
         items: cart.map((line) => ({ productId: line.productId, variantId: line.variantId, quantity: line.quantity })),
       });
@@ -210,7 +216,8 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
       const result = await callServerless<{ success?: boolean; orderNumber?: string; totalAmount?: number }>('createPosOrder',{...attempt.payload,operationKey:attempt.operationKey},60_000);
       if (!result?.success || !result.orderNumber) throw new Error("The POS did not receive a saved order confirmation.");
       finishPosCheckoutAttempt(staffId,attempt.operationKey);setPendingSale(null);
-      setLastSale({ orderNumber: result.orderNumber, totalAmount: Number(result.totalAmount) || 0, mode:attempt.payload.mode });
+      if(attempt.payload.paymentState==='unpaid')setInvoiceOrder({orderNumber:result.orderNumber,paymentMethodId:attempt.payload.paymentMethodId || ''});
+      else setLastSale({ orderNumber: result.orderNumber, totalAmount: Number(result.totalAmount) || 0, mode:attempt.payload.mode, paymentMethodId:attempt.payload.paymentMethodId || '' });
       setNotice(`Order ${result.orderNumber} saved in the shared Orders list.`);
       setRetryKey("");
       setCart([]); setCustomerName(""); setCustomerPhone(""); setTelegramId(""); setSelectedCustomerId(""); setCustomerType("guest"); setDeliveryAddress(""); setDeliveryFee("0");
@@ -226,6 +233,16 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
     finally { submissionBusy.current=false;setSaving(false); }
   };
 
+  const confirmInvoicePayment = async (invoice: {orderNumber:string;amountDue:number}) => {
+    if (saving || !window.confirm(`Have you verified receipt of ${formatPHP(invoice.amountDue)} for invoice ${invoice.orderNumber}?`)) return;
+    setSaving(true);setError('');
+    try {
+      await callServerless('sendPosInvoice',{action:'confirmPayment',orderNumber:invoice.orderNumber,confirmedAmount:invoice.amountDue,paymentVerified:true},30000);
+      setNotice(`Payment confirmed for ${invoice.orderNumber}. The order is ready for Processing in Orders.`);
+      await load();
+    }catch(err:any){setError(err?.message || 'Payment confirmation failed. Refresh and check Orders.');}
+    finally{setSaving(false);}
+  };
   const panelRef = useRef<HTMLElement | null>(null);
   const goTo = (tab: 'catalog' | 'sale' | 'payment') => {
     setWorkspaceTab(tab);
@@ -260,7 +277,8 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
     {(error || notice) && <div role={error ? 'alert' : 'status'} className={`pos-message ${error ? 'pos-message--error' : ''}`}>{error || notice}</div>}
     {checkingAuth && <div className="pos-empty"><Loader2 className="animate-spin"/><p>Opening register…</p></div>}
     {authorized && <>
-      {pendingSale && <section className="pos-message" aria-label="Pending sale"><p>This sale is awaiting confirmation. Retry before collecting another payment.</p><button type="button" className="pos-primary" disabled={saving} onClick={() => void checkout()}>Retry Pending Sale</button></section>}
+      {unpaidInvoices.length>0 && <section className="pos-card" aria-label="Unpaid POS invoices"><div className="pos-card-heading"><h2>Unpaid invoices</h2><small>{unpaidInvoices.length}</small></div><div className="pos-card-body">{unpaidInvoices.map(invoice=><div className="pos-unpaid-invoice" key={invoice.orderNumber}><strong>{invoice.customerName}</strong><small className="font-mono">{invoice.orderNumber} · {formatPHP(invoice.amountDue)}</small><div className="pos-invoice-actions"><button type="button" className="pos-text-action" disabled={saving} onClick={()=>setInvoiceOrder({orderNumber:invoice.orderNumber,paymentMethodId:invoice.paymentMethodId || ''})}>Invoice image</button><button type="button" className="pos-text-action" disabled={saving || invoice.deadline*1000<=Date.now()} onClick={()=>void confirmInvoicePayment(invoice)}>Confirm payment received</button></div>{invoice.deadline*1000<=Date.now()&&<small>Expired — cancel in Orders before creating a new invoice.</small>}</div>)}</div></section>}
+      {pendingSale && <section className="pos-message" aria-label="Pending sale"><p>The saved response is pending. Retry this attempt before starting another sale.</p><button type="button" className="pos-primary" disabled={saving} onClick={() => void checkout()}>Retry Pending Sale</button></section>}
       <fieldset disabled={saving || Boolean(pendingSale)} className="pos-workspace">
         <nav className="pos-tabs" aria-label="POS workspace">
           <button type="button" aria-current={workspaceTab === 'catalog' ? 'step' : undefined} onClick={() => goTo('catalog')}>Catalog</button>
@@ -312,7 +330,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
                 </div>
                 {customerType === 'existing' && <label className="pos-field">Customer Account<select value={selectedCustomerId} onChange={event => {const customer=customers.find(row=>row.id===event.target.value);setSelectedCustomerId(event.target.value);setCustomerName(customer?.tgName || customer?.tgUsername || '');setCustomerPhone(customer?.phoneNumber || '');}}><option value="">Choose a customer</option>{customers.map(customer => <option key={customer.id} value={customer.id} disabled={customer.isBanned}>{customer.tgName || customer.tgUsername || 'Telegram customer'} · {customer.primeMemberId || customer.tgUserId || customer.id}{customer.isBanned ? ' · Restricted' : ''}</option>)}</select></label>}
                 <div className="pos-contact-fields"><label className="pos-field">Customer Name<input value={customerName} onChange={event=>setCustomerName(event.target.value)} maxLength={120} placeholder="Name for the order" autoComplete="name"/></label><label className="pos-field">Phone <small>Optional</small><input value={customerPhone} onChange={event=>setCustomerPhone(event.target.value)} maxLength={40} inputMode="tel" autoComplete="tel" placeholder="Contact number"/></label></div>
-                {customerType === 'guest' ? <details className="pos-inline-details"><summary>Telegram order updates <span>Optional</span></summary><label className="pos-field">Telegram user ID<input value={telegramId} onChange={event=>setTelegramId(event.target.value.replace(/[^0-9]/g,'').slice(0,20))} inputMode="numeric" maxLength={20} placeholder="Numeric Telegram ID"/><small>The customer must have opened the bot.</small></label></details> : account && !account.tgUserId && <p className="pos-hint">This account has no Telegram ID for order updates.</p>}
+                {customerType === 'guest' ? <details className="pos-inline-details"><summary>Telegram order updates <span>Optional</span></summary><label className="pos-field">Telegram user ID<input value={telegramId} onChange={event=>setTelegramId(event.target.value.replace(/[^0-9]/g,'').slice(0,20))} inputMode="numeric" maxLength={20} placeholder="Numeric Telegram ID"/><small>Use the customer’s Telegram ID from their existing account or chat. Direct bot delivery requires a started bot chat.</small></label></details> : account && !account.tgUserId && <p className="pos-hint">This account has no Telegram ID for order updates.</p>}
               </div>
             </section>
 
@@ -370,16 +388,19 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
             </div>
 
             <section className="pos-card" aria-label="Payment collection"><div className="pos-card-heading"><h2>Collect Payment</h2></div><div className="pos-card-body">
-              <div className="pos-field-grid pos-field-grid--three"><label className="pos-field">Payment Method<select value={paymentMethodName} onChange={event=>setPaymentMethodName(event.target.value)}><option value="Cash">Cash</option>{tenders.filter(tender=>tender.name!=='Cash').map(tender=><option key={tender.id} value={tender.name}>{tender.name}</option>)}</select></label>
+              <div className="pos-field-grid pos-field-grid--three"><label className="pos-field">Payment Method<select value={paymentMethodId} onChange={event=>{setPaymentMethodId(event.target.value);setPaymentMethodName(tenders.find(tender=>tender.id===event.target.value)?.name || "Cash");}}><option value="">Cash</option>{tenders.filter(tender=>tender.name!=='Cash').map(tender=><option key={tender.id} value={tender.id}>{tender.name}</option>)}</select></label>
               {paymentMethodName==='Cash' && <><label className="pos-field">Cash Received<input type="number" min="0" step="0.01" inputMode="decimal" value={cashReceived} onChange={event=>setCashReceived(event.target.value)} placeholder="0.00"/></label><div className="pos-payment-change"><span>{currentBill && Number(cashReceived)>0 && Number(cashReceived)<currentBill.payableNow?'Still to Collect':'Change'}</span><strong>{currentBill ? formatPHP(Number(cashReceived)>0 && Number(cashReceived)<currentBill.payableNow?currentBill.payableNow-Number(cashReceived):Math.max(0,Number(cashReceived)-currentBill.payableNow)) : '—'}</strong></div></>}
               </div>
               <button type="button" className="pos-primary pos-wide" onClick={()=>void checkout()} disabled={saving || !cart.length || !customerName.trim() || !currentBill}>{saving?<Loader2 className="animate-spin"/>:<Check/>}{saving?'Saving sale…':currentBill?`Confirm ${formatPHP(currentBill.payableNow)} received`:'Waiting for bill…'}</button>
               <p className="pos-hint pos-payment-note">Confirm after verifying payment was received.</p>
+              <button type="button" className="pos-primary pos-wide" disabled={saving || !currentBill || !customerName.trim()} onClick={()=>void checkout('unpaid')}>Save unpaid invoice</button>
+              <p className="pos-hint">Send the invoice image and configured payment QR, then confirm the transfer after it arrives. Invoice payment is due within 24 hours.</p>
             </div></section>
           </>}
         </div>
       </fieldset>
     </>}
-    {lastSale && <div className="pos-dialog-backdrop"><section className="pos-dialog" role="dialog" aria-modal="true" aria-label="Sale saved"><button type="button" onClick={()=>setLastSale(null)} className="pos-icon pos-dialog-close" aria-label="Close"><X/></button><Check className="pos-saving"/><h2>Sale saved</h2><p>Order {lastSale.orderNumber}</p><strong className="pos-saved-total">{formatPHP(lastSale.totalAmount)}</strong><p className="pos-hint">View this {lastSale.mode==='store'?'store sale':'delivery order'} in Orders.</p><button type="button" onClick={()=>setLastSale(null)} className="pos-primary pos-wide">New sale</button></section></div>}
+    {lastSale && <div className="pos-dialog-backdrop"><section className="pos-dialog" role="dialog" aria-modal="true" aria-label="Sale saved"><button type="button" onClick={()=>setLastSale(null)} className="pos-icon pos-dialog-close" aria-label="Close"><X/></button><Check className="pos-saving"/><h2>Sale saved</h2><p>Order {lastSale.orderNumber}</p><strong className="pos-saved-total">{formatPHP(lastSale.totalAmount)}</strong><p className="pos-hint">View this {lastSale.mode==='store'?'store sale':'delivery order'} in Orders.</p><button type="button" onClick={()=>{setInvoiceOrder({orderNumber:lastSale.orderNumber,paymentMethodId:lastSale.paymentMethodId});setLastSale(null);}} className="pos-primary pos-wide">Customer invoice</button><button type="button" onClick={()=>setLastSale(null)} className="pos-text-action">New sale</button></section></div>}
+    {invoiceOrder && <PosInvoiceDialog {...invoiceOrder} onClose={()=>setInvoiceOrder(null)}/> }
   </main>;
 }

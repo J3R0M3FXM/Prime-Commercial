@@ -6,7 +6,7 @@ import { build } from 'rolldown';
 
 const sqlite=new DatabaseSync(':memory:');
 const schema=readFileSync('tgcloud/schema.js','utf8');
-for(const name of ['orders','customers','products','charges','couriers','inventoryReservations','pointTransactions','promos','promoRedemptions']) {
+for(const name of ['orders','customers','products','charges','couriers','inventoryReservations','pointTransactions','promos','promoRedemptions','paymentMethods']) {
   const start=schema.indexOf('export const '+name+' =');
   const end=schema.indexOf('\nexport const ',start+1);
   const segment=schema.slice(start,end<0?undefined:end);
@@ -43,7 +43,8 @@ const charges=load('tgcloud/lib/charges.js',['calculateChargesBreakdown','normal
 const credits=load('tgcloud/lib/credits.js',['reserveStoreCredits','finalizeStoreCredits','compensateStoreCredits']);
 const loyalty=load('tgcloud/lib/loyalty.js',['calculateCustomerTier','calculateOrderRewardPoints']);
 const pricing=load('tgcloud/lib/pos-pricing.js',['pricePosSale'],{...canonical,...charges,...loyalty,eq,asc:x=>x,charges:table('charges'),customers:table('customers'),orders:table('orders'),resolveTrustedFingerprint:()=>({})});
-const deps={orderDeliveryPaymentMethod,...credits,...pricing,...operations,releasePromoClaim:async()=>{},...inventory,...canonical,...charges,eq,asc:x=>x,orders:table('orders'),customers:table('customers'),charges:table('charges'),couriers:table('couriers'),requireAdmin:async ctx=>{if(!ctx?.staff)throw new EndpointError('Staff required',{code:'ADMIN_REQUIRED'});return {id:ctx.staff};},notifyAdminOrderCreated:async()=>{},notifyPosOrderCreated:async()=>{}};
+const invoiceRefunds=load('tgcloud/lib/pos-invoice-refunds.js',['ensurePosInvoiceRefunds']);
+const deps={...invoiceRefunds,orderDeliveryPaymentMethod,...credits,...pricing,...operations,releasePromoClaim:async()=>{},...inventory,...canonical,...charges,eq,asc:x=>x,orders:table('orders'),customers:table('customers'),charges:table('charges'),couriers:table('couriers'),requireAdmin:async ctx=>{if(!ctx?.staff)throw new EndpointError('Staff required',{code:'ADMIN_REQUIRED'});return {id:ctx.staff};},notifyAdminOrderCreated:async()=>{},notifyPosOrderCreated:async()=>{}};
 const ratePricing=load('tgcloud/lib/pos-pricing.js',['pricePosSale'],{...canonical,...charges,...loyalty,eq,asc:x=>x,charges:table('charges'),customers:table('customers'),orders:table('orders'),resolveTrustedFingerprint:()=>({}),quoteDelivery:async()=>({fee:40,courier:{id:'courier'}}),validatePromo:async()=>({valid:true,promoId:'voucher',code:'SAVE',discountType:'fixed',discountAmount:10})});
 sqlite.exec("INSERT INTO charges(id,name,type,rate,is_active,description) VALUES('extra','Packing','fixed',5,1,'{\"isDefault\":false}')");
 const priced=await ratePricing.pricePosSale({mode:'delivery',customerId:'customer',items:[{productId:'multi',quantity:2}],chargeIds:['extra','extra'],manualCharges:[{name:'Handling',amount:10,type:'percentage'}],promoCode:'SAVE',discountMode:'percentage',discountValue:10,storeCreditsUsed:20,deliveryPaymentMethod:'upon_delivery'});
@@ -133,6 +134,25 @@ assert.equal(sqlite.prepare("SELECT count(*) n FROM promo_claims WHERE status='r
 assert.equal(sqlite.prepare('SELECT discount_amount n FROM orders WHERE id=?').get(voucherSale.id).n,10);
 await assert.rejects(voucherPos({...voucherRequest,operationKey:'w'.repeat(32)},{staff:999}),{code:'POS_CHECKOUT_FAILED'});
 assert.equal(sqlite.prepare("SELECT count(*) n FROM promo_claims WHERE status='redeemed'").get().n,1,'Per-customer and total voucher limits are enforced');
+
+// Unpaid chat invoices reserve the same canonical sale without recording money received.
+sqlite.exec("UPDATE products SET stock=100 WHERE id='multi'; INSERT INTO payment_methods(id,name,is_active,qr_code_image,account_name,account_number) VALUES('gcash','GCash',1,'configured-qr','PRIME','09111111111')");
+const invoiceRequest={mode:'store',customerName:'Invoice Customer',customerId:'customer',paymentMethodId:'gcash',paymentMethodName:'GCash',paymentState:'unpaid',storeCreditsUsed:10,items:[{productId:'multi',quantity:1}],expectedTotal:40,operationKey:'invoice'.repeat(5)};
+const beforeInvoice=sqlite.prepare("SELECT store_credits n,received_transfer_balance r FROM customers WHERE id='customer'").get();
+const invoiceSale=await pos(invoiceRequest,{staff:999});
+const unpaid=sqlite.prepare('SELECT * FROM orders WHERE id=?').get(invoiceSale.id);
+assert.equal(unpaid.status,'Pending');assert.equal(unpaid.payment_status,'Unpaid');
+assert.equal(unpaid.payment_received_amount,0);assert.equal(unpaid.confirmed_paid_amount,0);
+assert.equal(unpaid.payment_method_id,'gcash');assert.ok(unpaid.payment_deadline_at>Math.floor(Date.now()/1000));
+assert.equal(sqlite.prepare("SELECT store_credits n FROM customers WHERE id='customer'").get().n,beforeInvoice.n-10);
+assert.deepEqual(await pos(invoiceRequest,{staff:999}),invoiceSale,'Invoice retries return the same saved order');
+await assert.rejects(pos({...invoiceRequest,paymentState:'paid'},{staff:999}),{code:'IDEMPOTENCY_CONFLICT'});
+sqlite.prepare("UPDATE orders SET status='Cancelled' WHERE id=?").run(invoiceSale.id);
+assert.equal(sqlite.prepare("SELECT store_credits n FROM customers WHERE id='customer'").get().n,beforeInvoice.n,'Unpaid cancellation restores only Store Credits');
+assert.equal(sqlite.prepare("SELECT received_transfer_balance r FROM customers WHERE id='customer'").get().r,beforeInvoice.r,'Restricted credits retain their restriction on cancellation');
+sqlite.prepare("UPDATE orders SET status='Cancelled' WHERE id=?").run(invoiceSale.id);
+assert.equal(sqlite.prepare("SELECT store_credits n FROM customers WHERE id='customer'").get().n,beforeInvoice.n,'Cancellation retries never refund twice');
+console.log('PASS: unpaid POS invoice status, canonical retry, configured tender, exact Store Credit return and cancellation idempotency.');
 sqlite.close();
 
 const bundled=await build({input:'lib/pos-checkout-attempt.ts',write:false,platform:'node',output:{format:'esm'}});

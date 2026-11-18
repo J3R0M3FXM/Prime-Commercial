@@ -1,6 +1,7 @@
 import { db, EndpointError } from 'sdk';
 import { eq } from 'sdk/db';
 import { orders, couriers, customers } from '../schema.js';
+import { ensurePosInvoiceRefunds } from '../lib/pos-invoice-refunds.js';
 import { requireAdmin } from '../lib/auth.js';
 import { quoteDelivery } from '../lib/delivery.js';
 import { pricePosSale } from '../lib/pos-pricing.js';
@@ -39,10 +40,12 @@ export default async function handler(input = {}, ctx) {
     const quote = await pricePosSale(input);
     return { ...quote, totalAmount: quote.total };
   }
+  const paymentState = String(input.paymentState || 'paid');
+  if (!['paid','unpaid'].includes(paymentState)) throw new EndpointError('Choose paid sale or unpaid invoice.', {code:'INVALID_PAYMENT_STATE'});
   const key = String(input.operationKey || '').trim();
   if (!/^[A-Za-z0-9_-]{16,128}$/.test(key)) throw new EndpointError('Refresh the POS and retry with a new checkout key.', { code: 'INVALID_OPERATION_KEY' });
   const request = {
-    mode, customerName:text(input.customerName,120), customerPhone:text(input.customerPhone,40),
+    mode, paymentState, paymentMethodId:text(input.paymentMethodId,120), customerName:text(input.customerName,120), customerPhone:text(input.customerPhone,40),
     paymentMethodName:text(input.paymentMethodName,100), customerId:text(input.customerId,120),
     telegramId:text(input.telegramId,20), deliveryAddress:mode==='delivery'?text(input.deliveryAddress,500):'',
     deliveryFee:mode==='delivery'?Number(input.deliveryFee):0, courierId:mode==='delivery'?text(input.courierId,120):'',
@@ -54,7 +57,7 @@ export default async function handler(input = {}, ctx) {
   };
   const prior = await findCheckoutOperation({customerId:'pos-'+String(admin.id),requestKey:key});
   if(prior.ok) {
-    if(input.action!=='resume' && prior.requestSnapshot?.expectedTotal !== undefined && canonicalRequest({destination:null,deliveryPaymentMethod:'upon_checkout',chargeIds:[],manualCharges:[],promoCode:'',discountMode:'none',discountValue:0,storeCreditsUsed:0,expectedPayableNow:null,...prior.requestSnapshot})!==canonicalRequest(request))
+    if(input.action!=='resume' && prior.requestSnapshot?.expectedTotal !== undefined && canonicalRequest({paymentState:'paid',paymentMethodId:'',destination:null,deliveryPaymentMethod:'upon_checkout',chargeIds:[],manualCharges:[],promoCode:'',discountMode:'none',discountValue:0,storeCreditsUsed:0,expectedPayableNow:null,...prior.requestSnapshot})!==canonicalRequest(request))
       throw new EndpointError('Retry the original sale before changing its details.',{code:'IDEMPOTENCY_CONFLICT'});
     const saved = await db.select().from(orders).where(eq(orders.id,prior.operationId)).get();
     if(saved) {
@@ -82,7 +85,12 @@ export default async function handler(input = {}, ctx) {
   try {
   const customerName = text(input.customerName, 120);
   const customerPhone = text(input.customerPhone, 40);
-  const paymentMethodName = text(input.paymentMethodName, 100);
+  let paymentMethodName = text(input.paymentMethodName, 100);
+  if (request.paymentMethodId) {
+    const method = await db.get('SELECT name,is_active FROM payment_methods WHERE id=:id',{':id':request.paymentMethodId});
+    if (!method || !method.is_active) throw new EndpointError('Choose an active payment method.',{code:'PAYMENT_METHOD_UNAVAILABLE'});
+    paymentMethodName=method.name;
+  }
   if (!customerName || !paymentMethodName) throw new EndpointError('Customer name and payment method are required.', { code: 'INVALID_INPUT' });
 
   const selectedCustomerId = text(input.customerId, 120);
@@ -117,6 +125,11 @@ export default async function handler(input = {}, ctx) {
     throw new EndpointError('The sale total changed. Review the updated quote before confirming payment.',{code:'POS_TOTAL_CHANGED'});
   if (operation.status === 'complete' && operation.responseSnapshot) return operation.responseSnapshot;
 
+  if (paymentState === 'unpaid') {
+    if (!recipientTelegramId) throw new EndpointError('Enter the customer Telegram ID to send an invoice.',{code:'TELEGRAM_ID_REQUIRED'});
+    if (pricing.payableNow <= 0) throw new EndpointError('Nothing is due now. Use Confirm received to save this sale.',{code:'NOTHING_DUE'});
+    await ensurePosInvoiceRefunds();
+  }
   const existingOrder = await db.select().from(orders).where(eq(orders.id, operationId)).get();
   if (existingOrder) {
     await settleSale(existingOrder, operationId);
@@ -168,13 +181,13 @@ export default async function handler(input = {}, ctx) {
       store_credits_used: pricing.creditsUsed, received_transfer_used: receivedTransferUsed,
       purchasing_points_amount: pricing.rewardPointsAmount || 0,
       charges_breakdown: JSON.stringify(chargeResult.computedCharges), total_amount: total,
-      payable_now: pricing.payableNow, payable_on_delivery: pricing.payableOnDelivery, status: 'Processing', payment_status: 'Paid',
-      confirmed_paid_amount: pricing.payableNow, payment_received_amount: pricing.payableNow,
-      payment_method_id: '', payment_method_name: paymentMethodName,
-      review_status: 'Approved - POS payment received', requires_manual_review: 0,
+      payable_now: pricing.payableNow, payable_on_delivery: pricing.payableOnDelivery, status: paymentState==='unpaid'?'Pending':'Processing', payment_status: paymentState==='unpaid'?'Unpaid':'Paid',
+      confirmed_paid_amount: paymentState==='unpaid'?0:pricing.payableNow, payment_received_amount: paymentState==='unpaid'?0:pricing.payableNow,
+      payment_method_id: request.paymentMethodId, payment_method_name: paymentMethodName,
+      review_status: paymentState==='unpaid'?'POS invoice — Awaiting payment':'Approved - POS payment received', requires_manual_review: paymentState==='unpaid'?1:0,
       delivery_address: JSON.stringify(mode === 'delivery' ? { formatted: addressText, ...request.destination, courierPaymentMode: pricing.deliveryPaymentMethod, distanceKm: pricing.delivery?.distanceKm, estimatedTravelMinutes: pricing.delivery?.routeTimeMinutes } : { formatted: 'Store pickup' }),
       courier_id: courier?.id || '', courier_name: courier?.name || '', notes: `POS · ${mode === 'store' ? 'Store pickup' : 'Delivery'}`,
-      fingerprint_snapshot: JSON.stringify(pricing.fingerprint || {}), payment_deadline_at: null, created_at: now, updated_at: now,
+      fingerprint_snapshot: JSON.stringify(pricing.fingerprint || {}), payment_deadline_at: paymentState==='unpaid'?now+86400:null, created_at: now, updated_at: now,
     };
     for (let attempt = 0; attempt < 120; attempt++) {
       row.order_number = number;
@@ -215,10 +228,10 @@ export default async function handler(input = {}, ctx) {
     await finishCheckoutOperation({ operationId, responseSnapshot: response });
     await Promise.allSettled([
       notifyPosOrderCreated({ chatId: recipientTelegramId, orderNumber: response.orderNumber,
-        status: 'Processing', paymentMethodName, totalAmount: pricing.payableNow,
+        status: paymentState==='unpaid'?'Pending':'Processing', paymentMethodName, totalAmount: pricing.payableNow,
         customerName, items: cart.items }),
       notifyAdminOrderCreated({ orderNumber: response.orderNumber, totalAmount: response.totalAmount,
-        customerName, paymentStatus: 'Paid', source: 'pos' }),
+        customerName, paymentStatus: paymentState==='unpaid'?'Unpaid':'Paid', source: 'pos' }),
     ]);
     return response;
   } catch (error) {

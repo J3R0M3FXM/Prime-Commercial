@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
+import {build} from 'rolldown';
+import {JSDOM} from 'jsdom';
+const require=createRequire(import.meta.url),dom=new JSDOM('<div id="root"></div>',{url:'https://local.example/'});
+for(const key of ['window','document','navigator','HTMLElement','Event','MouseEvent','localStorage'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.__invoiceCalls=[];globalThis.__unpaid=[];globalThis.__invoiceRenders=[];
+window.confirm=()=>true;
+const bundled=await build({input:'app/components/admin/telegram-serverless-pos-panel.tsx',write:false,platform:'node',tsconfig:false,resolve:{alias:{'@':process.cwd()}},transform:{jsx:{runtime:'automatic'}},plugins:[{name:'invoice-ui',resolveId(id){if(id==='lucide-react'||id==='react'||id.startsWith('react/'))return {id:pathToFileURL(require.resolve(id)).href,external:true};if(id.endsWith('/lib/telegram-serverless-client'))return '\0client';if(id.endsWith('/lib/pos-invoice-image'))return '\0image';},load(id){
+if(id==='\0image')return `export async function createPosInvoiceImage(invoice,qr){globalThis.__invoiceRenders.push({invoice,qr});return new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:'image/png'});}`;
+if(id==='\0client')return `export async function getTelegramServerlessSession(){return {authenticated:true,isAdmin:true,tgUserId:'999'};}export async function resolveTelegramMedia(value){return 'resolved:'+value;}export async function callServerless(name,input){globalThis.__invoiceCalls.push({name,input});if(name==='getCatalog')return [{id:'p',name:'Coffee',category:'Drinks',price:100,stock:5}];if(name==='manageCustomers')return [{id:'c',tgUserId:'111',tgName:'Customer'}];if(name==='managePaymentMethods')return [{id:'gcash',name:'GCash',isActive:true}];if(name==='createPosOrder'&&input.action==='quote')return {totalAmount:100,payableNow:100,payableOnDelivery:0,cart:{subtotal:100,items:[]},chargeResult:{computedCharges:[],totalChargesAmount:0},creditsUsed:0};if(name==='createPosOrder'){if(input.paymentState==='unpaid')globalThis.__unpaid=[{orderNumber:'181126130001',customerName:'Customer',amountDue:100,paymentMethodId:'gcash',deadline:Math.floor(Date.now()/1000)+86400}];return {success:true,orderNumber:'181126130001',totalAmount:100};}if(name==='sendPosInvoice'){if(input.action==='list')return globalThis.__unpaid;if(input.action==='prepare')return {sessionId:'a'.repeat(32),route:'business',sent:false,invoice:{reference:input.orderNumber,paymentStatus:'Unpaid',payment:{name:'GCash',qrCodeImage:'tgmedia:configured-qr'}}};if(input.action==='confirmPayment'){globalThis.__unpaid=[];return {success:true};}return {success:true,messageId:42};}return [];}`;
+}}],output:{format:'esm'}});
+const Component=(await import('data:text/javascript;base64,'+Buffer.from(bundled.output[0].code).toString('base64'))).default;
+const {createElement,act}=await import('react'),{createRoot}=await import('react-dom/client');
+const root=createRoot(document.getElementById('root'));
+const button=text=>[...document.querySelectorAll('button')].find(element=>element.textContent.includes(text));
+async function wait(ms){await act(async()=>new Promise(resolve=>setTimeout(resolve,ms)));}
+async function select(input,value){await act(async()=>{input.value=value;input.dispatchEvent(new Event('change',{bubbles:true}));});}
+await act(async()=>root.render(createElement(Component,{onBack(){}})));
+await act(async()=>button('Drinks').click());await act(async()=>button('Coffee').click());await wait(250);
+await act(async()=>button('Ticket').click());await act(async()=>button('Existing Customer').click());
+await select(document.querySelector('[aria-label="POS customer"] select'),'c');await wait(250);
+await act(async()=>button('Continue to payment').click());
+await select(document.querySelector('[aria-label="Payment collection"] select'),'gcash');
+assert.equal(button('Save unpaid invoice').disabled,false);
+await act(async()=>button('Save unpaid invoice').click());await wait(20);
+const saved=globalThis.__invoiceCalls.find(call=>call.name==='createPosOrder'&&!call.input.action);
+assert.equal(saved.input.paymentState,'unpaid');assert.equal(saved.input.paymentMethodId,'gcash');assert.equal(saved.input.paymentMethodName,'GCash');
+assert.ok(document.querySelector('[aria-label="Customer invoice"]'));
+assert.equal(globalThis.__invoiceRenders[0].qr,'resolved:tgmedia:configured-qr');
+assert.equal(globalThis.__invoiceCalls.some(call=>call.input.action==='send'),false,'Preview never sends automatically');
+await act(async()=>button('Send invoice to customer').click());
+assert.equal(globalThis.__invoiceCalls.filter(call=>call.input.action==='send').length,1);
+assert.match(document.querySelector('[aria-label="Customer invoice"]').textContent,/Invoice sent/);
+assert.equal(globalThis.__invoiceCalls.some(call=>call.input.action==='confirmPayment'),false,'Sending an invoice must not confirm payment');
+await act(async()=>document.querySelector('[aria-label="Close invoice"]').click());
+assert.ok(document.querySelector('[aria-label="Unpaid POS invoices"]'));
+await act(async()=>button('Confirm payment received').click());
+const confirmation=globalThis.__invoiceCalls.find(call=>call.input.action==='confirmPayment');
+assert.equal(confirmation.input.confirmedAmount,100);assert.equal(confirmation.input.paymentVerified,true);
+assert.equal(document.querySelector('[aria-label="Unpaid POS invoices"]'),null);
+await act(async()=>root.unmount());dom.window.close();
+console.log('PASS: POS unpaid invoice save, exact configured QR preview, explicit image send and separate verified payment confirmation.');

@@ -446,3 +446,9 @@ body:has(#mobile-portrait-viewport.admin-viewport) { background: #020617 !import
 #mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-pos-panel .pos-field-grid .pos-field :is(input,select) { padding:6px; font-size:12px; }
 #mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-pos-panel .pos-payment-change { display:flex; flex-direction:column; gap:5px; padding-top:2px; font-size:12px; }
 #mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-pos-panel .pos-payment-change strong { display:flex; align-items:center; min-height:44px; font-weight:400; overflow-wrap:anywhere; }
+
+/* Invoice preview stays inside the portrait POS sheet. */
+#mobile-portrait-viewport .pos-invoice-dialog { max-height:90dvh; overflow-y:auto; text-align:left; }
+#mobile-portrait-viewport .pos-invoice-preview { display:block; width:100%; height:auto; margin:12px 0; border:1px solid #e2e8f0; }
+#mobile-portrait-viewport .pos-unpaid-invoice { display:flex; flex-direction:column; gap:5px; padding:10px 0; border-bottom:1px solid #e2e8f0; }
+#mobile-portrait-viewport .pos-invoice-actions { display:flex; flex-wrap:wrap; gap:8px 16px; }
