@@ -23,6 +23,9 @@ const api={getBusinessConnection:async()=>({is_enabled:true,rights:{can_reply:tr
 const source=readFileSync('tgcloud/endpoints/sendPosInvoice.js','utf8').replace(/^import[\s\S]*?;\n/gm,'').replace('export default async function','async function handler');
 const handler=new Function('api','db','EndpointError','InputFile','requireAdmin','publicMediaReference','getAutomationSettings','getAutomationChatState','ensureOrderWorkflow','notifyOrderStatusChanged',source+'\nreturn handler;')(
  api,db,EndpointError,InputFile,requireAdmin,async value=>value,async()=>({businessConnectionId:business?'business-1':''}),async()=>({lastCustomerMessageAt:new Date(Date.now()-(recent?0:25*3600*1000))}),async()=>{},async input=>notifications.push(input));
+const caption=new Function(source+'\nreturn invoiceCaption;')();
+assert.equal(caption({reference:'INV-123',paymentStatus:'Unpaid',payableNow:12345.67,payment:{name:'GCash'},validUntil:'2026-11-18T06:38:00Z'}),'PRIME Invoice INV-123\n\nPayment Status: Awaiting Payment\n\nAmount Due: P12,345.67\n\nPayment Method: GCash\n\nPayment Due: 18-NOV-2026 02:38 PM');
+assert.equal(caption({reference:'INV-123',paymentStatus:'Paid',payableNow:12345.67,payment:{name:'GCash'},validUntil:'2026-11-18T06:38:00Z'}),'PRIME Invoice INV-123\n\nPayment Status: Paid\n\nAmount Paid: P12,345.67\n\nPayment Method: GCash');
 const ctx=id=>({initData:{user:{id}}});
 await assert.rejects(handler({action:'list'},ctx(999)),{code:'ADMIN_REQUIRED'});
 assert.equal((await handler({action:'list'},ctx(111))).length,4);
@@ -38,6 +41,8 @@ async function upload(value){await handler({action:'start',sessionId:value.sessi
 await assert.rejects(handler({action:'start',sessionId:invoice.sessionId,fileSize:bytes.length,chunkCount:1},ctx(222)),/expired/);
 await upload(invoice);
 await Promise.allSettled([handler({action:'send',sessionId:invoice.sessionId,chatId:'attacker'},ctx(111)),handler({action:'send',sessionId:invoice.sessionId},ctx(111))]);
+assert.ok(sent[0].caption.startsWith('PRIME Invoice 181126120000\n\nPayment Status: Awaiting Payment\n\nAmount Due: P180.00\n\nPayment Method: GCash\n\nPayment Due: '));
+assert.match(sent[0].caption,/Payment Due: \d{2}-[A-Z]{3}-\d{4} \d{2}:\d{2} [AP]M$/);
 assert.equal(sent.length,1,'Concurrent sends cannot duplicate an invoice');assert.equal(sent[0].chat_id,'333');assert.equal(sent[0].business_connection_id,'business-1');assert.deepEqual(sent[0].photo.bytes,bytes);
 await handler({action:'send',sessionId:invoice.sessionId},ctx(111));assert.equal(sent.length,1);
 assert.equal(sqlite.prepare('SELECT count(*) n FROM pos_invoice_parts').get().n,0);

@@ -24,6 +24,20 @@ function decode(value) {
   return bytes.subarray(0, offset);
 }
 
+function invoiceCaption(invoice) {
+  const paid=String(invoice.paymentStatus).toLowerCase()==='paid';
+  const value=Number(invoice.payableNow || 0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const lines=[`PRIME Invoice ${invoice.reference}`,`Payment Status: ${paid?'Paid':'Awaiting Payment'}`,
+    `${paid?'Amount Paid':'Amount Due'}: P${value}`,`Payment Method: ${invoice.payment.name}`];
+  if(!paid&&invoice.validUntil){
+    const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{
+      timeZone:'Asia/Manila',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h12',
+    }).formatToParts(new Date(invoice.validUntil)).map(part=>[part.type,part.value]));
+    lines.push(`Payment Due: ${parts.day}-${parts.month.toUpperCase()}-${parts.year} ${parts.hour}:${parts.minute} ${parts.dayPeriod.toUpperCase()}`);
+  }
+  return lines.join('\n\n');
+}
+
 async function deliveryTarget(chatId) {
   const settings = await getAutomationSettings();
   if (settings.businessConnectionId) {
@@ -186,7 +200,7 @@ export default async function (input = {}, ctx) {
   try {
     const message=await api.sendPhoto({chat_id:session.chat_id,...(session.connection_id?{business_connection_id:session.connection_id}:{}),
       photo:new InputFile(bytes,`PRIME-Invoice-${snapshot.reference}.png`,{type:'image/png'}),
-      caption:`PRIME invoice ${snapshot.reference}\n${snapshot.paymentStatus === 'Paid' ? 'Paid' : 'Amount due'}: PHP ${Number(snapshot.payableNow).toFixed(2)}\n${snapshot.payment.name}`});
+      caption:invoiceCaption(snapshot)});
     if (!message?.message_id) throw new Error('No delivery confirmation.');
     await db.run(`UPDATE pos_invoice_sessions SET status='complete',message_id=:message WHERE id=:id`,{':id':id,':message':message.message_id});
     await db.run(`DELETE FROM pos_invoice_parts WHERE session_id=:id`,{':id':id});

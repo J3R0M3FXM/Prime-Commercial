@@ -20,6 +20,13 @@ export type PosInvoice = {
 const WIDTH = 900;
 const money = (value: number) => `PHP ${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+function paymentDeadline(value: string) {
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{
+    timeZone:'Asia/Manila',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h12',
+  }).formatToParts(new Date(value)).map(part=>[part.type,part.value]));
+  return `${parts.day}-${parts.month.toUpperCase()}-${parts.year} ${parts.hour}:${parts.minute} ${parts.dayPeriod.toUpperCase()}`;
+}
+
 function wrapped(ctx: CanvasRenderingContext2D, value: string, width: number) {
   const lines: string[] = [];
   let line = '';
@@ -116,10 +123,25 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
     if(invoice.payment.accountName)labelValue('Account Name',invoice.payment.accountName);
     if(invoice.payment.accountNumber)labelValue('Account Number',invoice.payment.accountNumber);
     if(qr){
-      y+=18;box(196,y,508,508,'#dce4ee');box(197,y+1,506,506,'#fff');
-      const qrWidth=Number(qr.width)||1,qrHeight=Number(qr.height)||1,scale=Math.min(460/qrWidth,460/qrHeight);
-      if(draw){ctx.imageSmoothingEnabled=false;ctx.drawImage(qr,(WIDTH-qrWidth*scale)/2,y+(508-qrHeight*scale)/2,qrWidth*scale,qrHeight*scale);}
-      y+=530;text(paid?'Payment Method QR':'Scan Or Save This QR To Pay',24,muted,true);
+      const reminder=(value:string)=>{
+        font(24,true);
+        const lines:string[]=[];let line='';
+        for(const word of value.split(' ')){
+          const next=line?`${line} ${word}`:word;
+          if(line&&ctx.measureText(next).width>788){lines.push(line);line=word;}else line=next;
+        }
+        if(line)lines.push(line);
+        for(const value of lines){textAt(value,450,y,24,true,navy,'center');y+=38;}
+        y+=20;
+      };
+      y+=18;
+      if(!paid)reminder(`Please Pay The Total Amount Due Of P${Number(invoice.payableNow || 0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} Using The QR Code Below Thru Your Preferred Banking Or E-Wallet App.`);
+      const qrWidth=WIDTH*.7,qrHeight=qrWidth*(Number(qr.height)||1)/(Number(qr.width)||1),left=WIDTH*.15;
+      box(left-24,y,qrWidth+48,qrHeight+48,'#dce4ee');box(left-23,y+1,qrWidth+46,qrHeight+46,'#fff');
+      if(draw){ctx.imageSmoothingEnabled=false;ctx.drawImage(qr,left,y+24,qrWidth,qrHeight);}
+      y+=qrHeight+70;
+      if(!paid&&invoice.validUntil)reminder(`Payment Must Be Made Before ${paymentDeadline(invoice.validUntil)} To Avoid Cancellation.`);
+      if(paid)text('Payment Method QR',24,muted,true);
     }
     rule();text('Thank You For Choosing PRIME',30,navy,true,true);
     text(paid?'Payment Has Been Recorded':'Please Send Payment Confirmation In This Chat',23,muted,true);
