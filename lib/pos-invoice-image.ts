@@ -22,9 +22,9 @@ const money = (value: number) => `PHP ${Number(value || 0).toLocaleString('en-PH
 
 function paymentDeadline(value: string) {
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{
-    timeZone:'Asia/Manila',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h12',
+    timeZone:'Asia/Manila',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h12',
   }).formatToParts(new Date(value)).map(part=>[part.type,part.value]));
-  return `${parts.day}-${parts.month.toUpperCase()}-${parts.year} ${parts.hour}:${parts.minute} ${parts.dayPeriod.toUpperCase()}`;
+  return `${parts.hour}:${parts.minute}:${parts.second} ${parts.dayPeriod.toUpperCase()}`;
 }
 
 function wrapped(ctx: CanvasRenderingContext2D, value: string, width: number) {
@@ -147,7 +147,7 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
       box(left-24,y,qrWidth+48,qrHeight+48,'#dce4ee');box(left-23,y+1,qrWidth+46,qrHeight+46,'#fff');
       if(draw){ctx.imageSmoothingEnabled=false;ctx.drawImage(qr,left,y+24,qrWidth,qrHeight);}
       y+=qrHeight+70;
-      if(!paid&&invoice.validUntil)reminder(`PAYMENT MUST BE MADE BEFORE ${paymentDeadline(invoice.validUntil)} TO AVOID CANCELLATION.`);
+      if(!paid&&invoice.validUntil)reminder(`SETTLE PAYMENT BEFORE ${paymentDeadline(invoice.validUntil)} TODAY.`);
       if(paid)text('Payment Method QR',24,muted,true);
     }
     rule();text('Thank You For Choosing PRIME',30,navy,true,true);
