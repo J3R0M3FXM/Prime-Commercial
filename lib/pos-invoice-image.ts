@@ -32,82 +32,125 @@ function wrapped(ctx: CanvasRenderingContext2D, value: string, width: number) {
   return lines.length ? lines : [''];
 }
 
-/** Draw configured QR artwork unchanged, including its original quiet zone. */
-export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, qr?: CanvasImageSource & { width?: number; height?: number }) {
+type ArtworkImage = CanvasImageSource & { width?: number; height?: number };
+export const POS_INVOICE_ARTWORK = {
+  logo: '/prime-header-brand-refined.png',
+  background: '/prime-body-art.png',
+};
+export type PosInvoiceArtwork = { logo: ArtworkImage; background: ArtworkImage };
+
+/** Use the shopfront's official artwork; keep payment QR pixels on a white panel. */
+export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, qr: ArtworkImage | undefined, artwork: PosInvoiceArtwork) {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Invoice image generation is unavailable on this device.');
   if (!invoice.items.length || invoice.items.length > 100) throw new Error('An invoice must contain between 1 and 100 items.');
-  ctx.font = "400 28px 'Lato Condensed', 'Lato', sans-serif";
-  const itemLines = invoice.items.map(item => wrapped(ctx, item.name, 490));
-  const details = [invoice.customerName, invoice.customerPhone, invoice.address].filter(Boolean).flatMap(value => wrapped(ctx, String(value), 780));
-  const height = 620 + details.length * 34 + itemLines.reduce((sum, lines) => sum + Math.max(2, lines.length + 1) * 32, 0)
-    + (invoice.charges.length + invoice.discounts.length + 5) * 42 + (qr ? 570 : 110);
-  if (height > 8800) throw new Error('This invoice is too long for one image. Shorten item names or split the order.');
-  canvas.width = WIDTH; canvas.height = height;
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, WIDTH, height);
-  ctx.textBaseline = 'top';
-  let y = 42;
-  const text = (value: string, size = 28, bold = false, color = '#0b1f36') => {
-    ctx.fillStyle = color; ctx.font = `${bold ? 700 : 400} ${size}px 'Lato Condensed', 'Lato', sans-serif`;
-    ctx.textAlign = 'left'; ctx.fillText(value, 48, y); y += size + 10;
+  if (!artwork?.logo || !artwork?.background) throw new Error('The official PRIME invoice artwork could not be loaded.');
+  const paid = invoice.paymentStatus.toLowerCase() === 'paid';
+  const navy = '#011830', blue = '#176dc2', muted = '#526578';
+  const date = (value: string) => new Date(value).toLocaleString('en-PH', {timeZone:'Asia/Manila'});
+  const render = (draw: boolean) => {
+    let y = 44;
+    const font = (size: number, bold = false, heading = false) => {
+      ctx.font = heading ? `400 ${size}px 'Roboto Condensed', sans-serif` : `${bold ? 700 : 400} ${size}px 'Lato Condensed', 'Lato', sans-serif`;
+    };
+    const box = (x: number, top: number, width: number, height: number, color: string) => {
+      if (draw) {ctx.fillStyle=color;ctx.fillRect(x,top,width,height);}
+    };
+    const textAt = (value: string, x: number, top: number, size = 28, bold = false, color = navy, align: CanvasTextAlign = 'left', heading = false) => {
+      font(size,bold,heading);
+      if(draw){ctx.fillStyle=color;ctx.textAlign=align;ctx.fillText(value,x,top);}
+    };
+    const text = (value: string, size = 28, color = navy, centered = false, heading = false) => {
+      font(size,false,heading);
+      for(const line of wrapped(ctx,value,788)){
+        textAt(line,centered?450:56,y,size,false,color,centered?'center':'left',heading);y+=size+8;
+      }
+    };
+    const rule = () => {y+=8;box(56,y,788,1,'#dce4ee');y+=22;};
+    const heading = (value: string) => {y+=12;text(value,28,navy,false,true);y+=8;};
+    const labelValue = (label: string, value: string) => {
+      font(25);
+      const lines=wrapped(ctx,value,500);
+      textAt(label,56,y,24,false,muted);
+      lines.forEach((line,index)=>textAt(line,844,y+index*33,25,false,navy,'right'));
+      y+=lines.length*33+8;
+    };
+    const row = (label: string, value: number, emphasized = false) => {
+      font(emphasized?32:28,emphasized);
+      const lines=wrapped(ctx,label,470),height=Math.max(44,lines.length*34+8);
+      if(emphasized)box(44,y-10,812,height+10,'#eaf2fc');
+      lines.forEach((line,index)=>textAt(line,56,y+index*34,emphasized?32:28,emphasized));
+      textAt(money(value),844,y,emphasized?32:28,emphasized,navy,'right');y+=height;
+    };
+    if(draw){
+      const scale=Math.min(310/(Number(artwork.logo.width)||1740),66/(Number(artwork.logo.height)||342));
+      ctx.drawImage(artwork.logo,56,y,(Number(artwork.logo.width)||1740)*scale,(Number(artwork.logo.height)||342)*scale);
+    }
+    textAt('Order Invoice',844,46,34,false,navy,'right',true);
+    textAt(invoice.reference,844,90,25,true,blue,'right');
+    y=138;rule();
+    labelValue('Issued',date(invoice.createdAt));
+    labelValue('Payment Status',paid?'Paid':'Awaiting Payment');
+    if(invoice.validUntil)labelValue('Payment Due',date(invoice.validUntil));
+    heading('Billed To');
+    [invoice.customerName,invoice.customerPhone,invoice.address].filter(Boolean).forEach(value=>text(String(value)));
+    rule();
+    box(44,y-8,812,44,navy);
+    textAt('Item',56,y,24,false,'#fff');textAt('Qty',568,y,24,false,'#fff','center');textAt('Amount',844,y,24,false,'#fff','right');y+=52;
+    invoice.items.forEach(item=>{
+      font(28);const lines=wrapped(ctx,item.name,440),top=y;
+      lines.forEach(line=>{textAt(line,56,y);y+=34;});
+      textAt(String(item.quantity),568,top,26,false,navy,'center');
+      textAt(money(item.total),844,top,28,false,navy,'right');
+      textAt(`${money(item.price)} Each`,56,y,23,false,muted);y+=34;rule();
+    });
+    heading('Order Summary');row('Items Subtotal',invoice.subtotal);
+    invoice.charges.forEach(charge=>row(charge.name,charge.amount));
+    if(invoice.deliveryFee)row('Delivery',invoice.deliveryFee);
+    invoice.discounts.forEach(discount=>row(discount.name,-discount.amount));
+    y+=12;row('Order Total',invoice.total,true);y+=20;
+    row(paid?'Paid At Checkout':'Amount Due Now',invoice.payableNow,true);
+    if(invoice.payableOnDelivery){y+=12;row('Pay Courier On Delivery',invoice.payableOnDelivery);}
+    rule();heading(paid?'Payment Details':'Payment Instructions');
+    labelValue('Payment Method',invoice.payment.name);
+    if(invoice.payment.accountName)labelValue('Account Name',invoice.payment.accountName);
+    if(invoice.payment.accountNumber)labelValue('Account Number',invoice.payment.accountNumber);
+    if(qr){
+      y+=18;box(196,y,508,508,'#dce4ee');box(197,y+1,506,506,'#fff');
+      const qrWidth=Number(qr.width)||1,qrHeight=Number(qr.height)||1,scale=Math.min(460/qrWidth,460/qrHeight);
+      if(draw){ctx.imageSmoothingEnabled=false;ctx.drawImage(qr,(WIDTH-qrWidth*scale)/2,y+(508-qrHeight*scale)/2,qrWidth*scale,qrHeight*scale);}
+      y+=530;text(paid?'Payment Method QR':'Scan Or Save This QR To Pay',24,muted,true);
+    }
+    rule();text('Thank You For Choosing PRIME',30,navy,true,true);
+    text(paid?'Payment Has Been Recorded':'Please Send Payment Confirmation In This Chat',23,muted,true);
+    return y+44;
   };
-  const rule = () => { y += 8; ctx.fillStyle = '#e2e8f0'; ctx.fillRect(48, y, 804, 1); y += 22; };
-  const row = (label: string, value: number, bold = false) => {
-    ctx.font = `${bold ? 700 : 400} ${bold ? 32 : 28}px 'Lato Condensed', 'Lato', sans-serif`;
-    ctx.fillStyle = '#0b1f36'; ctx.textAlign = 'left'; ctx.fillText(label, 48, y);
-    ctx.textAlign = 'right'; ctx.fillText(money(value), 852, y); y += 42;
-  };
-  ctx.font = "400 44px 'Roboto Condensed', sans-serif"; ctx.fillStyle = '#0b1f36'; ctx.fillText('PRIME', 48, y); y += 60;
-  ctx.font = "400 32px 'Roboto Condensed', sans-serif"; ctx.fillText('ORDER INVOICE', 48, y); y += 46;
-  text(invoice.reference, 26, true);
-  text(new Date(invoice.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), 24, false, '#64748b');
-  text(invoice.paymentStatus.toLowerCase() === 'paid' ? 'PAID' : 'AWAITING PAYMENT', 26, true);
-  if(invoice.validUntil)text('Payment due: '+new Date(invoice.validUntil).toLocaleString('en-PH',{timeZone:'Asia/Manila'}),22,false,'#64748b');
-  rule(); details.forEach(line => text(line)); rule();
-  invoice.items.forEach((item, index) => {
-    ctx.font = "400 28px 'Lato Condensed', 'Lato', sans-serif"; ctx.fillStyle = '#0b1f36'; ctx.textAlign = 'left';
-    itemLines[index].forEach(line => { ctx.fillText(line, 48, y); y += 32; });
-    ctx.font = "400 24px 'Lato Condensed', 'Lato', sans-serif"; ctx.fillStyle = '#64748b';
-    ctx.fillText(`${item.quantity} × ${money(item.price)}`, 48, y);
-    ctx.textAlign = 'right'; ctx.fillStyle = '#0b1f36'; ctx.fillText(money(item.total), 852, y - 32);
-    y += 40;
-  });
-  rule(); row('Items subtotal', invoice.subtotal);
-  invoice.charges.forEach(charge => row(charge.name, charge.amount));
-  if (invoice.deliveryFee) row('Delivery', invoice.deliveryFee);
-  invoice.discounts.forEach(discount => row(discount.name, -discount.amount));
-  row('Order total', invoice.total, true); rule();
-  row(invoice.paymentStatus.toLowerCase() === 'paid' ? 'Paid at checkout' : 'Amount due now', invoice.payableNow, true);
-  if (invoice.payableOnDelivery) row('Pay courier on delivery', invoice.payableOnDelivery);
-  y += 16; text(invoice.payment.name, 30, true);
-  if (invoice.payment.accountName) text(invoice.payment.accountName, 26);
-  if (invoice.payment.accountNumber) text(invoice.payment.accountNumber, 26);
-  if (qr) {
-    const qrWidth = Number(qr.width) || 1, qrHeight = Number(qr.height) || 1;
-    const scale = Math.min(460 / qrWidth, 460 / qrHeight);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(qr, (WIDTH - qrWidth * scale) / 2, y + 14, qrWidth * scale, qrHeight * scale);
-    y += 490; text(invoice.paymentStatus.toLowerCase()==='paid'?'Payment method QR':'Scan or save this QR to pay.', 24, false, '#64748b');
-  }
-  text(invoice.paymentStatus.toLowerCase()==='paid'?'Thank you. Payment has been recorded.':'Please send your payment confirmation in this chat.', 24, false, '#64748b');
+  const height=Math.ceil(render(false));
+  if(height>8800)throw new Error('This invoice is too long for one image. Shorten item names or split the order.');
+  canvas.width=WIDTH;canvas.height=height;ctx.textBaseline='top';
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,WIDTH,height);
+  ctx.drawImage(artwork.background,0,0,WIDTH,height);
+  ctx.fillStyle='rgba(255,255,255,.88)';ctx.fillRect(24,164,852,height-188);
+  ctx.fillStyle=navy;ctx.fillRect(0,0,WIDTH,6);ctx.fillRect(0,height-6,WIDTH,6);
+  render(true);
   return canvas;
 }
 
 export async function createPosInvoiceImage(invoice: PosInvoice, qrUrl?: string): Promise<Blob> {
-  await document.fonts?.ready;
-  let qr: HTMLImageElement | undefined;
-  if (invoice.payment.qrCodeImage) {
-    if (!qrUrl) throw new Error('The configured payment QR could not be loaded.');
-    qr = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image(); image.crossOrigin = 'anonymous';
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error('The configured payment QR could not be loaded.'));
-      image.src = qrUrl;
-    });
-  }
-  const canvas = drawPosInvoice(document.createElement('canvas'), invoice, qr);
-  return await new Promise<Blob>((resolve, reject) => {
-    try { canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not generate the invoice image.')), 'image/png'); }
-    catch { reject(new Error('The configured QR cannot be included in an image. Re-upload it through Payment Methods.')); }
+  if(invoice.payment.qrCodeImage&&!qrUrl)throw new Error('The configured payment QR could not be loaded.');
+  const load = (url: string, label: string) => new Promise<HTMLImageElement>((resolve,reject)=>{
+    const image=new Image();image.crossOrigin='anonymous';
+    image.onload=()=>resolve(image);image.onerror=()=>reject(new Error(`${label} could not be loaded.`));image.src=url;
+  });
+  const [,logo,background,qr]=await Promise.all([
+    document.fonts?.ready,
+    load(POS_INVOICE_ARTWORK.logo,'The official PRIME logo'),
+    load(POS_INVOICE_ARTWORK.background,'The shopfront background'),
+    invoice.payment.qrCodeImage?load(qrUrl!,'The configured payment QR'):Promise.resolve(undefined),
+  ]);
+  const canvas=drawPosInvoice(document.createElement('canvas'),invoice,qr,{logo,background});
+  return await new Promise<Blob>((resolve,reject)=>{
+    try{canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Could not generate the invoice image.')),'image/png');}
+    catch{reject(new Error('The invoice artwork cannot be included in an image. Re-upload the payment QR through Payment Methods.'));}
   });
 }
