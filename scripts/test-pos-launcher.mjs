@@ -26,7 +26,7 @@ assert.equal(setup.dom.window.document.getElementById('install').hidden,false);
 setup.dom.window.document.getElementById('install').click();await new Promise(resolve=>setImmediate(resolve));
 assert.equal(prompts,1);assert.match(setup.dom.window.document.getElementById('install-help').textContent,/Installed/);
 for(const options of [{standalone:true},{search:'?launch=1'}]){
- const app=await launcher(options);assert.deepEqual(app.navigations,['tg://resolve?domain=primenetworkphbot&startapp=pos']);app.dom.window.close();
+ const app=await launcher(options);assert.deepEqual(app.navigations,['https://t.me/primenetworkphbot?startapp=pos']);app.dom.window.close();
 }
 setup.dom.window.close();
 // The launch worker must leave business requests outside its fetch handler.

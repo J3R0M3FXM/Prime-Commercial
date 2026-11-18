@@ -1,4 +1,4 @@
-const CACHE='prime-pos-launcher-v1';
+const CACHE='prime-pos-launcher-v2';
 const ASSETS=['/pos/index.html','/pos/launcher.css','/pos/launcher.js','/pos/manifest.webmanifest','/pos/lato-400.woff2','/pos/roboto-condensed-400.woff2','/pos/icon-192.png','/pos/icon-512.png','/prime-header-brand-refined.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
