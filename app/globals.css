@@ -2752,7 +2752,7 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
   background-color: #f5f8fc !important;
   border-bottom-color: #e8edf3 !important;
 }
-#mobile-portrait-viewport .prime-product-card__body { padding: 8px !important; gap: 4px !important; }
+#mobile-portrait-viewport .prime-product-card__body { padding: 6px !important; gap: 3px !important; }
 #mobile-portrait-viewport .prime-product-card__category,
 #mobile-portrait-viewport .prime-product-card__availability {
   font-family: 'Lato Condensed', 'Lato', 'Arial Narrow', sans-serif !important;
@@ -2763,8 +2763,11 @@ h1, h2, h3, h4, h5, h6, button, label, .font-heading, .prime-page-heading__title
 }
 #mobile-portrait-viewport .prime-product-card__name {
   font-family: 'Roboto Condensed', sans-serif !important;
-  font-size: 13px !important;
+  font-size: 12px !important;
   font-weight: 400 !important;
+  line-height: 1.1 !important;
+  margin: 0 !important;
+  min-height: 0 !important;
   letter-spacing: 0 !important;
 }
 #mobile-portrait-viewport .prime-shopfront-product-card .prime-product-card__price {
@@ -2835,3 +2838,13 @@ body,
 .prime-order-history .order-history__card { background:#fff; border-color:#e2e8f0; color:#0f172a; }
 .prime-order-history .order-history__utility { background:transparent !important; border-color:#cbd5e1 !important; color:#64748b !important; box-shadow:none !important; }
 .prime-order-history .order-history__utility:hover { background:#f1f5f9 !important; color:#334155 !important; }
+
+/* Keep catalogue dialogs as compact as their portrait product cards. */
+#mobile-portrait-viewport .prime-product-modal__heading h2,
+#mobile-portrait-viewport .prime-variant-picker__title {
+  font-family: 'Roboto Condensed', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 1.15 !important;
+  margin-block: 2px 0 !important;
+}

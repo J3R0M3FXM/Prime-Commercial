@@ -404,7 +404,7 @@ export default function Shopfront() {
             <p className="text-gray-500">Try adjusting your search or filters.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="prime-product-catalogue grid grid-cols-3 gap-2" aria-label="Product catalogue">
             {filteredProducts.map(p => {
               const variants = p.variants && p.variants.length > 0 ? p.variants : [];
               const isOutOfStock = variants.length > 0
@@ -429,6 +429,7 @@ export default function Shopfront() {
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
                       setSelectedProduct(p);
                     }
                   }}

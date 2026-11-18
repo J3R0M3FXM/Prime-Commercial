@@ -29,7 +29,7 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
   // Do NOT pre-select an option by default — require customer choice first
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [localQuantity, setLocalQuantity] = useState(1);
-  const [variantMenuOpen, setVariantMenuOpen] = useState(false);
+  const [variantMenuOpen, setVariantMenuOpen] = useState(() => Array.isArray(product?.variants) && product.variants.length > 0);
   const [variantFeedbackTick, setVariantFeedbackTick] = useState(0);
 
   // Preserve the customer's selected variant when the live product row updates.
@@ -143,17 +143,17 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-5 pb-4 overscroll-contain">
-          <div className="text-left pr-10">
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-3 pb-3 overscroll-contain">
+          <div className="prime-product-modal__heading text-left pr-10">
             <p className="text-[10px] font-mono font-bold tracking-wide text-slate-600 uppercase leading-tight">
               {product.category || "General"}
             </p>
-            <h2 className="mt-1 text-lg font-heading font-bold text-gray-900 leading-tight tracking-tight">
+            <h2 className="mt-0.5 text-sm font-heading font-normal text-gray-900 leading-tight tracking-tight">
               {product.name}
             </h2>
           </div>
 
-          <div className="mt-4 flex justify-center">
+          <div className="mt-2 flex justify-center">
             <div key={variantFeedbackTick} className={`relative aspect-square w-full max-w-[300px] ${variantFeedbackTick > 0 ? "variant-selection-feedback" : ""} overflow-hidden rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center`}>
               {renderGlossyChip()}
               <img
@@ -263,8 +263,8 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
         >
           <section role="dialog" aria-modal="true" aria-labelledby="variant-picker-title" className="flex max-h-[min(70dvh,520px)] w-full max-w-[430px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
             <header className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
-              <div>
-                <h3 id="variant-picker-title" className="font-heading text-base font-semibold text-slate-900">Select Variant</h3>
+              <div className="min-w-0">
+                <h3 id="variant-picker-title" className="prime-variant-picker__title font-heading text-sm font-normal text-slate-900">Select Variant</h3>
                 <p className="truncate font-mono text-[10px] font-bold uppercase tracking-wide text-slate-600">{product.name}</p>
               </div>
               <button type="button" onClick={() => setVariantMenuOpen(false)} aria-label="Close variant selector" className="rounded-full p-2 text-slate-600 hover:bg-slate-100"><X className="h-4 w-4" /></button>
