@@ -50,6 +50,7 @@ run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/re
 run('node', ['scripts/test-pos-invoice-ui.mjs'], 'rendered unpaid POS invoice flow');
 run('node', ['scripts/test-pos-invoice-image.mjs'], 'POS invoice image and configured QR');
 run('node', ['scripts/test-pos-invoice-delivery.mjs'], 'POS invoice delivery and payment confirmation');
+run('node', ['scripts/test-pos-native-shortcut.mjs'], 'native Telegram POS shortcut and launch preference');
 run('node', ['scripts/test-pos-launcher.mjs'], 'installed POS launcher and staff gate');
 run('node', ['scripts/test-pos-startup.mjs'], 'stable authentication startup and lightweight POS customers');
 run('node', ['scripts/test-pos-ui.mjs'], 'rendered POS register controls');

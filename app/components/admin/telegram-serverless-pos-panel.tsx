@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronRight, Loader2, Minus, Plus, RefreshCw, Search, ShoppingCart, Store, Truck, X } from "lucide-react";
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { isChargeApplicable } from "@/lib/charges";
+import PosHomeShortcut from './pos-home-shortcut';
 import PosInvoiceDialog from "./pos-invoice-dialog";
 import { formatPHP } from "@/lib/currency";
 import { beginPosCheckoutAttempt, readPosCheckoutAttempt, finishPosCheckoutAttempt, type PosCheckoutAttempt } from '@/lib/pos-checkout-attempt';
@@ -277,6 +278,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
     {(error || notice) && <div role={error ? 'alert' : 'status'} className={`pos-message ${error ? 'pos-message--error' : ''}`}>{error || notice}</div>}
     {checkingAuth && <div className="pos-empty"><Loader2 className="animate-spin"/><p>Opening register…</p></div>}
     {authorized && <>
+      <PosHomeShortcut staffId={staffId}/>
       {unpaidInvoices.length>0 && <section className="pos-card" aria-label="Unpaid POS invoices"><div className="pos-card-heading"><h2>Unpaid invoices</h2><small>{unpaidInvoices.length}</small></div><div className="pos-card-body">{unpaidInvoices.map(invoice=><div className="pos-unpaid-invoice" key={invoice.orderNumber}><strong>{invoice.customerName}</strong><small className="font-mono">{invoice.orderNumber} · {formatPHP(invoice.amountDue)}</small><div className="pos-invoice-actions"><button type="button" className="pos-text-action" disabled={saving} onClick={()=>setInvoiceOrder({orderNumber:invoice.orderNumber,paymentMethodId:invoice.paymentMethodId || ''})}>Invoice image</button><button type="button" className="pos-text-action" disabled={saving || invoice.deadline*1000<=Date.now()} onClick={()=>void confirmInvoicePayment(invoice)}>Confirm payment received</button></div>{invoice.deadline*1000<=Date.now()&&<small>Expired — cancel in Orders before creating a new invoice.</small>}</div>)}</div></section>}
       {pendingSale && <section className="pos-message" aria-label="Pending sale"><p>The saved response is pending. Retry this attempt before starting another sale.</p><button type="button" className="pos-primary" disabled={saving} onClick={() => void checkout()}>Retry Pending Sale</button></section>}
       <fieldset disabled={saving || Boolean(pendingSale)} className="pos-workspace">

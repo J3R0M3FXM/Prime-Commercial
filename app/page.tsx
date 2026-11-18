@@ -1,6 +1,7 @@
 "use client";
 
 import { adminDestination } from '@/lib/admin-destination';
+import { prefersPosLaunch } from '@/lib/pos-launch-preference';
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -216,7 +217,7 @@ export default function Shopfront() {
             if (typeof window !== 'undefined') {
               const hash = window.location.hash;
               const startParam = String(telegramWebApp?.initDataUnsafe?.start_param || '');
-              const adminTarget = adminDestination(startParam);
+              const adminTarget = adminDestination(startParam,prefersPosLaunch(String(authData.tgUserId||authData.user?.id||'')));
               router.replace(`${adminTarget}${hash ? hash : ''}`);
             }
             return;
