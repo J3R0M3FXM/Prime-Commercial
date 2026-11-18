@@ -35,7 +35,7 @@ function invoiceCaption(invoice) {
     }).formatToParts(new Date(invoice.validUntil)).map(part=>[part.type,part.value]));
     lines.push(`Payment Due: ${parts.day}-${parts.month.toUpperCase()}-${parts.year} ${parts.hour}:${parts.minute} ${parts.dayPeriod.toUpperCase()}`);
   }
-  return lines.join('\n\n');
+  return lines[0]+'\n\n'+lines.slice(1).join('\n');
 }
 
 async function deliveryTarget(chatId) {
