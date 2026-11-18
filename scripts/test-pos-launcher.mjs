@@ -7,7 +7,7 @@ import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 
 const manifest=JSON.parse(readFileSync('public/pos/manifest.webmanifest','utf8'));
-assert.equal(manifest.start_url,'/pos/index.html?launch=1');
+assert.equal(manifest.start_url,'/pos/?launch=1');
 assert.equal(manifest.scope,'/pos/');assert.equal(manifest.display,'standalone');
 assert.deepEqual(manifest.icons.map(icon=>icon.sizes),['192x192','512x512']);
 for(const size of [192,512]){const png=readFileSync(`public/pos/icon-${size}.png`);assert.equal(png.subarray(1,4).toString(),'PNG');assert.equal(png.readUInt32BE(16),size);assert.equal(png.readUInt32BE(20),size);}

@@ -3,7 +3,7 @@
   "name": "PRIME POS",
   "short_name": "PRIME POS",
   "description": "Open the PRIME register directly in Telegram.",
-  "start_url": "/pos/index.html?launch=1",
+  "start_url": "/pos/?launch=1",
   "scope": "/pos/",
   "display": "standalone",
   "orientation": "portrait",
