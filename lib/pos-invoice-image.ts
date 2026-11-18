@@ -118,20 +118,20 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
     y+=12;row('Order Total',invoice.total,true);y+=20;
     row(paid?'Paid At Checkout':'Amount Due Now',invoice.payableNow,true);
     if(invoice.payableOnDelivery){y+=12;row('Pay Courier On Delivery',invoice.payableOnDelivery);}
-    rule();heading(paid?'Payment Details':'Payment Instructions');
-    labelValue('Payment Method',invoice.payment.name);
+    y+=16;box(56,y,788,2,'#000000');y+=26;
+    if(paid)heading('Payment Details');
     if(invoice.payment.accountName)labelValue('Account Name',invoice.payment.accountName);
     if(invoice.payment.accountNumber)labelValue('Account Number',invoice.payment.accountNumber);
     if(qr){
-      const reminder=(value:string)=>{
-        font(24,true);
+      const reminder=(value:string,heading=false)=>{
+        font(24,!heading,heading);
         const lines:string[]=[];let line='';
         for(const word of value.split(' ')){
           const next=line?`${line} ${word}`:word;
           if(line&&ctx.measureText(next).width>788){lines.push(line);line=word;}else line=next;
         }
         if(line)lines.push(line);
-        for(const value of lines){textAt(value,450,y,24,true,navy,'center');y+=38;}
+        for(const value of lines){textAt(value,450,y,24,!heading,navy,'center',heading);y+=38;}
         y+=20;
       };
       y+=18;
@@ -142,6 +142,7 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
         const amountSize=Math.min(64,64*788/Math.max(1,ctx.measureText(amount).width));
         textAt(amount,450,y,amountSize,true,navy,'center');y+=amountSize+32;
       }
+      if(!paid)reminder('SCAN THE QR CODE BELOW TO PAY USING YOUR BANKING OR E-WALLET APP.',true);
       const qrWidth=WIDTH*.7,qrHeight=qrWidth*(Number(qr.height)||1)/(Number(qr.width)||1),left=WIDTH*.15;
       box(left-24,y,qrWidth+48,qrHeight+48,'#dce4ee');box(left-23,y+1,qrWidth+46,qrHeight+46,'#fff');
       if(draw){ctx.imageSmoothingEnabled=false;ctx.drawImage(qr,left,y+24,qrWidth,qrHeight);}
