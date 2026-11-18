@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronRight, Loader2, Minus, Plus, RefreshCw, Search, ShoppingCart, Store, Truck, X } from "lucide-react";
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { isChargeApplicable } from "@/lib/charges";
+import TelegramMediaImage from "../telegram-media-image";
 import PosHomeShortcut from './pos-home-shortcut';
 import PosInvoiceDialog from "./pos-invoice-dialog";
 import { formatPHP } from "@/lib/currency";
@@ -14,6 +15,13 @@ type CartLine = { key: string; productId: string; variantId: string; name: strin
 type Customer = { id: string; tgUserId?: string; tgName?: string; tgUsername?: string; phoneNumber?: string; primeMemberId?: string; isBanned?: boolean; storeCredits?: number };
 type Courier = { id: string; name: string; isActive?: boolean; calculatedFee?: number; coverageAvailable?: boolean };
 type Tender = { id: string; name: string; isActive?: boolean };
+
+const unavailableImage = '/product-image-unavailable.svg';
+
+function productImage(product: Product, variant?: Record<string, any>) {
+  const image = variant?.images?.[0];
+  return variant?.imageUrl || (typeof image === 'string' ? image : image?.url) || product.imageUrl || unavailableImage;
+}
 
 function productVariants(product: Product) {
   return Array.isArray(product.variants) ? product.variants : Array.isArray(product.bundleConfig?.variants) ? product.bundleConfig.variants : [];
@@ -298,7 +306,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
             <div className="pos-card-heading"><button type="button" className="pos-icon" onClick={() => setSelectedProductId(null)} aria-label="Back to products"><ArrowLeft/></button><h2>{activeProduct.name}</h2></div>
             <div className="pos-product-list">{productVariants(activeProduct).map(variant => {
               const stock = Math.max(0, Number(variant.stock) || 0);
-              return <button key={String(variant.id)} type="button" className="pos-product" disabled={stock < 1} onClick={() => addItem(activeProduct, variant)}><span><strong>{String(variant.name || variant.id)}</strong><small>{stock ? `${stock} available` : 'Out of stock'}</small></span><span className="pos-product-price">{formatPHP(Number(variant.price ?? activeProduct.price) || 0)}<Plus/></span></button>;
+              return <button key={String(variant.id)} type="button" className="pos-product" disabled={stock < 1} onClick={() => addItem(activeProduct, variant)}><TelegramMediaImage src={productImage(activeProduct, variant)} fallbackSrc={unavailableImage} alt={`${activeProduct.name} · ${String(variant.name || variant.id)}`} loading="lazy" className="pos-product-image"/><span className="pos-product-copy"><strong>{String(variant.name || variant.id)}</strong><small>{stock ? `${stock} available` : 'Out of stock'}</small></span><span className="pos-product-price">{formatPHP(Number(variant.price ?? activeProduct.price) || 0)}<Plus/></span></button>;
             })}</div>
           </section> : <section className="pos-card" aria-label="Live product picker">
             <div className="pos-card-heading"><h2>{selectedCategory || 'Products'}</h2><small>{matchingProducts.length} available</small></div>
@@ -306,7 +314,8 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
               const variants = productVariants(product);
               const stock = Math.max(0, Number(product.stock) || 0);
               return <button type="button" key={product.id} className="pos-product" disabled={!variants.length && stock < 1} onClick={() => variants.length ? setSelectedProductId(product.id) : addItem(product)}>
-                <span><strong>{product.name}</strong><small>{variants.length ? `${variants.length} options` : stock ? `${stock} available` : 'Out of stock'}</small></span>
+                <TelegramMediaImage src={productImage(product)} fallbackSrc={unavailableImage} alt={product.name} loading="lazy" className="pos-product-image"/>
+                <span className="pos-product-copy"><strong>{product.name}</strong><small>{variants.length ? `${variants.length} options` : stock ? `${stock} available` : 'Out of stock'}</small></span>
                 <span className="pos-product-price">{variants.length ? 'Choose' : formatPHP(Number(product.price) || 0)}{variants.length ? <ChevronRight/> : <Plus/>}</span>
               </button>;
             })}</div>
