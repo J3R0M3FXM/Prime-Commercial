@@ -42,16 +42,16 @@ function wrapped(ctx: CanvasRenderingContext2D, value: string, width: number) {
 type ArtworkImage = CanvasImageSource & { width?: number; height?: number };
 export const POS_INVOICE_ARTWORK = {
   logo: '/prime-header-brand-refined.png',
-  background: '/prime-body-art.png',
+  backgroundTop: '#f5f8fc',
 };
-export type PosInvoiceArtwork = { logo: ArtworkImage; background: ArtworkImage };
+export type PosInvoiceArtwork = { logo: ArtworkImage };
 
 /** Use the shopfront's official artwork; keep payment QR pixels on a white panel. */
 export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, qr: ArtworkImage | undefined, artwork: PosInvoiceArtwork) {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Invoice image generation is unavailable on this device.');
   if (!invoice.items.length || invoice.items.length > 100) throw new Error('An invoice must contain between 1 and 100 items.');
-  if (!artwork?.logo || !artwork?.background) throw new Error('The official PRIME invoice artwork could not be loaded.');
+  if (!artwork?.logo) throw new Error('The official PRIME invoice artwork could not be loaded.');
   const paid = invoice.paymentStatus.toLowerCase() === 'paid';
   const navy = '#011830', blue = '#176dc2', muted = '#526578';
   const date = (value: string) => new Date(value).toLocaleString('en-PH', {timeZone:'Asia/Manila'});
@@ -135,12 +135,12 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
         y+=20;
       };
       y+=18;
-      if(!paid)reminder(`Please Pay The Total Amount Due Of P${Number(invoice.payableNow || 0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} Using The QR Code Below Thru Your Preferred Banking Or E-Wallet App.`);
+      if(!paid)reminder(`PLEASE PAY THE TOTAL AMOUNT DUE OF P${Number(invoice.payableNow || 0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})} USING THE QR CODE BELOW THRU YOUR PREFERRED BANKING OR E-WALLET APP.`);
       const qrWidth=WIDTH*.7,qrHeight=qrWidth*(Number(qr.height)||1)/(Number(qr.width)||1),left=WIDTH*.15;
       box(left-24,y,qrWidth+48,qrHeight+48,'#dce4ee');box(left-23,y+1,qrWidth+46,qrHeight+46,'#fff');
       if(draw){ctx.imageSmoothingEnabled=false;ctx.drawImage(qr,left,y+24,qrWidth,qrHeight);}
       y+=qrHeight+70;
-      if(!paid&&invoice.validUntil)reminder(`Payment Must Be Made Before ${paymentDeadline(invoice.validUntil)} To Avoid Cancellation.`);
+      if(!paid&&invoice.validUntil)reminder(`PAYMENT MUST BE MADE BEFORE ${paymentDeadline(invoice.validUntil)} TO AVOID CANCELLATION.`);
       if(paid)text('Payment Method QR',24,muted,true);
     }
     rule();text('Thank You For Choosing PRIME',30,navy,true,true);
@@ -150,9 +150,10 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
   const height=Math.ceil(render(false));
   if(height>8800)throw new Error('This invoice is too long for one image. Shorten item names or split the order.');
   canvas.width=WIDTH;canvas.height=height;ctx.textBaseline='top';
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,WIDTH,height);
-  ctx.drawImage(artwork.background,0,0,WIDTH,height);
-  ctx.fillStyle='rgba(255,255,255,.88)';ctx.fillRect(24,164,852,height-188);
+  const background=ctx.createLinearGradient(0,0,0,height);
+  background.addColorStop(0,POS_INVOICE_ARTWORK.backgroundTop);
+  background.addColorStop(1,'#ffffff');
+  ctx.fillStyle=background;ctx.fillRect(0,0,WIDTH,height);
   ctx.fillStyle=navy;ctx.fillRect(0,0,WIDTH,6);ctx.fillRect(0,height-6,WIDTH,6);
   render(true);
   return canvas;
@@ -164,13 +165,12 @@ export async function createPosInvoiceImage(invoice: PosInvoice, qrUrl?: string)
     const image=new Image();image.crossOrigin='anonymous';
     image.onload=()=>resolve(image);image.onerror=()=>reject(new Error(`${label} could not be loaded.`));image.src=url;
   });
-  const [,logo,background,qr]=await Promise.all([
+  const [,logo,qr]=await Promise.all([
     document.fonts?.ready,
     load(POS_INVOICE_ARTWORK.logo,'The official PRIME logo'),
-    load(POS_INVOICE_ARTWORK.background,'The shopfront background'),
     invoice.payment.qrCodeImage?load(qrUrl!,'The configured payment QR'):Promise.resolve(undefined),
   ]);
-  const canvas=drawPosInvoice(document.createElement('canvas'),invoice,qr,{logo,background});
+  const canvas=drawPosInvoice(document.createElement('canvas'),invoice,qr,{logo});
   return await new Promise<Blob>((resolve,reject)=>{
     try{canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Could not generate the invoice image.')),'image/png');}
     catch{reject(new Error('The invoice artwork cannot be included in an image. Re-upload the payment QR through Payment Methods.'));}

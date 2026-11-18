@@ -26,7 +26,7 @@ const table=name=>new Proxy({_table:name},{get:(target,key)=>key==='_table'?targ
 const db={
   async get(sql,params={}){return sqlite.prepare(sql).get(params);},
   async all(sql,params={}){return sqlite.prepare(sql).all(params);},
-  async run(sql,params={}){const q=sqlite.prepare(sql);if(/RETURNING/i.test(sql)){const rows=q.all(params);return {rows,rowsAffected:rows.length};}return {rowsAffected:Number(q.run(params).changes)};},
+  async run(sql,params={}){if(/CREATE TRIGGER IF NOT EXISTS trg_pos_unpaid_invoice_refund_v1/.test(sql)&&sqlite.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_pos_unpaid_invoice_refund_v1'").get())throw new Error('Write query looks like a read one');const q=sqlite.prepare(sql);if(/RETURNING/i.test(sql)){const rows=q.all(params);return {rows,rowsAffected:rows.length};}return {rowsAffected:Number(q.run(params).changes)};},
   select(){let t,condition={text:'1',params:[]};const chain={from(value){t=value._table;return chain;},where(value){condition=value;return chain;},orderBy(){return chain;},async get(){return decode(sqlite.prepare(`SELECT * FROM ${t} WHERE ${condition.text}`).get(...condition.params));},async all(){return sqlite.prepare(`SELECT * FROM ${t} WHERE ${condition.text}`).all(...condition.params).map(decode);}};return chain;},
 };
 class EndpointError extends Error{constructor(message,options){super(message);this.code=options?.code;}}
@@ -44,6 +44,8 @@ const credits=load('tgcloud/lib/credits.js',['reserveStoreCredits','finalizeStor
 const loyalty=load('tgcloud/lib/loyalty.js',['calculateCustomerTier','calculateOrderRewardPoints']);
 const pricing=load('tgcloud/lib/pos-pricing.js',['pricePosSale'],{...canonical,...charges,...loyalty,eq,asc:x=>x,charges:table('charges'),customers:table('customers'),orders:table('orders'),resolveTrustedFingerprint:()=>({})});
 const invoiceRefunds=load('tgcloud/lib/pos-invoice-refunds.js',['ensurePosInvoiceRefunds']);
+await invoiceRefunds.ensurePosInvoiceRefunds();
+await invoiceRefunds.ensurePosInvoiceRefunds(); // Repeated saves must skip no-op trigger writes.
 const deps={...invoiceRefunds,orderDeliveryPaymentMethod,...credits,...pricing,...operations,releasePromoClaim:async()=>{},...inventory,...canonical,...charges,eq,asc:x=>x,orders:table('orders'),customers:table('customers'),charges:table('charges'),couriers:table('couriers'),requireAdmin:async ctx=>{if(!ctx?.staff)throw new EndpointError('Staff required',{code:'ADMIN_REQUIRED'});return {id:ctx.staff};},notifyAdminOrderCreated:async()=>{},notifyPosOrderCreated:async()=>{}};
 const ratePricing=load('tgcloud/lib/pos-pricing.js',['pricePosSale'],{...canonical,...charges,...loyalty,eq,asc:x=>x,charges:table('charges'),customers:table('customers'),orders:table('orders'),resolveTrustedFingerprint:()=>({}),quoteDelivery:async()=>({fee:40,courier:{id:'courier'}}),validatePromo:async()=>({valid:true,promoId:'voucher',code:'SAVE',discountType:'fixed',discountAmount:10})});
 sqlite.exec("INSERT INTO charges(id,name,type,rate,is_active,description) VALUES('extra','Packing','fixed',5,1,'{\"isDefault\":false}')");
