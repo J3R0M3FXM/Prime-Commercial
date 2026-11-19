@@ -59,6 +59,7 @@ async function upload(file) {
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
 }
 assert.ok(button('Video'), 'Video choice is visible without a dropdown');
+assert.equal(document.querySelector('textarea').required, true, 'Text-only messages are required');
 await click('Video');
 assert.equal(document.querySelector('textarea').maxLength, 1024);
 await upload(new File(['bad'], 'clip.mov', { type: 'video/quicktime' }));
@@ -70,7 +71,8 @@ await upload(new File(['video'], 'offer.mp4', { type: 'video/mp4' }));
 assert.equal(uploads, 1);
 assert.equal(document.querySelector('video').getAttribute('src'), 'https://media.example/video.mp4?token=1');
 await fill(document.querySelector('input[placeholder="@channelname or -100…"]'), '@primegroup');
-await fill(document.querySelector('textarea'), 'Video announcement');
+assert.equal(document.querySelector('textarea').required, false, 'Media caption is optional');
+assert.equal(button('Send Broadcast').disabled, false, 'Video without caption can be sent');
 failGrant = true;
 await act(async () => document.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
 assert.equal(calls.filter(call => call.input.action === 'send').length, 0, 'Grant failure cannot send');
@@ -84,7 +86,7 @@ await act(async () => {
 const sent = calls.filter(call => call.input.action === 'send');
 assert.equal(sent.length, 1, 'Rapid submits cannot duplicate delivery');
 assert.equal(sent[0].input.mediaType, 'video');
-assert.equal(sent[0].input.message, 'Video announcement');
+assert.equal(sent[0].input.message, '', 'Video can be sent without a caption');
 assert.equal(sent[0].input.media, 'https://media.example/video.mp4?token=2', 'Refresh access link immediately before send');
 assert.ok(button('Check Send Status'));
 await click('Check Send Status');

@@ -15,7 +15,8 @@ export function validateBroadcast(input) {
   const mediaType = String(input.mediaType || 'none');
   if (!['none', 'photo', 'video'].includes(mediaType)) invalid('Choose Text Only, Photo, or Video.');
   const message = String(input.message || '').trim();
-  if (!message || message.length > (mediaType === 'none' ? 4096 : 1024)) invalid('A message is required (4096 characters for text, 1024 with media).');
+  if (mediaType === 'none' && !message) invalid('A message is required for text-only broadcasts.');
+  if (message.length > (mediaType === 'none' ? 4096 : 1024)) invalid('Use up to 4096 characters for text or 1024 for an optional media caption.');
   const media = mediaType === 'none' ? '' : String(input.media || '').trim();
   if (mediaType !== 'none' && !(mediaType === 'photo' && /^tgmedia:[A-Za-z0-9_-]{8,64}$/.test(media))) https(media);
   if (!Array.isArray(input.buttons) || input.buttons.length > 12) invalid('Use up to 12 inline buttons.');
@@ -87,9 +88,9 @@ export default async function (input, ctx) {
   const common = { chat_id: chat.id, ...(keyboard.length ? { reply_markup: { inline_keyboard: keyboard } } : {}) };
   try {
     const sent = request.mediaType === 'photo'
-      ? await api.sendPhoto({ ...common, photo: media, caption: request.message })
+      ? await api.sendPhoto({ ...common, photo: media, ...(request.message ? { caption: request.message } : {}) })
       : request.mediaType === 'video'
-        ? await api.sendVideo({ ...common, video: media, caption: request.message })
+        ? await api.sendVideo({ ...common, video: media, ...(request.message ? { caption: request.message } : {}) })
         : await api.sendMessage({ ...common, text: request.message });
     if (!Number.isSafeInteger(sent?.message_id) || sent.message_id <= 0) throw new Error('Missing Telegram confirmation');
     await db.run(`UPDATE secretary_broadcasts SET status='sent',message_id=:message,

@@ -23,7 +23,7 @@ const source = readFileSync('tgcloud/endpoints/sendSecretaryBroadcast.js', 'utf8
 const handler = new Function('api', 'db', 'EndpointError', 'requireAdmin', 'resolveSecretaryPhoto', source + '\nreturn handler;')(api, db, EndpointError, requireAdmin, resolveSecretaryPhoto);
 const request = { action: 'send', operationKey: 'a'.repeat(32), target: '@prime_channel', message: 'Keep My Casing', mediaType: 'none', buttons: [{ text: 'Shop Now', url: 'https://example.com/shop', row: 1 }, { text: 'Support', url: 'https://example.com/support', row: 1 }] };
 await assert.rejects(handler(request, {}), { code: 'ADMIN_REQUIRED' });
-for (const patch of [{ target: '111' }, { message: '' }, { message: 'x'.repeat(4097) }, { buttons: [{ text: 'Bad', url: 'javascript:alert(1)', row: 1 }] }, { buttons: Array(3).fill(request.buttons[0]) }, { operationKey: 'x'.repeat(129) }]) {
+for (const patch of [{ target: '111' }, { message: '' }, { message: '   ' }, { message: 'x'.repeat(4097) }, { buttons: [{ text: 'Bad', url: 'javascript:alert(1)', row: 1 }] }, { buttons: Array(3).fill(request.buttons[0]) }, { operationKey: 'x'.repeat(129) }]) {
   await assert.rejects(handler({ ...request, ...patch }, { id: 111 }), { code: 'INVALID_BROADCAST' });
 }
 chatType = 'private'; await assert.rejects(handler(request, { id: 111 }), { code: 'INVALID_BROADCAST' }); chatType = 'channel';
@@ -48,5 +48,14 @@ assert.equal((await handler(uncertain, { id: 111 })).status, 'uncertain');
 assert.equal((await handler(uncertain, { id: 111 })).status, 'uncertain');
 assert.equal(sent.length, 4, 'Lost Telegram responses are never automatically resent');
 assert.equal((await handler({ action: 'list' }, { id: 111 })).broadcasts.length, 4);
+failSend = false;
+await handler({ ...photo, operationKey: 'f'.repeat(32), message: '' }, { id: 111 });
+assert.equal(sent.at(-1).type, 'photo');
+assert.equal('caption' in sent.at(-1), false, 'Photo can be sent without a caption');
+await handler({ ...video, operationKey: 'g'.repeat(32), message: '   ' }, { id: 111 });
+assert.equal(sent.at(-1).type, 'video');
+assert.equal('caption' in sent.at(-1), false, 'Blank video caption is omitted');
+await handler({ ...video, operationKey: 'h'.repeat(32), message: 'x'.repeat(1024) }, { id: 111 });
+assert.equal(sent.at(-1).caption.length, 1024);
 sqlite.close();
 console.log('PASS: staff-only group/channel broadcasts, photo/video/text with inline rows, input bounds, account isolation, concurrent one-time sends and uncertain-delivery protection.');
