@@ -2,7 +2,7 @@ import { db, EndpointError } from 'sdk';
 import { fetch } from 'sdk/fetch';
 import { eq } from 'sdk/db';
 import { systemSettings } from '../schema.js';
-import { extractReceiptEvidence } from './payment-evidence.js';
+import { extractReceiptEvidence, RECEIPT_RULE_VERSION } from './payment-evidence.js';
 export async function ensureReceiptScans() {
   await db.run(`CREATE TABLE IF NOT EXISTS payment_receipt_scans (
     id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, image_sha256 TEXT NOT NULL,
@@ -25,7 +25,14 @@ export async function scanReceipt(data,contentType,customerId) {
   const hash=await imageHash(data),id=String(customerId)+':'+hash;
   await ensureReceiptScans();
   const old=await db.get('SELECT status,analysis,updated_at AS updatedAt FROM payment_receipt_scans WHERE id=:id',{':id':id});
-  if(old?.status==='complete'){try{return JSON.parse(old.analysis)}catch{}}
+  let cached;try{cached=old?.status==='complete'?JSON.parse(old.analysis):null}catch{}
+  if(cached&&typeof cached==='object'){
+    if(typeof cached.rawSummary==='string'&&Number(cached.paymentEvidence?.ruleVersion||0)<RECEIPT_RULE_VERSION){
+      cached={...cached,paymentEvidence:extractReceiptEvidence(cached.rawSummary),evidenceRecheckedAt:new Date().toISOString(),requiresManualReview:true};
+      await db.run("UPDATE payment_receipt_scans SET analysis=:analysis,updated_at=unixepoch() WHERE id=:id AND status='complete'",{':analysis':JSON.stringify(cached),':id':id});
+    }
+    return cached;
+  }
   if(old&&Number(old.updatedAt)>Date.now()/1000-90)throw new EndpointError('Receipt scan is already running or was recently attempted. Try again shortly.',{code:'RECEIPT_SCAN_BUSY'});
   const selected=await setting('receipt_ocr_provider');
   const provider=String(selected?.provider||'ocr_space');

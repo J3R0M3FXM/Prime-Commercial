@@ -35,16 +35,22 @@ export async function handleSmsBridge(request,env,{url,admin,respond}) {
   if(url.pathname==='/sms/ingest'&&request.method==='POST') {
     const auth=/^Bearer ([a-f0-9]{32})\.([a-f0-9]{64})$/.exec(request.headers.get('Authorization')||'');
     const device=auth?await get(env,'devices/'+auth[1]+'.json'):null;
-    if(!device||device.value.revoked||!same(auth[2],await token(env,'sms-device:'+auth[1]+':'+device.value.nonce)))return respond({error:'Device is not paired or was revoked.'},403);
-    let input;try{input=await body(request)}catch{return respond({error:'Invalid SMS payload.'},400)}
+    if(!device||device.value.revoked||!same(auth[2],await token(env,'sms-device:'+auth[1]+':'+device.value.nonce)))return respond({error:'Device is not paired or was revoked.',errorCode:'PAIRED_DEVICE_REQUIRED'},403);
+    let input;try{input=await body(request)}catch{return respond({error:'Invalid SMS payload.',errorCode:'INVALID_SMS_PAYLOAD'},400)}
     const sender=String(input.sender||''),text=String(input.body||'').trim();
     const parsed=parseMayaSms(sender,text);
     const receivedAt=Number(input.receivedAt);
-    if(!parsed||!Number.isSafeInteger(receivedAt)||receivedAt>now+300000||receivedAt<now-RETENTION||Date.parse(parsed.paidAt)>receivedAt+300000||Date.parse(parsed.paidAt)<receivedAt-86400000)return respond({error:'Only a valid recent MayaBiz payment confirmation is accepted.'},422);
+    const rejectSms=(error,errorCode)=>respond({error,errorCode,smsTimestampMs:Number.isSafeInteger(receivedAt)?receivedAt:null,paymentTime:parsed?.paidAt||null},422);
+    if(!parsed)return rejectSms('The SMS format could not be verified as a MayaBiz QRPH payment confirmation.','SMS_FORMAT_UNSUPPORTED');
+    if(!Number.isSafeInteger(receivedAt))return rejectSms('The SMS timestamp is missing or invalid.','INVALID_SMS_TIMESTAMP');
+    if(receivedAt>now+300000)return rejectSms('The SMS timestamp is more than five minutes ahead of server time.','SMS_TIMESTAMP_FUTURE');
+    if(receivedAt<now-RETENTION)return rejectSms('The SMS timestamp is older than the thirty-day retention window.','SMS_TOO_OLD');
+    if(Date.parse(parsed.paidAt)>receivedAt+300000)return rejectSms('The payment time printed in the SMS is more than five minutes later than its SMS timestamp.','PAYMENT_TIME_AFTER_SMS');
+    if(Date.parse(parsed.paidAt)<receivedAt-86400000)return rejectSms('The payment time printed in the SMS is over twenty-four hours earlier than its SMS timestamp.','PAYMENT_TIME_BEFORE_SMS');
     const id=await digest('MayaBiz\n'+text),record={id,deviceId:auth[1],sender:'MayaBiz',body:text,receivedAt,ingestedAt:now,expiresAt:now+RETENTION,...parsed};
     // Canonical object and reference indexes have deterministic names: network retries are idempotent.
     const old=await get(env,'events/'+id+'.json');
-    if(old&&old.value.expiresAt<now)return respond({error:'Confirmation expired.'},410);
+    if(old&&old.value.expiresAt<now)return respond({error:'Confirmation expired.',errorCode:'CONFIRMATION_EXPIRED'},410);
     await put(env,'events/'+id+'.json',record,{etagDoesNotMatch:'*'});
     for(const [kind,value] of [['invoice',parsed.qrPhInvoice],['trn',parsed.mayaTrn]])await put(env,'index/'+kind+'/'+value+'/'+id+'.json',{id,expiresAt:record.expiresAt});
     // Credential revocation lives in its own object; ingestion never rewrites it.

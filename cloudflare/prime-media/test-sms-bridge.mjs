@@ -20,11 +20,20 @@ const message=`${stamp}\nPayment received: PHP 946.00 via QRPH.\nTotal QR sales 
 const input={sender:'MayaBiz',body:message,receivedAt:Date.now()},headers={Authorization:'Bearer '+phone+'.'+paired.token};
 assert.equal((await call('/sms/ingest',{body:input})).status,403);
 assert.equal((await call('/sms/ingest',{body:{...input,sender:'Maya'},headers})).status,422);
+async function rejectsSms(body,code){const response=await call('/sms/ingest',{body,headers});assert.equal(response.status,422);const result=await response.json();assert.equal(result.errorCode,code);assert.ok(result.error);assert.equal(result.body,undefined);}
+await rejectsSms({...input,sender:'Maya'},'SMS_FORMAT_UNSUPPORTED');
+await rejectsSms({...input,receivedAt:'invalid'},'INVALID_SMS_TIMESTAMP');
+await rejectsSms({...input,receivedAt:Date.now()+600000},'SMS_TIMESTAMP_FUTURE');
+await rejectsSms({...input,receivedAt:Date.now()-31*86400000},'SMS_TOO_OLD');
+await rejectsSms({...input,receivedAt:Date.now()-600000},'PAYMENT_TIME_AFTER_SMS');
+const olderStamp=new Date(Date.now()-2*86400000+8*3600000).toISOString().slice(0,19).replace('T',' ');
+await rejectsSms({...input,body:message.replace(stamp,olderStamp)},'PAYMENT_TIME_BEFORE_SMS');
+assert.equal([...objects.keys()].filter(key=>key.startsWith('payment-sms/events/')).length,0,'Rejected SMS never becomes matching evidence');
 const accepted=await (await call('/sms/ingest',{body:input,headers})).json();assert.equal(accepted.accepted,true);
 assert.equal((await (await call('/sms/ingest',{body:input,headers})).json()).duplicate,true);
 const service=createHmac('sha256',env.STREAM_SIGNING_KEY).update('prime-sms-server-read-v1').digest('hex');
 const match=await (await call('/sms/match',{body:{type:'qrph_invoice',value:'435346'},headers:{'X-Prime-Sms-Service':service}})).json();assert.equal(match.events.length,1);assert.equal(match.events[0].amountCents,94600);assert.equal(match.events[0].body,undefined,'Raw message is not in matching responses');
 assert.equal((await call('/sms/match',{admin:true,body:{type:'qrph_invoice',value:'435346'}})).status,404,'Client admin identity cannot run authoritative matching');
 const row=objects.get('payment-sms/devices/'+phone+'.json');const value=JSON.parse(row.value);objects.set('payment-sms/devices/'+phone+'.json',{value:JSON.stringify({...value,revoked:true}),etag:'revoked'});
-assert.equal((await call('/sms/ingest',{body:input,headers})).status,403);assert.equal((await call('/sms/pair',{body:{code:pair.code,deviceId:phone}})).status,403,'Old pairing does not reactivate revoked credentials');
+assert.equal((await (await call('/sms/ingest',{body:input,headers})).json()).errorCode,'PAIRED_DEVICE_REQUIRED');assert.equal((await call('/sms/pair',{body:{code:pair.code,deviceId:phone}})).status,403,'Old pairing does not reactivate revoked credentials');
 console.log('PASS: SMS device pairing, scoped credentials, idempotent ingestion, exact sender, server-only matching, daily-sales exclusion and revocation.');

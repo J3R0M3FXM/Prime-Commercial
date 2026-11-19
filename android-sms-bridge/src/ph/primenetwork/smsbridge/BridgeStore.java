@@ -12,9 +12,9 @@ import javax.crypto.spec.GCMParameterSpec;
 import org.json.JSONObject;
 public final class BridgeStore extends SQLiteOpenHelper {
   private final Context context;
-  public BridgeStore(Context c){super(c,"payment-events.db",null,1);context=c.getApplicationContext();}
-  public void onCreate(SQLiteDatabase db){db.execSQL("CREATE TABLE queue(id TEXT PRIMARY KEY,payload TEXT,received_at INTEGER NOT NULL,state TEXT NOT NULL DEFAULT 'pending')");}
-  public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){}
+  public BridgeStore(Context c){super(c,"payment-events.db",null,2);context=c.getApplicationContext();}
+  public void onCreate(SQLiteDatabase db){db.execSQL("CREATE TABLE queue(id TEXT PRIMARY KEY,payload TEXT,received_at INTEGER NOT NULL,state TEXT NOT NULL DEFAULT 'pending',rejection_reason TEXT)");}
+  public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){if(oldVersion<2)db.execSQL("ALTER TABLE queue ADD COLUMN rejection_reason TEXT");}
   public SharedPreferences prefs(){return context.getSharedPreferences("bridge",Context.MODE_PRIVATE);}
   public String deviceId(){String id=prefs().getString("deviceId","");if(id.isEmpty()){id=UUID.randomUUID().toString().replace("-","");prefs().edit().putString("deviceId",id).commit();}return id;}
   private SecretKey key() throws Exception {KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);String alias="prime_sms_bridge_v1";if(store.containsAlias(alias))return (SecretKey)store.getKey(alias,null);KeyGenerator gen=KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,"AndroidKeyStore");gen.init(new KeyGenParameterSpec.Builder(alias,KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());return gen.generateKey();}
@@ -35,7 +35,9 @@ public final class BridgeStore extends SQLiteOpenHelper {
   }
   public List<String[]> pending(){List<String[]> list=new ArrayList<>();try(Cursor c=getReadableDatabase().rawQuery("SELECT id,payload FROM queue WHERE state='pending' ORDER BY received_at LIMIT 20",null)){while(c.moveToNext())list.add(new String[]{c.getString(0),c.getString(1)});}return list;}
   public void accepted(String id){ContentValues values=new ContentValues();values.put("state","sent");values.putNull("payload");getWritableDatabase().update("queue",values,"id=?",new String[]{id});prefs().edit().putLong("lastSent",System.currentTimeMillis()).apply();}
-  public void blocked(String id){ContentValues values=new ContentValues();values.put("state","blocked");getWritableDatabase().update("queue",values,"id=?",new String[]{id});}
+  public void blocked(String id,String reason){ContentValues values=new ContentValues();values.put("state","blocked");values.put("rejection_reason",reason);getWritableDatabase().update("queue",values,"id=?",new String[]{id});}
+  public String blockedReason(){try(Cursor c=getReadableDatabase().rawQuery("SELECT rejection_reason FROM queue WHERE state='blocked' ORDER BY received_at DESC LIMIT 1",null)){if(!c.moveToFirst())return "";return c.isNull(0)?"Blocked by an older app version. Retry to obtain the server reason.":c.getString(0);}}
+  public int retryBlocked(){try(SQLiteStatement statement=getWritableDatabase().compileStatement("UPDATE queue SET state='pending',rejection_reason=NULL WHERE id IN (SELECT id FROM queue WHERE state='blocked' AND payload IS NOT NULL ORDER BY received_at LIMIT 1000)")){return statement.executeUpdateDelete();}}
   public String counts(){try(Cursor c=getReadableDatabase().rawQuery("SELECT state,count(*) FROM queue GROUP BY state",null)){StringBuilder text=new StringBuilder();while(c.moveToNext())text.append(c.getString(0)).append(": ").append(c.getInt(1)).append("   ");return text.length()==0?"No payment messages received yet.":text.toString();}}
   public void disconnect(){prefs().edit().remove("token").putBoolean("enabled",false).remove("status").commit();getWritableDatabase().delete("queue",null,null);}
 }

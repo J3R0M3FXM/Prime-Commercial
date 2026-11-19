@@ -77,6 +77,7 @@ run('node', ['scripts/test-broadcast-video-ui.mjs'], 'Broadcast video upload, ca
 run('node', ['scripts/test-admin-portrait.mjs'], 'Admin portrait and configuration preservation');
 run('node', ['--check', 'public/media-offline-worker.js'], 'offline media worker syntax');
 run('node_modules/.bin/rolldown', ['cloudflare/prime-media/src/index.mjs', '--platform', 'browser', '--format', 'esm', '--file', 'cloudflare/prime-media/dist/worker.mjs'], 'R2 Worker bundle');
+run('node', ['scripts/test-receipt-cache-upgrade.mjs'], 'Cached receipt evidence upgrades without repeat OCR');
 run('node', ['scripts/test-receipt-binding.mjs'], 'Receipt scan authority and stale SMS clearing');
 run('node', ['scripts/test-payment-evidence.mjs'], 'Exact receipt and payment SMS reference rules');
 run('node', ['cloudflare/prime-media/test-sms-bridge.mjs'], 'SMS pairing, ingestion and revocation');

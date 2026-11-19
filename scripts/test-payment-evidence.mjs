@@ -41,3 +41,15 @@ assert.equal(comparePaymentEvidence({...bpi,paidAt:null},sms,94600).matched,fals
 assert.equal(comparePaymentEvidence({...bpi,paidAt:'2026-11-19T14:40:41.000Z'},sms,94600).matched,false);
 assert.equal(moneyCents('PHP 1,234.50'),123450);assert.equal(moneyCents('1,23.50'),null);
 console.log('PASS: exact BPI/SMS case, all seven provider mappings, leading zeroes, case preservation, conflicts, sender/OTP filtering, daily-sales exclusion, amounts and times.');
+
+const iconReceipt='Paid via GCash\nAmount 1,019.00\nDate Nov 20, 2026 5:10 AM\nQRPH Invoice No. 123456 0';
+const iconEvidence=extractReceiptEvidence(iconReceipt);
+assert.equal(iconEvidence.reference,'123456','Copy-icon OCR does not hide the intact six-digit token');
+assert.equal(iconEvidence.amountCents,101900);
+assert.equal(iconEvidence.paidAtPrecision,'minute');
+for(const invalid of ['1234560','123 456','12345O 0','123456-0','X123456','123456X','123456 654321','123456 123456'])assert.equal(extractReceiptEvidence(iconReceipt.replace('123456 0',invalid)).reference,'','No joining, correction, truncation or ambiguous token choice: '+invalid);
+const minuteMatch=comparePaymentEvidence(iconEvidence,{qrPhInvoice:'123456',amountCents:101900,paidAt:'2026-11-19T21:10:45.000Z'},101900);
+assert.equal(minuteMatch.matched,true);assert.equal(minuteMatch.secondsApart,undefined,'Minute receipts cannot claim an exact second difference');
+assert.equal(minuteMatch.secondsApartMin,0);assert.equal(minuteMatch.secondsApartMax,45);
+assert.equal(comparePaymentEvidence(iconEvidence,{qrPhInvoice:'123456',amountCents:101900,paidAt:'2026-11-19T20:55:00.000Z'},101900).matched,false,'The entire receipt minute must fit the allowed time window');
+console.log('PASS: labelled intact identifiers survive separate copy-icon OCR tokens; ambiguous/joined/altered digits fail; minute-only receipt timing remains explicit.');

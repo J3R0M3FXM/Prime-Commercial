@@ -9,10 +9,12 @@ public final class SyncJob extends JobService {
     for(String[] row:store.pending()){
       if(!store.enabled())break;
       BridgeNetwork.Reply reply=BridgeNetwork.post("/sms/ingest",store.decrypt(row[1]),bearer);
-      if(reply.status==200&&reply.data.optBoolean("accepted")){store.accepted(row[0]);store.status("Last payment message delivered to PRIME.");}
-      else if(reply.status==403){store.prefs().edit().putBoolean("enabled",false).commit();ListenerService.stop(this);store.status("Pairing revoked or expired. Pair again.");break;}
-      else if(reply.status==422||reply.status==400||reply.status==410){store.blocked(row[0]);store.status("Message rejected by PRIME. Review bridge status.");}
-      else{retry=true;store.status("PRIME unavailable. Messages remain queued.");break;}
+      String code=reply.data.optString("errorCode","");String reason=reply.data.optString("error","");
+      int decision=DeliveryDecision.classify(reply.status,reply.data.optBoolean("accepted"),!reason.isEmpty(),code);
+      if(decision==DeliveryDecision.DELIVERED){store.accepted(row[0]);store.status("Last payment message delivered to PRIME.");}
+      else if(decision==DeliveryDecision.PAIR_REQUIRED){store.prefs().edit().putBoolean("enabled",false).commit();ListenerService.stop(this);store.status("Pairing revoked or expired. Pair again.");break;}
+      else if(decision==DeliveryDecision.BLOCKED){String detail="HTTP "+reply.status+" · "+code+" · "+reason.substring(0,Math.min(reason.length(),300));if(reply.data.has("smsTimestampMs")&&!reply.data.isNull("smsTimestampMs"))detail+="\nSMS timestamp (UTC): "+java.time.Instant.ofEpochMilli(reply.data.optLong("smsTimestampMs"));if(reply.data.has("paymentTime")&&!reply.data.isNull("paymentTime"))detail+="\nPayment time (UTC): "+reply.data.optString("paymentTime");store.blocked(row[0],detail);store.status("Message blocked. The saved reason is shown above.");}
+      else{retry=true;store.status("PRIME did not confirm delivery (HTTP "+reply.status+"). Messages remain queued for retry.");break;}
     }
     if(!store.pending().isEmpty()&&store.enabled())retry=true;
   }catch(Exception error){retry=true;try(BridgeStore store=new BridgeStore(this)){store.status("Offline or sync interrupted. Messages remain queued.");}}

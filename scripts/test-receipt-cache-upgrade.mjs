@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import { webcrypto } from 'node:crypto';
+import {extractReceiptEvidence,RECEIPT_RULE_VERSION} from '../tgcloud/lib/payment-evidence.js';
+const source=fs.readFileSync('tgcloud/lib/receipt-ocr.js','utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');
+const original={receiptScanId:'customer:hash',receiptOcrVerified:true,rawSummary:'Paid via GCash\nAmount 1,019.00\nQRPH Invoice No. 123456 0',paymentEvidence:{ruleVersion:1,reference:'',status:'reference_unreadable'},analyzedAt:'2026-11-20T00:00:00Z'};
+let stored=JSON.stringify(original),writes=0;
+const db={get:async()=>({status:'complete',analysis:stored}),run:async(query,params)=>{if(query.startsWith('UPDATE payment_receipt_scans SET analysis=')){stored=params[':analysis'];writes++}return {rowsAffected:1}},select(){throw Error('Cached text must not request provider credentials')}};
+const noFetch=()=>{throw Error('Cached text must not call a paid OCR provider')};
+const {scanReceipt}=new Function('db','EndpointError','crypto','fetch','extractReceiptEvidence','RECEIPT_RULE_VERSION',source+';return {scanReceipt}')(db,Error,webcrypto,noFetch,extractReceiptEvidence,RECEIPT_RULE_VERSION);
+const bytes=Buffer.from([255,216,...new Array(16).fill(1)]).toString('base64url');
+const result=await scanReceipt(bytes,'image/jpeg','customer');assert.equal(result.paymentEvidence.reference,'123456');assert.equal(result.paymentEvidence.ruleVersion,RECEIPT_RULE_VERSION);assert.equal(result.analyzedAt,original.analyzedAt);assert.equal(result.receiptOcrVerified,true);assert.equal(writes,1);
+await scanReceipt(bytes,'image/jpeg','customer');assert.equal(writes,1,'Current rules do not rewrite or re-OCR the cached scan');
+console.log('PASS: existing unreadable scans re-extract their saved OCR text once without uploading the receipt or paying for another OCR request.');

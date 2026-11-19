@@ -1,3 +1,4 @@
+export const RECEIPT_RULE_VERSION = 2;
 // Provider-labelled identifiers are never rearranged, fuzzy-matched or OCR-corrected.
 const clean = value => String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\r\n?/g, '\n');
 export function moneyCents(value) {
@@ -22,6 +23,15 @@ function uniqueValue(text, label, pattern) {
   const candidates = values(text, label);
   const valid = candidates.filter(value => pattern.test(value));
   return candidates.length === 1 && valid.length === 1 ? valid[0] : '';
+}
+// A receipt copy icon can OCR as a separate token after the real identifier.
+// Accept one complete labelled token; never join digits or cut a longer token.
+function uniqueReceiptValue(text, label, pattern) {
+  const candidates = values(text, label);
+  if (candidates.length !== 1) return '';
+  if (pattern.test(candidates[0])) return candidates[0];
+  const tokens = candidates[0].split(/\s+/).filter(token => pattern.test(token));
+  return tokens.length === 1 ? tokens[0] : '';
 }
 export function phtTimestamp(value) {
   const text = String(value || '').trim();
@@ -57,7 +67,7 @@ export function extractReceiptEvidence(raw) {
   let provider = 'unknown', referenceType = '', reference = '', fullReference = '', sourceLabel = '';
   const candidates = [];
   const add = (name, label, pattern, type, transform = value => value) => {
-    const value = uniqueValue(text, label, pattern);
+    const value = uniqueReceiptValue(text, label, pattern);
     if (value) candidates.push({provider:name,sourceLabel:({gcash:'QRPH Invoice No.',maya_email:'Maya Transaction No.',bpi:'Transaction Ref. No.',unionbank:'Instapay Reference Number',maribank_seabank:'Reference Number',maya_wallet:'Reference ID'})[name],fullReference:value,referenceType:type,reference:transform(value)});
   };
   add('gcash', 'QRPH[ \\t]+Invoice[ \\t]+No\\.?', /^\d{6}$/, 'qrph_invoice');
@@ -76,9 +86,11 @@ export function extractReceiptEvidence(raw) {
     if (found.length === 1) { amountCents = found[0]; break; }
     if (found.length > 1) break;
   }
-  const paidAt = text.split('\n').map(line => phtTimestamp(line.trim())).find(Boolean) || null;
-  return { ruleVersion: 1, provider, referenceType, reference, fullReference, sourceLabel,
-    amountCents, paidAt, status: distinct.size > 1 ? 'conflicting_references' : reference ? 'reference_extracted' : 'reference_unreadable',
+  const dateLine = text.split('\n').find(line => phtTimestamp(line.trim())) || '';
+  const paidAt = dateLine ? phtTimestamp(dateLine.trim()) : null;
+  const paidAtPrecision = !paidAt ? null : /\b\d{1,2}:\d{2}:\d{2}\b/.test(dateLine) ? 'second' : 'minute';
+  return { ruleVersion: RECEIPT_RULE_VERSION, provider, referenceType, reference, fullReference, sourceLabel,
+    amountCents, paidAt, paidAtPrecision, status: distinct.size > 1 ? 'conflicting_references' : reference ? 'reference_extracted' : 'reference_unreadable',
     requiresManualReview: true };
 }
 export function comparePaymentEvidence(receipt, sms, expectedCents) {
@@ -89,6 +101,11 @@ export function comparePaymentEvidence(receipt, sms, expectedCents) {
   const receiptTime = Date.parse(receipt.paidAt || ''), smsTime = Date.parse(sms.paidAt || '');
   if (!Number.isFinite(receiptTime) || !Number.isFinite(smsTime)) return {status:'time_unreadable',matched:false};
   const secondsApart = Math.abs(smsTime - receiptTime) / 1000;
-  if (secondsApart > 15 * 60) return {status:'time_mismatch',matched:false,secondsApart};
-  return {status:'sms_corroborated',matched:true,secondsApart,requiresManualReview:true};
+  // Minute-only receipts represent an interval, not an invented exact second.
+  const minute = receipt.paidAtPrecision === 'minute';
+  const end = receiptTime + (minute ? 59999 : 0);
+  const farthest = Math.max(secondsApart, Math.abs(smsTime - end) / 1000);
+  const timeDetails = minute ? {receiptTimePrecision:'minute',secondsApartMin:smsTime>=receiptTime&&smsTime<=end?0:Math.min(secondsApart,Math.abs(smsTime-end)/1000),secondsApartMax:farthest} : {secondsApart};
+  if (farthest > 15 * 60) return {status:'time_mismatch',matched:false,...timeDetails};
+  return {status:'sms_corroborated',matched:true,...timeDetails,requiresManualReview:true};
 }
