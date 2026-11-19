@@ -7,7 +7,7 @@ import { promoRedemptions, promos } from '../schema.js';
 const fields = new Set([
   'code', 'title', 'description', 'voucherType', 'discountType', 'discountValue',
   'maxDiscountAmount', 'cappedShippingDiscount', 'cashbackPercentage', 'minSpend',
-  'minItemQuantity', 'customerEligibility', 'eligibleCustomerId', 'minPreviousOrders', 'eligibleTiers',
+  'requiredItems', 'minItemQuantity', 'customerEligibility', 'eligibleCustomerId', 'minPreviousOrders', 'eligibleTiers',
   'allowedPaymentMethods', 'allowedCourierIds', 'activeDaysOfWeek', 'isPaydayOnly',
   'flashHourStart', 'flashHourEnd', 'totalUsageLimit', 'usageCount',
   'usageLimitPerCustomer', 'isActive', 'startDate', 'endDate',
@@ -37,7 +37,22 @@ function normalize(input, current = {}) {
   for (const [key, value] of Object.entries(input)) {
     if (key === 'action' || key === 'id') continue;
     if (!fields.has(key)) throw new EndpointError('Unsupported promo field: ' + key, { code: 'INVALID_FIELD' });
-    if (stringFields.has(key)) {
+    if (key === 'requiredItems') {
+      if (!Array.isArray(value) || value.length > 20) throw new EndpointError('Use up to 20 product requirements.', { code: 'INVALID_INPUT' });
+      const seen = new Set();
+      values.requiredItems = value.map(rule => {
+        if (!rule || typeof rule !== 'object' || Array.isArray(rule) ||
+            typeof rule.productId !== 'string' || !rule.productId.trim() || rule.productId.length > 128 ||
+            (rule.variantId != null && (typeof rule.variantId !== 'string' || rule.variantId.length > 128))) {
+          throw new EndpointError('Choose a valid required product and variant.', { code: 'INVALID_INPUT' });
+        }
+        const productId = rule.productId.trim(), variantId = String(rule.variantId || '').trim();
+        const key = JSON.stringify([productId, variantId]);
+        if (seen.has(key)) throw new EndpointError('Combine duplicate product requirements into one quantity.', { code: 'INVALID_INPUT' });
+        seen.add(key);
+        return { productId, variantId, quantity: numberValue(rule.quantity, 'Required quantity', { integer: true, min: 1, max: 9999 }) };
+      });
+    } else if (stringFields.has(key)) {
       if (typeof value !== 'string') throw new EndpointError(key + ' must be text.', { code: 'INVALID_INPUT' });
       const text = value.trim();
       if (['code', 'title', 'voucherType', 'discountType', 'customerEligibility'].includes(key) && !text) {

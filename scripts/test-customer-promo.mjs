@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calculatePromoDiscount, deserializePromo, generatePromoCode, serializePromoDescription } from '../tgcloud/lib/promos.js';
+import { checkPromoItems, calculatePromoDiscount, deserializePromo, generatePromoCode, serializePromoDescription } from '../tgcloud/lib/promos.js';
 
 function load(path, dependencies) {
   const source = readFileSync(path, 'utf8').replace(/^import[\s\S]*?;\n/gm, '').replace(/export default async function\s*\(/, 'async function handler(');
@@ -35,7 +35,7 @@ const db = {
 class EndpointError extends Error { constructor(message, info) { super(message); this.code = info.code; } }
 const requireAdmin = async ctx => { if (ctx?.initData?.user?.id !== 999) throw new EndpointError('Admin required', { code: 'ADMIN_REQUIRED' }); };
 const manage = load('tgcloud/endpoints/managePromos.js', { db, EndpointError, desc: field => field, eq, sql, requireAdmin, deserializePromo, generatePromoCode, serializePromoDescription, promoRedemptions, promos });
-const validate = load('tgcloud/endpoints/validatePromo.js', { db, and, asc: field => field, eq, isNull: field => row => row[field] == null, or, sql, calculateCustomerTier: () => ({ tier: 'Silver' }), resolveTrustedFingerprint: (_customer, submitted) => submitted, calculatePromoDiscount, deserializePromo, customers, orders, promoRedemptions, promos });
+const validate = load('tgcloud/endpoints/validatePromo.js', { db, and, asc: field => field, eq, isNull: field => row => row[field] == null, or, sql, calculateCustomerTier: () => ({ tier: 'Silver' }), resolveTrustedFingerprint: (_customer, submitted) => submitted, checkPromoItems, calculatePromoDiscount, deserializePromo, customers, orders, promoRedemptions, promos });
 const validateReferral = load('tgcloud/endpoints/validateReferral.js', { db, eq, customers, orders });
 const publicPromos = load('tgcloud/endpoints/getActivePromos.js', { db, desc: field => field, eq, deserializePromo, promos });
 const context = id => ({ initData: { user: { id } } });
@@ -103,3 +103,23 @@ const orderSource = readFileSync('tgcloud/endpoints/createOrder.js', 'utf8');
 assert.match(orderSource, /promo = await validatePromo\([\s\S]*?id: customer\.tgUserId[\s\S]*?if \(!promo\?\.valid\)/, 'Order submission repeats promo validation using the authenticated customer');
 assert.match(orderSource, /const referral = await validateReferral\([\s\S]*?if \(!referral\?\.valid\)/, 'Order submission repeats referral validation');
 console.log('PASS: promo create/update round-trip, admin authorization, customer-specific enforcement and order revalidation.');
+
+const basketPromo = await manage({...input,id:'basket-promo',code:'BASKET',customerEligibility:'all',eligibleCustomerId:'',requiredItems:[{productId:'coffee',variantId:'large',quantity:2}]},context(999));
+assert.deepEqual(basketPromo.requiredItems,[{productId:'coffee',variantId:'large',quantity:2}]);
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500},context(111))).valid,false,'Missing basket fails closed');
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500,items:[{productId:'coffee',variantId:'small',quantity:5}]},context(111))).valid,false,'Wrong variant fails');
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500,items:[{productId:'coffee',variantId:'large',quantity:1},{productId:'coffee',variantId:'large',quantity:1}]},context(111))).valid,true,'Split lines satisfy required quantity');
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500,items:[{productId:'coffee',variantId:'large',quantity:2,isFree:true}]},context(111))).valid,false,'Free gifts do not satisfy purchase requirements');
+const preserved = await manage({action:'update',id:'basket-promo',title:'Renamed'},context(999));
+assert.deepEqual(preserved.requiredItems,basketPromo.requiredItems,'Unrelated edits preserve product rules');
+await assert.rejects(manage({action:'update',id:'basket-promo',requiredItems:[{productId:'coffee',quantity:0}]},context(999)),error=>error.code==='INVALID_INPUT');
+await assert.rejects(manage({action:'update',id:'basket-promo',requiredItems:[{productId:'coffee',quantity:1},{productId:'coffee',quantity:2}]},context(999)),error=>error.code==='INVALID_INPUT');
+await manage({action:'update',id:'basket-promo',requiredItems:[{productId:'coffee',variantId:'',quantity:2}],minItemQuantity:3},context(999));
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500,itemQuantity:3,items:[{productId:'coffee',variantId:'small',quantity:1},{productId:'coffee',variantId:'large',quantity:1},{productId:'tea',quantity:1}]},context(111))).valid,true,'Any variant counts across variants');
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500,itemQuantity:0,items:[{productId:'coffee',quantity:3}]},context(111))).valid,false,'Zero cannot bypass minimum basket count');
+await manage({action:'update',id:'basket-promo',requiredItems:[],minItemQuantity:null},context(999));
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500},context(111))).valid,true,'Requirements can be cleared');
+assert.equal(checkPromoItems({requiredItems:[{productId:'coffee',variantId:'',quantity:2}]},[{productId:'coffee',quantity:-1}]).length>0,true);
+assert.equal(checkPromoItems({requiredItems:{}},[]).length>0,true);
+for(const path of ['tgcloud/endpoints/createOrder.js','tgcloud/lib/pos-pricing.js'])assert.match(readFileSync(path,'utf8'),/items: cart.items/,'Final pricing must validate canonical products');
+console.log('PASS: product/variant purchase rules, split quantities, gifts, persistence, malformed rules and authoritative checkout/POS wiring.');

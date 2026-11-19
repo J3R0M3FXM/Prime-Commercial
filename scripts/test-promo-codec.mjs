@@ -8,6 +8,7 @@ const original = {
   voucherType: 'shipping_voucher',
   customerEligibility: 'tier_restricted',
   minItemQuantity: 3,
+  requiredItems: [{ productId: "coffee", variantId: "large", quantity: 2 }],
   minPreviousOrders: 2,
   eligibleTiers: ['GOLD', 'PLATINUM'],
   allowedPaymentMethods: ['gcash', 'maya'],
@@ -39,7 +40,7 @@ const decoded = deserializePromo({
   endDate: new Date('2026-10-31T23:59:59.000Z'),
 });
 for (const key of [
-  'description', 'voucherType', 'customerEligibility', 'minItemQuantity',
+  'requiredItems', 'description', 'voucherType', 'customerEligibility', 'minItemQuantity',
   'minPreviousOrders', 'eligibleTiers', 'allowedPaymentMethods',
   'allowedCourierIds', 'activeDaysOfWeek', 'isPaydayOnly', 'flashHourStart',
   'flashHourEnd', 'cappedShippingDiscount', 'cashbackPercentage',

@@ -107,6 +107,15 @@ export default async function (input, ctx) {
   await requireAdmin(ctx);
   const action = input?.action;
 
+  if (action === 'promoOptions') {
+    const rows = await db.select({ id: products.id, name: products.name,
+      isActive: products.isActive, bundleConfig: products.bundleConfig })
+      .from(products).orderBy(asc(products.sortOrder)).all();
+    return rows.map(row => ({ id: row.id, name: row.name, isActive: row.isActive,
+      variants: (Array.isArray(row.bundleConfig?.variants) ? row.bundleConfig.variants : [])
+        .map(variant => ({ id: String(variant.id), name: String(variant.name || variant.id) })) }));
+  }
+
   if (action === 'list') return await db.select().from(products).orderBy(asc(products.sortOrder)).all();
 
   if (action === 'reorder') {

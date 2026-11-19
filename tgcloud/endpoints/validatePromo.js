@@ -2,7 +2,7 @@ import { db } from 'sdk';
 import { and, asc, eq, isNull, or, sql } from 'sdk/db';
 import { calculateCustomerTier } from '../lib/loyalty.js';
 import { resolveTrustedFingerprint } from '../lib/fingerprints.js';
-import { calculatePromoDiscount, deserializePromo } from '../lib/promos.js';
+import { calculatePromoDiscount, deserializePromo, checkPromoItems } from '../lib/promos.js';
 import { customers, orders, promoRedemptions, promos } from '../schema.js';
 
 const fail = (error) => ({ valid: false, error });
@@ -71,9 +71,12 @@ export default async function (input, ctx) {
   if (promo.minSpend > 0 && subtotal < promo.minSpend) {
     return fail('Minimum spend of ₱' + Number(promo.minSpend).toLocaleString() + ' on items is required for this promo.');
   }
-  if (promo.minItemQuantity > 0 && itemQuantity > 0 && itemQuantity < promo.minItemQuantity) {
+  if (promo.minItemQuantity > 0 && itemQuantity < promo.minItemQuantity) {
     return fail('Minimum of ' + promo.minItemQuantity + ' items in cart is required for this promo.');
   }
+
+  const itemError = checkPromoItems(promo, input?.items);
+  if (itemError) return fail(itemError);
 
   const ownership = [eq(orders.customerId, customer.id)];
   if (customer.primeMemberId) ownership.push(eq(orders.primeMemberId, customer.primeMemberId));

@@ -23,6 +23,7 @@ export function deserializePromo(row) {
     cashbackPercentage: hasMeta && meta.cashbackPercentage != null ? Number(meta.cashbackPercentage) : undefined,
     minSpend: Number(row.minSpend) || 0,
     minItemQuantity: hasMeta && meta.minItemQuantity != null ? Number(meta.minItemQuantity) : undefined,
+    requiredItems: hasMeta && meta.requiredItems != null ? meta.requiredItems : [],
     customerEligibility: hasMeta ? meta.customerEligibility ?? 'all' : 'all',
     eligibleCustomerId: hasMeta ? String(meta.eligibleCustomerId || '') : '',
     minPreviousOrders: hasMeta && meta.minPreviousOrders != null ? Number(meta.minPreviousOrders) : undefined,
@@ -60,6 +61,7 @@ export function serializePromoDescription(promo, existingDescription = '') {
     voucherType: promo.voucherType || 'shop_voucher',
     customerEligibility: promo.customerEligibility || 'all',
     eligibleCustomerId: String(promo.eligibleCustomerId || '').trim(),
+    requiredItems: Array.isArray(promo.requiredItems) ? promo.requiredItems : [],
     minItemQuantity: promo.minItemQuantity !== undefined ? promo.minItemQuantity : null,
     minPreviousOrders: promo.minPreviousOrders !== undefined ? promo.minPreviousOrders : null,
     eligibleTiers: Array.isArray(promo.eligibleTiers) ? promo.eligibleTiers : [],
@@ -122,4 +124,26 @@ export function generatePromoCode(prefix = 'PRIME') {
   for (let i = 0; i < 4; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
   const cleanPrefix = String(prefix || 'PRIME').toUpperCase().replace(/[^A-Z0-9]/g, '');
   return cleanPrefix + '-' + rand;
+}
+
+// Evaluate purchase conditions before any free gift is added to the cart.
+export function checkPromoItems(promo, items) {
+  const requirements = promo.requiredItems || [];
+  if (!Array.isArray(requirements)) return 'This promo has invalid product requirements.';
+  if (!requirements.length) return '';
+  const lines = Array.isArray(items) ? items.filter(line => line && !line.isFree) : [];
+  for (const rule of requirements) {
+    if (!rule || typeof rule.productId !== 'string' || !rule.productId.trim() ||
+        typeof rule.variantId !== 'string' || !Number.isSafeInteger(rule.quantity) || rule.quantity < 1) {
+      return 'This promo has invalid product requirements.';
+    }
+    const quantity = lines.reduce((total, line) => {
+      const amount = Number(line.quantity);
+      return String(line.productId || '') === rule.productId &&
+        (!rule.variantId || String(line.variantId || 'default') === rule.variantId) &&
+        Number.isSafeInteger(amount) && amount > 0 ? total + amount : total;
+    }, 0);
+    if (quantity < rule.quantity) return 'Add the required product and quantity to use this promo (' + rule.quantity + ' required).';
+  }
+  return '';
 }

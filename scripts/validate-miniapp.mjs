@@ -38,6 +38,7 @@ run('node', ['scripts/test-support-tabs.mjs'], 'customer and staff Support sub-t
 run('node', ['scripts/test-support-backend.mjs'], 'Support ownership, replies and FAQ capacity');
 run('node', ['scripts/test-promo-codec.mjs'], 'promo regressions');
 run('node', ['scripts/test-customer-promo.mjs'], 'customer-specific promo enforcement');
+run('node', ['scripts/test-promo-requirements-ui.mjs'], 'Promo product requirements editor');
 run('node', ['scripts/test-voucher-generator.mjs'], 'voucher generation and PNG export');
 run('node', ['scripts/test-voucher-delivery.mjs'], 'voucher delivery authorization and retries');
 run('node', ['scripts/test-order-location-pipeline.mjs'], 'IP and GPS snapshot provider pipeline');

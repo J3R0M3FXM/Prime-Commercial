@@ -270,6 +270,7 @@ async function makeCanonicalSnapshot(request, customer, submittedAt) {
       code: request.promoCode,
       itemsSubtotal: cart.subtotal,
       itemQuantity: cart.itemQuantity,
+      items: cart.items,
       totalItems: cart.itemQuantity,
       deliveryFee: delivery.fee,
       paymentMethod: request.deliveryPaymentMethod,

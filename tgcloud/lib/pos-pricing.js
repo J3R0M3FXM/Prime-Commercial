@@ -44,7 +44,7 @@ export async function pricePosSale(input) {
   let promo = null;
   if (String(input.promoCode || '').trim()) {
     if (!customer) throw new EndpointError('Select an existing customer to apply a voucher.');
-    promo = await validatePromo({ code: input.promoCode, itemsSubtotal: cart.subtotal, itemQuantity: cart.itemQuantity, deliveryFee, paymentMethod: delivery ? deliveryPaymentMethod : 'upon_checkout', courierId: delivery?.courier.id || '' }, { initData: { user: { id: customer.tgUserId } } });
+    promo = await validatePromo({ code: input.promoCode, itemsSubtotal: cart.subtotal, itemQuantity: cart.itemQuantity, items: cart.items, deliveryFee, paymentMethod: delivery ? deliveryPaymentMethod : 'upon_checkout', courierId: delivery?.courier.id || '' }, { initData: { user: { id: customer.tgUserId } } });
     if (!promo.valid) throw new EndpointError(promo.error || 'Voucher unavailable.');
     if (!delivery && ['free_shipping', 'shipping_discount'].includes(promo.discountType)) throw new EndpointError('Delivery vouchers require a delivery transaction.');
     if (promo.discountType === 'free_product') {

@@ -1142,6 +1142,12 @@ export default function CheckoutModal({
         code: cleanCode,
         itemsSubtotal,
         itemQuantity: totalItemCount,
+        items: selectedItems.map(it => ({
+          isFree: Boolean(it.isFree),
+          productId: it.productId || (typeof it.id === 'string' && it.id.includes('_') ? it.id.split('_')[0] : it.id),
+          variantId: it.variantId || (typeof it.id === 'string' && it.id.includes('_') ? it.id.split('_')[1] : 'default'),
+          quantity: Number(it.quantity) || 1,
+        })),
         totalItems: totalItemCount,
         deliveryFee: courierDeliveryFee,
         customerId: tgCustomer.id,
@@ -1269,6 +1275,10 @@ export default function CheckoutModal({
     }
   };
 
+  const promoBasketKey = JSON.stringify(selectedItems.map(item => [
+    item.productId || item.id, item.variantId || '', item.quantity, Boolean(item.isFree),
+  ]));
+
   useEffect(() => {
     const version = ++promoValidationVersion.current;
     if (!isOpen || currentStep !== 4 || !promoCodeInput.trim()) { setIsCheckingPromo(false); return; }
@@ -1276,7 +1286,7 @@ export default function CheckoutModal({
     setIsCheckingPromo(true);
     const timer = window.setTimeout(() => void handleApplyPromo(version), 350);
     return () => { window.clearTimeout(timer); promoValidationVersion.current++; };
-  }, [isOpen, currentStep, promoCodeInput, itemsSubtotal, courierDeliveryFee, selectedCourierId, deliveryPaymentMethod]);
+  }, [isOpen, currentStep, promoCodeInput, itemsSubtotal, promoBasketKey, courierDeliveryFee, selectedCourierId, deliveryPaymentMethod]);
 
   useEffect(() => {
     const version = ++referralValidationVersion.current;
