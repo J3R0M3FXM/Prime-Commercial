@@ -70,6 +70,7 @@ run('node', ['scripts/test-device-security-ui.mjs'], 'device security customer a
 run('node', ['scripts/test-media.mjs'], 'media upload/gallery/offline/playlist safety');
 run('node', ['scripts/test-secretary-ui.mjs'], 'Secretary configurator layout/navigation/save regressions');
 run('node', ['scripts/test-secretary-broadcast.mjs'], 'Secretary broadcast authorization and duplicate-send safety');
+run('node', ['scripts/test-broadcast-video-ui.mjs'], 'Broadcast video upload, caption and send locks');
 run('node', ['scripts/test-admin-portrait.mjs'], 'Admin portrait and configuration preservation');
 run('node', ['--check', 'public/media-offline-worker.js'], 'offline media worker syntax');
 run('node_modules/.bin/rolldown', ['cloudflare/prime-media/src/index.mjs', '--platform', 'browser', '--format', 'esm', '--file', 'cloudflare/prime-media/dist/worker.mjs'], 'R2 Worker bundle');

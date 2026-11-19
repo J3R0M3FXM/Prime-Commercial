@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { callServerless, getTelegramServerlessSession, uploadStaffImage } from "@/lib/telegram-serverless-client";
 import TelegramMediaImage from "@/app/components/telegram-media-image";
 
+import { uploadLibraryAsset, assetAccessUrl, type LibraryAsset } from "@/lib/asset-library";
+
 type LinkButton = { text: string; url: string; row: number };
-type Draft = { target: string; message: string; mediaType: "none" | "photo" | "video"; media: string; buttons: LinkButton[] };
+type Draft = { target: string; message: string; mediaType: "none" | "photo" | "video"; media: string; videoAsset?: LibraryAsset; buttons: LinkButton[] };
 type Attempt = { operationKey: string; draft: Draft };
 type Result = { status: string; messageId?: number; target?: string; requestKey?: string; createdAt?: number };
 const blank = (): Draft => ({ target: "", message: "", mediaType: "none", media: "", buttons: [] });
@@ -22,6 +24,8 @@ export default function SecretaryBroadcastPanel() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const lock = useRef(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [videoPreview, setVideoPreview] = useState("");
   async function refresh() {
     const result = await callServerless<{ broadcasts: Result[] }>("sendSecretaryBroadcast", { action: "list" });
     setHistory(result.broadcasts || []);
@@ -50,12 +54,14 @@ export default function SecretaryBroadcastPanel() {
     if (!window.confirm(`Send this broadcast to ${draft.target}? It will be visible to members of that group or channel.`)) return;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
-      const attempt = { operationKey: crypto.randomUUID(), draft };
+      const prepared = draft.mediaType === "video" && draft.videoAsset
+        ? { ...draft, media: await assetAccessUrl(draft.videoAsset) } : draft;
+      const attempt = { operationKey: crypto.randomUUID(), draft: prepared };
       // Persist before sending: reloads and lost responses must not create a fresh send key.
       localStorage.setItem(storageKey, JSON.stringify(attempt)); setPending(attempt);
-      const result = await callServerless<Result>("sendSecretaryBroadcast", { action: "send", operationKey: attempt.operationKey, ...draft }, 60_000);
+      const result = await callServerless<Result>("sendSecretaryBroadcast", { action: "send", operationKey: attempt.operationKey, ...attempt.draft }, 60_000);
       setNotice(statusText(result));
-      if (result.status === "sent") { localStorage.removeItem(storageKey); setPending(null); setDraft(blank()); }
+      if (result.status === "sent") { localStorage.removeItem(storageKey); setPending(null); setDraft(blank()); setVideoPreview(""); }
       await refresh();
     } catch (cause: any) { setError(cause?.message || "Send could not be confirmed. Check Send Status."); }
     finally { lock.current = false; setBusy(false); }
@@ -66,7 +72,7 @@ export default function SecretaryBroadcastPanel() {
     try {
       const result = await callServerless<Result>("sendSecretaryBroadcast", { action: "status", operationKey: pending.operationKey });
       setNotice(result.status === "not_found" ? "No send record yet. A timed-out request may still be running. Check the destination before starting again." : statusText(result));
-      if (result.status === "sent") { localStorage.removeItem(storageKey); setPending(null); setDraft(blank()); }
+      if (result.status === "sent") { localStorage.removeItem(storageKey); setPending(null); setDraft(blank()); setVideoPreview(""); }
       await refresh();
     } catch (cause: any) { setError(cause?.message || "Could not check delivery."); }
     finally { lock.current = false; setBusy(false); }
@@ -85,7 +91,7 @@ export default function SecretaryBroadcastPanel() {
     <form onSubmit={event => { event.preventDefault(); void send(); }}>
       <fieldset disabled={busy || !!pending || !storageKey} className="space-y-3 min-w-0">
         <label className="block"><span className="label-mini">Group Or Channel</span><input className="control-mini w-full" required value={draft.target} onChange={event => change({ target: event.target.value })} placeholder="@channelname or -100…" maxLength={40}/></label>
-        <label className="block"><span className="label-mini">Media Type</span><select className="control-mini w-full" value={draft.mediaType} onChange={event => change({ mediaType: event.target.value as Draft["mediaType"], media: "" })}><option value="none">Text Only</option><option value="photo">Photo</option><option value="video">Video</option></select></label>
+        <div><span className="label-mini">Message Type</span><div role="group" aria-label="Broadcast message type" className="grid grid-cols-3 gap-2">{([['none', 'Text'], ['photo', 'Photo'], ['video', 'Video']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={draft.mediaType === value} className={`control-mini ${draft.mediaType === value ? "bg-slate-900 text-white" : ""}`} onClick={() => { change({ mediaType: value, media: "", videoAsset: undefined }); setVideoPreview(""); }}>{label}</button>)}</div></div>
         {draft.mediaType === "photo" && <label className="block"><span className="label-mini">Upload Photo</span><input type="file" className="control-mini w-full" accept="image/jpeg,image/png,image/webp" onChange={async event => {
           const file = event.target.files?.[0]; event.target.value = ""; if (!file || lock.current) return;
           lock.current = true; setBusy(true); setError("");
@@ -93,9 +99,21 @@ export default function SecretaryBroadcastPanel() {
           catch (cause: any) { setError(cause?.message || "Photo upload failed."); }
           finally { lock.current = false; setBusy(false); }
         }}/></label>}
-        {draft.mediaType !== "none" && <label className="block"><span className="label-mini">{draft.mediaType === "photo" ? "Photo Reference Or HTTPS Link" : "Video HTTPS Link"}</span><input className="control-mini w-full" required value={draft.media} onChange={event => change({ media: event.target.value })} maxLength={2048}/><span className="secretary-help">{draft.mediaType === "video" ? "Use a publicly accessible MP4 link, including an R2 media link. Telegram must be able to retrieve it." : "Upload above or enter a publicly accessible image link."}</span></label>}
+        {draft.mediaType === "video" && <div className="space-y-2"><label className="block"><span className="label-mini">Upload Video</span><input aria-label="Upload broadcast video" type="file" accept="video/mp4,.mp4" className="control-mini w-full" onChange={async event => {
+          const file = event.target.files?.[0]; event.target.value = ""; if (!file || lock.current) return;
+          if (!/\.mp4$/i.test(file.name) || (file.type && file.type !== "video/mp4") || !file.size || file.size > 20_000_000) { setError("Choose an MP4 video up to 20 MB."); return; }
+          lock.current = true; setBusy(true); setError(""); setUploadProgress(0);
+          try {
+            const upload = file.type ? file : new File([file], file.name, { type: "video/mp4" });
+            const asset = await uploadLibraryAsset(upload, setUploadProgress);
+            change({ media: asset.reference, videoAsset: asset });
+            setVideoPreview(await assetAccessUrl(asset));
+          } catch (cause: any) { setError(cause?.message || "Video upload failed. Try again."); }
+          finally { lock.current = false; setBusy(false); setUploadProgress(null); }
+        }}/></label><p className="secretary-help">MP4 · Up to 20 MB. Your message appears as the video caption.</p>{uploadProgress !== null && <p role="status" className="text-xs font-mono">Uploading Video · {uploadProgress}%</p>}{draft.videoAsset && <p className="text-xs break-words">Selected: {draft.videoAsset.name}</p>}{(videoPreview || (!draft.videoAsset && /^https:\/\//.test(draft.media))) && <video controls playsInline preload="metadata" src={videoPreview || draft.media} aria-label="Broadcast video preview" className="w-full max-h-48 bg-slate-950"/>}</div>}
+        {draft.mediaType !== "none" && <label className="block"><span className="label-mini">{draft.mediaType === "photo" ? "Photo Reference Or HTTPS Link" : "Video HTTPS Link (Or Upload Above)"}</span><input className="control-mini w-full" required value={draft.media} onChange={event => { change({ media: event.target.value, videoAsset: undefined }); setVideoPreview(""); }} maxLength={2048}/><span className="secretary-help">{draft.mediaType === "video" ? draft.videoAsset ? "Uploaded video is ready. A fresh access link is created when you send." : "Upload an MP4 above or enter a public MP4 link up to 20 MB." : "Upload above or enter a publicly accessible image link."}</span></label>}
         {draft.mediaType === "photo" && draft.media.startsWith("tgmedia:") && <TelegramMediaImage src={draft.media} alt="Broadcast photo" className="max-h-40 w-full object-contain"/>}
-        <label className="block"><span className="label-mini">Message</span><textarea className="control-mini w-full min-h-28" required value={draft.message} maxLength={draft.mediaType === "none" ? 4096 : 1024} onChange={event => change({ message: event.target.value })}/><span className="secretary-help">Plain Text · {draft.message.length}/{draft.mediaType === "none" ? 4096 : 1024}</span></label>
+        <label className="block"><span className="label-mini">{draft.mediaType === "none" ? "Message" : "Message Caption"}</span><textarea className="control-mini w-full min-h-28" required value={draft.message} maxLength={draft.mediaType === "none" ? 4096 : 1024} onChange={event => change({ message: event.target.value })}/><span className="secretary-help">Plain Text · {draft.message.length}/{draft.mediaType === "none" ? 4096 : 1024}</span></label>
         <details open><summary className="label-mini cursor-pointer">Inline Buttons · {draft.buttons.length}/12</summary><div className="space-y-3 mt-2">
           {draft.buttons.map((button, index) => <div key={index} className="space-y-2 border-b border-slate-200 pb-2">
             <div className="grid grid-cols-2 gap-2"><label className="min-w-0"><span className="label-mini">Button Label</span><input className="control-mini w-full" required maxLength={64} value={button.text} onChange={event => change({ buttons: draft.buttons.map((item, i) => i === index ? { ...item, text: event.target.value } : item) })}/></label><label className="min-w-0"><span className="label-mini">Row</span><select className="control-mini w-full" value={button.row} onChange={event => change({ buttons: draft.buttons.map((item, i) => i === index ? { ...item, row: Number(event.target.value) } : item) })}>{[1,2,3,4,5,6].map(row => <option key={row}>{row}</option>)}</select></label></div>
