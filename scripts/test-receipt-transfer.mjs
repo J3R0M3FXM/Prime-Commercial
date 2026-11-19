@@ -16,8 +16,9 @@ const endpoint=readFileSync('tgcloud/endpoints/getMediaContent.js','utf8');asser
 console.log('PASS: multi-part receipt reconstruction, stable reopen URLs, fresh retries, incomplete-transfer rejection and retained authorization.');
 const asset={id:'proof',fileId:'inline:proof',contentType:'image/jpeg',size:bytes.length,visibility:'private',orderId:'order'};
 let contentReads=0;
+let proofOrder={id:'order',tgUserId:'123'};
 const tables={mediaAssets:{},mediaAssetContents:{},orders:{},customers:{},videos:{}};
-const db={select(){let table;return {from(value){table=value;return this;},where(){return this;},async get(){if(table===tables.mediaAssets)return asset;if(table===tables.orders)return {id:'order',tgUserId:'123'};if(table===tables.mediaAssetContents){contentReads++;return {bytes:new Uint8Array(bytes)};}return null;}};}};
+const db={select(){let table;return {from(value){table=value;return this;},where(){return this;},async get(){if(table===tables.mediaAssets)return asset;if(table===tables.orders)return proofOrder;if(table===tables.mediaAssetContents){contentReads++;return {bytes:new Uint8Array(bytes)};}return null;}};}};
 class EndpointError extends Error{constructor(message,options){super(message);this.code=options.code;}}
 const body=endpoint.replace(/^import[^\n]*\n/gm,'').replace('export default async function','async function handler');
 const read=new Function('api','db','EndpointError','eq','and','isAdminUser',...Object.keys(tables),body+';return handler;')({},db,EndpointError,()=>null,()=>null,async ctx=>Boolean(ctx.staff),...Object.values(tables));
@@ -26,3 +27,22 @@ const admin=await read({id:'proof',chunkIndex:1},{staff:true});assert.equal(admi
 const owner=await read({id:'proof',chunkIndex:2},{initData:{user:{id:123}}});assert.deepEqual(Buffer.from(owner.base64,'base64'),bytes.subarray(384*1024));
 await assert.rejects(read({id:'proof',chunkIndex:3},{staff:true}),{code:'INVALID_INPUT'});
 console.log('PASS: authorized admin/owner receipt chunks, foreign-user denial before content reads and invalid-part rejection.');
+
+// Existing checkout receipts use unpadded base64url stored directly on orders.
+for (const length of [bytes.length, bytes.length+1, bytes.length+2]) {
+  const original=Buffer.alloc(length,251);
+  proofOrder={id:'order',tgUserId:'123',paymentProofImage:'inline-payment-proof:operation',paymentProofData:original.toString('base64url'),paymentProofContentType:'image/png'};
+  const chunks=[];
+  for(let index=0;index<Math.ceil(length/(192*1024));index++) {
+    const part=await read({id:'order-payment-proof:order',chunkIndex:index},{staff:true});
+    assert.equal(part.size,length);assert.equal(part.chunkIndex,index);assert.equal(part.contentType,'image/png');
+    assert.ok(part.base64.length<=262144);chunks.push(part.base64);
+  }
+  assert.deepEqual(Buffer.from(chunks.join(''),'base64'),original);
+}
+await assert.rejects(read({id:'order-payment-proof:order',chunkIndex:0},{initData:{user:{id:999}}}),{code:'NOT_FOUND'});
+assert.ok((await read({id:'order-payment-proof:order',chunkIndex:0},{initData:{user:{id:123}}})).base64);
+await assert.rejects(read({id:'order-payment-proof:order',chunkIndex:99},{staff:true}),{code:'INVALID_INPUT'});
+proofOrder.paymentProofImage='tgmedia:replacement';
+await assert.rejects(read({id:'order-payment-proof:order'},{staff:true}),{code:'NOT_FOUND'});
+console.log('PASS: saved inline checkout receipts, base64url padding, bounded chunks, staff/owner access and foreign-user denial.');

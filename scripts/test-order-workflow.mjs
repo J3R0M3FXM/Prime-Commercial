@@ -184,5 +184,10 @@ assert.equal('paymentProofData' in detail.orders[0],false,'Detail never transfer
 assert.ok(detail.orders[0].workflow.actions.includes('review'));
 await assert.rejects(manage({action:'get',orderId:'large-proof-0'},{}),error=>error.code==='ADMIN_REQUIRED');
 await assert.rejects(manage({action:'get',orderId:'missing'},{testStaff:true}),error=>error.code==='NOT_FOUND');
+await create('inline-receipt',{payment_proof_data:'x'.repeat(500000),payment_proof_image:'inline-payment-proof:operation'});
+const inlineDetail=await manage({action:'get',orderId:'inline-receipt'},{testStaff:true});
+assert.equal(inlineDetail.orders[0].paymentProofImage,'tgmedia:order-payment-proof:inline-receipt');
+assert.equal('paymentProofData' in inlineDetail.orders[0],false);
+assert.ok(JSON.stringify(inlineDetail).length<20000,'Inline receipt detail stays bounded');
 sqlite.close();
 console.log('Order workflow: review/confirm/process, one receipt retry, deadlines, approval gates, paid cancellation, atomic/idempotent refunds, tracking and six-hour exactly-once rewards passed.');

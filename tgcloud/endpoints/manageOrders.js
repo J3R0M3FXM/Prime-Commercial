@@ -84,6 +84,9 @@ export default async function (input, ctx) {
       const order = await db.select().from(orders).where(or(eq(orders.id,id),eq(orders.orderNumber,id))).get();
       if (!order) throw new EndpointError('Order not found.', { code: 'NOT_FOUND' });
       const {paymentProofData, ...detail} = order;
+      if (String(order.paymentProofImage || '').startsWith('inline-payment-proof:') && paymentProofData) {
+        detail.paymentProofImage = 'tgmedia:order-payment-proof:' + order.id;
+      }
       rows = [detail];
     }
     const telegramIds = Array.from(new Set(rows.map(order => String(order.tgUserId || '')).filter(Boolean)));

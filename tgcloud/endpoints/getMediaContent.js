@@ -53,6 +53,35 @@ export default async function (input, ctx) {
   const videoId = String(input?.videoId || '').trim();
   if (!id && !videoId) throw new EndpointError('Media asset ID is required.', { code: 'INVALID_INPUT' });
 
+  // Checkout proofs live on the order rather than in mediaAssets. Keep their
+  // binary data out of order detail responses and use the same private loader.
+  if (id.startsWith('order-payment-proof:')) {
+    const orderId = id.slice('order-payment-proof:'.length);
+    const privateAsset = { orderId };
+    if (!(await canReadPrivateAsset(privateAsset, ctx))) {
+      throw new EndpointError('Media not found.', { code: 'NOT_FOUND' });
+    }
+    const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
+    if (!order || !String(order.paymentProofImage || '').startsWith('inline-payment-proof:') || !order.paymentProofData) {
+      throw new EndpointError('Media not found.', { code: 'NOT_FOUND' });
+    }
+    let base64 = String(order.paymentProofData).replace(/-/g, '+').replace(/_/g, '/');
+    const contentType = String(order.paymentProofContentType || '');
+    if (!/^image\/(jpeg|png|webp)$/.test(contentType) || !/^[A-Za-z0-9+/]+={0,2}$/.test(base64) || base64.length % 4 === 1 || base64.length > 820000) {
+      throw new EndpointError('Receipt content is invalid.', { code: 'MEDIA_READ_FAILED' });
+    }
+    base64 = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    const size = base64.length / 4 * 3 - (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0);
+    const chunkSize = 192 * 1024;
+    const count = Math.ceil(size / chunkSize);
+    const index = Number(input?.chunkIndex ?? 0);
+    if (!Number.isInteger(index) || index < 0 || index >= count) {
+      throw new EndpointError('Invalid image transfer part.', { code: 'INVALID_INPUT' });
+    }
+    return { id, contentType, size, chunkIndex: index, chunkCount: count,
+      base64: base64.slice(index * chunkSize / 3 * 4, (index + 1) * chunkSize / 3 * 4) };
+  }
+
   let asset;
   if (id) {
     asset = await db.select().from(mediaAssets).where(eq(mediaAssets.id, id)).get();
