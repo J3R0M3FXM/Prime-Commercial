@@ -7,7 +7,7 @@ import { promoRedemptions, promos } from '../schema.js';
 const fields = new Set([
   'code', 'title', 'description', 'voucherType', 'discountType', 'discountValue',
   'maxDiscountAmount', 'cappedShippingDiscount', 'cashbackPercentage', 'minSpend',
-  'requiredItems', 'minItemQuantity', 'customerEligibility', 'eligibleCustomerId', 'minPreviousOrders', 'eligibleTiers',
+  'requiredItemsMatch', 'requiredItems', 'minItemQuantity', 'customerEligibility', 'eligibleCustomerId', 'minPreviousOrders', 'eligibleTiers',
   'allowedPaymentMethods', 'allowedCourierIds', 'activeDaysOfWeek', 'isPaydayOnly',
   'flashHourStart', 'flashHourEnd', 'totalUsageLimit', 'usageCount',
   'usageLimitPerCustomer', 'isActive', 'startDate', 'endDate',
@@ -37,7 +37,10 @@ function normalize(input, current = {}) {
   for (const [key, value] of Object.entries(input)) {
     if (key === 'action' || key === 'id') continue;
     if (!fields.has(key)) throw new EndpointError('Unsupported promo field: ' + key, { code: 'INVALID_FIELD' });
-    if (key === 'requiredItems') {
+    if (key === 'requiredItemsMatch') {
+      if (value !== 'any' && value !== 'all') throw new EndpointError('Choose any one or all selected items.', { code: 'INVALID_INPUT' });
+      values.requiredItemsMatch = value;
+    } else if (key === 'requiredItems') {
       if (!Array.isArray(value) || value.length > 20) throw new EndpointError('Use up to 20 product requirements.', { code: 'INVALID_INPUT' });
       const seen = new Set();
       values.requiredItems = value.map(rule => {
@@ -172,6 +175,7 @@ export default async function (input, ctx) {
       discountType: 'fixed',
       discountValue: 0,
       minSpend: 0,
+      requiredItemsMatch: 'any',
       customerEligibility: 'all',
       eligibleTiers: [],
       allowedPaymentMethods: ['all'],

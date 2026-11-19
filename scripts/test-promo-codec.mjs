@@ -8,6 +8,7 @@ const original = {
   voucherType: 'shipping_voucher',
   customerEligibility: 'tier_restricted',
   minItemQuantity: 3,
+  requiredItemsMatch: 'any',
   requiredItems: [{ productId: "coffee", variantId: "large", quantity: 2 }],
   minPreviousOrders: 2,
   eligibleTiers: ['GOLD', 'PLATINUM'],
@@ -40,7 +41,7 @@ const decoded = deserializePromo({
   endDate: new Date('2026-10-31T23:59:59.000Z'),
 });
 for (const key of [
-  'requiredItems', 'description', 'voucherType', 'customerEligibility', 'minItemQuantity',
+  'requiredItemsMatch', 'requiredItems', 'description', 'voucherType', 'customerEligibility', 'minItemQuantity',
   'minPreviousOrders', 'eligibleTiers', 'allowedPaymentMethods',
   'allowedCourierIds', 'activeDaysOfWeek', 'isPaydayOnly', 'flashHourStart',
   'flashHourEnd', 'cappedShippingDiscount', 'cashbackPercentage',
@@ -75,3 +76,6 @@ assert.equal(calculatePromoDiscount({ discountType: 'percentage', discountValue:
 
 assert.match(generatePromoCode('prime'), /^PRIME-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/,
   'Generated promo codes must preserve the existing PRIME-XXXX format');
+
+assert.equal(deserializePromo({description: JSON.stringify({requiredItems: original.requiredItems})}).requiredItemsMatch, 'all', 'Existing promos retain all-items semantics');
+assert.equal(JSON.parse(serializePromoDescription({}, JSON.stringify({requiredItemsMatch:'any'}))).requiredItemsMatch, 'any', 'Partial metadata serialization preserves matching mode');

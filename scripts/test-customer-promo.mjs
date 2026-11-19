@@ -123,3 +123,26 @@ assert.equal(checkPromoItems({requiredItems:[{productId:'coffee',variantId:'',qu
 assert.equal(checkPromoItems({requiredItems:{}},[]).length>0,true);
 for(const path of ['tgcloud/endpoints/createOrder.js','tgcloud/lib/pos-pricing.js'])assert.match(readFileSync(path,'utf8'),/items: cart.items/,'Final pricing must validate canonical products');
 console.log('PASS: product/variant purchase rules, split quantities, gifts, persistence, malformed rules and authoritative checkout/POS wiring.');
+
+// Four variant-specific alternatives: each one alone qualifies in ANY mode.
+const alternatives = ['coffee','tea','cocoa','juice'].map(productId=>({productId,variantId:'large',quantity:2}));
+await manage({action:'update',id:'basket-promo',requiredItems:alternatives,requiredItemsMatch:'any'},context(999));
+for (const rule of alternatives) {
+ const result=await validate({code:'BASKET',itemsSubtotal:500,items:[{...rule}]},context(111));
+ assert.equal(result.valid,true,rule.productId+' alone qualifies without the other three products');
+ assert.equal((await validate({code:'BASKET',itemsSubtotal:500,items:[{...rule,variantId:'small',quantity:10}]},context(111))).valid,false,'Wrong variant does not qualify');
+ assert.equal((await validate({code:'BASKET',itemsSubtotal:500,items:[{...rule,quantity:1}]},context(111))).valid,false,'Each alternative keeps its quantity minimum');
+}
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500,items:alternatives.map(rule=>({...rule,isFree:true}))},context(111))).valid,false,'Free gifts cannot qualify any mode');
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500,items:alternatives.map(rule=>({...rule,quantity:1}))},context(111))).valid,false,'Different alternatives do not pool quantities');
+const anyPreserved=await manage({action:'update',id:'basket-promo',title:'Alternatives preserved'},context(999));
+assert.equal(anyPreserved.requiredItemsMatch,'any','Unrelated edits preserve ANY mode');
+await assert.rejects(manage({action:'update',id:'basket-promo',requiredItemsMatch:'either'},context(999)),error=>error.code==='INVALID_INPUT');
+await manage({action:'update',id:'basket-promo',requiredItemsMatch:'all'},context(999));
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500,items:[alternatives[3]]},context(111))).valid,false,'All mode requires all four');
+assert.equal((await validate({code:'BASKET',itemsSubtotal:500,items:alternatives},context(111))).valid,true,'All four correct variants qualify in ALL mode');
+assert.match(checkPromoItems({requiredItemsMatch:'any',requiredItems:[alternatives[0],{productId:'tea',variantId:'large',quantity:0}]},[alternatives[0]]),/invalid/,'A matching first rule cannot hide a malformed later rule');
+assert.match(checkPromoItems({requiredItemsMatch:'corrupt',requiredItems:alternatives},alternatives),/invalid/);
+assert.equal(checkPromoItems({requiredItems:alternatives},[alternatives[0]]).length>0,true,'Legacy rules still require ALL items');
+assert.equal(checkPromoItems({requiredItemsMatch:'any',requiredItems:[]},[]),'','Empty list remains unrestricted');
+console.log('PASS: four product/variant alternatives independently qualify; ALL, quantities, gifts, invalid modes and legacy behavior remain enforced.');

@@ -23,6 +23,7 @@ export function deserializePromo(row) {
     cashbackPercentage: hasMeta && meta.cashbackPercentage != null ? Number(meta.cashbackPercentage) : undefined,
     minSpend: Number(row.minSpend) || 0,
     minItemQuantity: hasMeta && meta.minItemQuantity != null ? Number(meta.minItemQuantity) : undefined,
+    requiredItemsMatch: hasMeta ? meta.requiredItemsMatch ?? 'all' : 'all',
     requiredItems: hasMeta && meta.requiredItems != null ? meta.requiredItems : [],
     customerEligibility: hasMeta ? meta.customerEligibility ?? 'all' : 'all',
     eligibleCustomerId: hasMeta ? String(meta.eligibleCustomerId || '') : '',
@@ -61,6 +62,7 @@ export function serializePromoDescription(promo, existingDescription = '') {
     voucherType: promo.voucherType || 'shop_voucher',
     customerEligibility: promo.customerEligibility || 'all',
     eligibleCustomerId: String(promo.eligibleCustomerId || '').trim(),
+    requiredItemsMatch: promo.requiredItemsMatch ?? previous.requiredItemsMatch ?? 'all',
     requiredItems: Array.isArray(promo.requiredItems) ? promo.requiredItems : [],
     minItemQuantity: promo.minItemQuantity !== undefined ? promo.minItemQuantity : null,
     minPreviousOrders: promo.minPreviousOrders !== undefined ? promo.minPreviousOrders : null,
@@ -130,7 +132,10 @@ export function generatePromoCode(prefix = 'PRIME') {
 export function checkPromoItems(promo, items) {
   const requirements = promo.requiredItems || [];
   if (!Array.isArray(requirements)) return 'This promo has invalid product requirements.';
+  const match = promo.requiredItemsMatch ?? 'all';
+  if (match !== 'any' && match !== 'all') return 'This promo has invalid product requirements.';
   if (!requirements.length) return '';
+  let matched = 0, missingQuantity = 0;
   const lines = Array.isArray(items) ? items.filter(line => line && !line.isFree) : [];
   for (const rule of requirements) {
     if (!rule || typeof rule.productId !== 'string' || !rule.productId.trim() ||
@@ -143,7 +148,9 @@ export function checkPromoItems(promo, items) {
         (!rule.variantId || String(line.variantId || 'default') === rule.variantId) &&
         Number.isSafeInteger(amount) && amount > 0 ? total + amount : total;
     }, 0);
-    if (quantity < rule.quantity) return 'Add the required product and quantity to use this promo (' + rule.quantity + ' required).';
+    if (quantity >= rule.quantity) matched += 1;
+    else if (!missingQuantity) missingQuantity = rule.quantity;
   }
-  return '';
+  if (match === 'any') return matched > 0 ? '' : 'Buy the required quantity of at least one selected product and variant to use this promo.';
+  return matched === requirements.length ? '' : 'Add every required product and quantity to use this promo (' + missingQuantity + ' required).';
 }

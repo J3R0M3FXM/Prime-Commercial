@@ -45,7 +45,7 @@ assert.ok(document.querySelector('img.voucher-generator__preview'), 'The generat
 const qr = document.querySelector('.voucher-generator__qr');
 const paint = contexts.get(preview).operations;
 assert.deepEqual([preview.width,preview.height],[1836,857]);
-assert.ok(paint.some(op => op[0] === 'fillText' && op[1].includes('700') && op[1].includes('IBM Plex Mono') && op[2] === 'PRIME-TEST2026'));
+assert.ok(paint.some(op => op[0] === 'fillText' && op[1].includes('700') && op[1].includes('Lato Condensed') && op[2] === 'PRIME-TEST2026'));
 assert.ok(paint.some(op => op[0] === 'drawImage' && op[1] === qr && op[2] === 1052 && op[3] === 418), 'QR canvas goes inside the designated placeholder');
 assert.ok(contexts.get(qr).operations.filter(op => op[0] === 'fillRect').length > 100, 'A real QR matrix is drawn');
 const longCode = 'A'.repeat(80), longContext = { ...contexts.get(preview), operations: [] };

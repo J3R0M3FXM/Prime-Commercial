@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'rolldown';
 import { JSDOM } from 'jsdom';
 const dom=new JSDOM('<div id="root"></div>',{url:'https://local.example/admin'}),require=createRequire(import.meta.url);
-for(const key of ['window','document','navigator','HTMLElement','HTMLInputElement','Event','MouseEvent'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+for(const key of ['window','document','navigator','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','MouseEvent'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const calls=[];let failProducts=true;
 let promo={id:'promo',code:'BUYCOFFEE',title:'Coffee offer',discountType:'fixed',discountValue:50,isActive:true,requiredItems:[{productId:'coffee',variantId:'large',quantity:2}],startDate:'2026-11-19T16:00:00.000Z'};
@@ -17,6 +17,12 @@ await act(async()=>root.render(createElement(Component,{mode:'promos',onBack(){}
 assert.equal(calls.length,1,'Catalog is lazy');
 await act(async()=>document.querySelector('[aria-label="Edit configuration"]').click());
 assert.match(document.querySelector('.promo-requirements legend').textContent,/Item & product requirements/);
+const matching=document.querySelector('[aria-label="Product requirement matching"]');
+assert.equal(matching.value,'all','Existing promos preserve all selected items');
+assert.deepEqual([...matching.options].map(option=>option.textContent),['Require any of the following','Require all selected']);
+await act(async()=>{matching.value='any';matching.dispatchEvent(new Event('change',{bubbles:true}));});
+assert.match(document.querySelector('.promo-requirements p').textContent,/at least one option/);
+
 assert.match(document.querySelector('.promo-requirements [role="alert"]').textContent,/Catalog unavailable/);
 assert.equal(document.querySelector('[aria-label="Required product 1"]').value,'coffee','Failed catalog load preserves saved IDs');
 assert.equal(document.querySelector('input[type="date"]').value,'2026-11-20','PHT date survives editing outside PHT');
@@ -25,8 +31,12 @@ assert.equal(document.querySelector('[aria-label="Required variant 1"]').value,'
 const quantity=document.querySelector('[aria-label="Required quantity 1"]');
 await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(quantity,'3');quantity.dispatchEvent(new Event('input',{bubbles:true}));});
 await act(async()=>document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+assert.equal(calls.find(call=>call.input.action==='update').input.requiredItemsMatch,'any');
 assert.deepEqual(calls.find(call=>call.input.action==='update').input.requiredItems,[{productId:'coffee',variantId:'large',quantity:3}]);
 await act(async()=>document.querySelector('[aria-label="Edit configuration"]').click());
+assert.equal(document.querySelector('[aria-label="Product requirement matching"]').value,'any','Saved mode survives reopening');
+await act(async()=>{const select=document.querySelector('[aria-label="Product requirement matching"]');select.value='all';select.dispatchEvent(new Event('change',{bubbles:true}));});
+assert.match(document.querySelector('.promo-requirements p').textContent,/every option/);
 await act(async()=>button('Add product requirement').click());
 const product=document.querySelector('[aria-label="Required product 2"]');
 await act(async()=>{product.value='tea';product.dispatchEvent(new Event('change',{bubbles:true}));});
@@ -35,5 +45,8 @@ await act(async()=>document.querySelector('[aria-label="Remove requirement 1"]')
 assert.equal(document.querySelectorAll('.promo-requirement').length,1);
 await act(async()=>button('Cancel').click());
 assert.equal(calls.filter(call=>call.input.action==='update').length,1,'Cancel does not save requirements');
+assert.equal(promo.requiredItemsMatch,'any','Cancel does not replace saved matching mode');
+await act(async()=>button('Add').click());
+assert.equal(document.querySelector('[aria-label="Product requirement matching"]').value,'any','New offers default to alternatives');
 await act(async()=>root.unmount());dom.window.close();
 console.log('PASS: rendered product requirements, catalog retry, variant/quantity editing, save payload, cancellation and PHT dates.');

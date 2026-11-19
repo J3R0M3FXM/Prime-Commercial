@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { Download, Send, X } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { callServerless } from "@/lib/telegram-serverless-client";
-import "@fontsource/ibm-plex-mono/700.css";
+import "@fontsource/lato/700.css";
 import "./voucher-generator.css";
 
 const WIDTH = 1836, HEIGHT = 857;
-const TEMPLATE = "/voucher-template.png";
+const TEMPLATE = "/voucher-template-color.png";
 
 export function makeVoucherCode(): string {
   const bytes = new Uint8Array(8);
@@ -60,12 +60,12 @@ export function drawVoucher(ctx: CanvasRenderingContext2D, template: CanvasImage
   const maxWidth = 800;
   let fontSize = 72, lines: string[] = [];
   while (fontSize > 38) {
-    ctx.font = `700 ${fontSize}px "IBM Plex Mono"`;
+    ctx.font = `700 ${fontSize}px "Lato Condensed", "Lato", sans-serif`;
     if (ctx.measureText(code).width <= maxWidth) break;
     fontSize -= 2;
   }
   do {
-    ctx.font = `700 ${fontSize}px "IBM Plex Mono"`;
+    ctx.font = `700 ${fontSize}px "Lato Condensed", "Lato", sans-serif`;
     lines = [""];
     for (const character of Array.from(code)) {
       const index = lines.length - 1;
@@ -107,7 +107,7 @@ export default function VoucherGenerator({ code, active, onClose }: { code: stri
     });
     const prepare = async () => {
       if (!document.fonts?.load) throw new Error("The voucher font could not be loaded on this device.");
-      const [, fonts] = await Promise.all([imageReady, document.fonts.load('700 72px "IBM Plex Mono"', code)]);
+      const [, fonts] = await Promise.all([imageReady, document.fonts.load('700 72px "Lato Condensed", "Lato", sans-serif', code)]);
       if (!fonts.length) throw new Error("The voucher font could not be loaded on this device.");
       if (!current) return;
       const canvas = output.current, qrCanvas = qr.current;
