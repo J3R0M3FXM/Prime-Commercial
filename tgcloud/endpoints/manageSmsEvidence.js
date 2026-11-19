@@ -40,7 +40,7 @@ export default async function(input,ctx){
  const receipt=scan.paymentEvidence;
  if(!receipt.reference)result={status:receipt.status||'receipt_reference_unreadable',matched:false,requiresManualReview:true};
  else if(key){
-  const response=await fetch(ORIGIN+'/sms/match',{method:'POST',headers:{'Content-Type':'application/json','X-Prime-Sms-Service':key},body:JSON.stringify({type:receipt.referenceType,value:receipt.reference})});
+  const response=await fetch(ORIGIN+'/sms/match',{method:'POST',headers:{'Content-Type':'application/json','X-Prime-Sms-Service':key,'User-Agent':'PRIME-Payment-Evidence/1.0'},body:JSON.stringify({type:receipt.referenceType,value:receipt.reference})});
   if(!response.ok)throw new EndpointError('SMS bridge is unavailable. Receipt remains for staff review.',{code:'SMS_BRIDGE_UNAVAILABLE'});
   const data=await response.json(),expected=moneyCents(Number(order.payableNow??order.totalAmount).toFixed(2));
   const candidates=(Array.isArray(data.events)?data.events:[]).map(event=>({event,comparison:comparePaymentEvidence(receipt,event,expected)}));
