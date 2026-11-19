@@ -57,6 +57,8 @@ run('node', ['scripts/test-pos-ui.mjs'], 'rendered POS register controls');
 run('node', ['scripts/test-checkout-idempotency.mjs'], 'checkout and POS collision/retry hardening');
 run('node', ['scripts/test-credit-operations.mjs'], 'points conversion and Store Credit transfer safety');
 run('node', ['scripts/test-account-staff-view.mjs'], 'staff account view authorization and customer parity');
+run('node', ['scripts/test-customers-profiles.mjs'], 'compact Customer profile queries');
+run('node', ['scripts/test-customers-ui.mjs'], 'rendered Customer profiles and refresh recovery');
 run('node', ['scripts/test-shopfront-queue.mjs'], 'shopfront queue ownership and ordering');
 run('node', ['scripts/test-shopfront-payment-link.mjs'], 'shopfront secure payment link');
 run('node', ['scripts/test-payment-method-links.mjs'], 'Admin payment link runtime and persistence');

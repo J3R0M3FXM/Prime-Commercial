@@ -42,6 +42,7 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
   const [authLoading, setAuthLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selected, setSelected] = useState<any>(null);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [repairing, setRepairing] = useState(false);
@@ -53,7 +54,7 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
     try {
       const rows = await callServerless<Customer[]>("manageCustomers", { action: "list" }, 30_000);
       if (!Array.isArray(rows)) throw new Error("The customer list response was invalid.");
-      setCustomers(rows.filter(r => !r.isVisitor && Boolean(r.primeMemberId)));
+      setCustomers(rows);
     } catch (err: any) { setError(err?.message || "Could not load customers."); }
     finally { setLoading(false); }
   }, []);
@@ -62,6 +63,7 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
     setLoading(true); setError("");
     try {
       const dossier = await callServerless<any>("manageCustomers", { action: "detail", id: customer.id }, 30_000);
+      setAccountOpen(false);
       setSelected(dossier);
     } catch (err: any) { setError(err?.message || "Could not load this customer."); }
     finally { setLoading(false); }
@@ -134,27 +136,41 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
     });
   }, [selected]);
 
-  return <main className="serverless-admin-panel" aria-label="Telegram Serverless customer management">
+  return <main className="serverless-admin-panel customer-profiles" aria-label="Telegram Serverless customer management">
     <header className="serverless-panel-header">
       <button type="button" onClick={selected ? () => setSelected(null) : onBack} className="serverless-action" aria-label={selected ? "Back to customers" : "Back to Admin modules"}><ArrowLeft className="h-4 w-4"/></button>
-      <div className="serverless-panel-header__copy"><h1>{selected ? "Customer Dossier" : "Customers"}</h1><p><ShieldCheck className="mr-1 inline h-3 w-3 text-emerald-700"/>Verified Telegram staff</p></div>
-      {!selected && <div className="flex gap-1"><button type="button" onClick={() => void normalizeIdentifiers()} disabled={!authorized || loading || repairing} className="serverless-action" aria-label="Normalize test identifiers" title="Normalize test identifiers"><Wrench className={`h-4 w-4 ${repairing ? "animate-pulse" : ""}`}/><span className="sr-only">Fix Test Ids</span></button><button type="button" onClick={() => void loadCustomers()} disabled={!authorized || loading || repairing} className="serverless-action" aria-label="Refresh customers"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}/></button></div>}
+      <div className="serverless-panel-header__copy"><h1>{selected ? "Customer Profile" : "Customers"}</h1><p><ShieldCheck className="mr-1 inline h-3 w-3 text-emerald-700"/>Verified Telegram staff</p></div>
+      {!selected && <div className="flex gap-1"><button type="button" onClick={() => void loadCustomers()} disabled={!authorized || loading || repairing} className="serverless-action" aria-label="Refresh customers"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}/></button></div>}
     </header>
     {error && <div role="alert" className="my-2 border border-red-200 bg-red-50 p-2 text-xs text-red-800">{error}</div>}
     {(authLoading || loading) && <div className="my-2 flex justify-center border bg-white p-5"><Loader2 className="h-5 w-5 animate-spin"/></div>}
     {authorized && !selected && <>
       <label className="serverless-search my-2"><Search aria-hidden="true" className="h-4 w-4"/><input aria-label="Search customers" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search customers, phone, or PRIME ID"/>{search && <button type="button" onClick={() => setSearch("")} aria-label="Clear customer search" className="serverless-search__clear">×</button>}</label>
+      <p className="customer-profiles__count">{visible.length} {visible.length === 1 ? "customer" : "customers"}</p>
       <div className="serverless-record-list">
-        {visible.map(customer => <button type="button" key={customer.id} className="serverless-record text-left" onClick={() => void openCustomer(customer)}>
-          <span className="serverless-record__summary"><span className="rounded-full bg-slate-100 p-2"><UserRound className="h-4 w-4 text-slate-600"/></span><span className="serverless-record__copy"><strong>{customer.tgName || "Telegram customer"}{customer.tgUsername ? ` · @${customer.tgUsername}` : ""}</strong><small>{customer.primeMemberId || customer.tgUserId || customer.id} · {customer.totalOrders || 0} orders · {formatPHP(Number(customer.lifetimeSpent || 0))} · {customer.fingerprintCount || 0} device sessions</small></span><ChevronDown className="h-4 w-4 -rotate-90 text-slate-400"/></span>
+        {visible.map(customer => <button type="button" key={customer.id} className="serverless-record text-left" disabled={loading} onClick={() => void openCustomer(customer)}>
+          <span className="serverless-record__summary"><span className="rounded-full bg-slate-100 p-2"><UserRound className="h-4 w-4 text-slate-600"/></span><span className="serverless-record__copy"><strong>{customer.tgName || "Telegram customer"}</strong><small>{customer.tgUsername ? `@${customer.tgUsername} · ` : ""}{customer.primeMemberId || "Visitor"}</small><small>{customer.totalOrders || 0} orders · {formatPHP(Number(customer.lifetimeSpent || 0))}</small></span><ChevronDown className="h-4 w-4 -rotate-90 text-slate-400"/></span>
         </button>)}
         {!loading && visible.length === 0 && <div className="border border-dashed bg-white p-6 text-center text-xs text-slate-500">{customers.length ? "No customers match this search." : "No Serverless customers yet."}</div>}
       </div>
+      <details className="serverless-disclosure mt-3"><summary>Maintenance</summary><div className="serverless-disclosure__body"><button type="button" onClick={() => void normalizeIdentifiers()} disabled={loading || repairing} className="serverless-action"><Wrench className="h-4 w-4"/>{repairing ? "Repairing…" : "Normalize test identifiers"}</button></div></details>
     </>}
     {authorized && selected && <div className="serverless-record-list">
-      <div className="admin-customer-account"><AccountModal key={selected.id} isOpen onClose={() => setSelected(null)} staffCustomerId={selected.id} /></div>
+      <section className="customer-profiles__hero" aria-label="Customer identity">
+        <span className="customer-profiles__avatar"><UserRound className="h-6 w-6"/></span>
+        <div><h2>{selected.tgName || "Telegram customer"}</h2><p>{selected.tgUsername ? `@${selected.tgUsername}` : "No Telegram username"}</p><p className="font-mono">{selected.primeMemberId || "Visitor account"}</p></div>
+        <span className={selected.isBanned ? "customer-profiles__banned" : "customer-profiles__active"}>{selected.isBanned ? "Banned" : "Active"}</span>
+      </section>
+      <div className="customer-profiles__stats" aria-label="Customer balances">
+        <article><small>Store Credits</small><strong>{formatPHP(Number(selected.storeCredits || 0))}</strong></article>
+        <article><small>Purchasing points</small><strong>{Number(selected.points || 0).toLocaleString()}</strong></article>
+        <article><small>Referral points</small><strong>{Number(selected.referralPoints || 0).toLocaleString()}</strong></article>
+      </div>
+      <section className="customer-profiles__contact"><p><span>Phone</span><b>{selected.phoneNumber || "Not provided"}</b></p><p><span>Joined</span><b>{compactDate(selected.createdAt)}</b></p><p><span>Referred by</span><b>{selected.referredByMemberId || "—"}</b></p></section>
+      <button type="button" className="serverless-action customer-profiles__account-button" onClick={() => setAccountOpen(value => !value)}>{accountOpen ? "Close account overview" : "View full account overview"}</button>
+      {accountOpen && <div className="admin-customer-account"><AccountModal key={selected.id} isOpen onClose={() => setAccountOpen(false)} staffCustomerId={selected.id} /></div>}
       <details className="serverless-disclosure"><summary>Staff Account Records</summary><div className="serverless-disclosure__body serverless-record-list">
-      <details className="serverless-disclosure" open><summary>Store Credit history ({selected.storeCreditTransactions?.length || 0})</summary><div className="serverless-disclosure__body serverless-record-list">
+      <details className="serverless-disclosure"><summary>Store Credit history ({selected.storeCreditTransactions?.length || 0})</summary><div className="serverless-disclosure__body serverless-record-list">
         {(selected.storeCreditTransactions || []).map((transaction: any) => {
           const amount = Number(transaction.amount || 0);
           const typeLabel = transaction.type === "store_credit_received" ? "Credit added"
@@ -171,8 +187,8 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
         {!selected.storeCreditTransactions?.length && <p className="text-xs text-slate-500">No Store Credit transactions were found in the available ledger history.</p>}
         <p className="px-1 text-[10px] text-slate-500">Read-only ledger view. It shows up to the 200 most recent Store Credit entries and does not change the balance.</p>
       </div></details>
-      <details className="serverless-disclosure" open={Boolean(selected.orders?.length)}><summary>Order history ({selected.orders?.length || 0})</summary><div className="serverless-disclosure__body serverless-record-list">
-        {(selected.orders || []).map((order: any) => <article key={order.id} className="serverless-record p-2"><strong className="text-xs">#{order.orderNumber || order.id} · {order.status}</strong><p className="text-[10px] text-slate-500">{date(order.createdAt)} · {order.paymentStatus} · {formatPHP(Number(order.totalAmount || 0))}</p><p className="mt-1 text-[10px]">{(order.items || []).map((item: any) => `${item.quantity || 1}× ${item.name || "Item"}`).join(", ") || "No item details"}</p></article>)}
+      <details className="serverless-disclosure"><summary>Order history ({selected.orders?.length || 0})</summary><div className="serverless-disclosure__body serverless-record-list">
+        {(selected.orders || []).map((order: any) => <article key={order.id} className="serverless-record p-2"><strong className="text-xs">#{order.orderNumber || order.id} · {order.status}</strong><p className="text-[10px] text-slate-500">{date(order.createdAt)} · {order.paymentStatus} · {formatPHP(Number(order.totalAmount || 0))}</p></article>)}
         {!selected.orders?.length && <p className="text-xs text-slate-500">No linked orders.</p>}
       </div></details>
       </div></details>

@@ -27,9 +27,18 @@ export default async function (input = {}, ctx) {
   const telegramId = customer.tgUserId ? String(customer.tgUserId) : '__no_telegram_account__';
   const ownership = [eq(orders.tgUserId, telegramId), eq(orders.customerId, customer.id)];
   if (customer.primeMemberId) ownership.push(eq(orders.primeMemberId, customer.primeMemberId));
+  // Account summaries never need payment proofs, OCR, addresses or device snapshots.
+  const summaryFields = {
+    id: orders.id, orderNumber: orders.orderNumber, createdAt: orders.createdAt,
+    deliveredAt: orders.deliveredAt, status: orders.status, subtotal: orders.subtotal,
+    totalAmount: orders.totalAmount, discountAmount: orders.discountAmount,
+    paymentStatus: orders.paymentStatus, customerId: orders.customerId,
+    tgUserId: orders.tgUserId, referredByUserId: orders.referredByUserId,
+    referralPointsStatus: orders.referralPointsStatus, referralPointsAmount: orders.referralPointsAmount,
+  };
   const [rows, tierOrders, lifetimeActivity] = await Promise.all([
-    db.select().from(orders).where(or(...ownership)).orderBy(desc(orders.createdAt)).limit(100).all(),
-    db.select().from(orders).where(eq(orders.customerId, customer.id)).orderBy(desc(orders.createdAt)).limit(1000).all(),
+    db.select({ ...summaryFields, items: orders.items }).from(orders).where(or(...ownership)).orderBy(desc(orders.createdAt)).limit(100).all(),
+    db.select(summaryFields).from(orders).where(eq(orders.customerId, customer.id)).orderBy(desc(orders.createdAt)).limit(1000).all(),
     db.get(`SELECT count(*) AS orderCount,
       sum(CASE WHEN lower(status) IN ('completed', 'delivered') THEN 1 ELSE 0 END) AS successfulOrders,
       min(CASE WHEN lower(status) IN ('completed', 'delivered') THEN created_at ELSE NULL END) AS firstCompletedAt,
@@ -47,10 +56,12 @@ export default async function (input = {}, ctx) {
   ]);
   const completed = tierOrders.filter(order => ['completed', 'delivered'].includes(String(order.status || '').toLowerCase()));
   const referrals = customer.primeMemberId
-    ? await db.select().from(customers).where(eq(customers.referredByMemberId, customer.primeMemberId)).orderBy(desc(customers.createdAt)).limit(200).all()
+    ? await db.select({ id: customers.id, tgName: customers.tgName, tgUsername: customers.tgUsername,
+      primeMemberId: customers.primeMemberId, tgUserId: customers.tgUserId,
+      createdAt: customers.createdAt }).from(customers).where(eq(customers.referredByMemberId, customer.primeMemberId)).orderBy(desc(customers.createdAt)).limit(200).all()
     : [];
   const referralOrders = customer.primeMemberId
-    ? await db.select().from(orders).where(eq(orders.referredByMemberId, customer.primeMemberId)).orderBy(desc(orders.createdAt)).limit(1000).all()
+    ? await db.select(summaryFields).from(orders).where(eq(orders.referredByMemberId, customer.primeMemberId)).orderBy(desc(orders.createdAt)).limit(1000).all()
     : [];
   const transactions = await db.select().from(pointTransactions).where(eq(pointTransactions.userId, customer.id)).orderBy(desc(pointTransactions.createdAt)).limit(100).all();
   const lastFingerprint = (Array.isArray(customer.fingerprints) ? customer.fingerprints : [])

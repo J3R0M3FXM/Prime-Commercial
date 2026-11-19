@@ -140,8 +140,6 @@ function normalizedCustomer(row, customerOrders) {
       id: order.id, orderNumber: order.orderNumber, createdAt: iso(order.createdAt), status: order.status,
       paymentStatus: order.paymentStatus, subtotal: num(order.subtotal), totalAmount: num(order.totalAmount),
       paymentMethodName: order.paymentMethodName || '', courierName: order.courierName || '',
-      items: Array.isArray(order.items) ? order.items : [], deliveryAddress: order.deliveryAddress || {},
-      fingerprintSnapshot: order.fingerprintSnapshot || null,
     })),
     fingerprints: fingerprintList(row.fingerprints).map(fp => ({
       deviceId: fp?.deviceId || fp?.device_id || '', hardwareId: fp?.hardwareId || fp?.hardware_id || '',
@@ -199,25 +197,27 @@ export default async function (input = {}, ctx) {
     return { success: true, alreadyApplied: false, customerId: order.customerId, amount };
   }
   if (action === 'list') {
-    const [people, allOrders] = await Promise.all([
-      db.select().from(customers).orderBy(desc(customers.createdAt)).limit(500).all(),
-      db.select().from(orders).orderBy(desc(orders.createdAt)).limit(2000).all(),
-    ]);
-    const counts = new Map();
-    for (const order of allOrders) {
-      const id = String(order.customerId || '');
-      if (!id) continue;
-      counts.set(id, (counts.get(id) || 0) + 1);
-    }
+    // Keep receipt/OCR/device blobs outside the list query and SDK serialization.
+    const people = await db.select({
+      id: customers.id, tgUserId: customers.tgUserId, tgName: customers.tgName,
+      tgUsername: customers.tgUsername, phoneNumber: customers.phoneNumber,
+      primeMemberId: customers.primeMemberId, points: customers.points,
+      referralPoints: customers.referralPoints, storeCredits: customers.storeCredits,
+      totalOrders: customers.totalOrders, lifetimeSpent: customers.lifetimeSpent,
+      isBanned: customers.isBanned, referredByMemberId: customers.referredByMemberId,
+      referredBy: customers.referredBy, createdAt: customers.createdAt,
+    }).from(customers).orderBy(desc(customers.createdAt)).limit(500).all();
+    const orderCounts = people.length ? await db.all(`SELECT customer_id AS customerId, count(*) AS totalOrders
+      FROM orders WHERE customer_id IN (SELECT value FROM json_each(:ids)) GROUP BY customer_id`,
+      { ':ids': JSON.stringify(people.map(person => String(person.id))) }) : [];
+    const counts = new Map(orderCounts.map(item => [String(item.customerId), num(item.totalOrders)]));
     return people.map(row => ({
       id: row.id, tgUserId: row.tgUserId || '', tgName: row.tgName || '', tgUsername: row.tgUsername || '',
       phoneNumber: row.phoneNumber || '', primeMemberId: row.primeMemberId || '',
       points: num(row.points), referralPoints: num(row.referralPoints), storeCredits: num(row.storeCredits),
-      totalOrders: counts.get(String(row.id)) ?? num(row.totalOrders), lifetimeSpent: num(row.lifetimeSpent),
+      totalOrders: counts.get(String(row.id)) || 0, lifetimeSpent: num(row.lifetimeSpent),
       isBanned: row.isBanned === true, referredByMemberId: row.referredByMemberId || row.referredBy || '',
-      createdAt: iso(row.createdAt), fingerprintCount: fingerprintList(row.fingerprints).length,
-      latestFingerprint: fingerprintList(row.fingerprints).sort((a, b) =>
-        (Date.parse(b?.lastSeen || b?.last_seen || '') || 0) - (Date.parse(a?.lastSeen || a?.last_seen || '') || 0))[0] || null,
+      createdAt: iso(row.createdAt), isVisitor: !String(row.primeMemberId || '').trim(),
     }));
   }
   if (action !== 'detail') throw new EndpointError('Unsupported customer action.', { code: 'INVALID_ACTION' });
@@ -228,7 +228,12 @@ export default async function (input = {}, ctx) {
   const owned = [eq(orders.customerId, row.id)];
   if (row.tgUserId) owned.push(eq(orders.tgUserId, row.tgUserId));
   if (row.primeMemberId) owned.push(eq(orders.primeMemberId, row.primeMemberId));
-  const customerOrders = await db.select().from(orders).where(or(...owned)).orderBy(desc(orders.createdAt)).limit(100).all();
+  const customerOrders = await db.select({
+    id: orders.id, orderNumber: orders.orderNumber, createdAt: orders.createdAt,
+    status: orders.status, paymentStatus: orders.paymentStatus, subtotal: orders.subtotal,
+    totalAmount: orders.totalAmount, paymentMethodName: orders.paymentMethodName,
+    courierName: orders.courierName,
+  }).from(orders).where(or(...owned)).orderBy(desc(orders.createdAt)).limit(100).all();
   const dossier = normalizedCustomer(row, customerOrders);
   const customerTransactions = await db.select().from(pointTransactions)
     .where(eq(pointTransactions.userId, String(row.id)))
@@ -242,13 +247,30 @@ export default async function (input = {}, ctx) {
   const ownIds = fingerprints.flatMap(fp => identifiers(fp));
   const keys = new Set(ownIds.map(item => `${item.type}:${item.value}`));
   if (keys.size) {
-    const others = await db.select().from(customers).orderBy(desc(customers.createdAt)).limit(500).all();
-    dossier.sharedAccounts = others.filter(other => other.id !== row.id).flatMap(other => {
-      const matches = [...new Map(fingerprintList(other.fingerprints).flatMap(fp => identifiers(fp)
-        .filter(item => keys.has(`${item.type}:${item.value}`))).map(item => [`${item.type}:${item.value}`, item])).values()];
-      const matchTypes = [...new Set(matches.map(item => item.type))];
-      return matches.length ? [{ id: other.id, tgName: other.tgName || '', tgUsername: other.tgUsername || '', primeMemberId: other.primeMemberId || '', matchCount: matches.length, matchTypes }] : [];
-    });
+    // Match inside SQLite so unrelated accounts' device histories never cross the SDK boundary.
+    const matches = await db.all(`SELECT DISTINCT c.id, c.tg_name AS tgName,
+      c.tg_username AS tgUsername, c.prime_member_id AS primeMemberId,
+      json_extract(own.value, '$.type') AS matchType,
+      json_extract(own.value, '$.value') AS matchValue
+      FROM customers c,
+        json_each(CASE WHEN json_valid(c.fingerprints) THEN c.fingerprints ELSE '[]' END) fp,
+        json_each(:identifiers) own
+      WHERE c.id <> :id AND (
+        (json_extract(own.value, '$.type') = 'deviceId' AND
+          trim(coalesce(json_extract(CASE WHEN fp.type = 'object' THEN fp.value ELSE '{}' END, '$.deviceId'), json_extract(CASE WHEN fp.type = 'object' THEN fp.value ELSE '{}' END, '$.device_id'), '')) = json_extract(own.value, '$.value'))
+        OR (json_extract(own.value, '$.type') = 'installationId' AND
+          trim(coalesce(json_extract(CASE WHEN fp.type = 'object' THEN fp.value ELSE '{}' END, '$.installationId'), json_extract(CASE WHEN fp.type = 'object' THEN fp.value ELSE '{}' END, '$.installation_id'), '')) = json_extract(own.value, '$.value'))
+      ) LIMIT 1000`, { ':id': String(row.id), ':identifiers': JSON.stringify(ownIds) });
+    const accounts = new Map();
+    for (const match of matches) {
+      const account = accounts.get(match.id) || { id: match.id, tgName: match.tgName || '',
+        tgUsername: match.tgUsername || '', primeMemberId: match.primeMemberId || '',
+        matchCount: 0, matchTypes: [] };
+      account.matchCount++;
+      if (!account.matchTypes.includes(match.matchType)) account.matchTypes.push(match.matchType);
+      accounts.set(match.id, account);
+    }
+    dossier.sharedAccounts = [...accounts.values()];
   } else dossier.sharedAccounts = [];
   return dossier;
 }

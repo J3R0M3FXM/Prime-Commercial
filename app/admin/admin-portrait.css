@@ -466,3 +466,35 @@ body:has(#mobile-portrait-viewport.admin-viewport) { background: #020617 !import
 #mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel.serverless-pos-panel .pos-variant-dialog h2 { margin:0; min-width:0; overflow-wrap:anywhere; font-size:16px !important; font-weight:400 !important; line-height:1.15 !important; }
 #mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel.serverless-pos-panel .pos-variant-dialog > .pos-hint { margin:6px 8px; }
 #mobile-portrait-viewport.admin-viewport .prime-admin-app .serverless-admin-panel.serverless-pos-panel .pos-variant-dialog .pos-product-list { min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+
+/* Customer profiles: quiet cards and grouped facts, inspired by the Device Info references. */
+#mobile-portrait-viewport.admin-viewport .customer-profiles { background: #f3f4f6; font-family: 'Lato Condensed', 'Lato', sans-serif; }
+.customer-profiles .serverless-panel-header h1,
+.customer-profiles h2 { font-family: 'Roboto Condensed', sans-serif; font-weight: 400; }
+.customer-profiles .serverless-record-list { gap: 10px; }
+#mobile-portrait-viewport.admin-viewport .customer-profiles .serverless-record,
+.customer-profiles .serverless-disclosure { border: 1px solid #e2e5ea; border-radius: 16px; background: #fff; box-shadow: none; overflow: hidden; }
+#mobile-portrait-viewport.admin-viewport .customer-profiles button.serverless-record { padding: 12px; width: 100%; }
+.customer-profiles .serverless-record__summary { gap: 10px; }
+.customer-profiles .serverless-record__copy { min-width: 0; }
+.customer-profiles .serverless-record__copy strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.customer-profiles .serverless-record__copy small { display: block; font-size: 11px; line-height: 1.5; color: #64748b; }
+.customer-profiles__count { margin: 10px 5px; color: #64748b; font-size: 12px; }
+.customer-profiles__hero { display: flex; align-items: center; gap: 10px; padding: 18px 12px; border: 1px solid #ddd6fe; border-radius: 20px; background: linear-gradient(120deg,#ede9fe,#fff 85%); }
+.customer-profiles__hero > div { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.customer-profiles__hero h2 { margin: 0 0 4px; font-size: 20px; line-height: 1.2; }
+.customer-profiles__hero p { margin: 2px 0; color: #64748b; font-size: 11px; }
+.customer-profiles__avatar { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border-radius: 50%; color: #7c3aed; background: #e4dcfb; }
+.customer-profiles__active, .customer-profiles__banned { font-size: 10px; align-self: flex-start; color: #047857; }
+.customer-profiles__banned { color: #be123c; }
+.customer-profiles__stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
+.customer-profiles__stats article { min-width: 0; padding: 13px 8px; border: 1px solid #e2e5ea; background: #fff; border-radius: 16px; }
+.customer-profiles__stats small { display: block; color: #64748b; font-size: 10px; margin-bottom: 7px; }
+.customer-profiles__stats strong { display: block; font-size: 16px; font-weight: 600; color: #6d28d9; overflow-wrap: anywhere; font-family: 'Lato Condensed', 'Lato', sans-serif; }
+.customer-profiles__contact { padding: 4px 12px; border-radius: 16px; background: #fff; border: 1px solid #e2e5ea; }
+.customer-profiles__contact p { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; margin: 0; font-size: 12px; }
+.customer-profiles__contact p + p { border-top: 1px solid #f1f5f9; }
+.customer-profiles__contact span { color: #64748b; }
+.customer-profiles__contact b { text-align: right; font-weight: 400; overflow-wrap: anywhere; }
+.customer-profiles .serverless-disclosure > summary { padding: 13px 12px; font-family: 'Roboto Condensed', sans-serif; font-weight: 400; }
+.customer-profiles__account-button { justify-content: center; min-height: 42px; }
