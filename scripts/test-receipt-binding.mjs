@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import { webcrypto } from 'node:crypto';
+const source=fs.readFileSync('tgcloud/lib/receipt-ocr.js','utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');
+let row=null;const db={run:async()=>({rowsAffected:1}),get:async()=>row};
+const EndpointError=class extends Error{constructor(message,options){super(message);this.code=options?.code}};
+const {bindReceiptAnalysis,imageHash}=new Function('db','EndpointError','crypto',source+';return {bindReceiptAnalysis,imageHash}')(db,EndpointError,webcrypto);
+const data=Buffer.from('sample actual bytes').toString('base64url');const hash=await imageHash(data);
+let bound=await bindReceiptAnalysis(data,'customer',{paymentEvidence:{reference:'435346'},smsEvidence:{matched:true},receiptOcrVerified:true});
+assert.equal(bound.receiptOcrVerified,false);assert.equal(bound.paymentEvidence,null);assert.equal(bound.smsEvidence,null);
+bound=await bindReceiptAnalysis(data,'customer',{receiptScanId:'forged',paymentEvidence:{reference:'435346'}});assert.equal(bound.receiptOcrVerified,false);
+row={analysis:JSON.stringify({receiptOcrVerified:true,receiptImageSha256:hash,paymentEvidence:{reference:'435346'}})};
+bound=await bindReceiptAnalysis(data,'customer',{receiptScanId:'stored',paymentEvidence:{reference:'fake'},smsEvidence:{matched:true}});assert.equal(bound.paymentEvidence.reference,'435346');assert.equal(bound.smsEvidence,null);
+console.log('PASS: client receipt/SMS claims cleared; only server image-bound scans accepted.');

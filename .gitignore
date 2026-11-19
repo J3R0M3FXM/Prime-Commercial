@@ -46,3 +46,5 @@ cloudflare/**/node_modules/
 cloudflare/**/__pycache__/
 cloudflare/**/dist/
 /dist/
+
+/android-sms-bridge/build/

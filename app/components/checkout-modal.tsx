@@ -177,7 +177,7 @@ export default function CheckoutModal({
   const preSubmitProofInputRef = useRef<HTMLInputElement>(null);
   const [isPreviewProofOpen, setIsPreviewProofOpen] = useState(false);
 
-  // Receipt forensics state; no OCR or payment decision is performed here.
+  // Receipt hashes plus server-extracted payment references; payment approval remains with staff.
   const [isAnalyzingReceipt, setIsAnalyzingReceipt] = useState(false);
   const [ocrAnalysis, setOcrAnalysis] = useState<any>(null);
   const [ocrError, setOcrError] = useState<string>("");
@@ -1104,8 +1104,18 @@ export default function CheckoutModal({
       const pixelBytes = context.getImageData(0, 0, canvas.width, canvas.height).data;
       const pixelDigest = await globalThis.crypto.subtle.digest("SHA-256", pixelBytes);
       const pixelFingerprintSha256 = Array.from(new Uint8Array(pixelDigest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      let textAnalysis: Record<string, any> = {};
+      try {
+        textAnalysis = await callServerless<Record<string, any>>("analyzePaymentReceipt", {
+          data: encoded.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+          contentType: /^data:([^;]+)/.exec(base64Image)?.[1] || "image/jpeg",
+        }, 45_000);
+      } catch {
+        textAnalysis = { ocrStatus: "unavailable", receiptOcrVerified: false };
+      }
       const analysis = {
-        model: "PRIME Image Forensics v1",
+        ...textAnalysis,
+        model: "PRIME Image Forensics v2",
         rawImageSha256,
         scanImageSha256: rawImageSha256,
         pixelFingerprintSha256,

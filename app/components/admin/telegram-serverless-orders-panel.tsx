@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Copy, Clock3, Download, ExternalLink, Loader2, Minus, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { formatPHP, formatPHPWhole } from "@/lib/currency";
 import { callServerless, getTelegramServerlessSession, resolveTelegramMedia } from "@/lib/telegram-serverless-client";
+import { ReceiptSmsEvidence } from "./sms-bridge-panel";
 import SnapshotLocationMap from "./snapshot-location-map";
 import OrderWorkflowController,{type OrderWorkflow} from './order-workflow-controller';
 
@@ -776,13 +777,14 @@ export default function TelegramServerlessOrdersPanel({
             </section>
 
             <section hidden={orderDetailTab !== "flags"}>
+            {selectedOrder.paymentProofImage && <ReceiptSmsEvidence key={`${selectedOrder.id}:${selectedOrder.paymentProofImage}`} orderId={selectedOrder.id}/>}
             {selectedOrder.ocrAnalysis && <details className="serverless-disclosure"><summary>Receipt Check Details</summary><div className="serverless-disclosure__body space-y-1 text-xs">
               <b>Automated image checks · staff payment verification still required</b>
               {selectedOrder.ocrAnalysis.forensicsResult && <p>{selectedOrder.ocrAnalysis.forensicsResult}</p>}
               {Array.isArray(selectedOrder.ocrAnalysis.forensicsFlags) && selectedOrder.ocrAnalysis.forensicsFlags.length > 0 && <div className="rounded border border-rose-200 bg-rose-50 p-2 text-rose-950"><b>Reuse Indicators</b><ul className="mt-1 list-disc pl-4">{selectedOrder.ocrAnalysis.forensicsFlags.map((flag: any, index: number) => <li key={`${flag.kind}-${flag.orderId || index}`}>{flag.kind === "REFERENCE_REUSE" ? "Reference number seen on another order" : flag.kind === "EXACT_SCAN_IMAGE_REUSE" || flag.kind === "EXACT_UPLOADED_IMAGE_REUSE" ? "Exact image fingerprint seen on another order" : flag.kind === "RECEIPT_IMAGE_CHANGED_ON_ORDER" ? "Receipt image changed after an earlier scan or submission" : "Receipt reuse indicator"}{flag.orderNumber ? ` · Order #${flag.orderNumber}` : ""}</li>)}</ul></div>}
               {selectedOrder.ocrAnalysis.rawImageSha256 && <p className="break-all"><b>File Fingerprint:</b> {selectedOrder.ocrAnalysis.rawImageSha256}</p>}
               {selectedOrder.ocrAnalysis.pixelFingerprintSha256 && <p className="break-all"><b>Pixel Sample Fingerprint:</b> {selectedOrder.ocrAnalysis.pixelFingerprintSha256}</p>}
-              {selectedOrder.ocrAnalysis.rawSummary && <details className="mt-2 border bg-white"><summary className="cursor-pointer p-2 font-bold">Older Text-Scan Result</summary><div className="max-h-64 space-y-1 overflow-y-auto border-t p-2">{selectedOrder.ocrAnalysis.rawSummary}<p>Detected amount: {formatPHP(Number(selectedOrder.ocrAnalysis.amountPaid) || 0)} · Reference: {selectedOrder.ocrAnalysis.referenceNumber || "Unreadable"}</p>{selectedOrder.ocrAnalysis.providerResponse && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words border-t p-2 text-[10px]">{selectedOrder.ocrAnalysis.providerResponse}</pre>}{Array.isArray(selectedOrder.ocrAnalysis.extractedFields) && selectedOrder.ocrAnalysis.extractedFields.map((field: any, index: number) => <p key={`${field.label}-${index}`} className="break-words border-b py-1"><b>{field.label}: </b>{field.value}</p>)}</div></details>}
+              {selectedOrder.ocrAnalysis.rawSummary && <details className="mt-2 border bg-white"><summary className="cursor-pointer p-2 font-bold">Extracted Receipt Text</summary><div className="max-h-64 space-y-1 overflow-y-auto border-t p-2">{selectedOrder.ocrAnalysis.rawSummary}<p>Detected amount: {formatPHP(selectedOrder.ocrAnalysis.paymentEvidence?.amountCents != null ? selectedOrder.ocrAnalysis.paymentEvidence.amountCents / 100 : Number(selectedOrder.ocrAnalysis.amountPaid) || 0)} · Reference: {selectedOrder.ocrAnalysis.paymentEvidence?.reference || selectedOrder.ocrAnalysis.referenceNumber || "Unreadable"}</p>{selectedOrder.ocrAnalysis.providerResponse && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words border-t p-2 text-[10px]">{selectedOrder.ocrAnalysis.providerResponse}</pre>}{Array.isArray(selectedOrder.ocrAnalysis.extractedFields) && selectedOrder.ocrAnalysis.extractedFields.map((field: any, index: number) => <p key={`${field.label}-${index}`} className="break-words border-b py-1"><b>{field.label}: </b>{field.value}</p>)}</div></details>}
               <p className="font-bold text-amber-800">Image matches are review clues only. They do not prove payment or image tampering. Verify the transaction directly with the payment provider.</p>
             </div></details>}
             </section>

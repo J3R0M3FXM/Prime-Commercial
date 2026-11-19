@@ -98,7 +98,7 @@ export default function TelegramServerlessSystemPanel({ onBack }: { onBack: () =
     try {
       await callServerless("manageOcrSettings", { action: "disconnectGoogleVision" });
       setGoogleVisionConfigured(false);
-      setMessage("The saved Google Cloud Vision key has been deleted. OCR.space remains the active scanner.");
+      setMessage("The saved Google Cloud Vision key has been deleted. The selected receipt scanner remains unchanged.");
     } catch (error: any) {
       setMessage(error?.message || "Could not delete the saved Google Cloud Vision key.");
     } finally {
@@ -190,11 +190,11 @@ export default function TelegramServerlessSystemPanel({ onBack }: { onBack: () =
         </div>
         <div className="flex items-start gap-3">
           <ShieldCheck className="mt-0.5 h-5 w-5 text-emerald-700" />
-          <div><h2 className="font-bold">Receipt scanner: OCR.space (planned)</h2><p className="mt-1 text-sm text-slate-600">OCR is currently disabled. Image fingerprints are captured for fraud detection; staff must verify payments manually until OCR.space is connected through TGCloud.</p></div>
+          <div><h2 className="font-bold">Receipt text scanner</h2><p className="mt-1 text-sm text-slate-600">The configured Taggun or OCR.space provider extracts receipt references, amount and time alongside image fingerprints. Payment SMS corroboration remains subject to staff review.</p></div>
         </div>
         <p className="text-sm">OCR.space key: {loading ? "Checking…" : ocrSpaceConfigured ? <span className="font-bold text-emerald-700">Configured</span> : <span className="font-bold text-amber-700">Not Configured</span>}</p>
         <form onSubmit={save} className="space-y-3">
-          <p className="border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">OCR.space offers a free API key without Google Cloud billing setup. Its free endpoint has rate limits and a 1 MB per-image limit; Engine 3 has a separate smaller quota and runs only if Engine 2 returns no text. Checkout compresses the scan copy while retaining the original for staff review. The key is write-only here. OCR never confirms or marks a payment as Paid.</p>
+          <p className="border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">OCR.space offers a free API key without Google Cloud billing setup. Its free endpoint has rate limits and a 1 MB per-image limit; Receipt extraction uses Engine 2 when OCR.space is selected. Checkout compresses the scan copy while retaining the original for staff review. The key is write-only here. OCR never confirms or marks a payment as Paid.</p>
           <label className="block text-sm font-semibold">OCR.space API key<input type="password" autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={ocrSpaceConfigured ? "Enter a new key to replace the saved key" : "Paste OCR.space API key"} className="mt-1 w-full border px-3 py-2 font-mono text-sm" /></label>
           <button type="submit" disabled={saving || !apiKey.trim()} className="inline-flex items-center gap-2 bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save OCR.space key</button>
         </form>

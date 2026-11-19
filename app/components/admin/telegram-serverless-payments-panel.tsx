@@ -1,5 +1,6 @@
 "use client";
 
+import SmsBridgePanel from "./sms-bridge-panel";
 import { useEffect, useState } from "react";
 import { ArrowLeft, CreditCard, Loader2, Pencil, Plus, RefreshCw, Save, Trash2, X } from "lucide-react";
 import { AssetPickerButton } from "./asset-library-panel";
@@ -106,6 +107,7 @@ export default function TelegramServerlessPaymentsPanel({ onBack }: { onBack: ()
     <p className="my-2 border bg-white p-2 text-[10px] leading-snug text-slate-600">API and crypto are configuration only. A payment link return never confirms payment; staff must review proof.</p>
     {error&&<div role="alert" className="my-2 border border-red-300 bg-red-50 p-2 text-xs text-red-800">{error}</div>}{message&&<div role="status" className="my-2 border border-emerald-300 bg-emerald-50 p-2 text-xs text-emerald-800">{message}</div>}
     {!authorized?<div className="border bg-white p-5 text-center text-xs">Checking verified Telegram admin access…</div>:<>
+      <SmsBridgePanel/>
       <div className="serverless-panel-toolbar"><strong className="flex-1 text-xs uppercase">Saved Methods · {methods.length}</strong>{busy&&<Loader2 className="h-4 w-4 animate-spin"/>}</div>
       {methods.length===0?<p className="border bg-white p-4 text-center text-xs text-slate-600">No payment methods configured.</p>:<div className="serverless-record-list prime-payments-list">{methods.map((method)=><article key={method.id} className="serverless-record prime-payment-method">
         <div className="serverless-record__summary prime-payment-method__summary">{method.logo?<UploadedPreview reference={method.logo} label={`${method.name} logo`} brand compact/>:<span className="prime-payment-preview prime-payment-preview--compact"><CreditCard className="h-5 w-5 text-slate-400"/></span>}<div className="serverless-record__copy"><strong>{method.name}</strong><small>{method.paymentType==="qr_code"?"Static QR":method.paymentType==="secured_payment_link"?"Secured Payment Link":method.paymentType==="api"?"API · Configuration Only":method.paymentType==="crypto"?"Crypto · Configuration Only":"Manual Transfer"}{method.accountNumber?` · ${method.accountNumber}`:""}</small></div><button type="button" disabled={busy} onClick={()=>edit(method)} className="serverless-action" aria-label={`Edit ${method.name}`}><Pencil className="h-4 w-4"/></button></div>

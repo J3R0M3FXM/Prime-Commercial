@@ -1,0 +1,24 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="ph.primenetwork.smsbridge" android:versionCode="1" android:versionName="1.0">
+  <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/>
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+  <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+  <application android:label="PRIME SMS Bridge" android:theme="@style/AppTheme" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
+    <activity android:name=".MainActivity" android:exported="true">
+      <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+      <intent-filter><action android:name="android.intent.action.VIEW"/><category android:name="android.intent.category.DEFAULT"/><category android:name="android.intent.category.BROWSABLE"/><data android:scheme="prime-sms" android:host="pair"/></intent-filter>
+    </activity>
+    <receiver android:name=".PaymentSmsReceiver" android:exported="true" android:permission="android.permission.BROADCAST_SMS">
+      <intent-filter><action android:name="android.provider.Telephony.SMS_RECEIVED"/></intent-filter>
+    </receiver>
+    <receiver android:name=".BootReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter></receiver>
+    <service android:name=".ListenerService" android:exported="false" android:foregroundServiceType="specialUse">
+      <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-enabled owner payment phone: keep MayaBiz SMS confirmation capture available with visible pause control for forwarding to merchant reconciliation."/>
+    </service>
+    <service android:name=".SyncJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true"/>
+  </application>
+</manifest>

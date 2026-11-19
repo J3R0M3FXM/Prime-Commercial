@@ -1,5 +1,6 @@
 import { db, EndpointError } from 'sdk';
 import { eq } from 'sdk/db';
+import { bindReceiptAnalysis } from '../lib/receipt-ocr.js';
 import { customers, mediaAssetContents, mediaAssets, orders, paymentMethods } from '../schema.js';
 import { notifyPaymentProofSubmitted } from '../lib/order-notifications.js';
 import { attachWorkflow, expireReceiptResubmissions,ensureOrderWorkflow } from '../lib/order-workflow.js';
@@ -125,7 +126,7 @@ export default async function (input, ctx) {
   );
   const savedAnalysis = {
     ...storedOcrAnalysis(order.ocrAnalysis),
-    ...storedOcrAnalysis(input?.ocrAnalysis),
+    ...await bindReceiptAnalysis(input.data, order.customerId, input?.ocrAnalysis),
   };
   const forensicsFlags = Array.isArray(savedAnalysis.forensicsFlags) ? [...savedAnalysis.forensicsFlags] : [];
   const priorProofId = String(order.paymentProofImage || '').startsWith('tgmedia:')

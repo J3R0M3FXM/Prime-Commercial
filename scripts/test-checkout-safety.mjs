@@ -201,7 +201,7 @@ if (!isMainThread) {
     const paymentDb = adapter(payments);
     paymentDb.select = () => ({ from(table) { this.table = table; return this; }, where() { return this; },
       async get() { return this.table === 'customers' ? { id: 'customer', tgUserId: '123' } : { id: 'qr', isActive: true }; } });
-    const dependencies = { db: paymentDb, EndpointError, eq: () => null, customers: 'customers', paymentMethods: 'paymentMethods' };
+    const dependencies = { bindReceiptAnalysis: async()=>({receiptOcrVerified:false}), db: paymentDb, EndpointError, eq: () => null, customers: 'customers', paymentMethods: 'paymentMethods' };
     const startPayment = load('tgcloud/endpoints/createPaymentSession.js', dependencies, ['handler']).handler;
     const proof = load('tgcloud/endpoints/uploadPaymentProof.js', dependencies, ['handler']).handler;
     const ctx = { initData: { user: { id: 123 } } };
