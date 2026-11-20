@@ -72,6 +72,7 @@ const AddressPickerMap = dynamic(() => import("./address-picker-map"), {
 
 import OrderSubmissionConfirmation from './order-submission-confirmation';
 import CheckoutPaymentReminder, { DeliveryFeeReminder } from './checkout-payment-reminder';
+import CheckoutPaymentSwitch from './checkout-payment-switch';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -154,6 +155,7 @@ export default function CheckoutModal({
   const [paymentMethodsLoadError, setPaymentMethodsLoadError] = useState(false);
   const [paymentMethodsReloadKey, setPaymentMethodsReloadKey] = useState(0);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<any>(null);
+  const [isChoosingPaymentMethod, setIsChoosingPaymentMethod] = useState(false);
   const [uploadedProofImage, setUploadedProofImage] = useState<string>("");
   const [isSubmittingProof, setIsSubmittingProof] = useState(false);
   const [proofSubmitSuccess, setProofSubmitSuccess] = useState(false);
@@ -569,6 +571,7 @@ export default function CheckoutModal({
       receiptScanVersion.current++;
       setIsAnalyzingReceipt(false); setOcrAnalysis(null); setOcrError("");
       setIsReceiptModalOpen(false); setIsPaymentDetailsModalOpen(false); setIsGatewayPromptOpen(false);
+      setIsChoosingPaymentMethod(false); setIsPaymentQrModalOpen(false); setZoomedPaymentMethod(null);
       setPromoCodeInput(""); setReferralCodeInput(""); setAppliedPromo(null); setAppliedReferral(null);
       setPromoError(""); setReferralError(""); setReferralSuccess("");
       setUseStoreCredits(false); setCreditAmountInput("");
@@ -2288,11 +2291,6 @@ export default function CheckoutModal({
             <section className="prime-checkout__payment-section space-y-3 border-t border-slate-200 pt-3">
               <CheckoutPaymentReminder amount={payableNow} deliveryAmount={payableOnDelivery} payUponDelivery={deliveryPaymentMethod === "upon_delivery"} />
 
-              <div className="prime-checkout__payment-method-heading">
-                <span>Choose your preferred payment method</span>
-                <span>Select one method below</span>
-              </div>
-
               {isLoadingPaymentMethods ? (
                 <div className="p-8 text-center bg-gray-50 border border-gray-200 text-xs font-mono text-gray-500">
                   <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin text-black" />Loading payment options...
@@ -2310,61 +2308,76 @@ export default function CheckoutModal({
                 <div className="border border-gray-200 bg-gray-50 p-4 text-center text-xs font-mono text-gray-600">No active payment methods are currently configured. Please contact shop support.</div>
               ) : (
                 <>
-                  {(() => {
-                    const itemsPerPage = 6;
-                    const totalPages = Math.ceil(paymentMethods.length / itemsPerPage);
-                    const pageIndex = Math.min(currentPaymentPage, Math.max(0, totalPages - 1));
-                    const slicedMethods = paymentMethods.slice(pageIndex * itemsPerPage, (pageIndex + 1) * itemsPerPage);
-                    return <div className="space-y-2.5">
-                      <div className="relative w-full overflow-hidden p-0.5 select-none" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={() => handleTouchEnd(totalPages)}>
-                        <div key={pageIndex} className={`prime-payment-grid prime-payment-grid--page prime-payment-grid--${paymentPageDirection === 1 ? "next" : "previous"} grid grid-cols-3 gap-1.5 sm:gap-2`}>
-                          {slicedMethods.map((method) => {
-                            const type = String(method.paymentType || method.type || "").toLowerCase();
-                            const selected = selectedPaymentMethod?.id === method.id;
-                            const qr = method.qrCodeImage || method.qrCode || method.qrImage || method.qr_code_image || "";
-                            return <div key={method.id} className="flex min-w-0 flex-col items-center gap-1">
-                              <button type="button" disabled={isConfirmingCodes} onClick={() => { void (async () => {
-                                if (!await confirmCheckoutCodes()) return;
-                                if (type === "secured_payment_link" || type === "api" || type === "webhook") {
-                                  setGatewayMethodPending(method);
-                                  setIsGatewayPromptOpen(true);
-                                  return;
-                                }
-                                setSelectedPaymentMethod(method);
-                                receiptScanVersion.current++;
-                                setUploadedProofImage("");
-                                setOcrAnalysis(null);
-                                setOcrError(""); setIsAnalyzingReceipt(false);
-                                setSubmitError("");
-                                if (type.includes("qr") && qr) {
-                                  setZoomedPaymentMethod(method);
-                                  setIsPaymentQrModalOpen(true);
-                                } else setIsPaymentDetailsModalOpen(true);
-                              })(); }} aria-pressed={selected} className={selectorTileClass(selected)} title={method.name}>
-                                <CheckoutTileLogo reference={String(method.logo || "")} name={method.name} selected={selected} payment />
-                                {type.includes("qr") && <QrCode className="absolute bottom-1 right-1 h-3 w-3 text-slate-500" aria-hidden="true" />}
-                              </button>
-                              <span className={selectorLabelClass}>{method.name}</span>
-                            </div>;
-                          })}
-                        </div>
-                      </div>
-                      {totalPages > 1 && <div className="prime-payment-grid__pagination" aria-label="Payment method pages">
-                        {Array.from({ length: totalPages }).map((_, index) => <button key={index} type="button" aria-label={`Show payment methods page ${index + 1}`} aria-current={index === pageIndex ? "page" : undefined} onClick={() => {
-                          if (index === pageIndex) return;
-                          setPaymentPageDirection(index > pageIndex ? 1 : -1);
-                          setCurrentPaymentPage(index);
-                        }} className={index === pageIndex ? "is-active" : ""} />)}
-                      </div>}
-                    </div>;
-                  })()}
-
                   <input ref={preSubmitProofInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => {
                     const file = event.target.files?.[0];
                     event.target.value = "";
                     void handleAttachPreSubmitProof(file);
                   }} />
-                  {selectedPaymentMethod && !isPaymentQrModalOpen && !isPaymentDetailsModalOpen && !isGatewayPromptOpen && <button type="button" onClick={() => setIsReceiptModalOpen(true)} className="w-full bg-slate-900 px-3 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-white">{ocrAnalysis ? "Review Payment Receipt" : "Upload Payment Receipt"}</button>}
+                  <CheckoutPaymentSwitch showPicker={!selectedPaymentMethod || isChoosingPaymentMethod}
+                    picker={<>
+                      <div className="prime-checkout__payment-method-heading">
+                        <span>Choose your preferred payment method</span>
+                        <span>Select one method below</span>
+                      </div>
+                      {(() => {
+                        const itemsPerPage = 6;
+                        const totalPages = Math.ceil(paymentMethods.length / itemsPerPage);
+                        const pageIndex = Math.min(currentPaymentPage, Math.max(0, totalPages - 1));
+                        const slicedMethods = paymentMethods.slice(pageIndex * itemsPerPage, (pageIndex + 1) * itemsPerPage);
+                        return <div className="space-y-2.5">
+                          <div className="relative w-full overflow-hidden p-0.5 select-none" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={() => handleTouchEnd(totalPages)}>
+                            <div key={pageIndex} className={`prime-payment-grid prime-payment-grid--page prime-payment-grid--${paymentPageDirection === 1 ? "next" : "previous"} grid grid-cols-3 gap-1.5 sm:gap-2`}>
+                              {slicedMethods.map((method) => {
+                                const type = String(method.paymentType || method.type || "").toLowerCase();
+                                const selected = selectedPaymentMethod?.id === method.id;
+                                const qr = method.qrCodeImage || method.qrCode || method.qrImage || method.qr_code_image || "";
+                                return <div key={method.id} className="flex min-w-0 flex-col items-center gap-1">
+                                  <button type="button" disabled={isConfirmingCodes} onClick={() => { void (async () => {
+                                    if (!await confirmCheckoutCodes()) return;
+                                    setIsChoosingPaymentMethod(false);
+                                    if (selectedPaymentMethod?.id !== method.id) {
+                                      receiptScanVersion.current++;
+                                      setUploadedProofImage("");
+                                      setOcrAnalysis(null);
+                                      setOcrError(""); setIsAnalyzingReceipt(false);
+                                    }
+                                    setSelectedPaymentMethod(method);
+                                    setSubmitError("");
+                                    if (type.includes("qr") && qr) {
+                                      setZoomedPaymentMethod(method);
+                                      setIsPaymentQrModalOpen(true);
+                                    } else setIsPaymentDetailsModalOpen(true);
+                                  })(); }} aria-pressed={selected} className={selectorTileClass(selected)} title={method.name}>
+                                    <CheckoutTileLogo reference={String(method.logo || "")} name={method.name} selected={selected} payment />
+                                    {type.includes("qr") && <QrCode className="absolute bottom-1 right-1 h-3 w-3 text-slate-500" aria-hidden="true" />}
+                                  </button>
+                                  <span className={selectorLabelClass}>{method.name}</span>
+                                </div>;
+                              })}
+                            </div>
+                          </div>
+                          {totalPages > 1 && <div className="prime-payment-grid__pagination" aria-label="Payment method pages">
+                            {Array.from({ length: totalPages }).map((_, index) => <button key={index} type="button" aria-label={`Show payment methods page ${index + 1}`} aria-current={index === pageIndex ? "page" : undefined} onClick={() => {
+                              if (index === pageIndex) return;
+                              setPaymentPageDirection(index > pageIndex ? 1 : -1);
+                              setCurrentPaymentPage(index);
+                            }} className={index === pageIndex ? "is-active" : ""} />)}
+                          </div>}
+                        </div>;
+                      })()}
+
+                      {selectedPaymentMethod && isChoosingPaymentMethod && <button type="button" onClick={() => setIsChoosingPaymentMethod(false)} className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-xs text-slate-700">Keep {selectedPaymentMethod.name}</button>}
+                    </>}
+                    selection={<>
+                      {selectedPaymentMethod && !isChoosingPaymentMethod && <div className="space-y-2">
+                        <p className="text-xs font-mono text-slate-600">Selected: {selectedPaymentMethod.name}</p>
+                        <div className="grid grid-cols-2 gap-2" aria-label="Selected payment method actions">
+                          <button type="button" disabled={isAnalyzingReceipt || isSubmittingProof} onClick={() => { setIsChoosingPaymentMethod(true); setCurrentPaymentPage(0); }} className="min-h-12 rounded-lg border border-slate-300 bg-white px-2 py-3 text-xs font-heading text-slate-800 disabled:opacity-50">Change Payment Method</button>
+                          <button type="button" disabled={isAnalyzingReceipt || isSubmittingProof} onClick={() => setIsReceiptModalOpen(true)} className="min-h-12 rounded-lg bg-slate-900 px-2 py-3 text-xs font-heading text-white disabled:opacity-50">{uploadedProofImage ? "Review Payment Receipt" : "Upload Payment Receipt"}</button>
+                        </div>
+                      </div>}
+                    </>}
+                  />
                 </>
               )}
             </section>
@@ -3011,18 +3024,18 @@ export default function CheckoutModal({
       )}
 
       {isPaymentDetailsModalOpen && selectedPaymentMethod && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/75 p-2.5 backdrop-blur-xs" role="presentation" onClick={() => { setIsPaymentDetailsModalOpen(false); setIsReceiptModalOpen(true); }}>
-          <section className="w-full max-w-[430px] space-y-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-2xl" role="dialog" aria-modal="true" aria-label="Payment instructions" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/75 p-2.5 backdrop-blur-xs" role="presentation" onClick={() => { setIsPaymentDetailsModalOpen(false); }}>
+          <section className="w-full max-w-[430px] max-h-[85dvh] overflow-y-auto space-y-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-2xl" role="dialog" aria-modal="true" aria-label="Payment instructions" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div><h3 className="font-heading text-sm font-bold uppercase text-slate-900">Payment details</h3><p className="text-[11px] text-slate-500">{selectedPaymentMethod.name}</p></div>
-              <button type="button" onClick={() => { setIsPaymentDetailsModalOpen(false); setIsReceiptModalOpen(true); }} className="grid min-h-10 min-w-10 place-items-center rounded-full bg-slate-100 text-slate-700" aria-label="Close payment details">✕</button>
+              <button type="button" onClick={() => { setIsPaymentDetailsModalOpen(false); }} className="grid min-h-10 min-w-10 place-items-center rounded-full bg-slate-100 text-slate-700" aria-label="Close payment details">✕</button>
             </div>
             {selectedPaymentMethod.accountName && <div className="border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[10px] font-heading font-semibold uppercase text-slate-500">Account name</span><div className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 break-words font-mono text-sm text-slate-900">{selectedPaymentMethod.accountName}</span><button type="button" onClick={() => { void navigator.clipboard.writeText(String(selectedPaymentMethod.accountName)); setCopiedField("modal-name"); window.setTimeout(() => setCopiedField(null), 1800); }} className="min-h-10 shrink-0 border border-slate-300 bg-white px-2 text-xs">{copiedField === "modal-name" ? "Copied" : "Copy"}</button></div></div>}
             {selectedPaymentMethod.accountNumber && <div className="border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[10px] font-heading font-semibold uppercase text-slate-500">Account / mobile number</span><div className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 break-all font-mono text-sm font-bold text-slate-900">{selectedPaymentMethod.accountNumber}</span><button type="button" onClick={() => { void navigator.clipboard.writeText(String(selectedPaymentMethod.accountNumber)); setCopiedField("modal-number"); window.setTimeout(() => setCopiedField(null), 1800); }} className="min-h-10 shrink-0 border border-slate-300 bg-white px-2 text-xs">{copiedField === "modal-number" ? "Copied" : "Copy"}</button></div></div>}
             {selectedPaymentMethod.walletAddress && <div className="border border-slate-200 bg-slate-50 p-2.5"><span className="block text-[10px] font-heading font-semibold uppercase text-slate-500">Wallet address</span><div className="mt-1 flex items-center gap-2"><span className="min-w-0 flex-1 break-all font-mono text-sm text-slate-900">{selectedPaymentMethod.walletAddress}</span><button type="button" onClick={() => { void navigator.clipboard.writeText(String(selectedPaymentMethod.walletAddress)); setCopiedField("modal-wallet"); window.setTimeout(() => setCopiedField(null), 1800); }} className="min-h-10 shrink-0 border border-slate-300 bg-white px-2 text-xs">{copiedField === "modal-wallet" ? "Copied" : "Copy"}</button></div></div>}
             {selectedPaymentMethod.instructions && <p className="break-words border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-950">{selectedPaymentMethod.instructions}</p>}
             {selectedPaymentMethod.paymentLinkUrl && <SecuredPaymentLink url={selectedPaymentMethod.paymentLinkUrl} />}
-            <button type="button" onClick={() => { setIsPaymentDetailsModalOpen(false); setIsReceiptModalOpen(true); }} className="min-h-11 w-full bg-slate-900 px-3 text-xs font-heading font-bold uppercase tracking-wider text-white">Done</button>
+            <button type="button" onClick={() => { setIsPaymentDetailsModalOpen(false); }} className="min-h-11 w-full bg-slate-900 px-3 text-xs font-heading font-bold uppercase tracking-wider text-white">Done</button>
           </section>
         </div>
       )}
@@ -3030,7 +3043,7 @@ export default function CheckoutModal({
       {/* Enlarged Payment QR Code Pop-up Modal */}
       {isPaymentQrModalOpen && zoomedPaymentMethod && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-2.5 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-3xl p-4 max-w-[430px] w-full shadow-lg space-y-2.5 text-center animate-in zoom-in-95 duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl p-4 max-w-[430px] w-full shadow-lg space-y-2.5 text-center animate-in zoom-in-95 duration-150" role="dialog" aria-modal="true" aria-label="Payment QR instructions">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2 text-left">
                 <QrCode className="w-5 h-5 text-black shrink-0" />
@@ -3048,7 +3061,6 @@ export default function CheckoutModal({
                 onClick={() => {
                   setIsPaymentQrModalOpen(false);
                   setZoomedPaymentMethod(null);
-                  setIsReceiptModalOpen(true);
                 }}
                 className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-mono font-bold cursor-pointer transition-colors"
               >
@@ -3062,14 +3074,14 @@ export default function CheckoutModal({
               {zoomedPaymentMethod.accountName && <p className="text-xs">Account Name: {zoomedPaymentMethod.accountName}</p>}
               {zoomedPaymentMethod.accountNumber && <p className="text-xs">Account: {zoomedPaymentMethod.accountNumber}</p>}
               {zoomedPaymentMethod.walletAddress && <p className="break-all text-xs">Wallet Address: {zoomedPaymentMethod.walletAddress}</p>}
+              {zoomedPaymentMethod.instructions && <p className="break-words text-xs text-slate-600">{zoomedPaymentMethod.instructions}</p>}
               <button
                 type="button"
                 onClick={() => {
                   setIsPaymentQrModalOpen(false);
                   setZoomedPaymentMethod(null);
-                  setIsReceiptModalOpen(true);
                 }}
-                className="flex-1 px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+                className="min-h-11 w-full px-3.5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading uppercase tracking-wider transition-all cursor-pointer shadow-xs"
               >
                 Done
               </button>
@@ -3081,8 +3093,10 @@ export default function CheckoutModal({
       {isReceiptModalOpen && selectedPaymentMethod && currentStep === 5 && (
         <div className="fixed inset-0 z-[2700] flex items-center justify-center bg-slate-950/75 p-3" role="dialog" aria-modal="true" aria-label="Payment receipt upload">
           <section className="w-full max-w-[430px] space-y-3 rounded-xl bg-white p-4 text-center shadow-xl">
-            <p className="text-xs leading-relaxed">Please upload a clear copy of your payment receipt. Our system will conduct an Automated Image Analysis to help review its authenticity before it can be submitted. Staff must verify the payment.</p>
-            {!ocrAnalysis && !ocrError && !isAnalyzingReceipt && <div className="space-y-2">{uploadedProofImage && <button type="button" onClick={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }} className="w-full border border-slate-300 px-3 py-2 text-xs">Re-scan Saved Receipt</button>}<button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="w-full bg-slate-900 px-3 py-3 text-xs font-heading font-semibold uppercase text-white">Select Receipt for Upload</button></div>}
+            <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700"><ShieldCheck className="h-5 w-5" aria-hidden="true" /></div>
+            <h3 className="font-heading text-base font-normal text-slate-900">SERVICE PROCESS NOTICE</h3>
+            <p className="text-sm leading-relaxed text-slate-600">For security purposes, we will perform automated Forensics Image Analysis and upload your receipt over an encrypted connection.</p>
+            {!ocrAnalysis && !ocrError && !isAnalyzingReceipt && <div className="space-y-2">{uploadedProofImage && <button type="button" onClick={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }} className="w-full border border-slate-300 px-3 py-2 text-xs">Re-scan Saved Receipt</button>}<button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="min-h-12 w-full rounded-lg bg-slate-900 px-3 py-3 text-xs font-heading text-white">ATTACH PAYMENT RECEIPT</button></div>}
             {isAnalyzingReceipt && <div role="status" className="space-y-3"><div className="prime-upload-scan">{uploadedProofImage ? <img src={uploadedProofImage} alt="Receipt being analyzed" /> : <Loader2 className="mx-auto h-10 w-10 animate-spin" />}<span /></div><p className="text-xs">Automated Forensics Image Analysis is in progress. Please do not close or refresh this page. This process will take up to 30 seconds.</p></div>}
             {ocrAnalysis?.matchStatus === "ANALYSIS_COMPLETED" && !isAnalyzingReceipt && <div role="status" className="space-y-3"><CheckCircle2 className="prime-success-check mx-auto h-12 w-12 text-emerald-600" /><p className="font-heading font-semibold">Image Analysis Completed</p><div className="grid grid-cols-3 gap-2"> <button type="button" onClick={() => setIsPreviewProofOpen(true)} className="border border-slate-300 p-2 text-xs">PREVIEW</button><button type="button" onClick={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }} className="border border-slate-300 p-2 text-xs">RE-SCAN</button><button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="border border-slate-300 p-2 text-xs">REPLACE</button></div></div>}
             {ocrError && <><p role="alert" className="text-xs text-red-700">{ocrError}</p><div className="flex justify-center gap-2">{uploadedProofImage && <button type="button" onClick={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }} className="border border-slate-300 p-2 text-xs">RE-SCAN</button>}<button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="border border-slate-300 p-2 text-xs">REPLACE</button></div></>}

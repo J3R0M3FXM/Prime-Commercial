@@ -46,6 +46,7 @@ run('node', ['scripts/test-mapbox-ui.mjs'], 'Mapbox views and pin lifecycle');
 run('node', ['scripts/test-receipt-transfer.mjs'], 'receipt image transfer and stable cache');
 run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
 run('node', ['scripts/test-checkout-promo-state.mjs'], 'fresh promo result before React render');
+run('node', ['scripts/test-checkout-payment-ui.mjs'], 'payment method details, selection actions and receipt entry');
 run('node', ['scripts/test-checkout-delivery-quotes.mjs'], 'stable checkout quote and promo totals');
 run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
 run('node', ['scripts/test-pos-invoice-ui.mjs'], 'rendered unpaid POS invoice flow');
