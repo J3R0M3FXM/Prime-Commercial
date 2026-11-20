@@ -118,6 +118,13 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
     y+=8;row('Order Total',invoice.total,true);
     if(invoice.payableOnDelivery){y+=8;row('Pay Courier On Delivery',invoice.payableOnDelivery);}
     y+=20;
+    if(!paid&&invoice.validUntil){
+      font(24,true);
+      for(const line of wrapped(ctx,`SETTLE PAYMENT BEFORE ${paymentDeadline(invoice.validUntil)} TODAY.`,788)){
+        textAt(line,450,y,24,true,'#dc2626','center');y+=32;
+      }
+      y+=12;
+    }
     box(56,y,788,44,navy);
     const instruction=paid||!qr?'Payment Details':'SCAN THE QR CODE TO PAY USING YOUR BANKING OR E-WALLET APP';
     font(24,false,true);
@@ -157,7 +164,6 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
     y=Math.max(cardTop+cardHeight,detailsY+24);
     box(56,y,788,8,navy);y+=26;
     if(!paid)text('PLEASE SEND A COPY OF PAYMENT RECEIPT IN THIS CHAT',23,navy,true);
-    if(!paid&&invoice.validUntil)text(`Settle payment before ${paymentDeadline(invoice.validUntil)} today.`,23,muted,true);
     y+=12;text('Thank You For Choosing PRIME',30,navy,true,true);
     if(paid)text('Payment Has Been Recorded',23,muted,true);
     return y+44;
