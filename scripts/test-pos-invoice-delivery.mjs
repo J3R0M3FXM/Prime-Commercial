@@ -75,5 +75,15 @@ const refreshed=await prepare('181126120005');assert.equal(refreshed.invoice.pay
 order('o7','181126120006');sqlite.exec("UPDATE orders SET payment_method_name='Cash',payment_method_id='' WHERE id='o7'");
 const cash=await handler({action:'prepare',orderNumber:'181126120006'},ctx(111));
 assert.equal((await handler({action:'prepare',orderNumber:'181126120006'},ctx(111))).sessionId,cash.sessionId);
+const adminInvoice=await handler({action:'prepare',orderNumber:'181126120004',paymentMethodId:'gcash',recipient:'admin',chatId:'attacker'},ctx(111));
+assert.notEqual(adminInvoice.sessionId,rejected.sessionId);
+assert.equal(adminInvoice.route,'bot');
+await upload(adminInvoice);
+await handler({action:'send',sessionId:adminInvoice.sessionId},ctx(111));
+assert.equal(sent.at(-1).chat_id,'111','Admin destination comes from verified identity');
+assert.equal(sent.at(-1).business_connection_id,undefined);
+const otherAdmin=await handler({action:'prepare',orderNumber:'181126120004',paymentMethodId:'gcash',recipient:'admin'},ctx(222));
+assert.notEqual(otherAdmin.sessionId,adminInvoice.sessionId);
+await assert.rejects(handler({action:'prepare',orderNumber:'181126120004',recipient:'other'},ctx(111)),/Choose customer or admin/);
 sqlite.close();
 console.log('PASS: admin-only configured QR invoices, customer/business routing, chunk ownership, duplicate/uncertain send guards and verified payment confirmation.');

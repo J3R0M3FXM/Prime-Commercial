@@ -95,6 +95,8 @@ export default async function (input = {}, ctx) {
     return {success:true};
   }
   if (action === 'prepare') {
+    const recipient = String(input.recipient || 'customer');
+    if (!['customer','admin'].includes(recipient)) fail('Choose customer or admin.');
     const reference = String(input.orderNumber || '').trim();
     if (!/^[0-9]{12}$/.test(reference)) fail('Choose a saved POS order.');
     const order = await db.get(`SELECT id,order_number,customer_name,customer_phone,tg_user_id,items,subtotal,
@@ -103,9 +105,9 @@ export default async function (input = {}, ctx) {
       delivery_address,created_at,notes,status,staff_edit_version,payment_deadline_at FROM orders WHERE order_number=:reference`, { ':reference': reference });
     if (!order || !String(order.notes || '').startsWith('POS ·')) fail('Choose a saved POS order.', 'NOT_FOUND');
     if (['cancelled','expired','rejected'].includes(String(order.status).toLowerCase())) fail('This order is no longer payable.');
-    if (!/^[0-9]{1,20}$/.test(String(order.tg_user_id || ''))) fail('Add the customer Telegram ID before saving the POS order.');
+    if (recipient === 'customer' && !/^[0-9]{1,20}$/.test(String(order.tg_user_id || ''))) fail('Add the customer Telegram ID before saving the POS order.');
     const methodId = String(input.paymentMethodId || '').trim();
-    const methodKey = methodId + ':' + String(order.payment_status) + ':' + String(Number(order.staff_edit_version)||0);
+    const methodKey = methodId + ':' + String(order.payment_status) + ':' + String(Number(order.staff_edit_version)||0) + (recipient === 'admin' ? ':admin:' + owner : '');
     if (String(order.payment_status).toLowerCase()==='unpaid' && Number(order.payment_deadline_at)<=Math.floor(Date.now()/1000)) fail('This invoice expired. Cancel it in Orders and create a new invoice.');
     const payment = methodId ? await db.get(`SELECT id,name,qr_code_image,account_name,account_number,is_active
       FROM payment_methods WHERE id=:id`, { ':id': methodId }) : null;
@@ -123,7 +125,7 @@ export default async function (input = {}, ctx) {
     }
     if (previous) {
       if (previous.owner !== owner) fail('Another staff member prepared this invoice. Ask them to finish sending it.');
-      if (previous.status === 'uncertain' || previous.status === 'sending') fail('Check the customer chat before attempting another send.', 'POS_INVOICE_UNCERTAIN');
+      if (previous.status === 'uncertain' || previous.status === 'sending') fail('Check the recipient chat before attempting another send.', 'POS_INVOICE_UNCERTAIN');
       return { sessionId: previous.id, invoice: json(previous.snapshot), route: previous.connection_id ? 'business' : 'bot', sent: previous.status === 'complete', messageId: previous.message_id };
     }
     const items = json(order.items) || [];
@@ -131,7 +133,7 @@ export default async function (input = {}, ctx) {
     const invoice = {
       reference: order.order_number, customerName: order.customer_name, customerPhone: order.customer_phone || '',
       address: address.formatted || '', createdAt: new Date(Number(order.created_at) * 1000).toISOString(),
-      paymentStatus: order.payment_status, ...(order.payment_deadline_at?{validUntil:new Date(Number(order.payment_deadline_at)*1000).toISOString()}:{}), orderVersion: Number(order.staff_edit_version)||0,
+      paymentStatus: order.payment_status, ...(order.payment_deadline_at?{validUntil:new Date(Number(order.payment_deadline_at)*1000).toISOString()}:{}), orderVersion: Number(order.staff_edit_version)||0, customerTelegramId: String(order.tg_user_id || ''),
       items: items.map(item => ({ name: String(item.name || item.productName || 'Item'), quantity: Number(item.quantity) || 0,
         price: item.isFree ? 0 : amount(item.price), total: item.isFree ? 0 : amount(Number(item.price) * Number(item.quantity)) })),
       subtotal: amount(order.subtotal),
@@ -142,12 +144,13 @@ export default async function (input = {}, ctx) {
       payableOnDelivery: amount(order.payable_on_delivery),
       payment: payment ? {id:payment.id,name:payment.name,qrCodeImage:qrReference,accountName:payment.account_name || '',accountNumber:payment.account_number || ''} : {id:'',name:'Cash'},
     };
-    const connectionId = await deliveryTarget(order.tg_user_id);
+    const chatId = recipient === 'admin' ? owner : String(order.tg_user_id);
+    const connectionId = recipient === 'admin' ? '' : await deliveryTarget(chatId);
     const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2,'0')).join('');
     await db.run(`INSERT INTO pos_invoice_sessions(id,owner,order_id,payment_method_id,chat_id,connection_id,snapshot,expires_at)
       VALUES(:id,:owner,:order,:method,:chat,:connection,:snapshot,unixepoch()+86400)
       ON CONFLICT(order_id,payment_method_id) DO NOTHING`,
-      { ':id':id, ':owner':owner, ':order':order.id, ':method':methodKey, ':chat':String(order.tg_user_id), ':connection':connectionId, ':snapshot':JSON.stringify(invoice) });
+      { ':id':id, ':owner':owner, ':order':order.id, ':method':methodKey, ':chat':chatId, ':connection':connectionId, ':snapshot':JSON.stringify(invoice) });
     const saved = await db.get(`SELECT * FROM pos_invoice_sessions WHERE order_id=:order AND payment_method_id=:method`,{':order':order.id,':method':methodKey});
     if (saved.owner !== owner) fail('Another staff member prepared this invoice.');
     return {sessionId:saved.id,invoice:json(saved.snapshot),route:saved.connection_id?'business':'bot',sent:saved.status==='complete',messageId:saved.message_id};
@@ -157,7 +160,7 @@ export default async function (input = {}, ctx) {
   const session = await db.get(`SELECT * FROM pos_invoice_sessions WHERE id=:id AND owner=:owner`, {':id':id,':owner':owner});
   if (!session) fail('Invoice session expired. Open the invoice again.');
   if (session.status === 'complete') return {success:true,messageId:session.message_id};
-  if (['sending','uncertain'].includes(session.status)) fail('Check the customer chat before attempting another send.', 'POS_INVOICE_UNCERTAIN');
+  if (['sending','uncertain'].includes(session.status)) fail('Check the recipient chat before attempting another send.', 'POS_INVOICE_UNCERTAIN');
   if (action === 'start') {
     const size = Number(input.fileSize), count = Number(input.chunkCount);
     if (!Number.isSafeInteger(size) || size < 8 || size > 8*1024*1024 || count !== Math.ceil(size/CHUNK_SIZE)) fail('Invalid invoice image size.');
@@ -178,7 +181,7 @@ export default async function (input = {}, ctx) {
   const order = await db.get(`SELECT status,payment_status,staff_edit_version,payable_now,payment_deadline_at,tg_user_id FROM orders WHERE id=:id`,{':id':session.order_id});
   if (!order || ['cancelled','expired','rejected'].includes(String(order.status).toLowerCase())) fail('This order is no longer payable.');
   const snapshot = json(session.snapshot);
-  if (Number(order.staff_edit_version||0)!==Number(snapshot.orderVersion||0) || amount(order.payable_now)!==amount(snapshot.payableNow) || String(order.tg_user_id)!==String(session.chat_id)) fail('The order changed. Prepare a new invoice.');
+  if (Number(order.staff_edit_version||0)!==Number(snapshot.orderVersion||0) || amount(order.payable_now)!==amount(snapshot.payableNow) || String(order.tg_user_id || '')!==String(snapshot.customerTelegramId ?? session.chat_id)) fail('The order changed. Prepare a new invoice.');
   if (String(order.payment_status).toLowerCase()==='unpaid' && Number(order.payment_deadline_at)<=Math.floor(Date.now()/1000)) fail('This invoice has expired.');
   if (String(order.payment_status)!==String(snapshot.paymentStatus)) fail('Payment status changed. Refresh the invoice before sending.');
   if (snapshot.payment.id) {
@@ -208,10 +211,10 @@ export default async function (input = {}, ctx) {
   } catch (error) {
     if ([400,403].includes(Number(error?.code || error?.error_code))) {
       await db.run(`UPDATE pos_invoice_sessions SET status='uploading' WHERE id=:id AND status='sending'`,{':id':id});
-      fail('Telegram rejected this invoice. Check the customer Telegram ID and ask them to start or unblock the PRIME bot before retrying.','POS_INVOICE_REJECTED');
+      fail('Telegram rejected this invoice. Ask the recipient to start or unblock the PRIME bot, or select Admin (me) to share the invoice manually.','POS_INVOICE_REJECTED');
     }
     await db.run(`UPDATE pos_invoice_sessions SET status='uncertain' WHERE id=:id AND status='sending'`,{':id':id});
     await db.run(`DELETE FROM pos_invoice_parts WHERE session_id=:id`,{':id':id});
-    fail('Delivery could not be confirmed. Check the customer chat before trying again.','POS_INVOICE_UNCERTAIN');
+    fail('Delivery could not be confirmed. Check the recipient chat before trying again.','POS_INVOICE_UNCERTAIN');
   }
 }
