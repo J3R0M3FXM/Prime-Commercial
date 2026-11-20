@@ -2,6 +2,8 @@ import { parseMayaSms } from '../../../tgcloud/lib/payment-evidence.js';
 const encoder = new TextEncoder();
 const BASE = 'payment-sms/';
 const RETENTION = 30 * 86400000;
+const PHT_OFFSET = 8 * 3600000;
+const TIME_TOLERANCE = 300000;
 const hex = value => [...new Uint8Array(value)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
 async function digest(value) { return hex(await crypto.subtle.digest('SHA-256',encoder.encode(value))); }
 async function token(env, value) {
@@ -43,11 +45,18 @@ export async function handleSmsBridge(request,env,{url,admin,respond}) {
     const rejectSms=(error,errorCode)=>respond({error,errorCode,smsTimestampMs:Number.isSafeInteger(receivedAt)?receivedAt:null,paymentTime:parsed?.paidAt||null},422);
     if(!parsed)return rejectSms('The SMS format could not be verified as a MayaBiz QRPH payment confirmation.','SMS_FORMAT_UNSUPPORTED');
     if(!Number.isSafeInteger(receivedAt))return rejectSms('The SMS timestamp is missing or invalid.','INVALID_SMS_TIMESTAMP');
-    if(receivedAt>now+300000)return rejectSms('The SMS timestamp is more than five minutes ahead of server time.','SMS_TIMESTAMP_FUTURE');
-    if(receivedAt<now-RETENTION)return rejectSms('The SMS timestamp is older than the thirty-day retention window.','SMS_TOO_OLD');
-    if(Date.parse(parsed.paidAt)>receivedAt+300000)return rejectSms('The payment time printed in the SMS is more than five minutes later than its SMS timestamp.','PAYMENT_TIME_AFTER_SMS');
-    if(Date.parse(parsed.paidAt)<receivedAt-86400000)return rejectSms('The payment time printed in the SMS is over twenty-four hours earlier than its SMS timestamp.','PAYMENT_TIME_BEFORE_SMS');
-    const id=await digest('MayaBiz\n'+text),record={id,deviceId:auth[1],sender:'MayaBiz',body:text,receivedAt,ingestedAt:now,expiresAt:now+RETENTION,...parsed};
+    const paidAt=Date.parse(parsed.paidAt);
+    // Some carrier timestamps encode Philippine wall time as UTC. Correct only
+    // the exact +08:00 signature corroborated by the payment's printed time.
+    // Keep the original timestamp for audit and apply all age/future checks
+    // to the corrected instant, including when a blocked SMS is retried later.
+    const timestampCorrectionMs=Math.abs(receivedAt-PHT_OFFSET-paidAt)<=TIME_TOLERANCE?PHT_OFFSET:0;
+    const effectiveReceivedAt=receivedAt-timestampCorrectionMs;
+    if(effectiveReceivedAt>now+TIME_TOLERANCE||paidAt>now+TIME_TOLERANCE)return rejectSms('The SMS timestamp or printed payment time is more than five minutes ahead of server time.','SMS_TIMESTAMP_FUTURE');
+    if(effectiveReceivedAt<now-RETENTION)return rejectSms('The SMS timestamp is older than the thirty-day retention window.','SMS_TOO_OLD');
+    if(paidAt>effectiveReceivedAt+TIME_TOLERANCE)return rejectSms('The payment time printed in the SMS is more than five minutes later than its SMS timestamp.','PAYMENT_TIME_AFTER_SMS');
+    if(paidAt<effectiveReceivedAt-86400000)return rejectSms('The payment time printed in the SMS is over twenty-four hours earlier than its SMS timestamp.','PAYMENT_TIME_BEFORE_SMS');
+    const id=await digest('MayaBiz\n'+text),record={id,deviceId:auth[1],sender:'MayaBiz',body:text,receivedAt,effectiveReceivedAt,timestampCorrectionMs,ingestedAt:now,expiresAt:now+RETENTION,...parsed};
     // Canonical object and reference indexes have deterministic names: network retries are idempotent.
     const old=await get(env,'events/'+id+'.json');
     if(old&&old.value.expiresAt<now)return respond({error:'Confirmation expired.',errorCode:'CONFIRMATION_EXPIRED'},410);
