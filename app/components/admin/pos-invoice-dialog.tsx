@@ -10,12 +10,13 @@ export default function PosInvoiceDialog({orderNumber,paymentMethodId,onClose}:{
   const [preview,setPreview]=useState('');
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
+  const [progress,setProgress]=useState('');
   const [sent,setSent]=useState<Partial<Record<'customer'|'admin',boolean>>>({});
   const [uncertain,setUncertain]=useState<Partial<Record<'customer'|'admin',boolean>>>({});
   const sending=useRef(false);
   useEffect(()=>{
     let current=true,url='';
-    setPreview('');setError('');setSent({});setUncertain({});
+    setPreview('');setError('');setProgress('');setSent({});setUncertain({});
     void (async()=>{
       let previewRecipient:'customer'|'admin'='customer';
       let result:Prepared;
@@ -30,20 +31,23 @@ export default function PosInvoiceDialog({orderNumber,paymentMethodId,onClose}:{
   },[orderNumber,paymentMethodId]);
   const send=async(target:'customer'|'admin')=>{
     if(sending.current||sent[target]||uncertain[target])return;
-    sending.current=true;setRecipient(target);setBusy(true);setError('');let deliveryStarted=false;
+    sending.current=true;setRecipient(target);setBusy(true);setError('');setProgress('Preparing invoice…');let deliveryStarted=false;
     try{
       const delivery=await callServerless<Prepared>('sendPosInvoice',{action:'prepare',orderNumber,paymentMethodId,recipient:target},30000);
       if(delivery.sent){setSent(value=>({...value,[target]:true}));return;}
       const qr=delivery.invoice.payment.qrCodeImage?await resolveTelegramMedia(delivery.invoice.payment.qrCodeImage):'';
       const blob=await createPosInvoiceImage(delivery.invoice,qr);
       const bytes=new Uint8Array(await blob.arrayBuffer()),size=256*1024,count=Math.ceil(bytes.length/size);
+      setProgress('Starting image upload…');
       await callServerless('sendPosInvoice',{action:'start',sessionId:delivery.sessionId,fileSize:bytes.length,chunkCount:count},30000);
       for(let index=0;index<count;index++){
+        setProgress(`Uploading invoice ${index+1}/${count}…`);
         const part=bytes.subarray(index*size,Math.min((index+1)*size,bytes.length));let binary='';
         for(let offset=0;offset<part.length;offset+=0x8000)binary+=String.fromCharCode(...part.subarray(offset,offset+0x8000));
         const data=btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
         await callServerless('sendPosInvoice',{action:'chunk',sessionId:delivery.sessionId,index,data},30000);
       }
+      setProgress('Sending invoice through Telegram…');
       deliveryStarted=true;
       const result=await callServerless<{success:boolean;messageId?:number}>('sendPosInvoice',{action:'send',sessionId:delivery.sessionId},60000);
       if(!result?.success||!result.messageId)throw new Error('Telegram did not confirm invoice delivery.');
@@ -52,16 +56,20 @@ export default function PosInvoiceDialog({orderNumber,paymentMethodId,onClose}:{
       const code=String(err?.parameters?.code || err?.code || '');
       if(deliveryStarted&&!['POS_INVOICE_INVALID','POS_INVOICE_REJECTED'].includes(code)){setUncertain(value=>({...value,[target]:true}));setError('Delivery could not be confirmed. Check the recipient chat before trying again.');}
       else setError(err?.message||'Could not upload the invoice. Try again.');
-    }finally{sending.current=false;setBusy(false);}
+    }finally{sending.current=false;setBusy(false);setProgress('');}
   };
   return <div className="pos-dialog-backdrop"><section className="pos-dialog pos-invoice-dialog max-w-[430px]" role="dialog" aria-modal="true" aria-label="Customer invoice">
     <button type="button" className="pos-icon pos-dialog-close" aria-label="Close invoice" disabled={busy} onClick={onClose}><X/></button>
     <h2>Customer invoice</h2><p className="pos-hint">Order {orderNumber}</p>
-    {error&&<p role="alert" className="pos-message pos-message--error">{error}</p>}
+    {!preview&&error&&<p role="alert" className="pos-message pos-message--error">{error}</p>}
     {!preview&&!error&&<p role="status"><Loader2 className="animate-spin"/>Preparing invoice…</p>}
     {preview&&<><img className="pos-invoice-preview" src={preview} alt={`Invoice for order ${orderNumber}`}/>
       <a className="pos-text-action" href={preview} download={`PRIME-Invoice-${orderNumber}.png`}><Download/>Save image</a>
-      <div style={{display:'grid',gridTemplateColumns:'1fr',gap:6}}>
+      {busy&&<p role="status" className="pos-hint">{progress}</p>}
+      {error&&<p role="alert" className="pos-message pos-message--error">{error}</p>}
+      {sent.admin&&<p role="status" className="pos-hint">Invoice delivered to your PRIME™ Core bot chat. <a href="https://t.me/primenetworkphbot" target="_blank" rel="noopener noreferrer" className="pos-text-action">Open PRIME bot chat</a></p>}
+      {sent.customer&&<p role="status" className="pos-hint">Invoice delivered to the customer.</p>}
+      <div aria-label="Invoice delivery actions" style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:6}}>
         {(['customer','admin'] as const).map(target=><button key={target} type="button" className="pos-primary pos-wide" onClick={()=>void send(target)} disabled={busy||sent[target]||uncertain[target]}>{busy&&recipient===target?<Loader2 className="animate-spin"/>:<Send/>}{sent[target]?`Invoice sent to ${target}`:busy&&recipient===target?'Sending invoice…':`Send invoice to ${target}`}</button>)}
       </div>
     </>}
