@@ -6,6 +6,7 @@ import { markOrderCompleted, markOrderDispatched, markOrderReady, reconcileOrder
 import { notifyOrderStatusChanged } from '../lib/order-notifications.js';
 import { attachWorkflow, applyWorkflowAction, workflowFor,ensureOrderWorkflow,workflowStage } from '../lib/order-workflow.js';
 import { calculateCustomerTier,calculateOrderRewardPoints } from '../lib/loyalty.js';
+import { reconcileOrderSmsEvidence, reconcilePendingSmsEvidence, orderSmsAnalysisStatuses } from '../lib/sms-order-evidence.js';
 
 function timestampMs(value, depth = 0) {
   if (depth > 3 || value == null) return null;
@@ -68,6 +69,9 @@ export default async function (input, ctx) {
         : 'Order milestones could not be reconciled during this refresh.';
     }
     let rows;
+    try {
+      if (action === 'list') await reconcilePendingSmsEvidence(1);
+    } catch { /* Order listing remains available when the SMS gateway is unavailable. */ }
     if (action === 'list') {
       rows = await db.select({
         id: orders.id, orderNumber: orders.orderNumber, customerName: orders.customerName,
@@ -83,6 +87,14 @@ export default async function (input, ctx) {
       if (!id) throw new EndpointError('Order ID is required.', { code: 'INVALID_INPUT' });
       const order = await db.select().from(orders).where(or(eq(orders.id,id),eq(orders.orderNumber,id))).get();
       if (!order) throw new EndpointError('Order not found.', { code: 'NOT_FOUND' });
+      try {
+        const evidence = await reconcileOrderSmsEvidence(order.id);
+        if (evidence) {
+          let prior = order.ocrAnalysis;
+          if (typeof prior === 'string') { try { prior = JSON.parse(prior); } catch { prior = {}; } }
+          order.ocrAnalysis = { ...(prior || {}), paymentEvidence: evidence.receipt, smsEvidence: evidence.result };
+        }
+      } catch { /* Staff can retry the evidence check without changing payment status. */ }
       const {paymentProofData, ...detail} = order;
       if (String(order.paymentProofImage || '').startsWith('inline-payment-proof:') && paymentProofData) {
         detail.paymentProofImage = 'tgmedia:order-payment-proof:' + order.id;
@@ -94,6 +106,7 @@ export default async function (input, ctx) {
       ? await db.select({tgUserId:customers.tgUserId,tgName:customers.tgName,tgUsername:customers.tgUsername})
         .from(customers).where(inArray(customers.tgUserId,telegramIds)).all() : [];
     const profileByTelegramId = new Map(profiles.map(profile => [String(profile.tgUserId),profile]));
+    const analysisStatuses = await orderSmsAnalysisStatuses(rows.map(order => String(order.id)));
     // Queue refreshes must not transfer every receipt, OCR result and device snapshot.
     if (action === 'list') return {orders: rows.map(order => ({
       id: order.id, orderNumber: order.orderNumber, customerName: order.customerName,
@@ -101,6 +114,7 @@ export default async function (input, ctx) {
       primeMemberId: order.primeMemberId, totalAmount: order.totalAmount, subtotal: order.subtotal,
       payableNow: order.payableNow, payableOnDelivery: order.payableOnDelivery,
       paymentStatus: order.paymentStatus, paymentMethodName: order.paymentMethodName,
+      analysisStatus: analysisStatuses[order.id] || 'AWAITING SMS MATCH',
       status: order.status, courierName: order.courierName,
       deliveryAddress: {courierPaymentMode:order.deliveryAddress?.courierPaymentMode || ''},
       workflow: {stage:workflowStage(order)},
@@ -143,6 +157,7 @@ export default async function (input, ctx) {
     const tierByOrder = new Map(tierRows.map((row) => [String(row.orderId), String(row.tier || '')]));
     return { orders: await Promise.all(rows.map(async (order) => ({
       ...order,
+      analysisStatus: analysisStatuses[order.id] || 'AWAITING SMS MATCH',
       tierLevel: tierByOrder.get(String(order.id)) || '',
       matchingIdentifiers: matchByOrder.get(String(order.id)) || [],
       workflow: await attachWorkflow(order,true),

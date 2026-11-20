@@ -21,6 +21,7 @@ import validateReferral from './validateReferral.js';
 import { notifyAdminOrderCreated, notifyOrderCreated } from '../lib/order-notifications.js';
 import { calculateCustomerTier, calculateOrderRewardPoints } from '../lib/loyalty.js';
 import { addFreeProductToCart } from '../lib/promos.js';
+import { reconcileOrderSmsEvidence } from '../lib/sms-order-evidence.js';
 
 const stages = ['prepared', 'inventory_held', 'promo_claimed', 'credits_reserved', 'order_persisted', 'promo_redeemed', 'credits_finalized', 'effects_recorded', 'complete'];
 const text = (value, max = 500) => String(value ?? '').trim().slice(0, max);
@@ -750,6 +751,8 @@ export default async function (input, ctx) {
   const storedRequest = operation.created ? request : operation.requestSnapshot || request;
   try {
     const response = await processOperation(fullOperation, storedRequest, customer);
+    // Evidence corroboration is advisory; payment and fulfillment remain pending.
+    try { await reconcileOrderSmsEvidence(operation.operationId); } catch { /* A later admin refresh retries the check. */ }
     await Promise.allSettled([
       ...(operation.created ? [notifyOrderCreated({
         chatId: customer.tgUserId,

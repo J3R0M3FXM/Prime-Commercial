@@ -73,6 +73,8 @@ const AddressPickerMap = dynamic(() => import("./address-picker-map"), {
 import OrderSubmissionConfirmation from './order-submission-confirmation';
 import CheckoutPaymentReminder, { DeliveryFeeReminder } from './checkout-payment-reminder';
 import CheckoutPaymentSwitch from './checkout-payment-switch';
+import ReceiptAnalysisCard from './receipt-analysis-card';
+import { waitForReceiptScanPresentation } from '@/lib/receipt-scan-presentation';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -1080,6 +1082,7 @@ export default function CheckoutModal({
   const analyzeReceiptImage = async (base64Image: string) => {
     if (!base64Image) return;
     const version = receiptScanVersion.current;
+    const analysisStartedAt = Date.now();
     try {
       setIsAnalyzingReceipt(true);
       setOcrError("");
@@ -1131,6 +1134,7 @@ export default function CheckoutModal({
         forensicsResult: "Image hashes and a normalized pixel sample are ready. Exact reuse and replacement comparisons are checked during secure upload; staff must still verify the payment manually.",
         requiresManualReview: true,
       };
+      await waitForReceiptScanPresentation(analysisStartedAt);
       if (version === receiptScanVersion.current) setOcrAnalysis(analysis);
     } catch (e: any) {
       console.warn("Receipt image analysis failed:", e);
@@ -1422,7 +1426,7 @@ export default function CheckoutModal({
       setSubmitError("Choose a payment method and upload your payment proof before submitting the order.");
       return;
     }
-    if (isAnalyzingReceipt || (!ocrError && !ocrAnalysis)) {
+    if (isAnalyzingReceipt || ocrAnalysis?.matchStatus !== "ANALYSIS_COMPLETED") {
       setSubmitError("Complete the receipt image analysis before submitting your order.");
       return;
     }
@@ -2941,7 +2945,7 @@ export default function CheckoutModal({
                     isConfirmingCodes ||
                     isLoadingCharges ||
                     Boolean(chargesLoadError) ||
-                    (!submissionKey && (isAnalyzingReceipt || (!ocrError && !ocrAnalysis) || !selectedPaymentMethod?.id || !uploadedProofImage))
+                    (!submissionKey && (isAnalyzingReceipt || ocrAnalysis?.matchStatus !== "ANALYSIS_COMPLETED" || !selectedPaymentMethod?.id || !uploadedProofImage))
                   }
                   className="prime-checkout__submit px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -3092,15 +3096,23 @@ export default function CheckoutModal({
 
       {isReceiptModalOpen && selectedPaymentMethod && currentStep === 5 && (
         <div className="fixed inset-0 z-[2700] flex items-center justify-center bg-slate-950/75 p-3" role="dialog" aria-modal="true" aria-label="Payment receipt upload">
-          <section className="w-full max-w-[430px] space-y-3 rounded-xl bg-white p-4 text-center shadow-xl">
-            <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700"><ShieldCheck className="h-5 w-5" aria-hidden="true" /></div>
-            <h3 className="font-heading text-base font-normal text-slate-900">SERVICE PROCESS NOTICE</h3>
-            <p className="text-sm leading-relaxed text-slate-600">For security purposes, we will perform automated Forensics Image Analysis and upload your receipt over an encrypted connection.</p>
-            {!ocrAnalysis && !ocrError && !isAnalyzingReceipt && <div className="space-y-2">{uploadedProofImage && <button type="button" onClick={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }} className="w-full border border-slate-300 px-3 py-2 text-xs">Re-scan Saved Receipt</button>}<button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="min-h-12 w-full rounded-lg bg-slate-900 px-3 py-3 text-xs font-heading text-white">ATTACH PAYMENT RECEIPT</button></div>}
-            {isAnalyzingReceipt && <div role="status" className="space-y-3"><div className="prime-upload-scan">{uploadedProofImage ? <img src={uploadedProofImage} alt="Receipt being analyzed" /> : <Loader2 className="mx-auto h-10 w-10 animate-spin" />}<span /></div><p className="text-xs">Automated Forensics Image Analysis is in progress. Please do not close or refresh this page. This process will take up to 30 seconds.</p></div>}
-            {ocrAnalysis?.matchStatus === "ANALYSIS_COMPLETED" && !isAnalyzingReceipt && <div role="status" className="space-y-3"><CheckCircle2 className="prime-success-check mx-auto h-12 w-12 text-emerald-600" /><p className="font-heading font-semibold">Image Analysis Completed</p><div className="grid grid-cols-3 gap-2"> <button type="button" onClick={() => setIsPreviewProofOpen(true)} className="border border-slate-300 p-2 text-xs">PREVIEW</button><button type="button" onClick={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }} className="border border-slate-300 p-2 text-xs">RE-SCAN</button><button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="border border-slate-300 p-2 text-xs">REPLACE</button></div></div>}
-            {ocrError && <><p role="alert" className="text-xs text-red-700">{ocrError}</p><div className="flex justify-center gap-2">{uploadedProofImage && <button type="button" onClick={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }} className="border border-slate-300 p-2 text-xs">RE-SCAN</button>}<button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="border border-slate-300 p-2 text-xs">REPLACE</button></div></>}
-            {!isAnalyzingReceipt && <button type="button" onClick={() => setIsReceiptModalOpen(false)} className="min-h-10 px-4 text-xs font-heading font-semibold uppercase">Done</button>}
+          <section className="w-full max-w-[430px] max-h-[88dvh] overflow-y-auto space-y-3 rounded-xl bg-white p-4 text-center shadow-xl">
+            {uploadedProofImage || isAnalyzingReceipt || ocrError ? <ReceiptAnalysisCard
+              image={uploadedProofImage} analysis={ocrAnalysis} busy={isAnalyzingReceipt} error={ocrError}
+              scanVersion={receiptScanVersion.current} submitting={isSubmittingOrder}
+              canSubmit={!isConfirmingCodes && !isLoadingCharges && !chargesLoadError && !!selectedPaymentMethod?.id && !!uploadedProofImage}
+              onPreview={() => setIsPreviewProofOpen(true)}
+              onRescan={() => { receiptScanVersion.current++; void analyzeReceiptImage(uploadedProofImage); }}
+              onReplace={() => preSubmitProofInputRef.current?.click()}
+              onSubmit={() => { void handleSubmitOrder(); }} onClose={() => setIsReceiptModalOpen(false)}
+            /> : <>
+              <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700"><ShieldCheck className="h-5 w-5" aria-hidden="true" /></div>
+              <h3 className="font-heading text-base font-normal text-slate-900">SERVICE PROCESS NOTICE</h3>
+              <p className="text-sm leading-relaxed text-slate-600">For security purposes, we will perform automated Forensics Image Analysis and upload your receipt over an encrypted connection.</p>
+              <button type="button" onClick={() => preSubmitProofInputRef.current?.click()} className="min-h-12 w-full rounded-lg bg-slate-900 px-3 py-3 text-xs font-heading text-white">ATTACH PAYMENT RECEIPT</button>
+              <button type="button" onClick={() => setIsReceiptModalOpen(false)} className="min-h-10 px-4 text-xs">Back to Payment</button>
+            </>}
+            {submitError && <p role="alert" className="text-xs text-red-700">{submitError}</p>}
           </section>
         </div>
       )}

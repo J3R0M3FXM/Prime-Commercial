@@ -143,7 +143,8 @@ const loyalty=load('tgcloud/lib/loyalty.js',['calculateCustomerTier','calculateO
 const eq=(field,value)=>({text:field+'=?',params:[value]});
 const or=(...conditions)=>({text:'('+conditions.map(condition=>condition.text).join(' OR ')+')',params:conditions.flatMap(condition=>condition.params)});
 const requireAdmin=async ctx=>{if(!ctx?.testStaff)throw new EndpointError('Admin required',{code:'ADMIN_REQUIRED'});return {id:999};};
-const manage=load('tgcloud/endpoints/manageOrders.js',['handler'],{requireAdmin,eq,or,desc:x=>x,inArray:(field,values)=>({text:field+' IN ('+values.map(()=>'?').join(',')+')',params:values}),orders:table('orders'),customers:table('customers'),products:table('products'),...workflow,...lifecycle,...loyalty,notifyOrderStatusChanged:async()=>{}}).handler;
+const smsOrderEvidence=load('tgcloud/lib/sms-order-evidence.js',['reconcileOrderSmsEvidence','reconcilePendingSmsEvidence','orderSmsAnalysisStatuses'],{fetch:async()=>{throw Error('No bridge in workflow fixture');},comparePaymentEvidence:()=>({matched:false}),moneyCents:value=>Math.round(Number(value)*100)});
+const manage=load('tgcloud/endpoints/manageOrders.js',['handler'],{requireAdmin,eq,or,desc:x=>x,inArray:(field,values)=>({text:field+' IN ('+values.map(()=>'?').join(',')+')',params:values}),orders:table('orders'),customers:table('customers'),products:table('products'),...workflow,...lifecycle,...loyalty,...smsOrderEvidence,notifyOrderStatusChanged:async()=>{}}).handler;
 await assert.rejects(manage({action:'markPaid',orderId:'busy',admin:true},{}),e=>e.code==='ADMIN_REQUIRED');
 sqlite.exec("INSERT INTO products(id,name,price,is_active,bundle_config) VALUES('sku','Product',60,1,'{}')");
 await create('endpoint-edit',{subtotal:120,store_credits_used:20,items:JSON.stringify([{productId:'sku',variantId:'default',quantity:2,price:60}])});

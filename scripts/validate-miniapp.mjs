@@ -47,6 +47,9 @@ run('node', ['scripts/test-receipt-transfer.mjs'], 'receipt image transfer and s
 run('node', ['scripts/test-delivery-fee.mjs'], 'delivery fee regressions');
 run('node', ['scripts/test-checkout-promo-state.mjs'], 'fresh promo result before React render');
 run('node', ['scripts/test-checkout-payment-ui.mjs'], 'payment method details, selection actions and receipt entry');
+run('node', ['scripts/test-receipt-analysis-ui.mjs'], 'receipt scan timing, metadata and submit locks');
+run('node', ['scripts/test-sms-order-evidence.mjs'], 'automatic receipt and SMS matching without payment approval');
+run('node', ['scripts/test-sms-evidence-ui.mjs'], 'late SMS matching while an order is open');
 run('node', ['scripts/test-checkout-delivery-quotes.mjs'], 'stable checkout quote and promo totals');
 run('node', ['scripts/test-checkout-safety.mjs'], 'checkout/inventory/loyalty/recovery safety');
 run('node', ['scripts/test-pos-invoice-ui.mjs'], 'rendered unpaid POS invoice flow');

@@ -2933,3 +2933,10 @@ body,
 }
 #mobile-portrait-viewport .prime-checkout .checkout-reminder--delivery .checkout-reminder__amount { font-size: 22px !important; }
 #mobile-portrait-viewport .prime-checkout .checkout-reminder--delivery p { color: #775b36; }
+
+.prime-receipt-analysis-scan { position: relative; display: grid; height: 166px; place-items: center; overflow: hidden; border: 1px solid #dbe3ed; border-radius: 12px; background: repeating-linear-gradient(0deg, #f8fafc, #f8fafc 23px, #eef2f6 24px); }
+.prime-receipt-analysis-scan img { height: 100%; max-width: 100%; object-fit: contain; padding: 10px; }
+.prime-receipt-analysis-scan__beam { position: absolute; inset: 0 0 auto; height: 3px; background: #10b981; box-shadow: 0 0 16px 5px rgb(16 185 129 / 28%); animation: prime-receipt-sweep 2.3s ease-in-out infinite alternate; }
+.prime-receipt-analysis-scan__complete { position: absolute; right: 10px; bottom: 10px; padding: 6px; border-radius: 50%; color: #047857; background: #ecfdf5; }
+@keyframes prime-receipt-sweep { from { top: 2%; } to { top: 96%; } }
+@media (prefers-reduced-motion: reduce) { .prime-receipt-analysis-scan__beam { animation: none; top: 50%; } }

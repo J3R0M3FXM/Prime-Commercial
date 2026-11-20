@@ -72,7 +72,8 @@ function visit(node){if(ts.isIfStatement(node)&&node.thenStatement.getText(tree)
 assert.ok(scanGuard);
 const blocked=new Function('isAnalyzingReceipt','ocrError','ocrAnalysis','return ('+scanGuard.getText(tree)+');');
 assert.equal(blocked(true,'',{}),true);assert.equal(blocked(false,'',null),true);
-assert.equal(blocked(false,'',{matchStatus:'FAILED'}),false,'An adverse analysis result must not block order submission');
-assert.equal(blocked(false,'Scan Unavailable',null),false,'A scan error must not prevent receipt submission for staff review');
+assert.equal(blocked(false,'',{matchStatus:'FAILED'}),true,'Incomplete image analysis cannot enable submission');
+assert.equal(blocked(false,'Scan Unavailable',null),true,'A scan error requires a re-scan or replacement');
+assert.equal(blocked(false,'',{matchStatus:'ANALYSIS_COMPLETED',ocrStatus:'unavailable'}),false,'A completed image scan can proceed to manual review even if OCR has no result');
 await act(async()=>root.unmount());dom.window.close();
 console.log('Order controller UI: all status-specific locks, fulfillment placement, one-hour request, provider checks, tracking and approval actions passed.');

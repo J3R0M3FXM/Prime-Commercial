@@ -39,6 +39,7 @@ type ServerlessOrder = {
   deliveryFee: number;
   status: string;
   paymentStatus: string;
+  analysisStatus: string;
   confirmedPaidAmount: number | null;
   paymentReceivedAmount: number | null;
   paymentMethodName: string;
@@ -116,6 +117,7 @@ function normalizeOrder(row: RawOrder): ServerlessOrder {
     deliveryFee: Number(field(row, "deliveryFee", "delivery_fee", 0)) || 0,
     status: String(field(row, "status", "status", "Pending")),
     paymentStatus: String(field(row, "paymentStatus", "payment_status", "Unpaid")),
+    analysisStatus: String(field(row, "analysisStatus", "analysis_status", "AWAITING SMS MATCH")),
     confirmedPaidAmount: field(row, "confirmedPaidAmount", "confirmed_paid_amount", null) == null ? null : Number(field(row, "confirmedPaidAmount", "confirmed_paid_amount", null)),
     paymentReceivedAmount: field(row, "paymentReceivedAmount", "payment_received_amount", null) == null ? null : Number(field(row, "paymentReceivedAmount", "payment_received_amount", null)),
     paymentMethodName: String(field(row, "paymentMethodName", "payment_method_name")),
@@ -610,6 +612,7 @@ export default function TelegramServerlessOrdersPanel({
               <div className="om-ticket-customer"><h2>{selectedOrder.customerName || selectedOrder.telegramName || 'Customer'}</h2><small>{displayDate(selectedOrder.createdAt)}</small></div>
               <div className="om-ticket-total"><span>Order Total</span><strong>{formatPHP(selectedOrder.totalAmount)}</strong></div>
               <div className="om-payment-state"><span>{selectedOrder.paymentMethodName || 'Payment'}</span><strong>{selectedOrder.paymentStatus}</strong></div>
+              {selectedOrder.paymentProofImage && <p className={`text-xs font-mono ${selectedOrder.analysisStatus === 'ANALYSIS PASSED' ? 'text-emerald-700' : 'text-slate-500'}`}>{selectedOrder.analysisStatus} · Staff payment approval required</p>}
               {selectedOrder.payableOnDelivery>0 && <div className="om-courier-due"><span>Pay Courier on Delivery</span><strong>{formatPHP(selectedOrder.payableOnDelivery)}</strong></div>}
               <small className="om-action-feedback" role="status" aria-live="polite">{busyAction ? "Saving action…" : detailLoading ? "Refreshing transaction…" : ""}</small>
             </section>
@@ -777,7 +780,10 @@ export default function TelegramServerlessOrdersPanel({
             </section>
 
             <section hidden={orderDetailTab !== "flags"}>
-            {selectedOrder.paymentProofImage && <ReceiptSmsEvidence key={`${selectedOrder.id}:${selectedOrder.paymentProofImage}`} orderId={selectedOrder.id}/>}
+            {selectedOrder.paymentProofImage && <ReceiptSmsEvidence key={`${selectedOrder.id}:${selectedOrder.paymentProofImage}:${selectedOrder.payableNow}:${selectedOrder.ocrAnalysis?.receiptImageSha256 || ''}`} orderId={selectedOrder.id} onMatched={() => {
+              setDetailOrder(current => current?.id === selectedOrder.id && current.analysisStatus !== 'ANALYSIS PASSED' ? { ...current, analysisStatus: 'ANALYSIS PASSED' } : current);
+              setOrders(current => current.map(order => order.id === selectedOrder.id && order.analysisStatus !== 'ANALYSIS PASSED' ? { ...order, analysisStatus: 'ANALYSIS PASSED' } : order));
+            }}/>}
             {selectedOrder.ocrAnalysis && <details className="serverless-disclosure"><summary>Receipt Check Details</summary><div className="serverless-disclosure__body space-y-1 text-xs">
               <b>Automated image checks · staff payment verification still required</b>
               {selectedOrder.ocrAnalysis.forensicsResult && <p>{selectedOrder.ocrAnalysis.forensicsResult}</p>}
@@ -859,6 +865,7 @@ export default function TelegramServerlessOrdersPanel({
               <article key={order.id} className="serverless-record serverless-order-compact om-order" data-status={String(order.workflow?.stage || order.status).toLowerCase()}>
                 <button type="button" onClick={()=>setSelectedId(order.id)} className="om-order-button" aria-label={`Open order ${order.orderNumber || order.id}`}>
                   <div className="om-order-top"><span className="font-mono">#{order.orderNumber || order.id}</span><span className="om-status" data-status={String(order.workflow?.stage || order.status).toLowerCase()}>{order.workflow?.stage || order.status}</span></div>
+                  {order.analysisStatus === 'ANALYSIS PASSED' && <p className="text-xs font-mono text-emerald-700">ANALYSIS PASSED</p>}
                   <div className="om-order-main"><strong>{order.customerName || order.telegramName || 'Customer'}</strong><span className="font-mono">{formatPHP(order.totalAmount)}</span></div>
                   <div className="om-order-bottom"><span>{order.courierName ? `${order.courierName} · ${order.deliveryAddress?.courierPaymentMode==='upon_delivery' || order.payableOnDelivery>0?'PUD':'PUC'}` : 'Store sale'} · {order.paymentStatus}</span><small>{timestampMs(order.createdAt)!==null ? new Date(timestampMs(order.createdAt)!).toLocaleDateString('en-PH',{timeZone:'Asia/Manila',month:'short',day:'numeric'}) : '—'}</small></div>
                 </button>

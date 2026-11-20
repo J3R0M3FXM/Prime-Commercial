@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { callServerless } from "@/lib/telegram-serverless-client";
 async function gateway(path:string,method="GET",body?:object){
  const initData=(window as any).Telegram?.WebApp?.initData||"";
@@ -18,9 +18,20 @@ export default function SmsBridgePanel(){
  {devices.map(device=><div className="border-t pt-2" key={device.id}><p>{device.label} · {device.revoked?"Revoked":"Paired"}</p><p className="font-mono">Last received: {device.lastSeen?new Date(device.lastSeen).toLocaleString():"None yet"}</p>{!device.revoked&&<button disabled={busy} className="serverless-action" onClick={()=>{if(window.confirm("Revoke this phone's forwarding access?"))void perform(async()=>{await gateway(`devices/${device.id}`,"DELETE");await load();});}}>Revoke phone</button>}</div>)}
  </div></details>;
 }
-export function ReceiptSmsEvidence({orderId}:{orderId:string}){
+export function ReceiptSmsEvidence({orderId,onMatched}:{orderId:string;onMatched?:()=>void}){
  const [data,setData]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
- async function check(){setBusy(true);setError("");try{setData(await callServerless("manageSmsEvidence",{action:"check",orderId},60000));}catch(error:any){setError(error.message||"Receipt check unavailable.");}finally{setBusy(false);}}
+ const matchedCallback=useRef(onMatched);matchedCallback.current=onMatched;
+ useEffect(()=>{
+  let active=true,timer:ReturnType<typeof setTimeout>|undefined;
+  async function refresh(){
+   let matched=false;
+   try{const next=await callServerless<any>("manageSmsEvidence",{action:"get",orderId},60000);if(!active)return;setData(next);matched=next?.result?.matched===true;if(matched)matchedCallback.current?.();}
+   catch{/* Staff can still use the explicit scan action when a background check fails. */}
+   if(active&&!matched)timer=setTimeout(()=>void refresh(),20000);
+  }
+  void refresh();return()=>{active=false;if(timer)clearTimeout(timer);};
+ },[orderId]);
+ async function check(){setBusy(true);setError("");try{const next=await callServerless<any>("manageSmsEvidence",{action:"check",orderId},60000);setData(next);if(next?.result?.matched===true)matchedCallback.current?.();}catch(error:any){setError(error.message||"Receipt check unavailable.");}finally{setBusy(false);}}
  const receipt=data?.receipt,result=data?.result;
- return <details className="serverless-disclosure"><summary>Receipt reference &amp; payment SMS</summary><div className="serverless-disclosure__body space-y-2 text-xs"><p>Compare the original receipt with MayaBiz confirmation. This check does not approve payment.</p><button className="serverless-action" disabled={busy} onClick={()=>void check()}>{busy?"Checking receipt and SMS…":"Scan receipt & check SMS"}</button>{error&&<p role="alert">{error}</p>}{receipt&&<div className="font-mono break-all"><p>Provider: {receipt.provider||"Unknown"}</p><p>{({bpi:"Transaction Ref. No.",gcash:"QRPH Invoice No.",maya_wallet:"Reference ID",maya_email:"Maya Transaction No.",maribank_seabank:"Reference Number",unionbank:"Instapay Reference Number"} as Record<string,string>)[receipt.provider]||"Reference"}: {receipt.fullReference||receipt.reference||"Not found"}</p><p>Match value: {receipt.reference||"Not found"}</p><p>Amount: {receipt.amountCents==null?"Not found":`PHP ${(receipt.amountCents/100).toFixed(2)}`}</p><p>Paid: {receipt.paidAt||"Time not found"}</p></div>}{result&&<p role="status">{String(result.status).replace(/_/g," ")} · Staff review required</p>}</div></details>;
+ return <details className="serverless-disclosure"><summary>Receipt reference &amp; payment SMS</summary><div className="serverless-disclosure__body space-y-2 text-xs"><p>Compare the original receipt with MayaBiz confirmation. This check does not approve payment.</p><button className="serverless-action" disabled={busy} onClick={()=>void check()}>{busy?"Checking receipt and SMS…":"Scan receipt & check SMS"}</button>{error&&<p role="alert">{error}</p>}{receipt&&<div className="font-mono break-all"><p>Provider: {receipt.provider||"Unknown"}</p><p>{({bpi:"Transaction Ref. No.",gcash:"QRPH Invoice No.",maya_wallet:"Reference ID",maya_email:"Maya Transaction No.",maribank_seabank:"Reference Number",unionbank:"Instapay Reference Number"} as Record<string,string>)[receipt.provider]||"Reference"}: {receipt.fullReference||receipt.reference||"Not found"}</p><p>Match value: {receipt.reference||"Not found"}</p><p>Amount: {receipt.amountCents==null?"Not found":`PHP ${(receipt.amountCents/100).toFixed(2)}`}</p><p>Paid: {receipt.paidAt||"Time not found"}</p></div>}{result&&<p role="status">{result.matched ? "ANALYSIS PASSED" : String(result.status).replace(/_/g," ")} · Staff review required</p>}</div></details>;
 }
