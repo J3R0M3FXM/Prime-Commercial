@@ -20,6 +20,15 @@ export type PosInvoice = {
 const WIDTH = 900;
 const money = (value: number) => `PHP ${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+function breakdownTitle(value: string) {
+  const acronyms=new Set(['VAT','GST','PHP','POS','QR','COD']);
+  return String(value || '').trim().replace(/\p{L}[\p{L}\p{N}]*/gu,word=>{
+    if(acronyms.has(word.toUpperCase()))return word.toUpperCase();
+    if(word.toLowerCase()==='gcash')return 'GCash';
+    return word.charAt(0).toUpperCase()+word.slice(1).toLowerCase();
+  });
+}
+
 function paymentDeadline(value: string) {
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{
     timeZone:'Asia/Manila',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h12',
@@ -112,9 +121,9 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
       textAt(`${money(item.price)} Each`,56,y,23,false,muted);y+=34;rule();
     });
     heading('Order Summary');row('Items Subtotal',invoice.subtotal);
-    invoice.charges.forEach(charge=>row(charge.name,charge.amount));
+    invoice.charges.forEach(charge=>row(breakdownTitle(charge.name),charge.amount));
     if(invoice.deliveryFee)row('Delivery',invoice.deliveryFee);
-    invoice.discounts.forEach(discount=>row(discount.name,-discount.amount));
+    invoice.discounts.forEach(discount=>row(breakdownTitle(discount.name),-discount.amount));
     y+=8;row('Order Total',invoice.total,true);
     if(invoice.payableOnDelivery){y+=8;row('Pay Courier On Delivery',invoice.payableOnDelivery);}
     y+=20;
