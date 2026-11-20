@@ -17,8 +17,9 @@ const eq = (field, value) => row => row[field] === value;
 const and = (...checks) => row => checks.every(check => check(row));
 const or = (...checks) => row => checks.some(check => check(row));
 const sql = (_strings, ...values) => ({ values });
+const requirementBundles = new Map();
 const db = {
-  async get(_query, params) { return rows.get(orders).find(order =>
+  async get(_query, params) { if(String(_query).startsWith('SELECT bundle_config'))return requirementBundles.has(params[':id'])?{bundleConfig:JSON.stringify(requirementBundles.get(params[':id']))}:null; return rows.get(orders).find(order =>
     (order.customerId === params[':customer_id'] || order.tgUserId === params[':telegram_id']) &&
     ['completed', 'delivered'].includes(String(order.status || '').toLowerCase())) || null; },
   async all(query) { const [promoId, code] = query.values; return claims.filter(claim =>
@@ -146,3 +147,23 @@ assert.match(checkPromoItems({requiredItemsMatch:'corrupt',requiredItems:alterna
 assert.equal(checkPromoItems({requiredItems:alternatives},[alternatives[0]]).length>0,true,'Legacy rules still require ALL items');
 assert.equal(checkPromoItems({requiredItemsMatch:'any',requiredItems:[]},[]),'','Empty list remains unrestricted');
 console.log('PASS: four product/variant alternatives independently qualify; ALL, quantities, gifts, invalid modes and legacy behavior remain enforced.');
+
+// Match the saved German Thunder labels, including their approximate-unit suffix.
+requirementBundles.set('german',{variants:[
+ {id:'half',name:'.50g | ~60u'}, {id:'one',name:'1.0g | ~120u'},
+ {id:'small',name:'.40g | ~48u'}, {id:'mg',name:'500mg'},
+ {id:'other',name:'Large'}, {id:'flavor',name:'1.0g | Different flavor'}
+]});
+await manage({action:'update',id:'basket-promo',requiredItemsMatch:'any',requiredItems:[{productId:'german',variantId:'half',quantity:1}]},context(999));
+for(const variantId of ['half','one','mg'])assert.equal((await validate({code:'BASKET',itemsSubtotal:6000,items:[{productId:'german',variantId,quantity:1}]},context(111))).valid,true,variantId+' meets the 0.5g minimum');
+for(const variantId of ['small','other','missing','flavor'])assert.equal((await validate({code:'BASKET',itemsSubtotal:6000,items:[{productId:'german',variantId,quantity:10,name:'100g',variantName:'100g'}]},context(111))).valid,false,variantId+' cannot bypass the catalog minimum');
+assert.equal((await validate({code:'BASKET',itemsSubtotal:6000,items:[{productId:'different-product',variantId:'one',quantity:1}]},context(111))).valid,false,'Another product cannot satisfy German Thunder');
+assert.equal((await validate({code:'BASKET',itemsSubtotal:6000,items:[{productId:'german',variantId:'one',quantity:1,isFree:true}]},context(111))).valid,false,'Larger free gifts cannot qualify');
+console.log('PASS: German Thunder 0.5g minimum accepts 1.0g and equivalent units; smaller, unrelated, fabricated and free variants fail.');
+
+await manage({action:'update',id:'basket-promo',requiredItemsMatch:'all',requiredItems:[{productId:'german',variantId:'half',quantity:1},{productId:'coffee',variantId:'large',quantity:2}]},context(999));
+assert.equal((await validate({code:'BASKET',itemsSubtotal:6000,items:[{productId:'german',variantId:'one',quantity:1}]},context(111))).valid,false,'A larger weight cannot skip another ALL requirement');
+assert.equal((await validate({code:'BASKET',itemsSubtotal:6000,items:[{productId:'german',variantId:'one',quantity:1},{productId:'coffee',variantId:'large',quantity:2}]},context(111))).valid,true,'Larger weight works with all product conditions');
+await manage({action:'update',id:'basket-promo',requiredItems:[{productId:'german',variantId:'half',quantity:2}]},context(999));
+assert.equal((await validate({code:'BASKET',itemsSubtotal:6000,items:[{productId:'german',variantId:'one',quantity:1}]},context(111))).valid,false,'Weight comparison does not bypass a required unit count');
+console.log('PASS: weight minimums preserve ALL-product conditions and unit-count requirements.');

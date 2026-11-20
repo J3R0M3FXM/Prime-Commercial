@@ -129,7 +129,27 @@ export function generatePromoCode(prefix = 'PRIME') {
 }
 
 // Evaluate purchase conditions before any free gift is added to the cart.
-export function checkPromoItems(promo, items) {
+function variantWeight(value) {
+  const match=String(value || '').trim().match(/^(\d+(?:\.\d+)?|\.\d+)\s*(mg|g|kg|grams?|milligrams?|kilograms?)(?:\s*\|\s*~?\s*\d+(?:\.\d+)?\s*u)?$/i);
+  if(!match)return null;
+  const unit=match[2].toLowerCase();
+  const weight=Number(match[1])*(unit==='mg'||unit.startsWith('milligram')?1:unit==='kg'||unit.startsWith('kilogram')?1000000:1000);
+  return Number.isFinite(weight)&&weight>0?Math.round(weight*1000)/1000:null;
+}
+
+function qualifyingVariant(rule, line, catalogById) {
+  if(!rule.variantId)return true;
+  const selected=String(line.variantId || 'default');
+  if(selected===rule.variantId)return true;
+  const product=catalogById[rule.productId];
+  const variants=Array.isArray(product?.variants)?product.variants:[];
+  const minimum=variants.find(variant=>String(variant.id)===rule.variantId);
+  const candidate=variants.find(variant=>String(variant.id)===selected);
+  const minimumWeight=variantWeight(minimum?.name),candidateWeight=variantWeight(candidate?.name);
+  return minimumWeight!==null&&candidateWeight!==null&&candidateWeight>=minimumWeight;
+}
+
+export function checkPromoItems(promo, items, catalogById = {}) {
   const requirements = promo.requiredItems || [];
   if (!Array.isArray(requirements)) return 'This promo has invalid product requirements.';
   const match = promo.requiredItemsMatch ?? 'all';
@@ -145,7 +165,7 @@ export function checkPromoItems(promo, items) {
     const quantity = lines.reduce((total, line) => {
       const amount = Number(line.quantity);
       return String(line.productId || '') === rule.productId &&
-        (!rule.variantId || String(line.variantId || 'default') === rule.variantId) &&
+        qualifyingVariant(rule,line,catalogById) &&
         Number.isSafeInteger(amount) && amount > 0 ? total + amount : total;
     }, 0);
     if (quantity >= rule.quantity) matched += 1;

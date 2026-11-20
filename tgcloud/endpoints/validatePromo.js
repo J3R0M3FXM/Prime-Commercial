@@ -75,7 +75,18 @@ export default async function (input, ctx) {
     return fail('Minimum of ' + promo.minItemQuantity + ' items in cart is required for this promo.');
   }
 
-  const itemError = checkPromoItems(promo, input?.items);
+  const requirementCatalog = Object.create(null);
+  if(Array.isArray(promo.requiredItems)){
+    for(const rule of promo.requiredItems){
+      const productId=String(rule?.productId || '');
+      if(!productId || !rule?.variantId || requirementCatalog[productId])continue;
+      const product=await db.get('SELECT bundle_config AS bundleConfig FROM products WHERE id=:id',{':id':productId});
+      let bundle=product?.bundleConfig;
+      if(typeof bundle==='string'){try{bundle=JSON.parse(bundle);}catch{bundle=null;}}
+      requirementCatalog[productId]=bundle&&typeof bundle==='object'?bundle:{};
+    }
+  }
+  const itemError = checkPromoItems(promo, input?.items, requirementCatalog);
   if (itemError) return fail(itemError);
 
   const ownership = [eq(orders.customerId, customer.id)];
