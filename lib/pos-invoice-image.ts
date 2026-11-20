@@ -115,54 +115,66 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
     invoice.charges.forEach(charge=>row(charge.name,charge.amount));
     if(invoice.deliveryFee)row('Delivery',invoice.deliveryFee);
     invoice.discounts.forEach(discount=>row(discount.name,-discount.amount));
-    y+=12;row('Order Total',invoice.total,true);y+=20;
-    row(paid?'Paid At Checkout':'Amount Due Now',invoice.payableNow,true);
-    if(invoice.payableOnDelivery){y+=12;row('Pay Courier On Delivery',invoice.payableOnDelivery);}
-    y+=16;box(56,y,788,2,'#000000');y+=26;
-    if(paid)heading('Payment Details');
-    if(invoice.payment.accountName)labelValue('Account Name',invoice.payment.accountName);
-    if(invoice.payment.accountNumber)labelValue('Account Number',invoice.payment.accountNumber);
+    y+=8;row('Order Total',invoice.total,true);
+    if(invoice.payableOnDelivery){y+=8;row('Pay Courier On Delivery',invoice.payableOnDelivery);}
+    y+=20;
+    box(56,y,788,44,navy);
+    textAt(paid?'Payment Details':qr?'Use the QR code to pay':'Payment Details',76,y+8,24,false,'#fff', 'left',true);
+    y+=44;
+    // Keep the original QR artwork intact, including its quiet zone.
+    const cardTop=y,left=56,cardWidth=788;
+    const amountLeft=qr?426:80,amountWidth=qr?394:740;
+    const lineHeight=(value:string,size:number)=>{font(size);return wrapped(ctx,value,amountWidth).length*(size+7);};
+    const detailHeight=lineHeight(invoice.payment.name,24)+(invoice.payment.accountName?lineHeight(invoice.payment.accountName,22):0)+(invoice.payment.accountNumber?lineHeight(invoice.payment.accountNumber,22):0);
+    const cardHeight=Math.max(qr?344:180,160+detailHeight);
+    box(left,cardTop,cardWidth,cardHeight,'#eaf2fc');
     if(qr){
-      const reminder=(value:string,heading=false)=>{
-        font(24,!heading,heading);
-        const lines:string[]=[];let line='';
-        for(const word of value.split(' ')){
-          const next=line?`${line} ${word}`:word;
-          if(line&&ctx.measureText(next).width>788){lines.push(line);line=word;}else line=next;
-        }
-        if(line)lines.push(line);
-        for(const value of lines){textAt(value,450,y,24,!heading,navy,'center',heading);y+=38;}
-        y+=20;
-      };
-      y+=18;
-      if(!paid){
-        textAt('TOTAL AMOUNT DUE',450,y,28,true,navy,'center');y+=46;
-        const amount=`P${Number(invoice.payableNow || 0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-        font(64,true);
-        const amountSize=Math.min(64,64*788/Math.max(1,ctx.measureText(amount).width));
-        textAt(amount,450,y,amountSize,true,navy,'center');y+=amountSize+32;
-      }
-      if(!paid)reminder('SCAN THE QR CODE BELOW TO PAY USING YOUR BANKING OR E-WALLET APP.',true);
-      const qrWidth=WIDTH*.7,qrHeight=qrWidth*(Number(qr.height)||1)/(Number(qr.width)||1),left=WIDTH*.15;
-      box(left-24,y,qrWidth+48,qrHeight+48,'#dce4ee');box(left-23,y+1,qrWidth+46,qrHeight+46,'#fff');
-      if(draw){ctx.imageSmoothingEnabled=false;ctx.drawImage(qr,left,y+24,qrWidth,qrHeight);}
-      y+=qrHeight+70;
-      if(!paid&&invoice.validUntil)reminder(`SETTLE PAYMENT BEFORE ${paymentDeadline(invoice.validUntil)} TODAY.`);
-      if(paid)text('Payment Method QR',24,muted,true);
+      const maxSize=296;
+      const ratio=Math.min(maxSize/(Number(qr.width)||1),maxSize/(Number(qr.height)||1));
+      const qrWidth=(Number(qr.width)||1)*ratio,qrHeight=(Number(qr.height)||1)*ratio;
+      box(68,cardTop+12,320,320,'#fff');
+      if(draw){ctx.imageSmoothingEnabled=false;ctx.drawImage(qr,80+(296-qrWidth)/2,cardTop+24+(296-qrHeight)/2,qrWidth,qrHeight);}
+      box(402,cardTop+24,1,cardHeight-48,'#cdd8e3');
     }
-    rule();text('Thank You For Choosing PRIME',30,navy,true,true);
-    text(paid?'Payment Has Been Recorded':'Please Send Payment Confirmation In This Chat',23,muted,true);
+    const cardText=(value:string,top:number,size=24,bold=false,color=navy)=>{
+      font(size,bold);
+      for(const line of wrapped(ctx,value,amountWidth)){
+        textAt(line,amountLeft,top,size,bold,color);top+=size+7;
+      }
+      return top;
+    };
+    let detailsY=cardText(paid?'AMOUNT PAID':'TOTAL AMOUNT DUE',cardTop+24,25,true);
+    const amount=money(invoice.payableNow);
+    font(48,true);
+    const amountSize=Math.min(48,48*amountWidth/Math.max(1,ctx.measureText(amount).width));
+    detailsY=cardText(amount,detailsY+8,amountSize,true,blue)+12;
+    detailsY=cardText(invoice.payment.name,detailsY,24,true);
+    if(invoice.payment.accountName)detailsY=cardText(invoice.payment.accountName,detailsY,22);
+    if(invoice.payment.accountNumber)detailsY=cardText(invoice.payment.accountNumber,detailsY,22);
+    y=Math.max(cardTop+cardHeight,detailsY+24);
+    box(56,y,788,8,navy);y+=26;
+    if(!paid)text('Send a copy of your payment screenshot in this chat.',23,navy,true);
+    if(!paid&&invoice.validUntil)text(`Settle payment before ${paymentDeadline(invoice.validUntil)} today.`,23,muted,true);
+    y+=12;text('Thank You For Choosing PRIME',30,navy,true,true);
+    if(paid)text('Payment Has Been Recorded',23,muted,true);
     return y+44;
   };
-  const height=Math.ceil(render(false));
-  if(height>8800)throw new Error('This invoice is too long for one image. Shorten item names or split the order.');
-  canvas.width=WIDTH;canvas.height=height;ctx.textBaseline='top';
+  const contentHeight=Math.ceil(render(false));
+  if(contentHeight>8800)throw new Error('This invoice is too long for one image. Shorten item names or split the order.');
+  // 3:4 portrait, exported as a high-resolution PNG. Fit long orders without cropping.
+  const width=1500,height=2000;
+  canvas.width=width;canvas.height=height;ctx.textBaseline='top';
   const background=ctx.createLinearGradient(0,0,0,height);
   background.addColorStop(0,POS_INVOICE_ARTWORK.backgroundTop);
   background.addColorStop(1,'#ffffff');
-  ctx.fillStyle=background;ctx.fillRect(0,0,WIDTH,height);
-  ctx.fillStyle=navy;ctx.fillRect(0,0,WIDTH,6);ctx.fillRect(0,height-6,WIDTH,6);
+  ctx.fillStyle=background;ctx.fillRect(0,0,width,height);
+  ctx.fillStyle=navy;ctx.fillRect(0,0,width,6);ctx.fillRect(0,height-6,width,6);
+  const scale=Math.min(width/WIDTH,(height-24)/contentHeight);
+  ctx.save();
+  ctx.translate((width-WIDTH*scale)/2,12);
+  ctx.scale(scale,scale);
   render(true);
+  ctx.restore();
   return canvas;
 }
 
