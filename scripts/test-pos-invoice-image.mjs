@@ -21,7 +21,7 @@ assert.equal(texts.includes('Payment Instructions'),false);
 assert.equal(texts.includes('Payment Method'),false);
 assert.ok(texts.includes('TOTAL AMOUNT DUE'));
 assert.ok(texts.includes('SCAN THE QR CODE TO PAY USING YOUR BANKING OR E-WALLET APP'));
-assert.ok(texts.join('').includes('Send a copy of your payment screenshot in this chat.'));
+assert.ok(texts.join('').includes('PLEASE SEND A COPY OF PAYMENT RECEIPT IN THIS CHAT'));
 assert.ok(paint.filter(op=>op[0]==='text').every(op=>/Lato Condensed|Roboto Condensed/.test(op.at(-2))));
 assert.equal(canvas.width,1500);assert.equal(canvas.height,2000);
 assert.equal(canvas.width/canvas.height,3/4);
@@ -36,7 +36,7 @@ const instruction=paint.find(op=>op[0]==='text'&&op[1]==='SCAN THE QR CODE TO PA
 assert.ok(instruction[3]<qrPaint[3]);
 const lowerBorder=paint.find(op=>op[0]==='rect'&&op[1]===56&&op[3]===788&&op[4]===8);
 assert.ok(lowerBorder[2]>=qrPaint[3]+qrPaint[5]);
-const screenshot=paint.find(op=>op[0]==='text'&&op[1].startsWith('Send a copy'));
+const screenshot=paint.find(op=>op[0]==='text'&&op[1].startsWith('PLEASE SEND'));
 assert.ok(screenshot[3]>lowerBorder[2]);
 paint.length=0;
 drawPosInvoice(canvas,{...invoice,payableNow:12345.67,validUntil:'2026-11-18T07:57:59Z'},qr,artwork);

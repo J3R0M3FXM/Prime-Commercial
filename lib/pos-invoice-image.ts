@@ -156,7 +156,7 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
     if(invoice.payment.accountNumber)detailsY=cardText(invoice.payment.accountNumber,detailsY,22);
     y=Math.max(cardTop+cardHeight,detailsY+24);
     box(56,y,788,8,navy);y+=26;
-    if(!paid)text('Send a copy of your payment screenshot in this chat.',23,navy,true);
+    if(!paid)text('PLEASE SEND A COPY OF PAYMENT RECEIPT IN THIS CHAT',23,navy,true);
     if(!paid&&invoice.validUntil)text(`Settle payment before ${paymentDeadline(invoice.validUntil)} today.`,23,muted,true);
     y+=12;text('Thank You For Choosing PRIME',30,navy,true,true);
     if(paid)text('Payment Has Been Recorded',23,muted,true);
