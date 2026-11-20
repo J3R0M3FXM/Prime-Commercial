@@ -119,7 +119,10 @@ export function drawPosInvoice(canvas: HTMLCanvasElement, invoice: PosInvoice, q
     if(invoice.payableOnDelivery){y+=8;row('Pay Courier On Delivery',invoice.payableOnDelivery);}
     y+=20;
     box(56,y,788,44,navy);
-    textAt(paid?'Payment Details':qr?'Use the QR code to pay':'Payment Details',76,y+8,24,false,'#fff', 'left',true);
+    const instruction=paid||!qr?'Payment Details':'SCAN THE QR CODE TO PAY USING YOUR BANKING OR E-WALLET APP';
+    font(24,false,true);
+    const instructionSize=Math.min(24,24*748/Math.max(1,ctx.measureText(instruction).width));
+    textAt(instruction,76,y+(44-instructionSize)/2,instructionSize,false,'#fff','left',true);
     y+=44;
     // Keep the original QR artwork intact, including its quiet zone.
     const cardTop=y,left=56,cardWidth=788;

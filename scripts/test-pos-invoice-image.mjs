@@ -20,7 +20,7 @@ for(const text of ['Order Invoice','Billed To','Order Summary','INV-123','Awaiti
 assert.equal(texts.includes('Payment Instructions'),false);
 assert.equal(texts.includes('Payment Method'),false);
 assert.ok(texts.includes('TOTAL AMOUNT DUE'));
-assert.ok(texts.includes('Use the QR code to pay'));
+assert.ok(texts.includes('SCAN THE QR CODE TO PAY USING YOUR BANKING OR E-WALLET APP'));
 assert.ok(texts.join('').includes('Send a copy of your payment screenshot in this chat.'));
 assert.ok(paint.filter(op=>op[0]==='text').every(op=>/Lato Condensed|Roboto Condensed/.test(op.at(-2))));
 assert.equal(canvas.width,1500);assert.equal(canvas.height,2000);
@@ -32,7 +32,7 @@ assert.equal(ctx.imageSmoothingEnabled,false,'QR pixels remain sharp');
 const amountColumn=paint.find(op=>op[0]==='text'&&op[1]==='TOTAL AMOUNT DUE');
 assert.ok(amountColumn[2]>qrPaint[2]+qrPaint[4],'Amount is beside the QR');
 assert.ok(amountColumn[3]>=qrPaint[3],'Amount starts inside the payment card');
-const instruction=paint.find(op=>op[0]==='text'&&op[1]==='Use the QR code to pay');
+const instruction=paint.find(op=>op[0]==='text'&&op[1]==='SCAN THE QR CODE TO PAY USING YOUR BANKING OR E-WALLET APP');
 assert.ok(instruction[3]<qrPaint[3]);
 const lowerBorder=paint.find(op=>op[0]==='rect'&&op[1]===56&&op[3]===788&&op[4]===8);
 assert.ok(lowerBorder[2]>=qrPaint[3]+qrPaint[5]);
