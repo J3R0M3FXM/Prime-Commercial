@@ -2848,3 +2848,88 @@ body,
   line-height: 1.15 !important;
   margin-block: 2px 0 !important;
 }
+
+/* Checkout payment instructions: distinguish the transfer from the courier fee. */
+#mobile-portrait-viewport .prime-checkout .checkout-reminders {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder {
+  min-width: 0;
+  max-width: 430px;
+  padding: 14px;
+  border: 1px solid #dbe3ed;
+  border-radius: 14px;
+  overflow-wrap: anywhere;
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder--payment {
+  color: #f8fafc;
+  border-color: #263f5d;
+  background: linear-gradient(125deg, #14283f, #213e5c);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 10%);
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder__heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder__heading h3 {
+  margin: 0;
+  color: inherit;
+  font: 400 15px/1.25 'Roboto Condensed', sans-serif !important;
+  letter-spacing: 0;
+  text-transform: none;
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder__icon {
+  display: grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 9px;
+  background: rgb(255 255 255 / 8%);
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder__icon svg { width: 16px; height: 16px; }
+#mobile-portrait-viewport .prime-checkout .checkout-reminder__amount-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgb(255 255 255 / 16%);
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder__amount-row > span {
+  color: inherit;
+  font: 400 13px/1.3 'Lato Condensed', 'Lato', sans-serif !important;
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder__amount-row > .checkout-reminder__amount {
+  font-size: 27px !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  white-space: nowrap;
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder p {
+  margin: 9px 0 0;
+  color: #d6e2ef;
+  font: 400 13px/1.5 'Lato Condensed', 'Lato', sans-serif !important;
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder--delivery {
+  color: #6b4517;
+  border-color: #ead8b9;
+  background: #fffaf1;
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder--delivery .checkout-reminder__icon {
+  border-color: #ecdbbc;
+  background: #fff;
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder--delivery .checkout-reminder__amount-row {
+  margin-top: 9px;
+  padding-bottom: 8px;
+  border-bottom-color: #ecdfc9;
+}
+#mobile-portrait-viewport .prime-checkout .checkout-reminder--delivery .checkout-reminder__amount { font-size: 22px !important; }
+#mobile-portrait-viewport .prime-checkout .checkout-reminder--delivery p { color: #775b36; }

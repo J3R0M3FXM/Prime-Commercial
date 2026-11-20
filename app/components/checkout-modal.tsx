@@ -71,6 +71,7 @@ const AddressPickerMap = dynamic(() => import("./address-picker-map"), {
 });
 
 import OrderSubmissionConfirmation from './order-submission-confirmation';
+import CheckoutPaymentReminder, { DeliveryFeeReminder } from './checkout-payment-reminder';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -2274,12 +2275,7 @@ export default function CheckoutModal({
                   </div>
 
                   {deliveryPaymentMethod === "upon_delivery" && (
-                    <div className="flex justify-between items-center text-xs font-mono text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                      <span className="font-medium">To be paid to Courier upon delivery:</span>
-                      <span className="font-bold font-mono">
-                        {appliedPromo?.isFreeShipping ? "FREE" : formatPHPWhole(courierDeliveryFee)}
-                      </span>
-                    </div>
+                    <DeliveryFeeReminder amount={payableOnDelivery} />
                   )}
                 </div>
               </div>
@@ -2290,17 +2286,7 @@ export default function CheckoutModal({
           {/* ================= STEP 5: PAYMENT & PROOF BEFORE SUBMISSION ================= */}
           {currentStep === 5 && (
             <section className="prime-checkout__payment-section space-y-3 border-t border-slate-200 pt-3">
-              <div className="prime-checkout__notice prime-checkout__notice--info" role="note">
-                <span className="prime-checkout__notice-icon"><Receipt aria-hidden="true" /></span>
-                <div className="min-w-0">
-                  <p className="prime-checkout__notice-title">Keep your payment receipt</p>
-                  <p className="prime-checkout__notice-copy">Please ensure to obtain a copy of the payment receipt. This is required prior to order submission.</p>
-                </div>
-              </div>
-              <div className="prime-checkout__payment-total flex items-center justify-between">
-                <span className="font-heading font-bold uppercase">Total Payable Now</span>
-                <span className="font-mono">{formatPHP(payableNow)}</span>
-              </div>
+              <CheckoutPaymentReminder amount={payableNow} deliveryAmount={payableOnDelivery} payUponDelivery={deliveryPaymentMethod === "upon_delivery"} />
 
               <div className="prime-checkout__payment-method-heading">
                 <span>Choose your preferred payment method</span>
