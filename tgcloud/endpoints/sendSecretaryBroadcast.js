@@ -31,6 +31,11 @@ export function validateBroadcast(input) {
 }
 
 async function ensureHistory() {
+  await db.run(`CREATE TABLE IF NOT EXISTS secretary_broadcast_posts (
+    staff_id TEXT NOT NULL, request_key TEXT NOT NULL, payload TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL DEFAULT 'active',
+    pending_payload TEXT, updated_at INTEGER NOT NULL,
+    PRIMARY KEY(staff_id, request_key))`);
   const exists = () => db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='secretary_broadcasts'");
   if (await exists()) return;
   try {
@@ -42,20 +47,86 @@ async function ensureHistory() {
   } catch (error) { if (!await exists()) throw error; }
 }
 
+function markup(buttons) {
+  const keyboard = [];
+  for (let row = 1; row <= 6; row++) {
+    const group = buttons.filter(button => button.row === row).map(({ text, url }) => ({ text, url }));
+    if (group.length) keyboard.push(group);
+  }
+  return { inline_keyboard: keyboard };
+}
+
+async function managePost(input, original, params) {
+  if (!original || original.status !== 'sent' || !Number.isSafeInteger(original.messageId)) invalid('Only a confirmed broadcast from this staff account can be managed.');
+  await db.run(`INSERT INTO secretary_broadcast_posts(staff_id,request_key,payload,updated_at)
+    VALUES (:staff,:key,:payload,unixepoch()) ON CONFLICT(staff_id,request_key) DO NOTHING`,
+    { ...params, ':payload': original.payload });
+  const read = () => db.get(`SELECT payload,revision,state,pending_payload AS pendingPayload,updated_at AS updatedAt
+    FROM secretary_broadcast_posts WHERE staff_id=:staff AND request_key=:key`, params);
+  const post = await read();
+  const current = JSON.parse(post.payload);
+  const summary = row => ({ status: row.state === 'active' ? 'sent' : row.state, revision: row.revision,
+    target: original.target, messageId: original.messageId });
+  if (input.action === 'detail') return { ...summary(post), draft: { message: current.message, buttons: current.buttons, mediaType: current.mediaType },
+    canDelete: Date.now() / 1000 < original.createdAt + 48 * 3600 };
+  if (post.state === 'deleted') return summary(post);
+  if (!Number.isSafeInteger(input.revision) || input.revision !== post.revision) invalid('This post changed. Refresh its details before continuing.');
+  const deleting = input.action === 'delete';
+  const retrying = input.action === 'retry_edit';
+  const waitingState = deleting ? 'deleting' : 'editing';
+  const uncertainState = deleting ? 'delete_uncertain' : 'edit_uncertain';
+  if (deleting && Date.now() / 1000 >= original.createdAt + 48 * 3600) invalid('Telegram only allows deletion of messages sent less than 48 hours ago.');
+  const recovering = post.state === uncertainState || (post.state === waitingState && post.updatedAt < Date.now() / 1000 - 120);
+  if (post.state !== 'active' && !recovering) invalid('A previous post change is still running or needs recovery. Refresh its details.');
+  if (retrying && !recovering) invalid('There is no saved edit to retry.');
+  if (!deleting && !retrying && recovering) invalid('Retry the saved edit before making another change.');
+  const desired = deleting ? current : retrying ? JSON.parse(post.pendingPayload) : validateBroadcast({ ...current, message: input.message, buttons: input.buttons });
+  const claimed = await db.run(`UPDATE secretary_broadcast_posts SET state=:state,pending_payload=:pending,updated_at=unixepoch()
+    WHERE staff_id=:staff AND request_key=:key AND revision=:revision AND state=:previous AND updated_at=:updated
+    RETURNING request_key`, { ...params, ':state': waitingState, ':pending': JSON.stringify(desired),
+    ':revision': post.revision, ':previous': post.state, ':updated': post.updatedAt });
+  if (!claimed?.rows?.length) invalid('Another post change is in progress. Refresh its details.');
+  const target = { chat_id: original.target, message_id: original.messageId };
+  let confirmed = false;
+  try {
+    const result = deleting ? await api.deleteMessage(target) : current.mediaType === 'none'
+      ? await api.editMessageText({ ...target, text: desired.message, reply_markup: markup(desired.buttons) })
+      : await api.editMessageCaption({ ...target, caption: desired.message, reply_markup: markup(desired.buttons) });
+    confirmed = deleting ? result === true : result === true || result?.message_id === original.messageId;
+  } catch (error) {
+    const message = String(error?.message || '');
+    // Safe recovery when a previous response was lost, or a post was already removed.
+    confirmed = deleting ? /message to delete not found/i.test(message) : /message is not modified/i.test(message);
+  }
+  if (!confirmed) {
+    await db.run(`UPDATE secretary_broadcast_posts SET state=:state,updated_at=unixepoch()
+      WHERE staff_id=:staff AND request_key=:key AND revision=:revision AND state=:waiting`,
+      { ...params, ':state': uncertainState, ':revision': post.revision, ':waiting': waitingState });
+    return summary(await read());
+  }
+  await db.run(`UPDATE secretary_broadcast_posts SET state=:state,payload=:payload,pending_payload=NULL,
+    revision=revision+1,updated_at=unixepoch() WHERE staff_id=:staff AND request_key=:key AND revision=:revision AND state=:waiting`,
+    { ...params, ':state': deleting ? 'deleted' : 'active', ':payload': JSON.stringify(desired), ':revision': post.revision, ':waiting': waitingState });
+  return summary(await read());
+}
+
 export default async function (input, ctx) {
   const staff = await requireAdmin(ctx);
   await ensureHistory();
   const staffId = String(staff.id);
   if (input?.action === 'list') return { broadcasts: await db.all(
-    `SELECT request_key AS requestKey, target, status, message_id AS messageId,
-      created_at AS createdAt FROM secretary_broadcasts WHERE staff_id=:staff
-      ORDER BY created_at DESC, request_key DESC LIMIT 20`, { ':staff': staffId }) };
+    `SELECT b.request_key AS requestKey, b.target, b.status, b.message_id AS messageId,
+      b.created_at AS createdAt, COALESCE(p.state,'active') AS postState
+      FROM secretary_broadcasts b LEFT JOIN secretary_broadcast_posts p
+      ON p.staff_id=b.staff_id AND p.request_key=b.request_key WHERE b.staff_id=:staff
+      ORDER BY b.created_at DESC, b.request_key DESC LIMIT 20`, { ':staff': staffId }) };
   const key = String(input?.operationKey || '');
   if (!/^[A-Za-z0-9_-]{16,128}$/.test(key)) invalid('A valid broadcast request key is required.');
   const params = { ':staff': staffId, ':key': key };
-  const read = () => db.get(`SELECT status, payload, target, message_id AS messageId
+  const read = () => db.get(`SELECT status, payload, target, message_id AS messageId,created_at AS createdAt
     FROM secretary_broadcasts WHERE staff_id=:staff AND request_key=:key`, params);
   if (input?.action === 'status') return await read() || { status: 'not_found' };
+  if (['detail', 'edit', 'retry_edit', 'delete'].includes(input?.action)) return await managePost(input, await read(), params);
   if (input?.action !== 'send') invalid('Unsupported broadcast action.');
   const request = validateBroadcast(input);
   const payload = JSON.stringify(request);

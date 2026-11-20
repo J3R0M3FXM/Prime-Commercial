@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { callServerless, getTelegramServerlessSession, uploadStaffImage } from "@/lib/telegram-serverless-client";
 import TelegramMediaImage from "@/app/components/telegram-media-image";
+import BroadcastPostControls from "./broadcast-post-controls";
 
 import { uploadLibraryAsset, assetAccessUrl, type LibraryAsset } from "@/lib/asset-library";
 
 type LinkButton = { text: string; url: string; row: number };
 type Draft = { target: string; message: string; mediaType: "none" | "photo" | "video"; media: string; videoAsset?: LibraryAsset; buttons: LinkButton[] };
 type Attempt = { operationKey: string; draft: Draft };
-type Result = { status: string; messageId?: number; target?: string; requestKey?: string; createdAt?: number };
+type Result = { status: string; postState?: string; messageId?: number; target?: string; requestKey?: string; createdAt?: number };
 const blank = (): Draft => ({ target: "", message: "", mediaType: "none", media: "", buttons: [] });
 const statusText = (result: Result) => result.status === "sent"
   ? `Sent To ${result.target} · Message ${result.messageId}`
@@ -127,6 +128,6 @@ export default function SecretaryBroadcastPanel() {
         <button type="submit" className="control-mini w-full" disabled={(draft.mediaType === "none" && !draft.message.trim()) || !draft.target.trim() || (draft.mediaType !== "none" && !draft.media)}>Send Broadcast</button>
       </fieldset>
     </form>
-    <details><summary className="label-mini cursor-pointer">Recent Broadcasts · This Staff Account</summary><button type="button" className="control-mini my-2" disabled={busy} onClick={() => { void refresh().catch(() => setError("Could not refresh history.")); }}>Refresh History</button>{history.length === 0 && <p className="secretary-help">No broadcasts yet.</p>}{history.map(item => <div key={item.requestKey} className="border-b border-slate-200 py-2 text-xs break-words"><p>{statusText(item)}</p><p className="font-mono">{item.createdAt ? new Date(item.createdAt * 1000).toLocaleString() : ""}</p></div>)}</details>
+    <details><summary className="label-mini cursor-pointer">Recent Broadcasts · This Staff Account</summary><button type="button" className="control-mini my-2" disabled={busy} onClick={() => { void refresh().catch(() => setError("Could not refresh history.")); }}>Refresh History</button>{history.length === 0 && <p className="secretary-help">No broadcasts yet.</p>}{history.map(item => <div key={item.requestKey} className="border-b border-slate-200 py-2 text-xs break-words"><p>{item.postState === "deleted" ? `Deleted · ${item.target} · Message ${item.messageId}` : statusText(item)}</p><p className="font-mono">{item.createdAt ? new Date(item.createdAt * 1000).toLocaleString() : ""}</p>{item.status === "sent" && item.requestKey && <BroadcastPostControls operationKey={item.requestKey} onChanged={refresh} />}</div>)}</details>
   </section>;
 }
