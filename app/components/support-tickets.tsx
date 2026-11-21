@@ -12,6 +12,9 @@ const categories = ["general", "order", "payment", "delivery", "product", "accou
 function stamp(value: number) {
   return new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(value));
 }
+function shortReference(value: string) {
+  return value.length > 8 ? value.slice(-8).toUpperCase() : value.toUpperCase();
+}
 export default function SupportTickets({ admin = false, onBack }: { admin?: boolean; onBack?: () => void }) {
   const [page, setPage] = useState<TicketPage>({ tickets: [], total: 0, unread: 0, nextCursor: null });
   const [selectedId, setSelectedId] = useState("");
@@ -99,7 +102,7 @@ export default function SupportTickets({ admin = false, onBack }: { admin?: bool
         {!loading && !page.tickets.length && <div className="support-empty"><Headphones /><h3>{admin ? "No Tickets Here" : "How Can We Help?"}</h3><p>{admin ? "Customer requests will appear in this inbox." : "Open a ticket for help with an order, payment or your account."}</p></div>}
         <div className="support-list">{page.tickets.map((row) => <button type="button" className="support-ticket-card" key={row.id} onClick={() => { setTicket(null); setSelectedId(row.id); setNotice(""); setError(""); }}>
           <span className="support-ticket-card__top"><strong>{row.subject}</strong><span className={"support-status support-status--" + row.status}>{statusLabel(row.status)}</span></span>
-          <small>{row.id.slice(0, 12).toUpperCase()} · {admin ? row.customerName + " · " : ""}{stamp(row.updatedAt)}{row.unread ? " · New Update" : ""}</small>
+          <small>Ticket #{shortReference(row.id)} · {admin ? row.customerName + " · " : ""}{stamp(row.updatedAt)}{row.unread ? " · New Update" : ""}</small>
           <span className="support-excerpt">{row.lastMessage}</span>
         </button>)}</div>
         {page.nextCursor && <button type="button" className="support-secondary" disabled={loading} onClick={() => void load(page.nextCursor)}>Load More</button>}
@@ -114,7 +117,7 @@ export default function SupportTickets({ admin = false, onBack }: { admin?: bool
         <div className="support-actions"><button type="button" className="support-secondary" disabled={busy} onClick={back}>Cancel</button><button type="submit" className="support-primary" disabled={busy || !subject.trim() || !body.trim()}>{busy ? <Loader2 className="animate-spin" /> : <Send />}Submit Ticket</button></div>
       </form>}
       {selectedId && ticket && <>
-        <div className="support-detail-heading"><h3>{ticket.subject}</h3><span className={"support-status support-status--" + ticket.status}>{statusLabel(ticket.status)}</span><p>{ticket.id} · {ticket.category}{ticket.orderId ? " · Order " + ticket.orderId : ""}</p>{admin && <p>{ticket.customerName}</p>}</div>
+        <div className="support-detail-heading"><h3>{ticket.subject}</h3><span className={"support-status support-status--" + ticket.status}>{statusLabel(ticket.status)}</span><p className="support-reference">Ticket #{shortReference(ticket.id)} <span>·</span> {ticket.category}{ticket.orderId ? <> <span>·</span> Order #{shortReference(ticket.orderId)}</> : null}</p>{admin && <p>{ticket.customerName}</p>}</div>
         <div className="support-thread" aria-label="Ticket conversation">{ticket.messages?.map((message) => message.type === "status" ? <p className="support-event" key={message.id}>{message.body}<small>{stamp(message.createdAt)}</small></p> : <article key={message.id} className={"support-message support-message--" + message.role}><header><strong>{message.role === "staff" ? "PRIME Support" : admin ? ticket.customerName : "You"}</strong><time>{stamp(message.createdAt)}</time></header><p>{message.body}</p></article>)}</div>
         {ticket.status !== "closed" ? <form className="support-form" onSubmit={(event) => { event.preventDefault(); void mutate("reply", { body: reply }); }}><label className="support-field">{admin ? "Reply to Customer" : "Your Reply"}<textarea required rows={3} maxLength={4000} value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Write your reply…" disabled={busy} /></label><div className="support-actions"><span className="support-hint">{reply.length}/4000</span><button type="submit" className="support-primary" disabled={busy || !reply.trim()}>{busy ? <Loader2 className="animate-spin" /> : <Send />}Send Reply</button></div></form> : <p className="support-hint">This ticket is closed. Reopen it if you need more help.</p>}
         <div className="support-ticket-actions">{admin ? <label className="support-field">Ticket Status<select disabled={busy} value={ticket.status} onChange={(event) => void mutate("status", { status: event.target.value })}>{(Object.keys(ticketStatusLabels) as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label> : <button type="button" className="support-secondary" disabled={busy} onClick={() => void mutate("status", { status: ticket.status === "closed" || ticket.status === "resolved" ? "open" : "closed" })}>{ticket.status === "closed" || ticket.status === "resolved" ? "Reopen Ticket" : "Close Ticket"}</button>}</div>

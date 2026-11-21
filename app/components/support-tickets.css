@@ -27,6 +27,7 @@
 #mobile-portrait-viewport .prime-support .support-status--closed { background: #f1f3f6; color: #68778a; }
 #mobile-portrait-viewport .prime-support .support-detail-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-bottom: 9px; border-bottom: 1px solid #e4eaf1; }
 #mobile-portrait-viewport .prime-support .support-detail-heading p { flex-basis: 100%; overflow-wrap: anywhere; }
+#mobile-portrait-viewport .prime-support .support-detail-heading .support-reference { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font: 400 12px/1.4 'Lato Condensed','Lato',sans-serif !important; letter-spacing: .02em; }
 #mobile-portrait-viewport .prime-support .support-thread { display: grid; gap: 8px; }
 #mobile-portrait-viewport .prime-support .support-message { width: 95%; padding: 10px; border: 1px solid #dce3eb; border-radius: 8px; background: #f7f9fc; }
 #mobile-portrait-viewport .prime-support .support-message--customer { justify-self: end; background: #edf4fb; }
