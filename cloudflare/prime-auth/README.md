@@ -1,36 +1,38 @@
 # PRIME native Telegram auth Worker
 
-## PARKED — NOT DEPLOYED
+## Gateway foundation — NOT DEPLOYED
 
-This is an incomplete scaffold, not a live authentication service. Do not present
-standalone APK Telegram login as implemented, do not promote this directory to
-Checkout, and do not point the production APK at it. The Worker has not been
-deployed, the custom domain/BotFather setup is not confirmed, and the APK does
-not yet consume the `/exchange` response. Resume only after those prerequisites
-are deliberately completed and device-tested.
+This is a gateway foundation, not a live authentication service. Do not point a
+production APK at it yet. The Worker has not been deployed, the custom
+domain/BotFather setup is not confirmed, and the APK flow still requires device
+testing. Configure `ADMIN_TELEGRAM_USER_IDS` before deployment; users outside
+that allowlist cannot exchange a login code.
 
 This Worker is intentionally separate from `prime-media-preview`. It verifies Telegram Login Widget data, stores a single-use 60-second native handoff code in KV, and redirects to `prime://auth/callback`.
 
-## Admin native-session contract
+## Gateway session contract
 
-Option 1 requires TGCloud to attach a platform-verified claim to endpoint context before endpoint code runs:
+Option 1 remains unsupported by TGCloud. Option 2 issues a short-lived signed
+gateway session to the APK:
 
 ```js
-ctx.nativeAdminSession = {
-  verified: true,
-  role: 'admin',
-  staffId: 'stable-native-staff-id',
-  authMethod: 'native_session',
-};
+admin|telegram-user-id|issued-unix-seconds|hmac-sha256
 ```
 
-`tgcloud/lib/auth.js` accepts this claim through `verifiedNativeAdmin`; it does not accept a token, access code, or `role` supplied in endpoint input. Until the Serverless runtime provides this trusted context, all Admin endpoints continue to require Telegram `initData`.
+The APK stores that value in Android Keystore-backed storage. `/session` validates
+the signature, expiry, and admin allowlist. This gateway session does **not** yet
+authorize TGCloud endpoints; those endpoints still require Telegram `initData`.
+The Admin API must be moved behind a gateway proxy or another backend before the
+standalone APK can operate without Telegram.
 
 Before deployment:
 
 1. Create a KV namespace and replace `REPLACE_WITH_KV_NAMESPACE_ID` in `wrangler.jsonc`.
 2. Set secrets: `wrangler secret put TELEGRAM_BOT_TOKEN` and `wrangler secret put SESSION_SIGNING_KEY` (at least 32 random bytes).
-3. Register `auth.codespacelabs.online` with BotFather for `primenetworkphbot`.
-4. Confirm the Cloudflare DNS route exists.
+3. Set `ADMIN_TELEGRAM_USER_IDS` to a comma-separated allowlist of Telegram user IDs.
+4. Register `auth.codespacelabs.online` with BotFather for `primenetworkphbot`.
+5. Confirm the Cloudflare DNS route exists.
 
-The `/exchange` response is a contract for the APK integration; the app must consume the code once and store the returned session only in native secure storage. Do not deploy this Worker until the backend accepts the signed native session format.
+The `/exchange` response is consumed by the APK helper and stored only in native
+secure storage. Do not deploy this Worker until the gateway backend is ready to
+serve the Admin API.

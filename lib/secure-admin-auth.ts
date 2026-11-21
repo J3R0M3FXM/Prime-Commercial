@@ -1,4 +1,7 @@
 import { registerPlugin } from '@capacitor/core';
+import { App } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
 
 type SecureAdminAuthPlugin = {
   store(options: { value: string }): Promise<void>;
@@ -31,6 +34,39 @@ export async function storeNativeAdminSession(value: string) {
 
 export async function clearNativeAdminSession() {
   await SecureAdminAuth.clear();
+}
+
+export async function startNativeAdminLogin(authBaseUrl: string) {
+  if (!Capacitor.isNativePlatform()) throw new Error('Native Admin login is only available in the APK.');
+  const base = authBaseUrl.replace(/\/$/, '');
+  return new Promise<void>(async (resolve, reject) => {
+    let settled = false;
+    const finish = async (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      await listener.remove();
+      if (error) reject(error); else resolve();
+    };
+    const listener = await App.addListener('appUrlOpen', async ({ url }) => {
+      try {
+        const callback = new URL(url);
+        if (callback.protocol !== 'prime:' || callback.hostname !== 'auth' || callback.pathname !== '/callback') return;
+        const code = callback.searchParams.get('code') || '';
+        if (!/^[a-f0-9]{32}$/.test(code)) throw new Error('The Admin login callback was invalid.');
+        const response = await fetch(`${base}/exchange?code=${encodeURIComponent(code)}`, { cache: 'no-store' });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body?.authenticated !== true || typeof body.session !== 'string') throw new Error('Admin authentication failed.');
+        await storeNativeAdminSession(body.session);
+        await Browser.close().catch(() => undefined);
+        await finish();
+      } catch (error) {
+        await Browser.close().catch(() => undefined);
+        await finish(error instanceof Error ? error : new Error('Admin authentication failed.'));
+      }
+    });
+    try { await Browser.open({ url: `${base}/login` }); }
+    catch (error) { await finish(error instanceof Error ? error : new Error('Could not open Admin login.')); }
+  });
 }
 
 export const nativeSmsBridge = {

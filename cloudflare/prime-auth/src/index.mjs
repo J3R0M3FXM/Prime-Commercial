@@ -31,14 +31,33 @@ async function verifyTelegramLogin(url, env) {
   return { tgUserId, user };
 }
 
+function isAdminTelegramUser(tgUserId, env) {
+  const configured = String(env.ADMIN_TELEGRAM_USER_IDS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => /^\d+$/.test(value));
+  return configured.includes(String(tgUserId));
+}
+
 async function signedSession(tgUserId, env) {
   const secret = String(env.SESSION_SIGNING_KEY || '');
   if (secret.length < 32) throw new Error('SESSION_SIGNING_KEY is not configured');
   const issued = Math.floor(Date.now() / 1000);
-  const payload = `${tgUserId}|${issued}`;
+  const payload = `admin|${tgUserId}|${issued}`;
   const key = new TextEncoder().encode(secret);
   const signature = await hmacHex(key, payload);
   return `${payload}|${signature}`;
+}
+
+async function verifySession(session, env) {
+  const parts = String(session || '').split('|');
+  if (parts.length !== 4 || parts[0] !== 'admin' || !/^\d+$/.test(parts[1]) || !/^\d+$/.test(parts[2]) || !/^[a-f0-9]{64}$/i.test(parts[3])) return null;
+  const issued = Number(parts[2]);
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isSafeInteger(issued) || issued > now || now - issued > SESSION_TTL_SECONDS || !isAdminTelegramUser(parts[1], env)) return null;
+  const expected = await hmacHex(new TextEncoder().encode(String(env.SESSION_SIGNING_KEY || '')), parts.slice(0, 3).join('|'));
+  if (expected !== parts[3].toLowerCase()) return null;
+  return { id: parts[1], role: 'admin', authMethod: 'gateway_session', expiresAt: issued + SESSION_TTL_SECONDS };
 }
 
 function loginPage(env) {
@@ -55,7 +74,7 @@ export default {
     if (url.pathname === '/login') return loginPage(env);
     if (url.pathname === '/callback') {
       const verified = await verifyTelegramLogin(url, env);
-      if (!verified || !env.AUTH_CODES) return new Response('Telegram authentication failed.', { status: 401 });
+      if (!verified || !env.AUTH_CODES || !isAdminTelegramUser(verified.tgUserId, env)) return new Response('Admin authentication failed.', { status: 401 });
       const code = crypto.randomUUID().replaceAll('-', '');
       await env.AUTH_CODES.put(`code:${code}`, await signedSession(verified.tgUserId, env), { expirationTtl: CODE_TTL_SECONDS });
       const target = String(env.NATIVE_CALLBACK_URL || 'prime://auth/callback');
@@ -71,6 +90,12 @@ export default {
       if (!session) return json({ error: 'Invalid or expired code' }, 401);
       await env.AUTH_CODES.delete(key);
       return json({ authenticated: true, session, expiresIn: SESSION_TTL_SECONDS });
+    }
+    if (url.pathname === '/session') {
+      const authorization = request.headers.get('authorization') || '';
+      const session = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+      const identity = await verifySession(session, env);
+      return identity ? json({ authenticated: true, identity }) : json({ authenticated: false }, 401);
     }
     return json({ error: 'Not found' }, 404);
   },
