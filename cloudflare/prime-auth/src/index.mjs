@@ -82,7 +82,9 @@ export default {
     if (url.pathname === '/login') return loginPage(env);
     if (url.pathname === '/callback' || url.pathname === '/api/telegram/callback') {
       const verified = await verifyTelegramLogin(url, env);
-      if (!verified || !env.AUTH_CODES || !isAdminTelegramUser(verified.tgUserId, env)) return new Response('Admin authentication failed.', { status: 401 });
+      if (!verified) return new Response('Telegram login verification failed.', { status: 401 });
+      if (!env.AUTH_CODES) return new Response('Admin authentication is not configured.', { status: 503 });
+      if (!isAdminTelegramUser(verified.tgUserId, env)) return new Response('Telegram account is not authorized for Admin access.', { status: 403 });
       const code = crypto.randomUUID().replaceAll('-', '');
       await env.AUTH_CODES.put(`code:${code}`, await signedSession(verified.tgUserId, env), { expirationTtl: CODE_TTL_SECONDS });
       const target = String(env.NATIVE_CALLBACK_URL || 'prime://auth/callback');
