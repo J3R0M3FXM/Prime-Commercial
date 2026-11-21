@@ -9,6 +9,14 @@ function parseList(value) {
 }
 
 /** Accept bounded browser telemetry, never client-supplied identity or timestamps. */
+function startupLocation(value) {
+  if (!value || typeof value !== 'object') return null;
+  const { lat, lon } = value;
+  if (typeof lat !== 'number' || typeof lon !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180 || (lat === 0 && lon === 0)) return null;
+  return { lat, lon, accuracy: typeof value.accuracy === 'number' && Number.isFinite(value.accuracy) && value.accuracy >= 0 ? Math.min(value.accuracy, 100000) : null,
+    capturedAt: text(value.capturedAt, 40), source: 'Precise GPS', verified: false };
+}
+
 export function sanitizeFingerprint(input = {}) {
   const source = input && typeof input === 'object' ? input : {};
   const number = (value, fallback = 0, min = 0, max = 100000) => {
@@ -37,6 +45,11 @@ export function sanitizeFingerprint(input = {}) {
     }
     return {
       appId: text(source.appId, 80), deviceId,
+      clientObservedIp: /^[0-9a-fA-F:.]{3,64}$/.test(text(source.clientObservedIp, 65)) ? text(source.clientObservedIp, 64) : '',
+      deviceLocationObservation: startupLocation(source.deviceLocationObservation),
+      startupCapturedAt: text(source.startupCapturedAt, 40), startupCaptureCompletedAt: text(source.startupCaptureCompletedAt, 40),
+      publicIpStatus: source.publicIpStatus === 'Available' ? 'Available' : 'Unavailable',
+      gpsStatus: source.gpsStatus === 'Available' ? 'Available' : 'Unavailable',
       hardwareId: text(source.hardwareId, 160), deviceFingerprintId,
       sessionToken, browser: text(source.browser, 320), userAgent: text(source.browser || source.userAgent, 320),
       platform, screenResolution, availScreen: text(source.availScreen, 40),
@@ -62,14 +75,22 @@ export function sanitizeFingerprint(input = {}) {
   })();
 }
 
-export async function saveCustomerFingerprint(customer, input = {}, now = new Date()) {
+export async function saveCustomerFingerprint(customer, input = {}, now = new Date(), enrichment = null) {
   const next = await sanitizeFingerprint(input);
+  // Enrichment comes only from server code, never a client-supplied provider result.
+  if (enrichment) { next.ipLocation = enrichment.ipLocation; next.deviceLocationObservation = enrichment.deviceLocationObservation; }
   if (!next.sessionToken && !next.deviceId) return { fingerprints: parseList(customer?.fingerprints), latestFingerprint: null };
   const records = parseList(customer?.fingerprints).filter(record => record && typeof record === 'object');
   const index = records.findIndex(record =>
     (next.sessionToken && text(record.sessionToken, 160) === next.sessionToken) ||
     (!next.sessionToken && next.deviceId && text(record.deviceId, 160) === next.deviceId));
   const existing = index >= 0 ? records[index] : {};
+  if (!enrichment && next.deviceLocationObservation && existing.deviceLocationObservation &&
+      next.deviceLocationObservation.lat === existing.deviceLocationObservation.lat &&
+      next.deviceLocationObservation.lon === existing.deviceLocationObservation.lon &&
+      next.deviceLocationObservation.capturedAt === existing.deviceLocationObservation.capturedAt) {
+    next.deviceLocationObservation = { ...existing.deviceLocationObservation, ...next.deviceLocationObservation };
+  }
   const timestamp = now.toISOString();
   const saved = {
     ...existing, ...next,

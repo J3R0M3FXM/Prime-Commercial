@@ -32,7 +32,7 @@ await new Promise(resolve=>setTimeout(resolve,30));
 assert.equal((await slow.collectRecognitionSignals()).fingerprintId,'a'.repeat(32),'Late SDK completion is recovered on the next capture');
 let savedFallback=false;
 const clientWindow={setTimeout,clearTimeout,Telegram:{WebApp:{Serverless:{call(name,input,callback){if(name==='manageDeviceSecurity')callback(Error('Security history unavailable'));else {assert.equal(name,'getTelegramSession');assert.equal(input.fingerprint.fingerprintId,'f'.repeat(32));savedFallback=true;callback(null,{authenticated:true});}}}}}};
-const exports={};new Function('exports','require','window','localStorage',compile('lib/telegram-serverless-client.ts'))(exports,name=>name.includes('fingerprint-collector')?{getClientFingerprint:async()=>({fingerprintId:'f'.repeat(32)})}:{setMediaOwner(){}},clientWindow,storage);
+const exports={};new Function('exports','require','window','localStorage',compile('lib/telegram-serverless-client.ts'))(exports,name=>name.includes('startup-capture')?{startStartupCapture:async()=>({fingerprintId:'f'.repeat(32)}),getStartupSnapshot:()=>({})}:name.includes('fingerprint-collector')?{getClientFingerprint:async()=>({fingerprintId:'f'.repeat(32)})}:{setMediaOwner(){}},clientWindow,storage);
 await assert.rejects(exports.recordCurrentDeviceSession({userId:'11'}),/Security history unavailable/);
 assert.equal(savedFallback,true,'Failed security enrollment still saves customer fingerprint captures');
 console.log('PASS: one-time launch permission, resume/reload guard, failed and slow SDK recovery, and customer fingerprint persistence fallback.');

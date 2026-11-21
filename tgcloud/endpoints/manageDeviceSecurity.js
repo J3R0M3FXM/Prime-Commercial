@@ -1,3 +1,5 @@
+import { enrichStartupLocationSignals } from '../lib/startup-location.js';
+import { sanitizeFingerprint } from '../lib/fingerprints.js';
 import { db, EndpointError } from 'sdk';
 import { eq } from 'sdk/db';
 import { customers } from '../schema.js';
@@ -26,6 +28,11 @@ export default async function (input = {}, ctx) {
       throw new EndpointError('Invalid device signals.', { code: 'INVALID_SIGNALS' });
     const result = await recordDeviceSession(telegramId, fingerprint);
     await persistFingerprintHistory(String(customer.id), fingerprint);
+    if (fingerprint.startupCapture === true) {
+      const enriched = await sanitizeFingerprint(fingerprint);
+      await enrichStartupLocationSignals(enriched, {});
+      await persistFingerprintHistory(String(customer.id), fingerprint, enriched);
+    }
     return result;
   }
   if (!['network', 'location'].includes(action)) throw new EndpointError('Unsupported device action.', { code: 'INVALID_ACTION' });

@@ -264,7 +264,7 @@ export default function Shopfront() {
 
           setBootProgress(72);
           setAuthorized(true);
-          await loadCatalog();
+          void loadCatalog();
           setBootProgress(100);
         } else {
           throw new Error(authData?.error || 'Telegram session could not be verified.');

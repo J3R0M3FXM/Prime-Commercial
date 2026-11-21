@@ -29,7 +29,7 @@ const security = load('tgcloud/lib/device-security.js', { db, sanitizeFingerprin
 class EndpointError extends Error { constructor(message, details) { super(message); this.code = details?.code; } }
 const context = id => ({ initData: { user: { id }, hash: 'private-auth-value' } });
 const requireAdmin = async ctx => { if (String(ctx?.initData?.user?.id) !== '99') throw new EndpointError('Admin access required.', { code: 'ADMIN_REQUIRED' }); };
-const { handler } = load('tgcloud/endpoints/manageDeviceSecurity.js', { db, customers: { id: 'id', tgUserId: 'tgUserId' }, eq: (key, value) => ({ key, value }), EndpointError, requireAdmin, ...security }, ['handler']);
+const { handler } = load('tgcloud/endpoints/manageDeviceSecurity.js', { db, customers: { id: 'id', tgUserId: 'tgUserId' }, eq: (key, value) => ({ key, value }), EndpointError, requireAdmin, sanitizeFingerprint, enrichStartupLocationSignals: async fp => { fp.ipLocation = { provider: 'IPLocate', ip: fp.clientObservedIp, verified: false }; if (fp.deviceLocationObservation) fp.deviceLocationObservation.reverseGeocodedAddress = 'Startup address'; }, ...security }, ['handler']);
 const installationId = crypto.randomUUID();
 const fingerprint = { installationId, deviceId: 'DEV_LEGACY', sessionToken: `SESS_${crypto.randomUUID()}`, fingerprintId: 'a'.repeat(32), fingerprintProvider: 'FingerprintJS', fingerprintStatus: 'Available', telegramUserId: '22', firstSeenAt: 1, riskScore: 100, trustStatus: 'trusted', latitude: 14.5995, browser: 'test' };
 const sanitized = await sanitizeFingerprint(fingerprint);
@@ -90,6 +90,15 @@ database.prepare('UPDATE device_security_sessions SET last_seen_at=1 WHERE teleg
 await security.pruneDeviceSecurity('11');
 assert.equal((await handler({ action: 'list' }, context(11))).sessions.length, 0);
 assert.equal((await handler({ action: 'list' }, context(22))).sessions.length, 1);
+const startupRecord = { ...fingerprint, startupCapture: true, clientObservedIp: '203.0.113.4', publicIpStatus: 'Available', gpsStatus: 'Available', deviceLocationObservation: { lat: 14.5, lon: 121, accuracy: 9, capturedAt: new Date().toISOString() } };
+await handler({ action: 'record', fingerprint: startupRecord }, context(11));
+const startupHistory = JSON.parse(database.prepare('SELECT fingerprints FROM customers WHERE id=?').get('alice').fingerprints)[0];
+assert.equal(startupHistory.clientObservedIp, '203.0.113.4');
+assert.equal(startupHistory.ipLocation.provider, 'IPLocate');
+assert.equal(startupHistory.deviceLocationObservation.reverseGeocodedAddress, 'Startup address');
+const startupSecurity = await security.readDeviceSecurity('11');
+assert.equal(startupSecurity.sessions.find(row => row.id === first.sessionId).reportedIp, '203.0.113.4');
+assert.equal(startupSecurity.devices.find(row => row.id === first.deviceId).metadata.deviceLocationObservation, undefined, 'Precise coordinates stay out of registry metadata');
 database.close();
 console.log('PASS: real SQLite enrollment/idempotency, account isolation, review-only risk, consent, IP provenance, coordinate non-retention, diagnostic privacy and scoped retention');
 

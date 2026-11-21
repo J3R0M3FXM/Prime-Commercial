@@ -24,7 +24,7 @@ const rules=(await bundle('app/components/admin/telegram-serverless-rules-panel.
 const print=(await bundle('app/components/admin/order-print-view.tsx')).default;
 const catalog=(await bundle('app/components/admin/telegram-serverless-catalog-panel.tsx')).default;
 const account=(await bundle('app/components/account-modal.tsx')).default;
-const splash=(await bundle('app/components/splash-screen.tsx')).default;
+const { default: splash, StartupProgressContext }=await bundle('app/components/splash-screen.tsx');
 const clock=(await bundle('app/components/live-header-clock.tsx')).default;
 const root=createRoot(document.getElementById('root'));
 await act(async()=>root.render(createElement(clock)));
@@ -47,6 +47,8 @@ assert.equal(splashSvg.querySelectorAll('.light[fill="#43ff91"]').length,5,'Serv
 for (const color of ['#ff625d','#ffad38','#46baff']) assert.ok(splashSvg.querySelector(`.light[fill="${color}"]`));
 assert.match(splashSvg.querySelector('style').textContent,/prefers-reduced-motion:reduce/);
 assert.match(document.body.textContent,/ADMIN ACCESS/);
+await act(async()=>root.render(createElement(StartupProgressContext.Provider,{value:100},createElement(splash,{progress:52}))));
+assert.equal(document.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'),'100','A slow authentication route cannot reset the completed twelve-second bar');
 await act(async()=>root.render(createElement(splash,{title:'CONNECTING TO PRIME PRIVATE SERVERS',subtitle:'Please wait'})));
 assert.match(document.body.textContent,/CONNECTING TO PRIME PRIVATE SERVERS/);
 await act(async()=>root.render(createElement('div')));

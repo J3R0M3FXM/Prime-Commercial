@@ -61,11 +61,11 @@ export function normalizeReportedIp(value) {
   return value.toLowerCase();
 }
 
-export async function persistFingerprintHistory(customerId, input) {
+export async function persistFingerprintHistory(customerId, input, enrichment = null) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const current = await db.get("SELECT tg_user_id AS tgUserId, COALESCE(CAST(fingerprints AS TEXT), '[]') AS fingerprints FROM customers WHERE id=:id", { ':id': customerId });
     if (!current) return null;
-    const saved = await saveCustomerFingerprint(current, input, new Date());
+    const saved = await saveCustomerFingerprint(current, input, new Date(), enrichment);
     const result = await db.run(`UPDATE customers SET fingerprints=json(:next), updated_at=unixepoch()
       WHERE id=:id AND COALESCE(fingerprints, '[]')=:current`,
     { ':id': customerId, ':next': JSON.stringify(saved.fingerprints), ':current': String(current.fingerprints || '[]') });
@@ -94,7 +94,7 @@ export async function recordDeviceSession(telegramId, input) {
   if (Number(shared?.count) > 0) reasons.push('Signals Shared With Another Account');
   const riskScore = Math.min(100, reasons.reduce((sum, reason) => sum + (reason === 'Signals Shared With Another Account' ? 25 : reason === 'New Installation' ? 20 : 10), 0));
   // Tokens and client timestamps are not retained in the registry metadata.
-  const { sessionToken, ...metadata } = signal;
+  const { sessionToken, deviceLocationObservation, ...metadata } = signal;
   await db.run(`INSERT INTO device_registrations (id,telegram_user_id,installation_id,fingerprint_id,metadata,risk_score,first_seen_at,last_seen_at)
     VALUES (:id,:owner,:installation,:fingerprint,:metadata,:risk,:now,:now)
     ON CONFLICT(id) DO UPDATE SET fingerprint_id=CASE WHEN excluded.fingerprint_id<>'' THEN excluded.fingerprint_id ELSE device_registrations.fingerprint_id END,
@@ -106,6 +106,11 @@ export async function recordDeviceSession(telegramId, input) {
       risk_score=max(device_security_sessions.risk_score,excluded.risk_score),
       risk_reasons=CASE WHEN excluded.risk_score>device_security_sessions.risk_score THEN excluded.risk_reasons ELSE device_security_sessions.risk_reasons END`,
     { ':id': sessionId, ':owner': telegramId, ':device': deviceId, ':now': now, ':risk': riskScore, ':reasons': JSON.stringify(reasons) });
+  const reportedIp = normalizeReportedIp(signal.clientObservedIp);
+  if (reportedIp) await db.run("UPDATE device_security_sessions SET reported_ip=:ip,ip_source='Browser-Reported',last_seen_at=:now WHERE id=:id AND telegram_user_id=:owner",
+    { ':ip': reportedIp, ':now': now, ':id': sessionId, ':owner': telegramId });
+  if (deviceLocationObservation) await db.run("UPDATE device_security_sessions SET location_checked_at=:now,location_accuracy=:accuracy,location_source='Launch Device Location',last_seen_at=:now WHERE id=:id AND telegram_user_id=:owner",
+    { ':accuracy': deviceLocationObservation.accuracy, ':now': now, ':id': sessionId, ':owner': telegramId });
   for (const eventType of ['Session Started', ...reasons]) {
     const eventId = await identifier(sessionId, eventType, eventType === 'Browser Fingerprint Changed' ? signal.fingerprintId : '');
     await db.run(`INSERT OR IGNORE INTO device_security_events (id,telegram_user_id,device_registration_id,session_id,event_type,details,created_at)

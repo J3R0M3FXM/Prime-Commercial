@@ -112,7 +112,10 @@ function startBrowserPhysicalGpsWatcher(): void {
 
 async function requestPhysicalGpsFromAvailableChannels(
   allowPermissionPrompt: boolean,
+  timeoutMs = 40000,
 ): Promise<LocationResult | null> {
+  const deadline = Date.now() + timeoutMs;
+  const remaining = () => Math.max(0, deadline - Date.now());
   if (typeof window === "undefined") {
     return null;
   }
@@ -129,7 +132,7 @@ async function requestPhysicalGpsFromAvailableChannels(
   // when navigator.geolocation is unavailable inside Telegram's WebView.
   if (hasTelegramLocationManager) {
     const telegramLocation = await getTelegramPreciseLocation(
-      25000,
+      Math.min(25000, remaining()),
       allowPermissionPrompt,
     );
 
@@ -139,8 +142,9 @@ async function requestPhysicalGpsFromAvailableChannels(
 
     // Do not create a second permission prompt after Telegram has handled the
     // location permission. The browser channel is only a silent fallback here.
+    if (remaining() <= 0) return null;
     const browserLocation = await getBrowserPreciseLocation(
-      10000,
+      Math.min(10000, remaining()),
       false,
     );
 
@@ -154,13 +158,14 @@ async function requestPhysicalGpsFromAvailableChannels(
   // Non-Telegram/browser deployments still get a normal browser geolocation
   // request. This branch is the only browser path allowed to prompt.
   return getBrowserPreciseLocation(
-    30000,
+    Math.min(30000, remaining()),
     allowPermissionPrompt,
   );
 }
 
 export function refreshPhysicalGpsTelemetry(
   allowPermissionPrompt = false,
+  timeoutMs = 40000,
 ): Promise<LocationResult | null> {
   if (typeof window === "undefined") {
     return Promise.resolve(null);
@@ -175,6 +180,7 @@ export function refreshPhysicalGpsTelemetry(
   const refresh = (async () => {
     const location = await requestPhysicalGpsFromAvailableChannels(
       allowPermissionPrompt,
+      timeoutMs,
     );
 
     if (generationAtStart !== physicalGpsGeneration) {
@@ -211,7 +217,7 @@ export function refreshPhysicalGpsTelemetry(
   return trackedRefresh;
 }
 
-export function startPhysicalGpsTelemetry(): void {
+export function startPhysicalGpsTelemetry(timeoutMs = 40000): void {
   if (
     typeof window === "undefined" ||
     physicalGpsTelemetryStarted
@@ -244,7 +250,7 @@ export function startPhysicalGpsTelemetry(): void {
   for (const storage of ['localStorage', 'sessionStorage'] as const) {
     try { window[storage].setItem(key, '1'); } catch {}
   }
-  void refreshPhysicalGpsTelemetry(!requested).catch(error => {
+  void refreshPhysicalGpsTelemetry(!requested, timeoutMs).catch(error => {
     console.warn('[PRIME GPS] Launch location request failed:', error);
   });
 }
@@ -382,6 +388,7 @@ async function getTelegramPreciseLocation(
   refineForMs = 5000,
   targetAccuracyMeters = 25,
 ): Promise<LocationResult | null> {
+  const deadline = Date.now() + timeoutMs;
   const webApp = (window as any)?.Telegram?.WebApp;
   const manager = webApp?.LocationManager;
 
@@ -414,7 +421,7 @@ async function getTelegramPreciseLocation(
         if (settled) return;
         settled = true;
         resolve();
-      }, initTimeoutMs);
+      }, Math.min(initTimeoutMs, Math.max(0, deadline - Date.now())));
 
       try {
         manager.init(() => {
@@ -434,7 +441,7 @@ async function getTelegramPreciseLocation(
     let lastState = "";
     let bestResult: LocationResult | null = null;
 
-    while (Date.now() - startedAt < timeoutMs) {
+    while (Date.now() < deadline) {
       const available = manager.isLocationAvailable !== false;
       const accessRequested = manager.isAccessRequested === true;
       const accessGranted = manager.isAccessGranted === true;
@@ -461,7 +468,7 @@ async function getTelegramPreciseLocation(
         return bestResult || { lat: 0, lon: 0, source: "Unavailable" };
       }
 
-      const slice = Math.min(3000, timeoutMs - (Date.now() - startedAt));
+      const slice = Math.min(3000, deadline - Date.now());
       if (slice <= 0) break;
 
       const result = await requestTelegramLocationOnce(manager, webApp, slice);
@@ -474,7 +481,7 @@ async function getTelegramPreciseLocation(
         }
       }
 
-      if (Date.now() - startedAt < timeoutMs) {
+      if (Date.now() < deadline) {
         await new Promise((resolve) => window.setTimeout(resolve, 500));
       }
     }

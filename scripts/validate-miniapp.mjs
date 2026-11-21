@@ -72,6 +72,7 @@ run('node', ['scripts/test-order-history-dates.mjs'], 'customer order history da
 run('node', ['scripts/test-order-confirmation.mjs'], 'order confirmation display and payment states');
 run('node', ['scripts/test-device-security.mjs'], 'device recognition ownership, privacy and persistence');
 run('node', ['scripts/test-device-collection.mjs'], 'launch GPS and fingerprint recovery');
+run('node', ['scripts/test-startup-capture.mjs'], 'bounded startup IP GPS capture and twelve-second splash');
 run('node', ['scripts/test-asset-library.mjs'], 'Assets picker and storage integration');
 run('node', ['scripts/test-device-security-ui.mjs'], 'device security customer and staff controls');
 run('node', ['scripts/test-media.mjs'], 'media upload/gallery/offline/playlist safety');

@@ -15,7 +15,8 @@ import Shopfront from "./page";
 import AdminPage from "./admin/page";
 import MayaResultPage from "./payment/maya/result/page";
 import { getTelegramServerlessSession } from "../lib/telegram-serverless-client";
-import { startPhysicalGpsTelemetry } from "./components/fingerprint-collector";
+import { startStartupCapture, startupElapsed, startupProgress, STARTUP_DURATION_MS } from "@/lib/startup-capture";
+import SplashScreen, { StartupProgressContext } from "./components/splash-screen";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import VideoGalleryModal from "./components/video-gallery-modal";
@@ -24,8 +25,26 @@ function MiniApp() {
   const [path, setPath] = useState(() => window.location.pathname);
   const [offlineMedia] = useState(() => !navigator.onLine);
 
+  const timedStartup = !offlineMedia && import.meta.env.VITE_UI_PREVIEW !== '1' && !path.startsWith('/payment/');
+  const [startupDone, setStartupDone] = useState(!timedStartup);
+  const [captureProgress, setCaptureProgress] = useState(0);
   useEffect(() => {
-    startPhysicalGpsTelemetry();
+    if (!timedStartup) return;
+    void startStartupCapture();
+    let frame = 0;
+    const tick = () => {
+      const elapsed = startupElapsed();
+      setCaptureProgress(startupProgress(elapsed));
+      if (elapsed >= STARTUP_DURATION_MS) {
+        // Paint the completed bar before revealing the authenticated route.
+        frame = requestAnimationFrame(() => setStartupDone(true));
+      } else frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [timedStartup]);
+
+  useEffect(() => {
     let stopped = false;
     const heartbeat = async () => {
       if (stopped || !navigator.onLine || !window.Telegram?.WebApp?.initData)
@@ -94,13 +113,14 @@ function MiniApp() {
     );
 
   return (
-    <div
+    <StartupProgressContext.Provider value={timedStartup ? captureProgress : null}><div
       id="mobile-portrait-viewport"
       className={`mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-gray-50 shadow-2xl sm:border-x sm:border-slate-800/80${!offlineMedia && path.startsWith("/admin") ? " admin-viewport" : ""}`}
     >
-      {offlineMedia ? screen : <CartProvider>{screen}</CartProvider>}
+      {!startupDone && <div className="prime-startup-window fixed inset-0 z-[10000] mx-auto w-full max-w-[430px] overflow-y-auto bg-white"><SplashScreen progress={captureProgress} subtitle="PREPARING YOUR SECURE SESSION..." /></div>}
+      <div className="min-w-0 flex-1" hidden={!startupDone}>{offlineMedia ? screen : <CartProvider>{screen}</CartProvider>}</div>
       <SystemFooter />
-    </div>
+    </div></StartupProgressContext.Provider>
   );
 }
 

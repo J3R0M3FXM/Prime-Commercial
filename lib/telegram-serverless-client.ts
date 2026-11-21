@@ -1,5 +1,6 @@
 'use client';
 import { setMediaOwner } from '@/lib/media-library';
+import { startStartupCapture, getStartupSnapshot } from '@/lib/startup-capture';
 
 type ServerlessError = Error & { type?: string; parameters?: Record<string, unknown> };
 type ServerlessBridge = {
@@ -61,12 +62,12 @@ export async function getClientObservedPublicIp(): Promise<string> {
     const response = await fetch('https://api.ipify.org?format=json', {
       cache: 'no-store', signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) return '';
+    if (!response.ok) return String(getStartupSnapshot().clientObservedIp || '');
     const result = await response.json();
     const ip = String(result?.ip || '').trim();
-    return ip.length <= 64 ? ip : '';
+    return ip && ip.length <= 64 ? ip : String(getStartupSnapshot().clientObservedIp || '');
   } catch {
-    return '';
+    return String(getStartupSnapshot().clientObservedIp || '');
   }
 }
 
@@ -410,6 +411,7 @@ export type TelegramServerlessSession = {
 };
 
 type DeviceEnrollment = { deviceId: string; sessionId: string; riskScore: number; reasons: string[]; newInstallation: boolean };
+const startupRecordedOwners = new Set<string>();
 const deviceEnrollments = new Map<string, { startedAt: number; promise: Promise<DeviceEnrollment> }>();
 
 /** Record recognition after authentication; the fingerprint never grants access. */
@@ -420,9 +422,12 @@ export function recordCurrentDeviceSession(options: { force?: boolean; userId?: 
   if (current && Date.now() - current.startedAt < (options.force ? 4000 : 60_000)) return current.promise;
   const promise = (async () => {
     const { getClientFingerprint } = await import('@/app/components/fingerprint-collector');
-    const fingerprint = await getClientFingerprint();
+    const startup = await startStartupCapture();
+    const fingerprint = { ...await getClientFingerprint({ advanced: false }), ...startup, startupCapture: !startupRecordedOwners.has(owner) };
     try {
-      return await callServerless<DeviceEnrollment>('manageDeviceSecurity', { action: 'record', fingerprint }, 20_000);
+      const result = await callServerless<DeviceEnrollment>('manageDeviceSecurity', { action: 'record', fingerprint }, 20_000);
+      startupRecordedOwners.add(owner);
+      return result;
     } catch (error) {
       // Preserve customer captures even when the security-history endpoint fails.
       await callServerless('getTelegramSession', { fingerprint }, 20_000);

@@ -1,13 +1,18 @@
 "use client";
 import React, { useEffect } from 'react';
 
+export const StartupProgressContext = React.createContext<number | null>(null);
+let activeSplashes = 0;
+
 interface SplashScreenProps { title?: string; subtitle?: string; progress?: number; }
 
 export default function SplashScreen({ title = 'INITIALIZING SECURE SESSION', subtitle = 'ESTABLISHING ENCRYPTED TELEGRAM LINK...', progress = 0 }: SplashScreenProps) {
-  const displayedProgress = Math.max(0, Math.min(100, Math.round(progress)));
+  const launchProgress = React.useContext(StartupProgressContext);
+  const displayedProgress = Math.max(0, Math.min(100, Math.round(launchProgress ?? progress)));
   useEffect(() => {
+    activeSplashes++;
     document.body.classList.add('splash-active');
-    return () => document.body.classList.remove('splash-active');
+    return () => { if (--activeSplashes === 0) document.body.classList.remove('splash-active'); };
   }, []);
 
   return <div className="relative overflow-hidden z-[9999] min-h-screen w-full max-w-[430px] mx-auto bg-white flex flex-col items-center justify-between p-6 text-slate-950 font-sans antialiased select-none">
@@ -16,7 +21,7 @@ export default function SplashScreen({ title = 'INITIALIZING SECURE SESSION', su
         <div className="prime-splash-network" aria-label="Secure connection loading illustration">
           <img className="prime-splash-secure-art" src="/prime-splash-secure-connection.svg" alt="Animated secure connection between a Telegram phone and PRIME servers" />
         </div>
-        <div className="prime-splash-progress" aria-label={`Loading ${displayedProgress}%`}>
+        <div className="prime-splash-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={displayedProgress} aria-label="Startup progress">
           <div className="prime-splash-progress__fill" style={{ width: `${displayedProgress}%` }}><span>{displayedProgress}%</span></div>
         </div>
         <div className="text-center space-y-1.5 z-10 px-4">

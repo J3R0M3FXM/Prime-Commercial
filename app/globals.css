@@ -968,6 +968,7 @@ body.splash-active #system-wide-proprietary-footer {
 .prime-splash-secure-art { display: block; width: 100%; height: auto; position: relative; }
 .prime-splash-progress { width: min(100% - 40px, 330px); height: 18px; margin: 2px auto 12px; overflow: hidden; border: 1px solid #a8d8bc; border-radius: 999px; background: #e8f4ec; box-shadow: inset 0 1px 2px rgb(15 23 42 / 12%); }
 .prime-splash-progress__fill { display: grid; height: 100%; min-width: 15%; place-items: center; overflow: hidden; border-radius: inherit; background: #17bd63; transition: width .25s ease-out; }
+.prime-startup-window .prime-splash-progress__fill { transition: none; }
 .prime-splash-progress__fill span { color: #fff; font: 800 11px 'Lato Condensed', 'Lato', sans-serif; line-height: 1; text-shadow: 0 1px 1px rgb(0 80 38 / 45%); }
 .prime-splash-connection-flow { position: absolute; z-index: 2; left: 36.2%; top: 49%; width: 27.8%; height: 5%; display: flex; align-items: center; justify-content: space-evenly; pointer-events: none; }
 .prime-splash-connection-flow i { width: 6%; aspect-ratio: 1; border-radius: 50%; background: #147be8; animation: prime-splash-packet 1.5s ease-in-out infinite; }

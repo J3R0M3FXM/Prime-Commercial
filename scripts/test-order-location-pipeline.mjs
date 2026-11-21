@@ -14,3 +14,14 @@ assert.equal(requests.some(url=>url.includes('mapbox')),false,'Mapbox only displ
 ipCoordinates=false;const missing={clientObservedIp:'203.0.113.10'};await enrich(missing,{});assert.equal(missing.ipLocation.latitude,null);assert.equal(missing.ipLocation.longitude,null);assert.equal(missing.ipLocation.reverseGeocodedAddress,'');
 const checkout=readFileSync('app/components/checkout-modal.tsx','utf8');assert.match(checkout,/getLatestPhysicalGpsLocation\(\)/);assert.match(checkout,/clientObservedIp,/);assert.match(checkout,/deviceLocationObservation: deviceLocationObservation\?\.source === 'Precise GPS'/);
 console.log('PASS: IPLocate approximate coordinates, TomTom IP/GPS address enrichment, missing coordinates, and cached launch GPS checkout capture.');
+
+const startupSource=readFileSync('tgcloud/lib/startup-location.js','utf8');
+const startupFunctions=startupSource.slice(startupSource.indexOf('async function settingKey(')).replace('export async function','async function');
+const enrichStartup=new Function('db','systemSettings','eq','fetch','text',startupFunctions+';return enrichStartupLocationSignals;')(db,{},()=>null,fetch,(value,max=500)=>String(value??'').slice(0,max));
+ipCoordinates=true;
+const launch={clientObservedIp:'203.0.113.10',deviceLocationObservation:{lat:14.7,lon:121.2}};
+await enrichStartup(launch,{});
+assert.equal(launch.ipLocation.provider,'IPLocate');
+assert.equal(launch.deviceLocationObservation.reverseGeocodingProvider,'TomTom');
+assert.equal(launch.ipLocation.reverseGeocodingProvider,'TomTom');
+console.log('PASS: startup IPLocate and TomTom enrichment uses captured launch IP and GPS.');
