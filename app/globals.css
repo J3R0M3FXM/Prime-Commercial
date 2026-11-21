@@ -2996,3 +2996,15 @@ body,
   font: 600 11px/1 'Lato', sans-serif !important;
 }
 #mobile-portrait-viewport .prime-shopfront-shell .prime-checkout__header > div:first-child { min-width: 0 !important; flex: 1 1 auto !important; }
+#mobile-portrait-viewport .prime-shopfront-global-header {
+  box-shadow: 0 2px 6px rgb(15 23 42 / 10%) !important;
+}
+#mobile-portrait-viewport .prime-shopfront-global-header .prime-queue-monitor {
+  box-shadow: none !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell :is(.prime-account, .prime-cart, .prime-order-history, .prime-media-gallery) {
+  background: #fff !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell :is(.prime-account > div, .prime-cart > div, .prime-order-history > div, .prime-media-gallery) {
+  box-shadow: none !important;
+}

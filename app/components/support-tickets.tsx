@@ -88,8 +88,8 @@ export default function SupportTickets({ admin = false, onBack }: { admin?: bool
   return <section className="prime-page-shell prime-support" data-support-view={admin ? "admin" : "customer"}>
     <PrimePageHeading icon={<Headphones />} title={admin ? "Support Inbox" : "Support"} actions={<>
       {(selectedId || creating) && <button type="button" aria-label="Back" disabled={busy} onClick={back}><ArrowLeft /></button>}
-      {onBack && <button type="button" aria-label="Close support" disabled={busy} onClick={onBack}><X /></button>}
       <button type="button" aria-label="Refresh support" disabled={busy || loading} onClick={() => void load()}><RefreshCw className={loading ? "animate-spin" : ""} /></button>
+      {onBack && <button type="button" aria-label="Close support" disabled={busy} onClick={onBack}><X /></button>}
     </>} />
     <nav className="support-two-fields" aria-label="Support Sections"><button type="button" className="support-secondary" disabled={busy} aria-pressed={adminTab==='faqs'} onClick={()=>setAdminTab('faqs')}>FAQ</button><button type="button" className="support-secondary" disabled={busy} aria-pressed={adminTab==='tickets'} onClick={()=>setAdminTab('tickets')}>Tickets</button></nav>
     {adminTab==='faqs'?<div className="support-body"><SupportFaqs admin={admin}/></div>:<div className="support-body">
