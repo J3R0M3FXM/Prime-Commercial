@@ -7,7 +7,7 @@
   "vars": {
     "TELEGRAM_BOT_USERNAME": "primenetworkphbot",
     "ADMIN_TELEGRAM_USER_IDS": "REPLACE_WITH_ADMIN_TELEGRAM_IDS",
-    "AUTH_CALLBACK_URL": "https://auth.codespacelabs.online/callback",
+    "AUTH_CALLBACK_URL": "https://auth.codespacelabs.online/api/telegram/callback",
     "NATIVE_CALLBACK_URL": "prime://auth/callback"
   }
 }

@@ -62,7 +62,7 @@ async function verifySession(session, env) {
 
 function loginPage(env) {
   const bot = String(env.TELEGRAM_BOT_USERNAME || 'primenetworkphbot').replace(/^@/, '');
-  const callback = String(env.AUTH_CALLBACK_URL || 'https://auth.codespacelabs.online/callback');
+  const callback = String(env.AUTH_CALLBACK_URL || 'https://auth.codespacelabs.online/api/telegram/callback');
   return new Response(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRIME sign in</title><script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="${bot}" data-size="large" data-auth-url="${callback}" data-request-access="write"></script>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
 
@@ -72,7 +72,7 @@ export default {
     if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
     if (url.pathname === '/health') return json({ ok: true, service: 'prime-auth' });
     if (url.pathname === '/login') return loginPage(env);
-    if (url.pathname === '/callback') {
+    if (url.pathname === '/callback' || url.pathname === '/api/telegram/callback') {
       const verified = await verifyTelegramLogin(url, env);
       if (!verified || !env.AUTH_CODES || !isAdminTelegramUser(verified.tgUserId, env)) return new Response('Admin authentication failed.', { status: 401 });
       const code = crypto.randomUUID().replaceAll('-', '');
