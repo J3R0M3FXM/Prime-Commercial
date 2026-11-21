@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 const sqlite=new DatabaseSync(':memory:');
 sqlite.exec(`CREATE TABLE support_tickets(id TEXT PRIMARY KEY,owner_telegram_id TEXT,customer_name TEXT,request_key TEXT,subject TEXT,category TEXT,order_id TEXT,status TEXT,messages TEXT,version INTEGER,customer_seen_version INTEGER,staff_seen_version INTEGER,last_message TEXT,created_at INTEGER,updated_at INTEGER);
-CREATE TABLE orders(id TEXT PRIMARY KEY,tg_user_id TEXT);
-INSERT INTO orders VALUES('own-order','111'),('foreign-order','222');`);
+CREATE TABLE orders(id TEXT PRIMARY KEY,tg_user_id TEXT,order_number TEXT);
+INSERT INTO orders VALUES('own-order','111','PRIME-1001'),('foreign-order','222','PRIME-2002');`);
 const db={async get(sql,params={}){return sqlite.prepare(sql).get(params);},async all(sql,params={}){return sqlite.prepare(sql).all(params);},async run(sql,params={}){if(/^CREATE /i.test(sql)){sqlite.exec(sql);return {rowsAffected:0};}return {rowsAffected:Number(sqlite.prepare(sql).run(params).changes)};}};
 class EndpointError extends Error {constructor(message,{code}){super(message);this.code=code;}}
 const load=(file,names,args={})=>new Function('db','EndpointError',...Object.keys(args),readFileSync(file,'utf8').replace(/^import[^\n]*\n/gm,'').replace(/export default async function/,'async function handler').replace(/export /g,'')+'\nreturn {'+names.join(',')+'};')(db,EndpointError,...Object.values(args));
@@ -12,6 +12,7 @@ const {handleSupport}=load('tgcloud/lib/support.js',['handleSupport']);
 const customer={id:111,first_name:'Test'},other={id:222},staff={id:333};
 const input={action:'create',requestId:'test-support-00001',subject:'Payment Help',body:'Please review this receipt.',category:'payment',orderId:'own-order'};
 const created=(await handleSupport(input,customer)).ticket;
+assert.equal(created.orderNumber,'PRIME-1001');
 assert.equal((await handleSupport(input,customer)).ticket.id,created.id);
 await assert.rejects(handleSupport({...input,body:'Changed request'},customer),e=>e.code==='REQUEST_CONFLICT');
 await assert.rejects(handleSupport({...input,requestId:'test-support-00002',orderId:'foreign-order'},customer),e=>e.code==='NOT_FOUND');

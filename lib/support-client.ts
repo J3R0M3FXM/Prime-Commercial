@@ -2,7 +2,7 @@ import { callServerless } from "./telegram-serverless-client";
 
 export type TicketStatus = "open" | "waiting_customer" | "resolved" | "closed";
 export type SupportMessage = { id: string; role: "customer" | "staff"; body: string; type: "message" | "status"; createdAt: number };
-export type SupportTicket = { id: string; subject: string; category: string; orderId: string; status: TicketStatus; version: number; lastMessage: string; createdAt: number; updatedAt: number; unread: boolean; customerName?: string; messages?: SupportMessage[] };
+export type SupportTicket = { id: string; subject: string; category: string; orderId: string; orderNumber?: string; status: TicketStatus; version: number; lastMessage: string; createdAt: number; updatedAt: number; unread: boolean; customerName?: string; messages?: SupportMessage[] };
 export type TicketPage = { tickets: SupportTicket[]; total: number; unread: number; nextCursor: { updatedAt: number; id: string } | null };
 export const ticketStatusLabels: Record<TicketStatus, string> = { open: "Open", waiting_customer: "Awaiting Your Reply", resolved: "Resolved", closed: "Closed" };
 export const supportPreview = () => import.meta.env?.VITE_UI_PREVIEW === "1";
