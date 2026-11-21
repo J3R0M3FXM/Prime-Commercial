@@ -41,8 +41,11 @@ await act(async()=>root.render(createElement(splash,{title:'ADMIN ACCESS',subtit
 assert.ok(document.body.classList.contains('splash-active'));
 assert.ok(document.querySelector('img[src="/prime-splash-secure-connection.svg"]'),'The splash uses the animated secure connection artwork');
 const splashSvg = new JSDOM(readFileSync('public/prime-splash-secure-connection.svg','utf8'), { contentType: 'image/svg+xml' }).window.document;
-assert.equal(splashSvg.querySelectorAll('animateMotion').length,3,'All three lanes carry signals');
-assert.ok(splashSvg.querySelector('animateMotion[keyPoints="1;0"]'),'The middle lane carries signals back to the phone');
+assert.equal(splashSvg.querySelectorAll('.connection').length,1,'One dotted connection links the devices');
+assert.ok(splashSvg.querySelector('.shield'),'The center uses a shield and lock');
+assert.equal(splashSvg.querySelector('.halo'),null,'No circular device halo');
+assert.equal(splashSvg.querySelector('circle[r="121"]'),null,'No enclosing phone ring');
+assert.match(splashSvg.querySelector('style').textContent,/animation:flow[^}]*alternate/,'Dots move back and forth');
 assert.equal(splashSvg.querySelectorAll('.light[fill="#43ff91"]').length,5,'Server lights are mostly green');
 for (const color of ['#ff625d','#ffad38','#46baff']) assert.ok(splashSvg.querySelector(`.light[fill="${color}"]`));
 assert.match(splashSvg.querySelector('style').textContent,/prefers-reduced-motion:reduce/);
