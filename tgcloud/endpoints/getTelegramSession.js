@@ -3,7 +3,27 @@ import { eq } from 'sdk/db';
 import { customers } from '../schema.js';
 import { isAdminUser } from '../lib/auth.js';
 import { saveCustomerFingerprint } from '../lib/fingerprints.js';
-import { recordAccountChanges } from '../lib/account-history.js';
+
+function cleanHistoryValue(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text || null;
+}
+
+async function recordAccountChanges({ customerId, telegramUserId, changes, eventType = 'profile_changed', details = {} }) {
+  const rows = (Array.isArray(changes) ? changes : []).filter(change => change?.fieldName)
+    .map(change => ({ customerId: String(customerId), telegramUserId: String(telegramUserId), eventType,
+      fieldName: String(change.fieldName), previousValue: cleanHistoryValue(change.previousValue),
+      nextValue: cleanHistoryValue(change.nextValue), details }));
+  for (const row of rows) await db.run(`INSERT INTO account_history
+    (id,customer_id,telegram_user_id,event_type,field_name,previous_value,next_value,details,created_at)
+    VALUES (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(6))),
+      :customer_id,:telegram_user_id,:event_type,:field_name,:previous_value,:next_value,json(:details),unixepoch())`, {
+    ':customer_id': row.customerId, ':telegram_user_id': row.telegramUserId, ':event_type': row.eventType,
+    ':field_name': row.fieldName, ':previous_value': row.previousValue, ':next_value': row.nextValue,
+    ':details': JSON.stringify(row.details),
+  });
+}
 
 function memberId() {
   if (!globalThis.crypto?.getRandomValues) throw new Error('Secure random generation is unavailable.');
