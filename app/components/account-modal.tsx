@@ -62,6 +62,7 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
   const conversionBusyRef = useRef(false);
   const transferBusyRef = useRef(false);
   const [telegramPhoto, setTelegramPhoto] = useState('');
+  const [telegramInitPhoto, setTelegramInitPhoto] = useState('');
   const [photoChecked, setPhotoChecked] = useState(false);
   const photoKeyRef = useRef('');
   const c = data?.customer;
@@ -117,6 +118,12 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
     if (!isOpen || staffCustomerId || import.meta.env.VITE_UI_PREVIEW === '1') return;
     let active = true;
     let inFlight = false;
+    const webApp = (window as any).Telegram?.WebApp;
+    const initPhoto = String(webApp?.initDataUnsafe?.user?.photo_url || '').trim();
+    photoKeyRef.current = '';
+    setTelegramPhoto('');
+    setPhotoChecked(false);
+    setTelegramInitPhoto(/^https:\/\//i.test(initPhoto) ? initPhoto : '');
     const refreshPhoto = async () => {
       if (!active || inFlight || document.visibilityState === 'hidden') return;
       inFlight = true;
@@ -131,7 +138,6 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
       } finally { inFlight = false; }
     };
     const onVisible = () => { if (document.visibilityState === 'visible') void refreshPhoto(); };
-    const webApp = (window as any).Telegram?.WebApp;
     void refreshPhoto();
     const timer = window.setInterval(() => void refreshPhoto(), 30_000);
     document.addEventListener('visibilitychange', onVisible);
@@ -280,9 +286,9 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
                   <div className="flex min-w-0 items-center gap-2.5">
                     <div className="prime-account__avatar relative group">
                       <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm flex items-center justify-center">
-                        {(photoChecked ? telegramPhoto : c?.telegramPhotoUrl || c?.photoUrl) ? (
+                        {(photoChecked ? telegramPhoto : c?.telegramPhotoUrl || c?.photoUrl || telegramInitPhoto) ? (
                           <img 
-                            src={photoChecked ? telegramPhoto : c?.telegramPhotoUrl || c?.photoUrl}
+                            src={photoChecked ? telegramPhoto : c?.telegramPhotoUrl || c?.photoUrl || telegramInitPhoto}
                             alt={c.tgName || 'User'} 
                             className="w-full h-full object-cover"
                             onError={() => { setTelegramPhoto(''); setPhotoChecked(true); }}
