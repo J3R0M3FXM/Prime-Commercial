@@ -489,10 +489,29 @@ type ServerlessProduct = {
   [key: string]: unknown;
 };
 
+let catalogRowsRequest: Promise<ServerlessProduct[]> | undefined;
+async function readCatalogRows(): Promise<ServerlessProduct[]> {
+  if (catalogRowsRequest) return catalogRowsRequest;
+  const pending = (async () => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const rows = await callServerless<ServerlessProduct[]>('getCatalog', {}, 20_000);
+        if (!Array.isArray(rows)) throw new Error('The product catalog response was invalid.');
+        return rows;
+      } catch (error) {
+        if (attempt > 0 || !isSessionConnectionError(error)) throw error;
+        await new Promise(resolve => setTimeout(resolve, 350));
+      }
+    }
+  })();
+  const tracked = pending.finally(() => { if (catalogRowsRequest === tracked) catalogRowsRequest = undefined; });
+  catalogRowsRequest = tracked;
+  return tracked;
+}
+
 /** Read the public catalog and turn Telegram media references into browser URLs. */
 export async function getServerlessCatalog(options: { resolveMedia?: boolean } = {}): Promise<ServerlessProduct[]> {
-  const rows = await callServerless<ServerlessProduct[]>('getCatalog', {}, 20_000);
-  if (!Array.isArray(rows)) throw new Error('The product catalog response was invalid.');
+  const rows = await readCatalogRows();
   const resolveMedia = options.resolveMedia !== false;
   const safeMedia = async (reference: unknown) => {
     const raw = String(reference || '').trim();

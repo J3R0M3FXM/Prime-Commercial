@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useCart } from './cart-context';
+import TelegramMediaImage from './telegram-media-image';
 import { X, Check, Minus, Plus, ShoppingCart, Info, ChevronDown } from 'lucide-react';
 import { formatPHP } from "@/lib/currency";
 
@@ -156,14 +157,12 @@ export default function ProductModal({ product, onClose }: { product: any, onClo
           <div className="mt-2 flex justify-center">
             <div key={variantFeedbackTick} className={`relative aspect-square w-full max-w-[300px] ${variantFeedbackTick > 0 ? "variant-selection-feedback" : ""} overflow-hidden rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center`}>
               {renderGlossyChip()}
-              <img
+              <TelegramMediaImage
+                fallbackSrc="/product-image-unavailable.svg"
                 src={selectedVariant?.imageUrl || fallbackImage}
                 alt={selectedVariant ? `${product.name} - ${selectedVariant.name}` : product.name}
                 className={`max-w-full max-h-full w-full h-full object-contain ${isOutOfStock ? "opacity-60 grayscale" : ""}`}
-                onError={(e) => {
-                  const target = e.currentTarget as HTMLImageElement;
-                  if (target.src !== fallbackImage) target.src = fallbackImage;
-                }}
+
               />
             </div>
           </div>

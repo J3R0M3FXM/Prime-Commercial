@@ -1,7 +1,7 @@
 "use client";
 import { readCheckoutDraft, clearCheckoutDraft } from '@/lib/checkout-draft';
 
-import { getServerlessCatalog, callServerless } from "@/lib/telegram-serverless-client";
+import { getServerlessCatalog } from "@/lib/telegram-serverless-client";
 
 import React, { useEffect, useState, useMemo, Component, ErrorInfo, ReactNode } from 'react';
 import { useCart } from './cart-context';
@@ -80,13 +80,16 @@ class CartErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
 type CartDrawerProps = { isOpen: boolean; onClose: () => void; onCheckoutOpenChange?: (open: boolean) => void; liveQueue?: { averageReadyMinutes: number | null; ordersInQueue: number; ordersInProcessing: number } | null; onViewOrder?: (order: any) => void };
 function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange, liveQueue, onViewOrder }: CartDrawerProps) {
   const { cart, removeFromCart, updateQuantity, toggleSelection, clearCheckoutItems, cartTotal, cartCount, syncWithServerData } = useCart();
-  const [activeCharges, setActiveCharges] = useState<any[]>([]);
-  const [loadingCharges, setLoadingCharges] = useState(false);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [inventoryError, setInventoryError] = useState("");
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutItems, setCheckoutItems] = useState<any[]>([]);
 
   useEffect(() => {
-    const draft = readCheckoutDraft(localStorage.getItem('prime_customer_id') || '');
+    let owner = '';
+    try { owner = localStorage.getItem('prime_customer_id') || ''; } catch {}
+    const draft = readCheckoutDraft(owner);
     if (draft) {
       setCheckoutItems(draft.items);
       setIsCheckoutOpen(true);
@@ -95,19 +98,18 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange, liveQueue, o
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      // Read current cart data and applicable charges from Telegram Serverless.
-      setLoadingCharges(true);
-      Promise.all([
-        getServerlessCatalog({ resolveMedia: false }),
-        callServerless<any[]>('getPublicCharges'),
-      ]).then(([products, charges]) => {
-        if (Array.isArray(products) && typeof syncWithServerData === 'function') syncWithServerData(products);
-        if (Array.isArray(charges)) setActiveCharges(charges);
-      }).catch(err => console.warn("Failed to refresh cart data", err))
-        .finally(() => setLoadingCharges(false));
-    }
-  }, [isOpen]); 
+    if (!isOpen) return;
+    let cancelled = false;
+    setInventoryLoading(true);
+    setInventoryError('');
+    // Cart needs stock and prices only. Checkout loads its own authoritative charges.
+    void getServerlessCatalog({ resolveMedia: false }).then(products => {
+      if (!cancelled && typeof syncWithServerData === 'function') syncWithServerData(products);
+    }).catch(error => {
+      if (!cancelled) setInventoryError(error instanceof Error ? error.message : 'Could not refresh cart inventory.');
+    }).finally(() => { if (!cancelled) setInventoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [isOpen, refreshAttempt]);
 
   const safeCart = Array.isArray(cart) ? cart : [];
   const selectedItems = useMemo(() => {
@@ -127,6 +129,8 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange, liveQueue, o
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors cursor-pointer" aria-label="Close cart"><X className="w-4 h-4" /></button>
         </>} />
 
+        {inventoryLoading && <p role="status" className="px-3 py-2 font-mono text-xs text-slate-500">Updating prices and stock…</p>}
+        {inventoryError && <div role="alert" className="mx-3 my-2 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><p>Could not refresh prices and stock. Your cart has been kept.</p><button type="button" className="mt-2 min-h-9 font-bold underline" onClick={() => setRefreshAttempt(attempt => attempt + 1)}>Retry cart refresh</button></div>}
         {/* Cart Items */}
         <div className="overflow-y-auto p-2.5 space-y-2 max-h-[calc(100vh-250px)]">
           {safeCart.length === 0 ? (
@@ -209,7 +213,7 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange, liveQueue, o
             </div>
 
             <button 
-              disabled={selectedItems.length === 0}
+              disabled={selectedItems.length === 0 || inventoryLoading || Boolean(inventoryError)}
               onClick={() => {
                 setCheckoutItems(selectedItems);
                 setIsCheckoutOpen(true);

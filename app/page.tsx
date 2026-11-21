@@ -6,6 +6,7 @@ import { prefersPosLaunch } from '@/lib/pos-launch-preference';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProductModal from "./components/product-modal";
+import TelegramMediaImage from "./components/telegram-media-image";
 import CartDrawer from "./components/cart-drawer";
 import OrderHistoryModal from "./components/order-history-modal";
 import AccountModal from "./components/account-modal";
@@ -90,7 +91,7 @@ export default function Shopfront() {
     }
     setCatalogLoading(true);
     try {
-      const latest = await getServerlessCatalog();
+      const latest = await getServerlessCatalog({ resolveMedia: false });
       setProducts(latest);
       setCatalogError("");
       setSelectedProduct((selected: any) => selected
@@ -391,7 +392,9 @@ export default function Shopfront() {
       <main className={`${activeTab !== "shop" ? "hidden" : ""} flex-1 px-3 sm:px-3.5 pt-[4.8px] pb-[4.8px] sm:pt-[5.6px] sm:pb-[5.6px] w-full`}>
 
         {/* Product Grid */}
-        {catalogError && products.length === 0 ? (
+        {catalogLoading && products.length === 0 ? (
+          <div role="status" className="py-20 text-center text-slate-500"><Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin" aria-hidden="true" /><p className="font-mono text-sm">Loading products…</p></div>
+        ) : catalogError && products.length === 0 ? (
           <div role="alert" className="py-16 px-4 text-center">
             <AlertCircle className="w-12 h-12 mx-auto text-amber-500 mb-4" />
             <h2 className="text-xl font-heading font-bold text-gray-900 mb-2">Could Not Load Products</h2>
@@ -445,7 +448,8 @@ export default function Shopfront() {
                   }}
                 >
                   <div className="prime-product-card__media relative aspect-[4/3] overflow-hidden bg-gray-50 border-b border-gray-100">
-                    <img
+                    <TelegramMediaImage
+                      fallbackSrc="/product-image-unavailable.svg"
                       src={p.imageUrl || "/product-image-unavailable.svg"}
                       alt={p.name}
                       className={`w-full h-full object-contain ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}

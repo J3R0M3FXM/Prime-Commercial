@@ -37,6 +37,7 @@
 <path d="M-50 284 Q8 220 66 278 Q96 261 120 270 C175 219 247 236 272 287 Q309 267 344 291 C390 239 450 250 478 298 Q514 280 540 299 C583 240 654 242 689 288 Q730 264 764 291 C806 240 866 245 900 280 Q950 226 1045 260 V420 H-50Z"/>
 </g>
 <rect x="0" y="340" width="1000" height="60" fill="url(#bottom-fade)"/>
+<g transform="translate(28.25 10.35) scale(.95)">
 <ellipse cx="312" cy="329" rx="74" ry="10" fill="#6285a0" opacity=".26" filter="url(#shadow)"/>
 <ellipse cx="755" cy="315" rx="141" ry="11" fill="#4a7398" opacity=".3" filter="url(#shadow)"/>
 <path class="connection" d="M388 207 H625" fill="none" stroke="#16c76a" stroke-width="16" stroke-linecap="round"/>
@@ -58,4 +59,5 @@
 <path d="M486 204v-11a14 14 0 0 1 28 0v11" fill="none" stroke="url(#lock-fill)" stroke-width="5.5"/>
 <rect x="478" y="201" width="44" height="34" rx="6" fill="url(#lock-fill)"/>
 <circle cx="500" cy="215" r="4" fill="#fff"/><path d="M500 217v7" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+</g>
 </g></svg>
