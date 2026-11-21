@@ -1,6 +1,6 @@
 import { db, EndpointError } from 'sdk';
 import { desc, eq, or } from 'sdk/db';
-import { customers, orders, pointTransactions } from '../schema.js';
+import { accountHistory, customers, orders, pointTransactions } from '../schema.js';
 import { requireAdmin } from '../lib/auth.js';
 
 function iso(value) {
@@ -235,6 +235,13 @@ export default async function (input = {}, ctx) {
     courierName: orders.courierName,
   }).from(orders).where(or(...owned)).orderBy(desc(orders.createdAt)).limit(100).all();
   const dossier = normalizedCustomer(row, customerOrders);
+  const history = await db.select().from(accountHistory)
+    .where(eq(accountHistory.customerId, row.id)).orderBy(desc(accountHistory.createdAt)).limit(200).all();
+  dossier.accountHistory = history.map(item => ({
+    id: String(item.id || ''), eventType: String(item.eventType || ''), fieldName: String(item.fieldName || ''),
+    previousValue: item.previousValue == null ? null : String(item.previousValue),
+    nextValue: item.nextValue == null ? null : String(item.nextValue), createdAt: iso(item.createdAt),
+  }));
   const customerTransactions = await db.select().from(pointTransactions)
     .where(eq(pointTransactions.userId, String(row.id)))
     .orderBy(desc(pointTransactions.createdAt)).limit(2000).all();

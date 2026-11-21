@@ -37,6 +37,18 @@ function compactDate(value?: string) {
   });
 }
 
+function accountChangeLabel(item: any) {
+  if (item.eventType === "account_created") return "Account created";
+  const labels: Record<string, string> = { display_name: "Display name", username: "Username", profile_photo: "Profile photo", phone_number: "Phone number", account_status: "Account status" };
+  return `${labels[item.fieldName] || item.fieldName || "Account"} changed`;
+}
+
+function accountChangeValue(item: any) {
+  if (item.fieldName === "profile_photo") return item.nextValue ? "Updated" : "Removed";
+  if (item.fieldName === "account") return item.nextValue || "—";
+  return item.nextValue || "Not set";
+}
+
 export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: () => void }) {
   const [authorized, setAuthorized] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
@@ -170,6 +182,14 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
       <button type="button" className="serverless-action customer-profiles__account-button" onClick={() => setAccountOpen(value => !value)}>{accountOpen ? "Close account overview" : "View full account overview"}</button>
       {accountOpen && <div className="admin-customer-account"><AccountModal key={selected.id} isOpen onClose={() => setAccountOpen(false)} staffCustomerId={selected.id} /></div>}
       <details className="serverless-disclosure"><summary>Staff Account Records</summary><div className="serverless-disclosure__body serverless-record-list">
+      <details className="serverless-disclosure"><summary>Account changes ({selected.accountHistory?.length || 0})</summary><div className="serverless-disclosure__body serverless-record-list">
+        {(selected.accountHistory || []).map((item: any) => <article key={item.id} className="serverless-record p-2">
+          <div className="flex items-center justify-between gap-2"><strong className="text-xs">{accountChangeLabel(item)}</strong><time className="text-[10px] text-slate-500">{compactDate(item.createdAt)}</time></div>
+          {item.fieldName !== "account" && <p className="mt-1 text-[11px] text-slate-600">{accountChangeValue(item)}</p>}
+        </article>)}
+        {!selected.accountHistory?.length && <p className="text-xs text-slate-500">No recorded account changes yet.</p>}
+        <p className="px-1 text-[10px] text-slate-500">Append-only verified Telegram profile history. Values are intentionally minimized to keep this record readable.</p>
+      </div></details>
       <details className="serverless-disclosure"><summary>Store Credit history ({selected.storeCreditTransactions?.length || 0})</summary><div className="serverless-disclosure__body serverless-record-list">
         {(selected.storeCreditTransactions || []).map((transaction: any) => {
           const amount = Number(transaction.amount || 0);

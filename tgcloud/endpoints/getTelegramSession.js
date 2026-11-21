@@ -3,6 +3,7 @@ import { eq } from 'sdk/db';
 import { customers } from '../schema.js';
 import { isAdminUser } from '../lib/auth.js';
 import { saveCustomerFingerprint } from '../lib/fingerprints.js';
+import { recordAccountChanges } from '../lib/account-history.js';
 
 function memberId() {
   if (!globalThis.crypto?.getRandomValues) throw new Error('Secure random generation is unavailable.');
@@ -33,17 +34,41 @@ export default async function (input = {}, ctx) {
     tgUserId: telegramId,
     tgName: fullName,
     tgUsername: String(user.username || ''),
+    telegramPhotoKey: String(user.photo_url || '').trim() || null,
     primeMemberId: existing?.primeMemberId || memberId(),
     updatedAt: now,
   };
 
+  const changes = existing ? [
+    ['display_name', existing.tgName, values.tgName],
+    ['username', existing.tgUsername, values.tgUsername],
+    ['profile_photo', existing.telegramPhotoKey, values.telegramPhotoKey],
+  ] : [
+    ['account', null, 'created'],
+    ['display_name', null, values.tgName],
+    ['username', null, values.tgUsername],
+    ['profile_photo', null, values.telegramPhotoKey],
+  ];
+
   const [customer] = await db.insert(customers).values(values).onConflictDoUpdate({
     target: customers.tgUserId,
-    set: { tgName: values.tgName, tgUsername: values.tgUsername, updatedAt: now },
+    set: { tgName: values.tgName, tgUsername: values.tgUsername, telegramPhotoKey: values.telegramPhotoKey, updatedAt: now },
   }).returning().run();
 
   if (!customer || customer.isBanned === true) {
     return { authenticated: false, error: 'Unable to initialize this customer account.' };
+  }
+
+  try {
+    await recordAccountChanges({
+      customerId: customer.id, telegramUserId: telegramId,
+      eventType: existing ? 'profile_changed' : 'account_created',
+      changes: changes.filter(([, previousValue, nextValue]) => String(previousValue || '') !== String(nextValue || ''))
+        .map(([fieldName, previousValue, nextValue]) => ({ fieldName, previousValue, nextValue })),
+      details: { source: 'verified_telegram_session' },
+    });
+  } catch (error) {
+    console.warn('[getTelegramSession] account history persistence failed:', error?.message || error);
   }
 
   let latestFingerprint = null;

@@ -74,6 +74,7 @@ export const products = table('products', {
 export const customers = table('customers', {
   id: text('id').primaryKey().default(uuidDefault()), tgUserId: text('tg_user_id'),
   tgName: text('tg_name'), tgUsername: text('tg_username'), phoneNumber: text('phone_number'),
+  telegramPhotoKey: text('telegram_photo_key'),
   primeMemberId: text('prime_member_id'), points: numeric('points').default(0),
   storeCredits: numeric('store_credits').default(0), referralCode: text('referral_code'),
   storeCreditsOperationId: text('store_credits_operation_id'),
@@ -94,6 +95,17 @@ export const customers = table('customers', {
   customersMemberIdx: index('idx_customers_prime_member_id').on(t.primeMemberId),
   customersReferralUnique: uniqueIndex('customers_referral_code_key').on(t.referralCode),
   customersReferralIdx: index('idx_customers_referral_code').on(t.referralCode),
+}));
+
+// Append-only customer identity changes. Endpoints may insert records but must never update or delete them.
+export const accountHistory = table('account_history', {
+  id: text('id').primaryKey().default(uuidDefault()), customerId: text('customer_id').notNull(),
+  telegramUserId: text('telegram_user_id').notNull(), eventType: text('event_type').notNull(),
+  fieldName: text('field_name').notNull(), previousValue: text('previous_value'), nextValue: text('next_value'),
+  details: json('details').notNull().default({}), createdAt: requiredCreatedAt(),
+}, (t) => ({
+  customerCreatedIdx: index('account_history_customer_created_idx').on(t.customerId, t.createdAt),
+  telegramCreatedIdx: index('account_history_telegram_created_idx').on(t.telegramUserId, t.createdAt),
 }));
 
 export const orders = table('orders', {
