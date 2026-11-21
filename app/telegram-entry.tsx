@@ -22,7 +22,13 @@ import { Capacitor } from "@capacitor/core";
 import VideoGalleryModal from "./components/video-gallery-modal";
 
 function MiniApp() {
-  const [path, setPath] = useState(() => window.location.pathname);
+  const [path, setPath] = useState(() => {
+    if (Capacitor.isNativePlatform() && window.location.pathname === "/") {
+      window.history.replaceState({}, "", "/admin");
+      return "/admin";
+    }
+    return window.location.pathname;
+  });
   const [offlineMedia] = useState(() => !navigator.onLine);
 
   const timedStartup = !offlineMedia && import.meta.env.VITE_UI_PREVIEW !== '1' && !path.startsWith('/payment/');
