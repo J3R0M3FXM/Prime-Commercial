@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { callServerless } from '@/lib/telegram-serverless-client';
+import PrimePageHeading from './prime-page-heading';
 import './account-modal.css';
 
 interface AccountModalProps {
@@ -254,31 +255,10 @@ export default function AccountModal({ isOpen, onClose, onSelectOrder, staffCust
     <div id="account-modal-overlay" className="prime-account w-full bg-gray-50 flex justify-center py-[4.8px]">
       <div className="w-full max-w-[430px] min-h-[calc(100vh-120px)] bg-white shadow-sm border-x border-slate-200 flex flex-col overflow-hidden">
         {/* Modal Header */}
-        <div className="prime-account__heading prime-page-heading px-3.5 py-2.5 border-b border-gray-200 flex items-center justify-between bg-white sticky top-0 z-10">
-          <div className="flex items-center gap-2">
-            <User className="w-5 h-5 text-gray-900" />
-            <h2 className="text-base font-normal uppercase text-gray-900 tracking-wide">
-              {staffCustomerId ? 'Customer Account' : 'Your Account'}
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={fetchAccount}
-              disabled={loading}
-              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-              title="Refresh Account Data"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-            <button
-              id="close-account-modal-btn"
-              onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+        <PrimePageHeading icon={<User />} title={staffCustomerId ? 'CUSTOMER ACCOUNT' : 'MY ACCOUNT'} actions={<>
+          <button type="button" onClick={fetchAccount} disabled={loading} aria-label="Refresh account" title="Refresh account"><RefreshCw className={loading ? 'animate-spin' : ''} /></button>
+          <button type="button" id="close-account-modal-btn" onClick={onClose} aria-label="Close account" title="Close account"><X /></button>
+        </>} />
 
         {/* Modal Body */}
         <div className="prime-account__body flex-1 overflow-y-auto p-2.5 space-y-3">

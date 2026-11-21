@@ -508,7 +508,7 @@ export default function Shopfront() {
         )}
       </main>
 
-      {activeTab === "support" && <SupportTickets />}
+      {activeTab === "support" && <SupportTickets onBack={() => setActiveTab("shop")} />}
 
       {(activeTab === "cart" || isCheckoutActive) && (
         <CartDrawer

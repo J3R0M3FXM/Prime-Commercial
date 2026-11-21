@@ -16,7 +16,7 @@ const result=await build({input:'app/components/support-tickets.tsx',platform:'n
     if(id==='lucide-react')return '\0icons';
     if(id.includes('telegram-serverless-client'))return '\0bridge';
     if(id.endsWith('.css'))return '\0css';
-  },load(id){if(id==='\0bridge')return 'export const callServerless=(name,input)=>globalThis.__supportTabsCall(name,input);';if(id==='\0icons')return 'export const ArrowLeft=()=>null,Headphones=()=>null,Loader2=()=>null,Plus=()=>null,RefreshCw=()=>null,Send=()=>null;';if(id==='\0css')return '';}}],output:{format:'esm'}});
+  },load(id){if(id==='\0bridge')return 'export const callServerless=(name,input)=>globalThis.__supportTabsCall(name,input);';if(id==='\0icons')return 'export const ArrowLeft=()=>null,Headphones=()=>null,Loader2=()=>null,Plus=()=>null,RefreshCw=()=>null,Send=()=>null,X=()=>null;';if(id==='\0css')return '';}}],output:{format:'esm'}});
 const Component=(await import('data:text/javascript;base64,'+Buffer.from(result.output[0].code).toString('base64'))).default;
 const {createElement,act}=await import('react');
 const {createRoot}=await import('react-dom/client');

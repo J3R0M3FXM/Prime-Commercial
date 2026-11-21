@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Headphones, Loader2, Plus, RefreshCw, Send } from "lucide-react";
+import { ArrowLeft, Headphones, Loader2, Plus, RefreshCw, Send, X } from "lucide-react";
 import PrimePageHeading from "./prime-page-heading";
 import { callServerless } from "@/lib/telegram-serverless-client";
 import { newSupportRequestId, requestSupport, supportPreview, ticketStatusLabels, type SupportTicket, type TicketPage, type TicketStatus } from "@/lib/support-client";
@@ -87,7 +87,8 @@ export default function SupportTickets({ admin = false, onBack }: { admin?: bool
   const statusLabel = (status: TicketStatus) => admin && status === "waiting_customer" ? "Awaiting Customer" : ticketStatusLabels[status];
   return <section className="prime-page-shell prime-support" data-support-view={admin ? "admin" : "customer"}>
     <PrimePageHeading icon={<Headphones />} title={admin ? "Support Inbox" : "Support"} actions={<>
-      {(selectedId || creating || onBack) && <button type="button" aria-label="Back" disabled={busy} onClick={() => selectedId || creating ? back() : onBack?.()}><ArrowLeft /></button>}
+      {(selectedId || creating) && <button type="button" aria-label="Back" disabled={busy} onClick={back}><ArrowLeft /></button>}
+      {onBack && <button type="button" aria-label="Close support" disabled={busy} onClick={onBack}><X /></button>}
       <button type="button" aria-label="Refresh support" disabled={busy || loading} onClick={() => void load()}><RefreshCw className={loading ? "animate-spin" : ""} /></button>
     </>} />
     <nav className="support-two-fields" aria-label="Support Sections"><button type="button" className="support-secondary" disabled={busy} aria-pressed={adminTab==='faqs'} onClick={()=>setAdminTab('faqs')}>FAQ</button><button type="button" className="support-secondary" disabled={busy} aria-pressed={adminTab==='tickets'} onClick={()=>setAdminTab('tickets')}>Tickets</button></nav>

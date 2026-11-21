@@ -344,6 +344,7 @@ body .prime-order-history .font-lato-regular { font-family: 'Lato', sans-serif !
 @keyframes prime-forensics-scan { 0%, 100% { transform: translateY(-8px); opacity: .45; } 50% { transform: translateY(8px); opacity: 1; } }
 @keyframes prime-forensics-pulse { 50% { transform: scale(.82); opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .prime-receipt-forensics__ring, .prime-receipt-forensics__line, .prime-receipt-forensics__icon::after { animation: none; } }
+
 .prime-checkout__header > button { flex: 0 0 32px; width: 32px; height: 32px; padding: 4px; }
 .prime-checkout__header > button:first-child { margin-left: -3px; }
 .prime-checkout [class~="text-xs"] { font-size: 14px !important; line-height: 1.35; }
@@ -2933,3 +2934,65 @@ body,
 .prime-receipt-analysis-scan__complete { position: absolute; right: 10px; bottom: 10px; padding: 6px; border-radius: 50%; color: #047857; background: #ecfdf5; }
 @keyframes prime-receipt-sweep { from { top: 2%; } to { top: 96%; } }
 @media (prefers-reduced-motion: reduce) { .prime-receipt-analysis-scan__beam { animation: none; top: 50%; } }
+
+/* Customer tab and checkout heading contract. Keep this final so legacy utility rules cannot change the surface. */
+#mobile-portrait-viewport .prime-shopfront-shell :is(.prime-page-heading, .prime-checkout__header) {
+  box-sizing: border-box !important;
+  display: flex !important;
+  width: 100% !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  flex: 0 0 48px !important;
+  align-items: center !important;
+  padding: 0 12px !important;
+  background: #fff !important;
+  border-bottom: 1px solid #d7e1ef !important;
+  box-shadow: none !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell :is(.prime-page-heading h2, .prime-checkout__title, .prime-page-heading__title) {
+  margin: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: #102a56 !important;
+  font: 600 16px/1 'Roboto Condensed', sans-serif !important;
+  letter-spacing: .02em !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell :is(.prime-page-heading__icon, .prime-page-heading__icon svg, .prime-checkout__header svg) {
+  width: 18px !important;
+  height: 18px !important;
+  color: #102a56 !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-heading > div:last-child,
+#mobile-portrait-viewport .prime-shopfront-shell .prime-checkout__header > button {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-heading button,
+#mobile-portrait-viewport .prime-shopfront-shell .prime-checkout__header > button {
+  display: grid !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 !important;
+  place-items: center !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 5px !important;
+  background: #fff !important;
+  color: #334155 !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-page-heading__badge {
+  display: inline-flex !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 999px !important;
+  background: #102a56 !important;
+  color: #fff !important;
+  font: 600 11px/1 'Lato', sans-serif !important;
+}
+#mobile-portrait-viewport .prime-shopfront-shell .prime-checkout__header > div:first-child { min-width: 0 !important; flex: 1 1 auto !important; }

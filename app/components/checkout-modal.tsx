@@ -1638,10 +1638,10 @@ export default function CheckoutModal({
         aria-modal="false"
       >
         {/* Header with Step Tracker */}
-        <div className="prime-checkout__header border-b border-gray-100 bg-white px-2.5 sticky top-0 z-30 flex items-center justify-between">
+        <div className="prime-checkout__header border-b border-gray-100 bg-white sticky top-0 z-30 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <h2 className="prime-checkout__title text-base font-heading font-bold text-gray-900 uppercase">
+              <h2 className="prime-checkout__title font-heading font-bold text-gray-900 uppercase">
                 <span className="inline-flex min-w-0 items-center gap-2">
                   {currentStep === 1 && <User className="h-4 w-4 shrink-0" aria-hidden="true" />}
                   {currentStep === 2 && <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />}

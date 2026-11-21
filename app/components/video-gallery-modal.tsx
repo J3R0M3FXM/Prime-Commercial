@@ -19,6 +19,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
+import PrimePageHeading from "./prime-page-heading";
 import {
   callServerless,
   getServerlessVideos,
@@ -467,6 +468,10 @@ export default function VideoGalleryModal({
   if (!isOpen) return null;
   return (
     <div ref={root} className="prime-media-gallery" aria-label="Media library">
+      <PrimePageHeading icon={<Film />} title="MEDIA" actions={<>
+        <button type="button" aria-label="Refresh media" title="Refresh media" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "animate-spin" : ""} /></button>
+        <button type="button" aria-label={offlineOnly ? "Return online" : "Close media"} title={offlineOnly ? "Return online" : "Close media"} disabled={offlineOnly && !navigator.onLine} onClick={onClose}><X /></button>
+      </>} />
       <div className="media-search-strip">
         <label>
           <Search size={15} />
@@ -507,20 +512,6 @@ export default function VideoGalleryModal({
           >
             <ListPlus size={14} />
             Playlists
-          </button>
-          <button
-            aria-label="Refresh media"
-            onClick={() => void load()}
-            disabled={loading}
-          >
-            <RefreshCw size={14} />
-          </button>
-          <button
-            aria-label={offlineOnly ? "Return online" : "Close media"}
-            disabled={offlineOnly && !navigator.onLine}
-            onClick={onClose}
-          >
-            <X size={14} />
           </button>
         </div>
         {!online && (

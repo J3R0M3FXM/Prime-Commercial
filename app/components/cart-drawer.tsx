@@ -125,8 +125,9 @@ function CartDrawerContent({ isOpen, onClose, onCheckoutOpenChange, liveQueue, o
         
         {/* Header */}
         <PrimePageHeading icon={<ShoppingCart />} title="CART" actions={<>
-          <span className="bg-black text-white text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full">{cartCount || 0}</span>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors cursor-pointer" aria-label="Close cart"><X className="w-4 h-4" /></button>
+          <span className="prime-page-heading__badge">{cartCount || 0}</span>
+          <button type="button" onClick={() => setRefreshAttempt(attempt => attempt + 1)} disabled={inventoryLoading} aria-label="Refresh cart" title="Refresh cart"><RefreshCw className={inventoryLoading ? "animate-spin" : ""} /></button>
+          <button type="button" onClick={onClose} aria-label="Close cart" title="Close cart"><X /></button>
         </>} />
 
         {inventoryLoading && <p role="status" className="px-3 py-2 font-mono text-xs text-slate-500">Updating prices and stock…</p>}
