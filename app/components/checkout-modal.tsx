@@ -2049,9 +2049,7 @@ export default function CheckoutModal({
                 </div>
 
                 <div className="flex justify-between items-start pt-1 border-t border-gray-200">
-                  <span className="prime-checkout__review-label text-gray-500 uppercase text-[10px] flex items-center gap-1">
-                    <span>Address</span>
-                  </span>
+                  <span className="prime-checkout__review-label text-gray-500 uppercase text-[10px]">Address</span>
                   <span className="prime-checkout__review-value prime-checkout__contact-value font-heading font-semibold text-[11px] text-gray-900 text-right max-w-xs break-words">
                     {selectedAddress}
                     <span className="block text-gray-500 text-[10px] font-heading font-semibold">Unit/Landmark: {unitDetails.trim() || "NONE PROVIDED"}</span>
