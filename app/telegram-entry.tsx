@@ -118,7 +118,7 @@ function MiniApp() {
       className={`mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-gray-50 shadow-2xl sm:border-x sm:border-slate-800/80${!offlineMedia && path.startsWith("/admin") ? " admin-viewport" : ""}`}
     >
       {!startupDone && <div className="prime-startup-window fixed inset-0 z-[10000] mx-auto w-full max-w-[430px] overflow-y-auto bg-white"><SplashScreen progress={captureProgress} subtitle="PREPARING YOUR SECURE SESSION..." /></div>}
-      <div className="min-w-0 flex-1" hidden={!startupDone}>{offlineMedia ? screen : <CartProvider>{screen}</CartProvider>}</div>
+      <div className="min-w-0 flex-1">{offlineMedia ? screen : <CartProvider>{screen}</CartProvider>}</div>
       <SystemFooter />
     </div></StartupProgressContext.Provider>
   );

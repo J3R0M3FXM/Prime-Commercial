@@ -30,6 +30,6 @@ const clean=await sanitizeFingerprint({...result,ipLocation:{verified:true},devi
 assert.equal(clean.clientObservedIp,'203.0.113.4');assert.equal(clean.deviceLocationObservation.verified,false);assert.equal(clean.ipLocation,undefined);
 assert.equal((await sanitizeFingerprint({deviceLocationObservation:{lat:null,lon:121}})).deviceLocationObservation,null);
 const saved=await saveCustomerFingerprint({tgUserId:'11',fingerprints:[]},{...result,sessionToken:'test'},new Date(),{ipLocation:{provider:'IPLocate',verified:false},deviceLocationObservation:clean.deviceLocationObservation});assert.equal(saved.latestFingerprint.ipLocation.provider,'IPLocate');
-const entry=readFileSync('app/telegram-entry.tsx','utf8');assert.match(entry,/elapsed >= STARTUP_DURATION_MS/);assert.match(entry,/hidden={!startupDone}/);assert.match(entry,/<SplashScreen progress={captureProgress}/);
+const entry=readFileSync('app/telegram-entry.tsx','utf8');assert.match(entry,/elapsed >= STARTUP_DURATION_MS/);assert.doesNotMatch(entry,/hidden={!startupDone}/);assert.match(entry,/prime-startup-window fixed inset-0 z-\[10000\]/);assert.match(entry,/<SplashScreen progress={captureProgress}/);
 const splash=readFileSync('app/components/splash-screen.tsx','utf8');assert.match(splash,/role="progressbar"/);assert.match(splash,/aria-valuenow={displayedProgress}/);
 console.log('PASS: parallel startup collection, one launch clock, 11-second failure release, frozen partial evidence, 12-second progress, GPS/IP persistence and provider provenance.');
