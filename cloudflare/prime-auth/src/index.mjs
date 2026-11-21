@@ -16,6 +16,7 @@ async function verifyTelegramLogin(url, env) {
   const hash = params.get('hash') || '';
   if (!/^[a-f0-9]{64}$/i.test(hash)) return null;
   params.delete('hash');
+  params.delete('native');
   const authDate = Number(params.get('auth_date') || 0);
   const now = Math.floor(Date.now() / 1000);
   if (!Number.isSafeInteger(authDate) || authDate <= 0 || authDate > now + 300 || now - authDate > 86400) return null;
