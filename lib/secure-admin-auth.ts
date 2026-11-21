@@ -5,6 +5,11 @@ type SecureAdminAuthPlugin = {
   read(): Promise<{ value?: string }>;
   clear(): Promise<void>;
   unlock(): Promise<void>;
+  smsStatus(): Promise<{ paired: boolean; enabled: boolean; status: string; counts: string }>;
+  pairSms(options: { code: string }): Promise<void>;
+  pauseSms(): Promise<void>;
+  syncSms(): Promise<void>;
+  enableSms(): Promise<void>;
 };
 
 const SecureAdminAuth = registerPlugin<SecureAdminAuthPlugin>('SecureAdminAuth');
@@ -27,4 +32,12 @@ export async function storeNativeAdminSession(value: string) {
 export async function clearNativeAdminSession() {
   await SecureAdminAuth.clear();
 }
+
+export const nativeSmsBridge = {
+  status: () => SecureAdminAuth.smsStatus(),
+  pair: (code: string) => SecureAdminAuth.pairSms({ code }),
+  pause: () => SecureAdminAuth.pauseSms(),
+  sync: () => SecureAdminAuth.syncSms(),
+  enable: () => SecureAdminAuth.enableSms(),
+};
 

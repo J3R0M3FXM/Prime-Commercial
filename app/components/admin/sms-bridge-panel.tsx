@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { callServerless } from "@/lib/telegram-serverless-client";
+import { Capacitor } from "@capacitor/core";
+import { nativeSmsBridge } from "@/lib/secure-admin-auth";
 async function gateway(path:string,method="GET",body?:object){
  const initData=(window as any).Telegram?.WebApp?.initData||"";
  const response=await fetch(`https://prime-media-gateway.pages.dev/sms/${path}`,{method,headers:{"Content-Type":"application/json","X-Telegram-Init-Data":initData},...(body?{body:JSON.stringify(body)}:{})});
@@ -8,12 +10,14 @@ async function gateway(path:string,method="GET",body?:object){
 }
 export default function SmsBridgePanel(){
  const [devices,setDevices]=useState<any[]>([]),[code,setCode]=useState(""),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
+ const [nativeStatus,setNativeStatus]=useState<any>(null),isNative=Capacitor.isNativePlatform();
  async function perform(action:()=>Promise<void>){setBusy(true);setMessage("");try{await action();}catch(error:any){setMessage(error.message||"Bridge unavailable.");}finally{setBusy(false);}}
- async function load(){const [list,status]=await Promise.all([gateway("devices"),callServerless<any>("manageSmsEvidence",{action:"status"})]);setDevices(list.devices||[]);setMessage(status.configured?"Server ready. Only MayaBiz confirmations are accepted.":"Server connection is awaiting configuration.");}
+ async function load(){const [list,status,local]=await Promise.all([gateway("devices"),callServerless<any>("manageSmsEvidence",{action:"status"}),isNative?nativeSmsBridge.status():Promise.resolve(null)]);setDevices(list.devices||[]);setNativeStatus(local);setMessage(status.configured?"Server ready. Only MayaBiz confirmations are accepted.":"Server connection is awaiting configuration.");}
  return <details className="serverless-disclosure my-2"><summary>Owner phone · SMS Bridge</summary><div className="serverless-disclosure__body space-y-2 text-xs">
- <p>Install PRIME SMS Bridge on the payment phone, pair it here, then enable SMS forwarding and its listening notification. Staff still review each payment.</p>
- <div className="flex flex-wrap gap-2"><button disabled={busy} className="serverless-action" onClick={()=>void perform(load)}>Refresh phones</button><button disabled={busy} className="serverless-action" onClick={()=>void perform(async()=>{const result=await gateway("pairing","POST",{label:"Owner payment phone"});setCode(result.code);setMessage("Pairing code expires in ten minutes.");})}>Create pairing code</button></div>
- {code&&<div className="space-y-2"><p className="break-all font-mono select-all">{code}</p><div className="flex gap-2"><button className="serverless-action" onClick={()=>void perform(async()=>{await navigator.clipboard.writeText(code);setMessage("Pairing code copied.");})}>Copy</button><a className="serverless-action" href={`prime-sms://pair?code=${code}`}>Open SMS Bridge</a></div></div>}
+ <p>{isNative?"This Admin APK includes the payment-phone SMS listener. Pair it here, then enable SMS forwarding and its listening notification.":"Install PRIME SMS Bridge on the payment phone, pair it here, then enable SMS forwarding and its listening notification."} Staff still review each payment.</p>
+ <div className="flex flex-wrap gap-2"><button disabled={busy} className="serverless-action" onClick={()=>void perform(load)}>Refresh phones</button><button disabled={busy} className="serverless-action" onClick={()=>void perform(async()=>{const result=await gateway("pairing","POST",{label:"Owner payment phone"});setCode(result.code);setMessage("Pairing code expires in ten minutes.");})}>Create pairing code</button>{isNative&&<>{nativeStatus?.enabled?<button disabled={busy} className="serverless-action" onClick={()=>void perform(async()=>{await nativeSmsBridge.pause();await load();})}>Pause forwarding</button>:<button disabled={busy||!nativeStatus?.paired} className="serverless-action" onClick={()=>void perform(async()=>{await nativeSmsBridge.enable();await load();})}>Enable forwarding</button>}</>}</div>
+ {code&&<div className="space-y-2"><p className="break-all font-mono select-all">{code}</p><div className="flex gap-2"><button className="serverless-action" onClick={()=>void perform(async()=>{await navigator.clipboard.writeText(code);setMessage("Pairing code copied.");})}>Copy</button>{isNative?<button className="serverless-action" onClick={()=>void perform(async()=>{await nativeSmsBridge.pair(code);setMessage("Payment phone paired. Grant Android permissions, then enable forwarding.");await load();})}>Pair in this Admin APK</button>:<a className="serverless-action" href={`prime-sms://pair?code=${code}`}>Open SMS Bridge</a>}</div></div>}
+ {isNative&&nativeStatus&&<p className="font-mono">Local listener: {nativeStatus.enabled?"Enabled":nativeStatus.paired?"Paired · Paused":"Not paired"} · {nativeStatus.counts}</p>}
  {message&&<p role="status">{message}</p>}
  {devices.map(device=><div className="border-t pt-2" key={device.id}><p>{device.label} · {device.revoked?"Revoked":"Paired"}</p><p className="font-mono">Last received: {device.lastSeen?new Date(device.lastSeen).toLocaleString():"None yet"}</p>{!device.revoked&&<button disabled={busy} className="serverless-action" onClick={()=>{if(window.confirm("Revoke this phone's forwarding access?"))void perform(async()=>{await gateway(`devices/${device.id}`,"DELETE");await load();});}}>Revoke phone</button>}</div>)}
  </div></details>;

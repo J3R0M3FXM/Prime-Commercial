@@ -22,6 +22,11 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
+import org.json.JSONObject;
+import ph.primenetwork.prime.smsbridge.BridgeNetwork;
+import ph.primenetwork.prime.smsbridge.BridgeStore;
+import ph.primenetwork.prime.smsbridge.ListenerService;
+import ph.primenetwork.prime.smsbridge.SyncJob;
 
 @CapacitorPlugin(name = "SecureAdminAuth")
 public class SecureAdminAuthPlugin extends Plugin {
@@ -63,6 +68,55 @@ public class SecureAdminAuthPlugin extends Plugin {
     public void clear(PluginCall call) {
         getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply();
         call.resolve();
+    }
+
+    @PluginMethod
+    public void smsStatus(PluginCall call) {
+        try (BridgeStore store = new BridgeStore(getContext())) {
+            JSObject result = new JSObject();
+            result.put("paired", store.paired()); result.put("enabled", store.enabled());
+            result.put("status", store.prefs().getString("status", "")); result.put("counts", store.counts());
+            call.resolve(result);
+        } catch (Exception error) { call.reject("Could not read SMS bridge status.", error); }
+    }
+
+    @PluginMethod
+    public void pairSms(PluginCall call) {
+        String code = call.getString("code", "").trim().toLowerCase(java.util.Locale.US);
+        if (!code.matches("[a-f0-9]{32}")) { call.reject("Enter a valid pairing code."); return; }
+        new Thread(() -> {
+            try (BridgeStore store = new BridgeStore(getContext())) {
+                BridgeNetwork.Reply reply = BridgeNetwork.post("/sms/pair", new JSONObject().put("code", code).put("deviceId", store.deviceId()).toString(), null);
+                String token = reply.data.optString("token", "");
+                if (reply.status != 200 || !token.matches("[a-f0-9]{64}")) throw new Exception("Pairing failed. Create a fresh code in Admin.");
+                store.saveToken(token); store.status("Paired. Enable forwarding to grant SMS access.");
+                getActivity().runOnUiThread(() -> call.resolve());
+            } catch (Exception error) { getActivity().runOnUiThread(() -> call.reject(error.getMessage(), error)); }
+        }, "prime-sms-pair").start();
+    }
+
+    @PluginMethod
+    public void pauseSms(PluginCall call) {
+        try (BridgeStore store = new BridgeStore(getContext())) { store.prefs().edit().putBoolean("enabled", false).commit(); ListenerService.stop(getContext()); store.status("Forwarding paused."); call.resolve(); }
+        catch (Exception error) { call.reject("Could not pause SMS forwarding.", error); }
+    }
+
+    @PluginMethod
+    public void enableSms(PluginCall call) {
+        if (getContext().checkSelfPermission(android.Manifest.permission.RECEIVE_SMS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            call.reject("Grant SMS permission in Android before enabling forwarding."); return;
+        }
+        try (BridgeStore store = new BridgeStore(getContext())) {
+            if (!store.paired()) throw new Exception("Pair this payment phone first.");
+            store.prefs().edit().putBoolean("enabled", true).commit(); ListenerService.start(getContext()); SyncJob.schedule(getContext());
+            store.status("Enabled. Only new matching MayaBiz confirmations are forwarded."); call.resolve();
+        } catch (Exception error) { call.reject(error.getMessage(), error); }
+    }
+
+    @PluginMethod
+    public void syncSms(PluginCall call) {
+        try (BridgeStore store = new BridgeStore(getContext())) { if (!store.enabled()) throw new Exception("Enable SMS forwarding first."); SyncJob.schedule(getContext()); store.status("Sync scheduled. Delivery is not yet confirmed."); call.resolve(); }
+        catch (Exception error) { call.reject(error.getMessage(), error); }
     }
 
     @PluginMethod
