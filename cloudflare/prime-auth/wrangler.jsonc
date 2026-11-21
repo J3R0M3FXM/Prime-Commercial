@@ -3,7 +3,7 @@
   "main": "src/index.mjs",
   "compatibility_date": "2026-11-15",
   "routes": [{ "pattern": "auth.codespacelabs.online/*", "zone_name": "codespacelabs.online" }],
-  "kv_namespaces": [{ "binding": "AUTH_CODES", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }],
+  "kv_namespaces": [{ "binding": "AUTH_CODES", "id": "0ef43c021040432899be2bc9d26c1aec" }],
   "vars": {
     "TELEGRAM_BOT_USERNAME": "primenetworkphbot",
     "ADMIN_TELEGRAM_USER_IDS": "REPLACE_WITH_ADMIN_TELEGRAM_IDS",
