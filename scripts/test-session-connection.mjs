@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import {JSDOM} from 'jsdom';
+import {build} from 'rolldown';
+import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
+import {resolve} from 'node:path';
+const compile=path=>ts.transpileModule(readFileSync(path,'utf8').replaceAll('import.meta.env','({})'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+const classification={};new Function('exports',compile('lib/session-connection.ts'))(classification);
+for(const message of ['Network error calling endpoint getTelegramSession: Failed to fetch','Load failed','The Telegram service took too long to respond. Please try again.','Telegram Serverless did not initialize.'])assert.equal(classification.isSessionConnectionError(Error(message)),true,message);
+for(const error of [Error('Invalid Telegram signature'),{message:'Network error',code:'AUTH_REQUIRED'},{message:'Failed to fetch',status:403}])assert.equal(classification.isSessionConnectionError(error),false);
+function client(responses){let calls=0;const store={getItem:()=>'',setItem(){}};const browser={setTimeout,clearTimeout,Telegram:{WebApp:{Serverless:{call(name,input,callback){if(name==='getTelegramSession'){calls++;const response=responses.shift();response instanceof Error?callback(response):callback(null,response);}else callback(null,{deviceId:'d',sessionId:'s',riskScore:0,reasons:[]});}}}}};const exports={};new Function('exports','require','window','localStorage','setTimeout',compile('lib/telegram-serverless-client.ts'))(exports,name=>name.includes('session-connection')?classification:name.includes('startup-capture')?{startStartupCapture:async()=>({}),getStartupSnapshot:()=>({})}:name.includes('fingerprint-collector')?{getClientFingerprint:async()=>({})}:{setMediaOwner(){}},browser,store,(fn,ms)=>setTimeout(fn,ms===350?0:ms));return {exports,get calls(){return calls;}};}
+const recovered=client([Error('Failed to fetch'),{authenticated:true,tgUserId:'11'}]);assert.equal((await recovered.exports.getTelegramServerlessSession()).authenticated,true);assert.equal(recovered.calls,2);
+const denied=client([Object.assign(Error('Invalid credentials'),{status:401})]);await assert.rejects(denied.exports.getTelegramServerlessSession(),/Invalid credentials/);assert.equal(denied.calls,1,'Invalid credentials never become a network retry');
+const offline=client([Error('Failed to fetch'),Error('Failed to fetch')]);await assert.rejects(offline.exports.getTelegramServerlessSession(),/Failed to fetch/);assert.equal(offline.calls,2,'Automatic connection retries remain bounded');
+const dom=new JSDOM('<div id="root"></div>');for(const name of ['window','document','navigator','HTMLElement','Event','MouseEvent'])Object.defineProperty(globalThis,name,{value:dom.window[name],configurable:true});globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const require=createRequire(import.meta.url);const output=await build({input:resolve('app/components/session-connection-error.tsx'),platform:'node',write:false,transform:{jsx:{runtime:'automatic'}},resolve:{alias:{'@':process.cwd()}},onLog(level,log,handler){if(log.code!=='MODULE_LEVEL_DIRECTIVE')handler(level,log);},plugins:[{name:'external',resolveId(id){if(id==='react'||id.startsWith('react/')||id==='lucide-react')return {id:pathToFileURL(require.resolve(id)).href,external:true};}}],output:{format:'esm'}});
+const Component=(await import('data:text/javascript;base64,'+Buffer.from(output.output[0].code).toString('base64'))).default;
+const {createElement,act}=await import('react');const {createRoot}=await import('react-dom/client');const root=createRoot(document.getElementById('root'));let retried=0;await act(async()=>root.render(createElement(Component,{onRetry:()=>retried++})));assert.match(document.body.textContent,/Connection interrupted/);assert.doesNotMatch(document.body.textContent,/Access Denied/);await act(async()=>document.querySelector('button').click());assert.equal(retried,1);await act(async()=>root.unmount());
+for(const path of ['app/page.tsx','app/admin/page.tsx']){const source=readFileSync(path,'utf8');assert.match(source,/connectionFailed/);assert.match(source,/<SessionConnectionError onRetry=/);assert.match(source,/authAttempt/);}
+console.log('PASS: network failure classification, bounded session retry, rejected-credential protection and rendered in-place connection recovery.');

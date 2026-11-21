@@ -1,5 +1,6 @@
 'use client';
 import { setMediaOwner } from '@/lib/media-library';
+import { isSessionConnectionError } from '@/lib/session-connection';
 import { startStartupCapture, getStartupSnapshot } from '@/lib/startup-capture';
 
 type ServerlessError = Error & { type?: string; parameters?: Record<string, unknown> };
@@ -463,6 +464,7 @@ export async function getTelegramServerlessSession(options: { heartbeat?: boolea
       break;
     } catch (error) {
       lastError = error;
+      if (!isSessionConnectionError(error)) break;
       if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350));
     }
   }

@@ -16,6 +16,8 @@ import SupportTickets from "./components/support-tickets";
 import PrimeOrderQueue, { type PublicOrderQueue } from "./components/prime-order-queue";
 import PrimePageHeading from "./components/prime-page-heading";
 import SplashScreen from "./components/splash-screen";
+import SessionConnectionError from "./components/session-connection-error";
+import { isSessionConnectionError } from "@/lib/session-connection";
 import VideoGalleryModal from "./components/video-gallery-modal";
 import { ShoppingBag, Search, Filter, AlertCircle, Loader2, ShoppingCart, Plus, Minus, Receipt, Home, User, Store, Film, Headphones, Info } from "lucide-react";
 import { formatPHP } from "@/lib/currency";
@@ -44,6 +46,8 @@ export default function Shopfront() {
   const [authorized, setAuthorized] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [authAttempt, setAuthAttempt] = useState(0);
+  const [connectionFailed, setConnectionFailed] = useState(false);
   const [bootProgress, setBootProgress] = useState(5);
   const [routingToAdmin, setRoutingToAdmin] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
@@ -153,6 +157,9 @@ export default function Shopfront() {
 
   useEffect(() => {
     async function checkAuth() {
+      setChecking(true);
+      setConnectionFailed(false);
+      setErrorMsg("");
       const previewMode = import.meta.env.VITE_UI_PREVIEW === "1";
       if (previewMode) {
         setBootProgress(100);
@@ -272,6 +279,7 @@ export default function Shopfront() {
       } catch (e: any) {
         console.error("Auth check failed", e);
         setErrorMsg(e.message || String(e));
+        setConnectionFailed(isSessionConnectionError(e));
       } finally {
         setBootProgress(100);
         await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -280,7 +288,7 @@ export default function Shopfront() {
     }
 
     checkAuth();
-  }, [loadCatalog, router]);
+  }, [loadCatalog, router, authAttempt]);
 
   const safeProducts = Array.isArray(products) ? products : [];
   const categories = ["All", ...Array.from(new Set(safeProducts.map(p => p?.category || "General")))];
@@ -295,6 +303,8 @@ export default function Shopfront() {
   }
 
   if (checking) return <SplashScreen title="CONNECTING TO PRIME PRIVATE SERVERS" subtitle="Please wait while we are initializing your secure session..." progress={bootProgress} />;
+
+  if (!authorized && connectionFailed) return <SessionConnectionError onRetry={() => { setChecking(true); setAuthAttempt(attempt => attempt + 1); }} />;
 
   if (!authorized) {
     return (

@@ -58,6 +58,7 @@ run('node', ['scripts/test-pos-invoice-delivery.mjs'], 'POS invoice delivery and
 run('node', ['scripts/test-pos-native-shortcut.mjs'], 'native Telegram POS shortcut and launch preference');
 run('node', ['scripts/test-pos-launcher.mjs'], 'installed POS launcher and staff gate');
 run('node', ['scripts/test-pos-startup.mjs'], 'stable authentication startup and lightweight POS customers');
+run('node', ['scripts/test-session-connection.mjs'], 'session transport recovery and credential rejection');
 run('node', ['scripts/test-pos-ui.mjs'], 'rendered POS register controls');
 run('node', ['scripts/test-checkout-idempotency.mjs'], 'checkout and POS collision/retry hardening');
 run('node', ['scripts/test-credit-operations.mjs'], 'points conversion and Store Credit transfer safety');
