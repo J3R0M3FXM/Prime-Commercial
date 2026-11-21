@@ -9,6 +9,7 @@ import PosHomeShortcut from './pos-home-shortcut';
 import PosInvoiceDialog from "./pos-invoice-dialog";
 import { formatPHP } from "@/lib/currency";
 import { beginPosCheckoutAttempt, readPosCheckoutAttempt, finishPosCheckoutAttempt, type PosCheckoutAttempt } from '@/lib/pos-checkout-attempt';
+import { clearPosDraft, readPosDraft, writePosDraft } from '@/lib/pos-draft';
 
 type Product = { id: string; name: string; price: number; stock: number; category?: string; imageUrl?: string; isActive?: boolean; variants?: Array<Record<string, any>>; bundleConfig?: { variants?: Array<Record<string, any>> } };
 type CartLine = { key: string; productId: string; variantId: string; name: string; price: number; quantity: number; stock: number };
@@ -78,6 +79,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   const [workspaceTab, setWorkspaceTab] = useState<'catalog'|'sale'|'payment'>('catalog');
   const [retryKey, setRetryKey] = useState("");
   const [lastSale, setLastSale] = useState<{ orderNumber: string; totalAmount: number; mode: string; paymentMethodId: string } | null>(null);
+  const draftRestored = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -113,6 +115,16 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
       const id=String(session.tgUserId||'');
       setStaffId(id);
       setPendingSale(readPosCheckoutAttempt(id));
+      const draft = readPosDraft(id);
+      if (draft) {
+        setMode(draft.mode); setCustomerType(draft.customerType); setSelectedCustomerId(draft.selectedCustomerId); setTelegramId(draft.telegramId);
+        setCart(draft.cart); setCustomerName(draft.customerName); setCustomerPhone(draft.customerPhone); setDeliveryAddress(draft.deliveryAddress);
+        setCourierId(draft.courierId); setDeliveryFee(draft.deliveryFee); setPaymentMethodName(draft.paymentMethodName); setPaymentMethodId(draft.paymentMethodId);
+        setDeliveryPaymentMethod(draft.deliveryPaymentMethod); setChargeIds(draft.chargeIds); setManualCharges(draft.manualCharges); setPromoCode(draft.promoCode);
+        setDiscountMode(draft.discountMode); setDiscountValue(draft.discountValue); setStoreCreditsUsed(draft.storeCreditsUsed); setCashReceived(draft.cashReceived);
+        setWorkspaceTab(draft.workspaceTab); setNotice(`Recovered your POS draft from ${new Date(draft.savedAt).toLocaleTimeString()}.`);
+      }
+      draftRestored.current = true;
       setAuthorized(true);
     }).catch((err: any) => { if (current) setError(err?.message || "Open PRIME from Telegram to use POS."); })
       .finally(() => { if (current) setCheckingAuth(false); });
@@ -120,6 +132,16 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
   }, []);
 
   useEffect(() => { if (authorized) void load(); }, [authorized, load]);
+
+  useEffect(() => {
+    if (!authorized || !staffId || !draftRestored.current) return;
+    const timer = window.setTimeout(() => writePosDraft(staffId, {
+      savedAt: Date.now(), mode, customerType, selectedCustomerId, telegramId, cart, customerName, customerPhone,
+      deliveryAddress, courierId, deliveryFee, paymentMethodName, paymentMethodId, deliveryPaymentMethod, chargeIds,
+      manualCharges, promoCode, discountMode, discountValue, storeCreditsUsed, cashReceived, workspaceTab,
+    }), 250);
+    return () => window.clearTimeout(timer);
+  }, [authorized, staffId, mode, customerType, selectedCustomerId, telegramId, cart, customerName, customerPhone, deliveryAddress, courierId, deliveryFee, paymentMethodName, paymentMethodId, deliveryPaymentMethod, chargeIds, manualCharges, promoCode, discountMode, discountValue, storeCreditsUsed, cashReceived, workspaceTab]);
 
   useEffect(() => {
     if (!selectedProductId) return;
@@ -250,6 +272,7 @@ export default function TelegramServerlessPosPanel({ onBack }: { onBack: () => v
       setRetryKey("");
       setCart([]); setCustomerName(""); setCustomerPhone(""); setTelegramId(""); setSelectedCustomerId(""); setCustomerType("guest"); setDeliveryAddress(""); setDeliveryFee("0");
       setChargeIds([]);setManualCharges([]);setPromoCode('');setDiscountMode('none');setDiscountValue('0');setStoreCreditsUsed('0');setDestination(null);setDeliveryQuote(null);setCashReceived('');setBill(null);setWorkspaceTab('catalog');
+      clearPosDraft(staffId);
       await load();
     } catch (err: any) {
       const code=String(err?.parameters?.code||err?.code||err?.type||'');
