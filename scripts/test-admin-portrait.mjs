@@ -47,8 +47,10 @@ assert.ok(splashSvg.querySelector('.shield'),'The center uses a shield and lock'
 assert.equal(splashSvg.querySelector('.halo'),null,'No circular device halo');
 assert.equal(splashSvg.querySelector('circle[r="121"]'),null,'No enclosing phone ring');
 assert.match(splashSvg.querySelector('style').textContent,/animation:flow[^}]*alternate/,'Dots move back and forth');
-assert.equal(splashSvg.querySelectorAll('.light[fill="#43ff91"]').length,5,'Server lights are mostly green');
-for (const color of ['#ff625d','#ffad38','#46baff']) assert.ok(splashSvg.querySelector(`.light[fill="${color}"]`));
+assert.equal(splashSvg.querySelectorAll('.server').length,3,'The reference composition has three server towers');
+assert.equal(splashSvg.querySelectorAll('.cloud-back,.cloud-middle,.cloud-front').length,3,'Three animated cloud layers fill the backdrop');
+assert.ok(splashSvg.querySelectorAll('.light[fill="#43ff91"]').length > splashSvg.querySelectorAll('.light:not([fill="#43ff91"])').length,'Server lights are mostly green');
+for (const color of ['#ff625d','#ffad38']) assert.ok(splashSvg.querySelector(`.light[fill="${color}"]`));
 assert.match(splashSvg.querySelector('style').textContent,/prefers-reduced-motion:reduce/);
 assert.match(document.body.textContent,/ADMIN ACCESS/);
 await act(async()=>root.render(createElement(StartupProgressContext.Provider,{value:100},createElement(splash,{progress:52}))));
