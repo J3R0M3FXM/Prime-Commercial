@@ -75,7 +75,7 @@ export default function Shopfront() {
   const [publicOrderQueue, setPublicOrderQueue] = useState<PublicOrderQueue | null>(null);
   const queueRequestInFlight = useRef(false);
 
-  const { cart, cartCount, addToCart, updateQuantity } = useCart();
+  const { cart, cartCount, addToCart, updateQuantity, restoreCart } = useCart();
 
   useEffect(() => {
     if (!authorized) return;
@@ -556,6 +556,7 @@ export default function Shopfront() {
         <button
           type="button"
           onClick={() => {
+            if (products.length === 0 && !catalogLoading) void loadCatalog();
             setActiveTab("shop");
             setSearchTerm("");
             setSelectedCategory("All");
@@ -573,6 +574,7 @@ export default function Shopfront() {
         <button
           type="button"
           onClick={() => {
+            restoreCart?.();
             setActiveTab("cart");
             setIsCartOpen(true);
           }}

@@ -28,6 +28,19 @@ export default function CartProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
+  const restoreCart = () => {
+    try {
+      const savedCart = typeof window !== 'undefined' ? localStorage.getItem('prime-cart') : null;
+      if (!savedCart) return;
+      const parsed = JSON.parse(savedCart);
+      if (!Array.isArray(parsed)) return;
+      const clean = parsed.filter(item => item && typeof item === 'object' && item.id);
+      setCart(previous => previous.length > 0 ? previous : clean);
+    } catch (error) {
+      console.warn('Saved cart could not be restored.', error);
+    }
+  };
+
   useEffect(() => {
     try {
       if (hydrated && typeof window !== 'undefined' && Array.isArray(cart)) {
@@ -210,7 +223,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
   }, [cart]);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, clearCheckoutItems, clearCart, cartTotal, cartCount, syncWithServerData, setCart }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, toggleSelection, clearSelectedItems, clearCheckoutItems, clearCart, cartTotal, cartCount, syncWithServerData, restoreCart, setCart }}>
       {children}
     </CartContext.Provider>
   );
