@@ -25,7 +25,15 @@ async function verifyTelegramLogin(url, env) {
   const tokenKey = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
   if ((await hmacHex(tokenKey, dataCheck)) !== hash.toLowerCase()) return null;
   let user;
-  try { user = JSON.parse(params.get('user') || '{}'); } catch { return null; }
+  try {
+    user = params.get('user') ? JSON.parse(params.get('user')) : {
+      id: params.get('id'),
+      first_name: params.get('first_name') || '',
+      last_name: params.get('last_name') || '',
+      username: params.get('username') || '',
+      photo_url: params.get('photo_url') || ''
+    };
+  } catch { return null; }
   const tgUserId = user?.id == null ? '' : String(user.id);
   if (!/^\d+$/.test(tgUserId)) return null;
   return { tgUserId, user };
