@@ -11,6 +11,21 @@ are deliberately completed and device-tested.
 
 This Worker is intentionally separate from `prime-media-preview`. It verifies Telegram Login Widget data, stores a single-use 60-second native handoff code in KV, and redirects to `prime://auth/callback`.
 
+## Admin native-session contract
+
+Option 1 requires TGCloud to attach a platform-verified claim to endpoint context before endpoint code runs:
+
+```js
+ctx.nativeAdminSession = {
+  verified: true,
+  role: 'admin',
+  staffId: 'stable-native-staff-id',
+  authMethod: 'native_session',
+};
+```
+
+`tgcloud/lib/auth.js` accepts this claim through `verifiedNativeAdmin`; it does not accept a token, access code, or `role` supplied in endpoint input. Until the Serverless runtime provides this trusted context, all Admin endpoints continue to require Telegram `initData`.
+
 Before deployment:
 
 1. Create a KV namespace and replace `REPLACE_WITH_KV_NAMESPACE_ID` in `wrangler.jsonc`.

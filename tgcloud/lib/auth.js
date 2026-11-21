@@ -21,12 +21,28 @@ export function configuredAdminIds(value) {
 }
 
 /**
+ * Native Admin sessions are accepted only when the Serverless runtime marks
+ * the claim as verified. A client-supplied input field is never trusted here.
+ * This is the Option 1 contract for the platform native-session hook.
+ */
+export function verifiedNativeAdmin(ctx) {
+  const claim = ctx?.nativeAdminSession || ctx?.nativeSession;
+  if (!claim || claim.verified !== true || claim.role !== 'admin') return null;
+  const staffId = String(claim.staffId || claim.subject || '').trim();
+  if (!staffId || staffId.length > 128) return null;
+  return { id: staffId, role: 'admin', authMethod: 'native_session' };
+}
+
+/**
  * Telegram Serverless verifies Mini App initData before invoking an endpoint.
- * Admin access is then restricted to the configured Telegram user ID stored as
- * a JSON scalar in system_settings. Missing/malformed configuration fails shut.
- * Never trust an admin flag supplied by the Mini App.
+ * When the platform later supplies a verified native-session claim, that claim
+ * is accepted through verifiedNativeAdmin. Otherwise access remains restricted
+ * to configured Telegram user IDs. Never trust an admin flag supplied by the
+ * Mini App or an unverified input field.
  */
 export async function requireAdmin(ctx) {
+  const nativeAdmin = verifiedNativeAdmin(ctx);
+  if (nativeAdmin) return nativeAdmin;
   const user = ctx?.initData?.user;
   const userId = user?.id == null ? '' : String(user.id);
   if (!/^[0-9]+$/.test(userId)) {
