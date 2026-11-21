@@ -68,9 +68,10 @@ async function verifySession(session, env) {
   return { id: parts[1], role: 'admin', authMethod: 'gateway_session', expiresAt: issued + SESSION_TTL_SECONDS };
 }
 
-function loginPage(env) {
+function loginPage(env, requestUrl) {
   const bot = String(env.TELEGRAM_BOT_USERNAME || 'primenetworkphbot').replace(/^@/, '');
-  const callback = String(env.AUTH_CALLBACK_URL || 'https://auth.codespacelabs.online/api/telegram/callback');
+  const callback = new URL(String(env.AUTH_CALLBACK_URL || 'https://auth.codespacelabs.online/api/telegram/callback'));
+  if (new URL(requestUrl).searchParams.get('native') === '1') callback.searchParams.set('native', '1');
   return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRIME sign in</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0f172a;color:#0f172a;font:16px system-ui,sans-serif}main{width:min(430px,calc(100% - 32px));box-sizing:border-box;background:#fff;border-radius:16px;padding:28px 22px;text-align:center;box-shadow:0 16px 40px #0005}h1{margin:0 0 8px;font-size:24px}p{margin:0 0 22px;color:#475569;line-height:1.45}.widget{min-height:46px;display:grid;place-items:center}noscript{display:block;color:#b91c1c;font-size:13px;margin-top:16px}</style></head><body><main><h1>PRIME Services</h1><p>Sign in securely with your Telegram account.</p><div class="widget"><script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="${bot}" data-size="large" data-auth-url="${callback}" data-request-access="write"></script></div><noscript>Enable JavaScript to display the Telegram login button.</noscript></main></body></html>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
 
@@ -79,7 +80,7 @@ export default {
     const url = new URL(request.url);
     if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
     if (url.pathname === '/health') return json({ ok: true, service: 'prime-auth' });
-    if (url.pathname === '/login') return loginPage(env);
+    if (url.pathname === '/login') return loginPage(env, request.url);
     if (url.pathname === '/callback' || url.pathname === '/api/telegram/callback') {
       const verified = await verifyTelegramLogin(url, env);
       if (!verified) return new Response('Telegram login verification failed.', { status: 401 });
@@ -90,6 +91,7 @@ export default {
       const target = String(env.NATIVE_CALLBACK_URL || 'prime://auth/callback');
       const redirect = new URL(target);
       redirect.searchParams.set('code', code);
+      if (url.searchParams.get('native') !== '1') return new Response(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRIME Login Complete</title><style>body{font:16px system-ui;padding:32px;max-width:430px;margin:auto}h1{color:#0f172a}p{color:#475569}</style><h1>Login successful</h1><p>You may close this tab and return to the Admin Panel.</p>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
       return Response.redirect(redirect.toString(), 302);
     }
     if (url.pathname === '/exchange') {

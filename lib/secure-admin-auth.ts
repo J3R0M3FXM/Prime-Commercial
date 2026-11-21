@@ -64,7 +64,7 @@ export async function startNativeAdminLogin(authBaseUrl: string) {
         await finish(error instanceof Error ? error : new Error('Admin authentication failed.'));
       }
     });
-    try { await Browser.open({ url: `${base}/login` }); }
+    try { await Browser.open({ url: `${base}/login?native=1` }); }
     catch (error) { await finish(error instanceof Error ? error : new Error('Could not open Admin login.')); }
   });
 }
