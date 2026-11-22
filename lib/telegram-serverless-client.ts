@@ -153,7 +153,19 @@ export function callServerless<T>(
 ): Promise<T> {
   if (isVisualPreview) return Promise.resolve(visualPreviewResponse(name, input) as T);
   if (typeof window === 'undefined') return Promise.reject(new Error('Telegram Mini App is not available.'));
-  if (Capacitor.isNativePlatform()) return callNativeAdminGateway<T>(name, input);
+  if (Capacitor.isNativePlatform()) {
+    if (name === 'geoapifyAddress') {
+      return import('@/lib/tomtom').then(async ({ searchAddressesTomTom, reverseGeocodeTomTom }) => {
+        const action = String(input.action || 'autocomplete');
+        if (action === 'reverse') {
+          const result = await reverseGeocodeTomTom(Number(input.lat), Number(input.lon));
+          return { results: result ? [result] : [] } as T;
+        }
+        return { results: await searchAddressesTomTom(String(input.text || ''), { limit: 8 }) } as T;
+      });
+    }
+    return callNativeAdminGateway<T>(name, input);
+  }
   const bridge = window.Telegram?.WebApp?.Serverless;
   if (!bridge?.call) return Promise.reject(new Error('Open PRIME from Telegram to use this feature.'));
 
