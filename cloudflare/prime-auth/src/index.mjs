@@ -2,7 +2,7 @@ const CODE_TTL_SECONDS = 60;
 const SESSION_TTL_SECONDS = 86400;
 
 function json(body, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, OPTIONS' } });
 }
 
 async function hmacHex(keyBytes, value) {
@@ -85,6 +85,7 @@ function loginPage(env, requestUrl) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, OPTIONS', 'access-control-max-age': '86400' } });
     if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
     if (url.pathname === '/health') return json({ ok: true, service: 'prime-auth' });
     if (url.pathname === '/login') return loginPage(env, request.url);
