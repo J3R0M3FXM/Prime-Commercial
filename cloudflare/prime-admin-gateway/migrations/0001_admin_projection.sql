@@ -214,6 +214,18 @@ CREATE TABLE IF NOT EXISTS device_registrations (
   last_seen_at INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS media_assets (
+  id TEXT PRIMARY KEY,
+  bucket TEXT,
+  path TEXT,
+  content_type TEXT NOT NULL,
+  size INTEGER NOT NULL DEFAULT 0,
+  visibility TEXT NOT NULL DEFAULT 'public',
+  content_base64 TEXT NOT NULL,
+  created_at INTEGER,
+  updated_at INTEGER
+);
+
 CREATE INDEX IF NOT EXISTS idx_device_registrations_telegram ON device_registrations(telegram_user_id);
 
 CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active);

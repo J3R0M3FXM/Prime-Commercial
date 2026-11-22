@@ -38,6 +38,7 @@ const nativeReadRoutes: Record<string, string> = {
   manageCharges: '/v1/charges',
   getPublicCharges: '/v1/charges',
   manageAccountHistory: '/v1/account-history',
+  manageMediaAssets: '/v1/media-assets',
   manageNotifications: '/v1/admin-read',
   manageDeviceSecurity: '/v1/device-security',
   manageSmsEvidence: '/v1/admin-read',
@@ -62,6 +63,17 @@ function camelizeNative(value: unknown): unknown {
 }
 
 async function callNativeAdminGateway<T>(name: string, input: Record<string, unknown>): Promise<T> {
+  if (name === 'getMediaContent') {
+    const session = await readNativeAdminSession();
+    if (!session) throw new Error('Native Admin session is missing. Sign in again.');
+    const url = new URL('/v1/media-content', NATIVE_ADMIN_GATEWAY);
+    url.searchParams.set('id', String(input.id || ''));
+    if (input.chunkIndex != null) url.searchParams.set('chunkIndex', String(input.chunkIndex));
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${session}` }, cache: 'no-store', signal: AbortSignal.timeout(30_000) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(body?.error || `Native media request failed (${response.status}).`));
+    return body as T;
+  }
   const path = nativeReadRoutes[name];
   if (!path) throw new Error(`The native Admin gateway does not support ${name} yet.`);
   const session = await readNativeAdminSession();
@@ -77,6 +89,7 @@ async function callNativeAdminGateway<T>(name: string, input: Record<string, unk
     url.searchParams.set('action', String(input.action || 'staffDetail'));
     if (input.customerId) url.searchParams.set('customerId', String(input.customerId));
   }
+  if (name === 'manageMediaAssets') url.searchParams.set('action', String(input.action || 'list'));
   if (path === '/v1/admin-read') {
     url.searchParams.set('name', name);
     url.searchParams.set('action', String(input.action || ''));

@@ -12,6 +12,7 @@ const READ_ROUTES = new Map([
   ['/v1/charges', 'charges'],
   ['/v1/account-history', 'account_history'],
   ['/v1/device-registrations', 'device_registrations'],
+  ['/v1/media-assets', 'media_assets'],
 ]);
 
 function headers() {
@@ -112,6 +113,29 @@ export default {
         return { id: row.id, installationId: row.installation_id, fingerprintId: row.fingerprint_id, riskScore: Number(row.risk_score || 0), trustStatus: row.trust_status || 'observed', firstSeenAt: Number(row.first_seen_at || 0), lastSeenAt: Number(row.last_seen_at || 0), metadata };
       });
       return json({ data: { devices, sessions: [], events: [], retentionDays: 365, preciseCoordinatesStored: false, serverIpAvailable: devices.some((device) => Boolean(device.metadata?.clientObservedIp)) } });
+    }
+    if (url.pathname === '/v1/media-content') {
+      const identity = await requireAdmin(request, env);
+      if (!identity) return json({ error: 'Admin authentication required' }, 401);
+      if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
+      const id = String(url.searchParams.get('id') || '').trim();
+      const row = await env.ADMIN_DB.prepare('SELECT id,content_type,size,content_base64 FROM media_assets WHERE id = ? AND visibility = ? LIMIT 1').bind(id, 'public').first();
+      if (!row) return json({ error: 'Media not found' }, 404);
+      const chunkSize = 192 * 1024;
+      const index = Number(url.searchParams.get('chunkIndex') || 0);
+      const bytes = Number(row.size);
+      const count = Math.ceil(bytes / chunkSize);
+      if (!Number.isInteger(index) || index < 0 || index >= count) return json({ error: 'Invalid media transfer part' }, 400);
+      const start = Math.floor(index * chunkSize / 3) * 4;
+      const end = Math.ceil(Math.min(bytes, (index + 1) * chunkSize) / 3) * 4;
+      return json({ id: row.id, contentType: row.content_type, size: bytes, chunkIndex: index, chunkCount: count, base64: String(row.content_base64).slice(start, end) });
+    }
+    if (url.pathname === '/v1/media-assets') {
+      const identity = await requireAdmin(request, env);
+      if (!identity) return json({ error: 'Admin authentication required' }, 401);
+      if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
+      const result = await env.ADMIN_DB.prepare('SELECT id,bucket,path,content_type,size,visibility,created_at,updated_at FROM media_assets ORDER BY created_at DESC LIMIT 500').all();
+      return json({ data: camelize(result.results || []) });
     }
 
     const table = READ_ROUTES.get(url.pathname);
