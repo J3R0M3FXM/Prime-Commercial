@@ -202,6 +202,20 @@ CREATE TABLE IF NOT EXISTS system_settings (
   updated_at INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS device_registrations (
+  id TEXT PRIMARY KEY,
+  telegram_user_id TEXT,
+  installation_id TEXT,
+  fingerprint_id TEXT,
+  metadata TEXT DEFAULT '{}',
+  risk_score NUMERIC DEFAULT 0,
+  trust_status TEXT DEFAULT 'observed',
+  first_seen_at INTEGER,
+  last_seen_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_registrations_telegram ON device_registrations(telegram_user_id);
+
 CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_tg_user_id ON customers(tg_user_id) WHERE tg_user_id IS NOT NULL;

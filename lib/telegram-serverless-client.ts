@@ -36,9 +36,10 @@ const nativeReadRoutes: Record<string, string> = {
   manageCouriers: '/v1/couriers',
   manageSupportTickets: '/v1/support-tickets',
   manageCharges: '/v1/charges',
+  getPublicCharges: '/v1/charges',
   manageAccountHistory: '/v1/account-history',
   manageNotifications: '/v1/admin-read',
-  manageDeviceSecurity: '/v1/admin-read',
+  manageDeviceSecurity: '/v1/device-security',
   manageSmsEvidence: '/v1/admin-read',
   manageStoryCampaigns: '/v1/admin-read',
   manageVideos: '/v1/admin-read',
@@ -72,6 +73,10 @@ async function callNativeAdminGateway<T>(name: string, input: Record<string, unk
   if (Number.isFinite(requestedOffset)) url.searchParams.set('offset', String(requestedOffset));
   if (name === 'manageOrders' && input.action) url.searchParams.set('action', String(input.action));
   if (name === 'manageOrders' && input.orderId) url.searchParams.set('orderId', String(input.orderId));
+  if (name === 'manageDeviceSecurity') {
+    url.searchParams.set('action', String(input.action || 'staffDetail'));
+    if (input.customerId) url.searchParams.set('customerId', String(input.customerId));
+  }
   if (path === '/v1/admin-read') {
     url.searchParams.set('name', name);
     url.searchParams.set('action', String(input.action || ''));

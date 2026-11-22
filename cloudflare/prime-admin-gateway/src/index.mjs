@@ -11,6 +11,7 @@ const READ_ROUTES = new Map([
   ['/v1/support-tickets', 'support_tickets'],
   ['/v1/charges', 'charges'],
   ['/v1/account-history', 'account_history'],
+  ['/v1/device-registrations', 'device_registrations'],
 ]);
 
 function headers() {
@@ -94,6 +95,23 @@ export default {
         manageTomtomSettings: { configured: false },
       };
       return json({ data: defaults[name] ?? {} });
+    }
+
+    if (url.pathname === '/v1/device-security') {
+      const identity = await requireAdmin(request, env);
+      if (!identity) return json({ error: 'Admin authentication required' }, 401);
+      if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
+      const action = url.searchParams.get('action') || 'staffDetail';
+      if (action === 'capabilities') return json({ data: { contextKeys: [], requestKeys: ['authorization'], metadataKeys: [], ipStatus: 'Server IP is available only in source security records.' } });
+      const customerId = String(url.searchParams.get('customerId') || '').trim();
+      const rows = customerId
+        ? await env.ADMIN_DB.prepare('SELECT d.* FROM device_registrations d LEFT JOIN customers c ON c.tg_user_id = d.telegram_user_id OR c.id = d.telegram_user_id WHERE c.id = ? OR c.tg_user_id = ? ORDER BY d.last_seen_at DESC LIMIT 100').bind(customerId, customerId).all()
+        : await env.ADMIN_DB.prepare('SELECT * FROM device_registrations ORDER BY last_seen_at DESC LIMIT 100').all();
+      const devices = (rows.results || []).map((row) => {
+        let metadata = {}; try { metadata = JSON.parse(row.metadata || '{}'); } catch {}
+        return { id: row.id, installationId: row.installation_id, fingerprintId: row.fingerprint_id, riskScore: Number(row.risk_score || 0), trustStatus: row.trust_status || 'observed', firstSeenAt: Number(row.first_seen_at || 0), lastSeenAt: Number(row.last_seen_at || 0), metadata };
+      });
+      return json({ data: { devices, sessions: [], events: [], retentionDays: 365, preciseCoordinatesStored: false, serverIpAvailable: devices.some((device) => Boolean(device.metadata?.clientObservedIp)) } });
     }
 
     const table = READ_ROUTES.get(url.pathname);
