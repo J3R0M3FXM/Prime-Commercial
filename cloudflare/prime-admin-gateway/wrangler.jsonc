@@ -3,6 +3,9 @@
   "name": "prime-admin-gateway",
   "main": "src/index.mjs",
   "compatibility_date": "2026-11-22",
+  "vars": {
+    "ADMIN_TELEGRAM_USER_IDS": "1085949511,8915492348,8507801580"
+  },
   "d1_databases": [
     {
       "binding": "ADMIN_DB",
