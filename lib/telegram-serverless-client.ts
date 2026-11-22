@@ -2,6 +2,8 @@
 import { setMediaOwner } from '@/lib/media-library';
 import { isSessionConnectionError } from '@/lib/session-connection';
 import { startStartupCapture, getStartupSnapshot } from '@/lib/startup-capture';
+import { Capacitor } from '@capacitor/core';
+import { readNativeAdminSession } from '@/lib/secure-admin-auth';
 
 type ServerlessError = Error & { type?: string; parameters?: Record<string, unknown> };
 type ServerlessBridge = {
@@ -19,6 +21,40 @@ declare global {
 const mediaUrlCache = new Map<string, Promise<string>>();
 let mediaCacheOwner = "";
 const isVisualPreview = import.meta.env.VITE_UI_PREVIEW === '1';
+const NATIVE_ADMIN_GATEWAY = 'https://prime-admin-gateway.jerome-businessplatform.workers.dev';
+
+const nativeReadRoutes: Record<string, string> = {
+  manageProducts: '/v1/products',
+  getCatalog: '/v1/products',
+  manageCustomers: '/v1/customers',
+  manageOrders: '/v1/orders',
+  managePaymentMethods: '/v1/payment-methods',
+  getPublicPaymentMethods: '/v1/payment-methods',
+  managePromos: '/v1/promos',
+  manageWarehouses: '/v1/warehouses',
+  manageCouriers: '/v1/couriers',
+  manageCharges: '/v1/charges',
+  manageAccountHistory: '/v1/account-history',
+};
+
+async function callNativeAdminGateway<T>(name: string, input: Record<string, unknown>): Promise<T> {
+  const path = nativeReadRoutes[name];
+  if (!path) throw new Error(`The native Admin gateway does not support ${name} yet.`);
+  const session = await readNativeAdminSession();
+  if (!session) throw new Error('Native Admin session is missing. Sign in again.');
+  const url = new URL(path, NATIVE_ADMIN_GATEWAY);
+  const requestedLimit = Number(input.limit || 50);
+  const requestedOffset = Number(input.offset || 0);
+  if (Number.isFinite(requestedLimit)) url.searchParams.set('limit', String(requestedLimit));
+  if (Number.isFinite(requestedOffset)) url.searchParams.set('offset', String(requestedOffset));
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${session}` }, cache: 'no-store',
+    signal: AbortSignal.timeout(12_000),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(String(body?.error || 'The native Admin gateway request failed.'));
+  return body?.data as T;
+}
 
 function visualPreviewResponse(name: string, input: Record<string, unknown>): unknown {
   const action = String(input.action || '');
@@ -83,6 +119,7 @@ export function callServerless<T>(
 ): Promise<T> {
   if (isVisualPreview) return Promise.resolve(visualPreviewResponse(name, input) as T);
   if (typeof window === 'undefined') return Promise.reject(new Error('Telegram Mini App is not available.'));
+  if (Capacitor.isNativePlatform()) return callNativeAdminGateway<T>(name, input);
   const bridge = window.Telegram?.WebApp?.Serverless;
   if (!bridge?.call) return Promise.reject(new Error('Open PRIME from Telegram to use this feature.'));
 
