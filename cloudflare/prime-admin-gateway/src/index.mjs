@@ -150,7 +150,28 @@ export default {
       if (!identity) return json({ error: 'Admin authentication required' }, 401);
       if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
       const result = await env.ADMIN_DB.prepare('SELECT id,bucket,path,content_type,size,visibility,created_at,updated_at FROM media_assets ORDER BY created_at DESC LIMIT 500').all();
-    return json({ data: (result.results || []).map((row) => normalizeProjectionRow(table, row)) });
+      return json({ data: (result.results || []).map((row) => camelize(row)) });
+    }
+
+    if (url.pathname === '/v1/support-tickets') {
+      const identity = await requireAdmin(request, env);
+      if (!identity) return json({ error: 'Admin authentication required' }, 401);
+      if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
+      const action = url.searchParams.get('action') || 'list';
+      const ticketId = String(url.searchParams.get('id') || '').trim();
+      const mapTicket = (row) => {
+        const ticket = normalizeProjectionRow('support_tickets', row);
+        ticket.messages = Array.isArray(ticket.messages) ? ticket.messages : [];
+        ticket.unread = Number(ticket.staffSeenVersion || 0) < Number(ticket.version || 0);
+        return ticket;
+      };
+      if (action === 'detail' && ticketId) {
+        const row = await env.ADMIN_DB.prepare('SELECT * FROM support_tickets WHERE id = ? LIMIT 1').bind(ticketId).first();
+        return json({ data: { ticket: row ? mapTicket(row) : null } });
+      }
+      const result = await env.ADMIN_DB.prepare('SELECT * FROM support_tickets ORDER BY updated_at DESC LIMIT 500').all();
+      const tickets = (result.results || []).map(mapTicket);
+      return json({ data: { tickets, total: tickets.length, unread: tickets.filter((ticket) => ticket.unread).length, nextCursor: null } });
     }
 
     const table = READ_ROUTES.get(url.pathname);
@@ -168,6 +189,6 @@ export default {
       return json({ data: camelize(result.results?.[0] || null) });
     }
     const result = await env.ADMIN_DB.prepare(`SELECT * FROM ${table} LIMIT ? OFFSET ?`).bind(limit, offset).all();
-    return json({ data: camelize(result.results || []), pagination: { limit, offset, count: result.results?.length || 0 } });
+    return json({ data: (result.results || []).map((row) => normalizeProjectionRow(table, row)), pagination: { limit, offset, count: result.results?.length || 0 } });
   },
 };

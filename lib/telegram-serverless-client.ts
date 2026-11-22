@@ -85,6 +85,10 @@ async function callNativeAdminGateway<T>(name: string, input: Record<string, unk
   if (Number.isFinite(requestedOffset)) url.searchParams.set('offset', String(requestedOffset));
   if (name === 'manageOrders' && input.action) url.searchParams.set('action', String(input.action));
   if (name === 'manageOrders' && input.orderId) url.searchParams.set('orderId', String(input.orderId));
+  if (name === 'manageSupportTickets') {
+    if (input.action) url.searchParams.set('action', String(input.action));
+    if (input.id) url.searchParams.set('id', String(input.id));
+  }
   if (name === 'manageDeviceSecurity') {
     url.searchParams.set('action', String(input.action || 'staffDetail'));
     if (input.customerId) url.searchParams.set('customerId', String(input.customerId));
