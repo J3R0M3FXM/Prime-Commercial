@@ -1,0 +1,35 @@
+name: PRIME Native Projection Sync
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prime-native-projection-sync
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Reconcile authoritative TGCloud data into native projection
+        env:
+          TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_TOKEN }}
+        run: |
+          set -eu
+          case "$TGCLOUD_TOKEN" in app8830494959:*) ;; *) echo 'Unexpected TGCloud app token' >&2; exit 1 ;; esac
+          for table in products customers payment_methods promos warehouses couriers support_tickets charges account_history device_registrations; do
+            npx --yes --package=@tgcloud/cli -- tgcloud run endpoints/health "{action:'sync',table:'$table'}"
+          done
+          for offset in 0 40; do
+            npx --yes --package=@tgcloud/cli -- tgcloud run endpoints/health "{action:'sync',table:'orders',offset:$offset,singlePage:true}"
+          done
+          for offset in 0 40 80 120 160 200 240 280 320; do
+            npx --yes --package=@tgcloud/cli -- tgcloud run endpoints/health "{action:'sync',table:'media_assets',offset:$offset,singlePage:true}"
+          done
+          echo 'Native projection reconciliation completed.'
