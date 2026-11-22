@@ -256,3 +256,15 @@ CREATE TABLE IF NOT EXISTS admin_import_state (
   last_error TEXT,
   updated_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS projection_sync_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_name TEXT NOT NULL,
+  table_name TEXT NOT NULL,
+  row_count INTEGER NOT NULL DEFAULT 0,
+  cursor TEXT,
+  status TEXT NOT NULL,
+  error TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_projection_sync_runs_created ON projection_sync_runs(created_at DESC);

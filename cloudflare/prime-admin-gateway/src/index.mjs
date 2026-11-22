@@ -20,9 +20,69 @@ function headers() {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
     'access-control-allow-origin': '*',
-    'access-control-allow-headers': 'authorization, content-type',
-    'access-control-allow-methods': 'GET, OPTIONS',
+    'access-control-allow-headers': 'authorization, content-type, x-prime-sync-timestamp, x-prime-sync-signature',
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
   };
+}
+
+const SYNC_TABLES = new Set([
+  'products', 'customers', 'orders', 'payment_methods', 'promos', 'warehouses',
+  'couriers', 'support_tickets', 'charges', 'system_settings', 'account_history',
+  'device_registrations', 'media_assets',
+]);
+const SYNC_KEYS = { system_settings: 'key' };
+
+function constantTimeEqual(left, right) {
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return diff === 0;
+}
+
+async function hmac(secret, value) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const bytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function verifySync(request, env, body) {
+  const secret = String(env.SYNC_SECRET || '').trim();
+  const timestamp = String(request.headers.get('x-prime-sync-timestamp') || '').trim();
+  const signature = String(request.headers.get('x-prime-sync-signature') || '').trim().toLowerCase();
+  const age = Date.now() - Number(timestamp);
+  if (!secret || !/^\d{13}$/.test(timestamp) || !Number.isFinite(age) || Math.abs(age) > 5 * 60 * 1000 || !/^[a-f0-9]{64}$/.test(signature)) return false;
+  return constantTimeEqual(signature, await hmac(secret, `${timestamp}\n${body}`));
+}
+
+async function applySyncBatch(env, payload) {
+  const table = String(payload?.table || '');
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  if (!SYNC_TABLES.has(table) || rows.length > 250) throw new Error('Invalid synchronization batch');
+  const info = await env.ADMIN_DB.prepare(`PRAGMA table_info(${table})`).all();
+  const allowed = new Set((info.results || []).map((column) => column.name));
+  let imported = 0;
+  for (const sourceRow of rows) {
+    const hasMediaContent = Object.prototype.hasOwnProperty.call(sourceRow || {}, 'content_base64');
+    const row = Object.fromEntries(Object.entries(sourceRow || {}).filter(([key]) => allowed.has(key)));
+    if (table === 'media_assets' && !hasMediaContent) row.content_base64 = '';
+    const columns = Object.keys(row);
+    if (!columns.length) continue;
+    const values = columns.map((column) => {
+      const value = row[column];
+      return value && typeof value === 'object' ? JSON.stringify(value) : value == null ? null : value;
+    });
+    const placeholders = columns.map(() => '?').join(',');
+    const key = SYNC_KEYS[table] || 'id';
+    const updates = columns.filter((column) => column !== key && !(table === 'media_assets' && column === 'content_base64' && !hasMediaContent)).map((column) => `${column}=excluded.${column}`).join(',');
+    const statement = updates
+      ? `INSERT INTO ${table} (${columns.join(',')}) VALUES (${placeholders}) ON CONFLICT(${key}) DO UPDATE SET ${updates}`
+      : `INSERT OR IGNORE INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`;
+    await env.ADMIN_DB.prepare(statement).bind(...values).run();
+    imported += 1;
+  }
+  await env.ADMIN_DB.prepare('INSERT INTO projection_sync_runs (source_name,table_name,row_count,cursor,status,error,created_at) VALUES (?,?,?,?,?,?,?)')
+    .bind(String(payload?.source || 'tgcloud'), table, imported, String(payload?.cursor || ''), 'ok', '', Date.now()).run();
+  return imported;
 }
 
 function json(body, status = 200) {
@@ -84,13 +144,31 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers() });
-    if (request.method !== 'GET' && !(request.method === 'POST' && url.pathname === '/v1/media-upload')) return json({ error: 'Method not allowed' }, 405);
+    if (request.method !== 'GET' && !(request.method === 'POST' && ['/v1/media-upload', '/v1/sync/batch'].includes(url.pathname))) return json({ error: 'Method not allowed' }, 405);
     if (url.pathname === '/health') return json({ ok: true, service: 'prime-admin-gateway', database: Boolean(env.ADMIN_DB) });
     if (url.pathname === '/session') {
       const identity = await requireAdmin(request, env);
       return identity
         ? json({ authenticated: true, isAdmin: true, tgUserId: identity.id, user: identity })
         : json({ authenticated: false }, 401);
+    }
+    if (url.pathname === '/v1/sync/batch') {
+      if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
+      const body = await request.text();
+      if (!(await verifySync(request, env, body))) return json({ error: 'Invalid synchronization signature' }, 401);
+      try {
+        const imported = await applySyncBatch(env, JSON.parse(body));
+        return json({ data: { ok: true, imported, table: JSON.parse(body).table } });
+      } catch (error) {
+        return json({ error: String(error?.message || 'Synchronization failed') }, 400);
+      }
+    }
+    if (url.pathname === '/v1/sync/status') {
+      const identity = await requireAdmin(request, env);
+      if (!identity) return json({ error: 'Admin authentication required' }, 401);
+      if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
+      const result = await env.ADMIN_DB.prepare('SELECT table_name AS tableName, SUM(row_count) AS rows, MAX(created_at) AS lastSyncAt, MAX(status) AS status FROM projection_sync_runs GROUP BY table_name ORDER BY table_name').all();
+      return json({ data: { automatic: Boolean(env.SYNC_SECRET), tables: result.results || [] } });
     }
     if (url.pathname === '/v1/admin-read') {
       const identity = await requireAdmin(request, env);
