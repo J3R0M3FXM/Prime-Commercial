@@ -14,21 +14,22 @@ async function hmacHex(keyBytes, value) {
 async function verifyTelegramLogin(url, env) {
   const params = new URLSearchParams(url.search);
   const hash = params.get('hash') || '';
-  if (!/^[a-f0-9]{64}$/i.test(hash)) return null;
+  if (!/^[a-f0-9]{64}$/i.test(hash)) return { error: 'hash' };
   params.delete('hash');
   const authDate = Number(params.get('auth_date') || 0);
   const now = Math.floor(Date.now() / 1000);
-  if (!Number.isSafeInteger(authDate) || authDate <= 0 || authDate > now + 300 || now - authDate > 86400) return null;
+  if (!Number.isSafeInteger(authDate) || authDate <= 0 || authDate > now + 300 || now - authDate > 86400) return { error: 'auth_date' };
   const token = String(env.TELEGRAM_BOT_TOKEN || '').trim();
-  if (!token) return null;
+  if (!token) return { error: 'bot_token' };
   const tokenKey = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
   const signedPayloads = [params, new URLSearchParams(params)];
   signedPayloads[1].delete('native');
-  const validSignature = await Promise.any(signedPayloads.map((payload) => {
+  const signatureMatches = await Promise.all(signedPayloads.map((payload) => {
     const dataCheck = [...payload.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('\n');
     return hmacHex(tokenKey, dataCheck).then((signature) => signature === hash.toLowerCase());
   }));
-  if (!validSignature) return null;
+  const validSignature = signatureMatches.some(Boolean);
+  if (!validSignature) return { error: 'signature' };
   params.delete('native');
   let user;
   try {
@@ -39,10 +40,10 @@ async function verifyTelegramLogin(url, env) {
       username: params.get('username') || '',
       photo_url: params.get('photo_url') || ''
     };
-  } catch { return null; }
+  } catch { return { error: 'user_json' }; }
   const tgUserId = user?.id == null ? '' : String(user.id);
-  if (!/^\d+$/.test(tgUserId)) return null;
-  return { tgUserId, user };
+  if (!/^\d+$/.test(tgUserId)) return { error: 'user_id' };
+  return { ok: true, tgUserId, user };
 }
 
 function isAdminTelegramUser(tgUserId, env) {
@@ -89,7 +90,7 @@ export default {
     if (url.pathname === '/login') return loginPage(env, request.url);
     if (url.pathname === '/callback' || url.pathname === '/api/telegram/callback') {
       const verified = await verifyTelegramLogin(url, env);
-      if (!verified) return new Response('Telegram login verification failed.', { status: 401 });
+      if (!verified.ok) return new Response('Telegram login verification failed.', { status: 401 });
       if (!env.AUTH_CODES) return new Response('Admin authentication is not configured.', { status: 503 });
       if (!isAdminTelegramUser(verified.tgUserId, env)) return new Response('Telegram account is not authorized for Admin access.', { status: 403 });
       const code = crypto.randomUUID().replaceAll('-', '');
