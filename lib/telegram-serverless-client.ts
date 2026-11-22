@@ -24,6 +24,7 @@ const isVisualPreview = import.meta.env.VITE_UI_PREVIEW === '1';
 const NATIVE_ADMIN_GATEWAY = 'https://prime-admin-gateway.jerome-businessplatform.workers.dev';
 
 const nativeReadRoutes: Record<string, string> = {
+  getTelegramSession: '/session',
   manageProducts: '/v1/products',
   getCatalog: '/v1/products',
   manageCustomers: '/v1/customers',
@@ -53,7 +54,7 @@ async function callNativeAdminGateway<T>(name: string, input: Record<string, unk
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(String(body?.error || 'The native Admin gateway request failed.'));
-  return body?.data as T;
+  return (name === 'getTelegramSession' ? body : body?.data) as T;
 }
 
 function visualPreviewResponse(name: string, input: Record<string, unknown>): unknown {

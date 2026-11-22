@@ -64,6 +64,12 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers() });
     if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
     if (url.pathname === '/health') return json({ ok: true, service: 'prime-admin-gateway', database: Boolean(env.ADMIN_DB) });
+    if (url.pathname === '/session') {
+      const identity = await requireAdmin(request, env);
+      return identity
+        ? json({ authenticated: true, isAdmin: true, tgUserId: identity.id, user: identity })
+        : json({ authenticated: false }, 401);
+    }
 
     const table = READ_ROUTES.get(url.pathname);
     if (!table) return json({ error: 'Not found' }, 404);
