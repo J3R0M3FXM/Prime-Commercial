@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "prime-admin-gateway",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-11-22",
+  "d1_databases": [
+    {
+      "binding": "ADMIN_DB",
+      "database_name": "prime-admin-native",
+      "database_id": "f66d5793-3c53-4645-9965-f80c8bc832fb",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
