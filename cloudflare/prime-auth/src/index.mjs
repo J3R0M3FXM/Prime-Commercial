@@ -16,15 +16,20 @@ async function verifyTelegramLogin(url, env) {
   const hash = params.get('hash') || '';
   if (!/^[a-f0-9]{64}$/i.test(hash)) return null;
   params.delete('hash');
-  params.delete('native');
   const authDate = Number(params.get('auth_date') || 0);
   const now = Math.floor(Date.now() / 1000);
   if (!Number.isSafeInteger(authDate) || authDate <= 0 || authDate > now + 300 || now - authDate > 86400) return null;
-  const dataCheck = [...params.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('\n');
   const token = String(env.TELEGRAM_BOT_TOKEN || '').trim();
   if (!token) return null;
   const tokenKey = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
-  if ((await hmacHex(tokenKey, dataCheck)) !== hash.toLowerCase()) return null;
+  const signedPayloads = [params, new URLSearchParams(params)];
+  signedPayloads[1].delete('native');
+  const validSignature = await Promise.any(signedPayloads.map((payload) => {
+    const dataCheck = [...payload.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('\n');
+    return hmacHex(tokenKey, dataCheck).then((signature) => signature === hash.toLowerCase());
+  }));
+  if (!validSignature) return null;
+  params.delete('native');
   let user;
   try {
     user = params.get('user') ? JSON.parse(params.get('user')) : {
