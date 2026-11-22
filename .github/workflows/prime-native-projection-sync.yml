@@ -26,13 +26,14 @@ jobs:
           workdir=$(mktemp -d)
           cd "$workdir"
           npm exec --yes --package=@tgcloud/cli -- tgcloud pull >/dev/null
+          ctx="{initData:{user:{id:1085949511}}}"
           for table in products customers payment_methods promos warehouses couriers support_tickets charges account_history device_registrations; do
-            npx --yes --package=@tgcloud/cli -- tgcloud run endpoints/health "{action:'sync',table:'$table'}"
+            npx --yes --package=@tgcloud/cli -- tgcloud run --ctx "$ctx" endpoints/health "{action:'sync',table:'$table'}"
           done
           for offset in 0 40; do
-            npx --yes --package=@tgcloud/cli -- tgcloud run endpoints/health "{action:'sync',table:'orders',offset:$offset,singlePage:true}"
+            npx --yes --package=@tgcloud/cli -- tgcloud run --ctx "$ctx" endpoints/health "{action:'sync',table:'orders',offset:$offset,singlePage:true}"
           done
           for offset in 0 40 80 120 160 200 240 280 320; do
-            npx --yes --package=@tgcloud/cli -- tgcloud run endpoints/health "{action:'sync',table:'media_assets',offset:$offset,singlePage:true}"
+            npx --yes --package=@tgcloud/cli -- tgcloud run --ctx "$ctx" endpoints/health "{action:'sync',table:'media_assets',offset:$offset,singlePage:true}"
           done
           echo 'Native projection reconciliation completed.'
