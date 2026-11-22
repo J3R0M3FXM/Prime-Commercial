@@ -42,6 +42,11 @@ export default function AdminPage() {
   const [publicOrderQueue, setPublicOrderQueue] = useState<PublicOrderQueue | null>(null);
   const [dashboardOrders, setDashboardOrders] = useState<any[] | null>(null);
   const [lowStockCount, setLowStockCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    document.documentElement.dataset.nativeAdmin = "true";
+    return () => { delete document.documentElement.dataset.nativeAdmin; };
+  }, []);
   useEffect(() => { let cancelled = false; void (async () => { setChecking(true); setConnectionFailed(false); setBootProgress(45); try { if (Capacitor.isNativePlatform()) { await resumeNativeAdminLogin("https://auth.codespacelabs.online"); let nativeSession = await readNativeAdminSession(); const verifyNativeSession = async (session: string) => { const response = await fetch("https://auth.codespacelabs.online/session", { headers: { Authorization: `Bearer ${session}` }, cache: "no-store" }); const body = await response.json().catch(() => ({})); return body?.authenticated === true && body.identity?.role === "admin"; }; if (!nativeSession || !(await verifyNativeSession(nativeSession))) { await clearNativeAdminSession(); await startNativeAdminLogin("https://auth.codespacelabs.online"); nativeSession = await readNativeAdminSession(); } if (nativeSession && await verifyNativeSession(nativeSession)) { if (!cancelled) { setBootProgress(78); setAuthorized(true); } return; } } const session = await getTelegramServerlessSession(); if (cancelled) return; if (session?.authenticated && session.isAdmin) { setBootProgress(78); setAuthorized(true); void callServerless("setShopMenuButton").catch(() => undefined); } } catch (error) { if (!cancelled) setConnectionFailed(isSessionConnectionError(error)); } finally { if (!cancelled) { setBootProgress(100); await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); if (!cancelled) setChecking(false); } } })(); return () => { cancelled = true; }; }, [authAttempt]);
   useEffect(() => {
     if (!authorized) return;

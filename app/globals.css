@@ -886,6 +886,31 @@ body .prime-order-history .font-lato-regular { font-family: 'Lato', sans-serif !
   border-radius: 18px !important;
 }
 
+/* Native APK WebView renders the same mobile CSS slightly smaller than Telegram.
+   Keep this adjustment scoped to the native Admin document only. */
+html[data-native-admin="true"] .admin-shell {
+  font-size: 15px;
+}
+
+html[data-native-admin="true"] .admin-shell [class*="text-xs"] {
+  font-size: 13px !important;
+}
+
+html[data-native-admin="true"] .admin-shell [class*="text-sm"] {
+  font-size: 15px !important;
+}
+
+html[data-native-admin="true"] .admin-shell small,
+html[data-native-admin="true"] .admin-shell .admin-eyebrow {
+  font-size: 12px !important;
+}
+
+html[data-native-admin="true"] .admin-shell input,
+html[data-native-admin="true"] .admin-shell select,
+html[data-native-admin="true"] .admin-shell textarea {
+  font-size: 15px;
+}
+
 @media (max-width: 639px) {
   .admin-shell {
     font-size: 14px;
