@@ -49,7 +49,7 @@ function normalizeProjectionRow(table, row) {
     parse('bundleConfig', {}); parse('tags', []); parse('gallery', []);
     if (!Array.isArray(value.variants) && Array.isArray(value.bundleConfig?.variants)) value.variants = value.bundleConfig.variants;
   }
-  if (table === 'orders') { parse('items', []); parse('deliveryAddress', {}); parse('chargesBreakdown', []); }
+  if (table === 'orders') { parse('items', []); parse('deliveryAddress', {}); parse('chargesBreakdown', []); parse('workflow', {}); }
   if (table === 'support_tickets') parse('messages', []);
   return value;
 }
@@ -202,7 +202,7 @@ export default {
       const result = await env.ADMIN_DB.prepare('SELECT * FROM orders WHERE id = ? OR order_number = ? LIMIT 1').bind(orderId, orderId).all();
       return json({ data: camelize(result.results?.[0] || null) });
     }
-    const result = await env.ADMIN_DB.prepare(`SELECT * FROM ${table} LIMIT ? OFFSET ?`).bind(limit, offset).all();
+    const result = await env.ADMIN_DB.prepare(`SELECT * FROM ${table} ORDER BY ${table === 'orders' ? 'created_at' : 'updated_at'} DESC LIMIT ? OFFSET ?`).bind(limit, offset).all();
     return json({ data: (result.results || []).map((row) => normalizeProjectionRow(table, row)), pagination: { limit, offset, count: result.results?.length || 0 } });
   },
 };

@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS orders (
   delivered_at INTEGER,
   tracking_url TEXT,
   control_state TEXT NOT NULL DEFAULT 'normal',
+  workflow TEXT DEFAULT '{}',
   created_at INTEGER,
   updated_at INTEGER
 );
