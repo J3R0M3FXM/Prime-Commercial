@@ -1,0 +1,38 @@
+name: Admin Gateway Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  gateway-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check gateway health
+        env:
+          GATEWAY_URL: https://prime-admin-gateway.jerome-businessplatform.workers.dev
+          AUTH_URL: https://auth.codespacelabs.online
+        run: |
+          set -euo pipefail
+          health="$(curl --fail --silent --show-error --location --max-time 15 "$GATEWAY_URL/health")"
+          echo "$health"
+          printf '%s' "$health" | jq -e '.ok == true and .database == true' >/dev/null
+
+          auth_health="$(curl --fail --silent --show-error --location --max-time 15 "$AUTH_URL/health")"
+          echo "$auth_health"
+          printf '%s' "$auth_health" | jq -e '.ok == true' >/dev/null
+
+      - name: Verify protected routes fail closed
+        env:
+          GATEWAY_URL: https://prime-admin-gateway.jerome-businessplatform.workers.dev
+        run: |
+          set -euo pipefail
+          for route in session v1/products v1/customers v1/orders v1/payment-methods v1/promos v1/warehouses v1/couriers v1/charges v1/account-history; do
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' --location --max-time 15 "$GATEWAY_URL/$route")"
+            test "$status" = 401 || { echo "Expected 401 for /$route, got $status"; exit 1; }
+          done
+          echo 'All protected routes fail closed with HTTP 401.'
