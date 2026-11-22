@@ -8,6 +8,7 @@ const READ_ROUTES = new Map([
   ['/v1/promos', 'promos'],
   ['/v1/warehouses', 'warehouses'],
   ['/v1/couriers', 'couriers'],
+  ['/v1/support-tickets', 'support_tickets'],
   ['/v1/charges', 'charges'],
   ['/v1/account-history', 'account_history'],
 ]);

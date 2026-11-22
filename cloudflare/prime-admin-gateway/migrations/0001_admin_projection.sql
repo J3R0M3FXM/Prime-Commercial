@@ -166,6 +166,24 @@ CREATE TABLE IF NOT EXISTS couriers (
   updated_at INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id TEXT PRIMARY KEY,
+  owner_telegram_id TEXT,
+  customer_name TEXT,
+  request_key TEXT,
+  subject TEXT,
+  category TEXT,
+  order_id TEXT,
+  status TEXT,
+  messages TEXT DEFAULT '[]',
+  version INTEGER DEFAULT 0,
+  customer_seen_version INTEGER DEFAULT 0,
+  staff_seen_version INTEGER DEFAULT 0,
+  last_message TEXT,
+  created_at INTEGER,
+  updated_at INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS charges (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

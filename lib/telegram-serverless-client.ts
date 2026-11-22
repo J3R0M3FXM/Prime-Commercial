@@ -34,6 +34,7 @@ const nativeReadRoutes: Record<string, string> = {
   managePromos: '/v1/promos',
   manageWarehouses: '/v1/warehouses',
   manageCouriers: '/v1/couriers',
+  manageSupportTickets: '/v1/support-tickets',
   manageCharges: '/v1/charges',
   manageAccountHistory: '/v1/account-history',
   manageNotifications: '/v1/admin-read',
