@@ -23,17 +23,23 @@ export async function unlockAdminDevice() {
 }
 
 export async function readNativeAdminSession() {
-  const result = await SecureAdminAuth.read();
-  return String(result?.value || '');
+  try {
+    const result = await SecureAdminAuth.read();
+    const value = String(result?.value || '');
+    if (value) return value;
+  } catch {}
+  return String(localStorage.getItem('prime_native_admin_session') || '');
 }
 
 export async function storeNativeAdminSession(value: string) {
   if (!value) throw new Error('Cannot store an empty Admin session.');
-  await SecureAdminAuth.store({ value });
+  localStorage.setItem('prime_native_admin_session', value);
+  try { await SecureAdminAuth.store({ value }); } catch {}
 }
 
 export async function clearNativeAdminSession() {
-  await SecureAdminAuth.clear();
+  localStorage.removeItem('prime_native_admin_session');
+  await SecureAdminAuth.clear().catch(() => undefined);
 }
 
 async function completeNativeAdminCallback(authBaseUrl: string, url: string) {
