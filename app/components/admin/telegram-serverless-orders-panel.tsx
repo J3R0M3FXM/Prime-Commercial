@@ -377,12 +377,13 @@ export default function TelegramServerlessOrdersPanel({
     if (!authorized || !selectedId) {setDetailOrder(null);setDetailError('');setDetailLoading(false);return;}
     let active=true;
     setDetailLoading(true);setDetailError('');
+    const cached = orders.find((row) => row.id === selectedId || row.orderNumber === selectedId);
     callServerless<unknown>('manageOrders',{action:'get',orderId:selectedId},30_000)
-      .then(response=>{const unpacked=unpackOrderList(response);if(!unpacked || unpacked.rows.length!==1)throw new Error('The order details could not be read.');if(active)setDetailOrder(normalizeOrder(unpacked.rows[0]));})
-      .catch((err:any)=>{if(active)setDetailError(err?.message || 'Could not load this order.');})
+      .then(response=>{const unpacked=unpackOrderList(response);if(unpacked?.rows.length===1){if(active)setDetailOrder(normalizeOrder(unpacked.rows[0]));return;}if(cached&&active)setDetailOrder(cached);else throw new Error('The order details could not be read.');})
+      .catch((err:any)=>{if(active&&cached)setDetailOrder(cached);else if(active)setDetailError(err?.message || 'Could not load this order.');})
       .finally(()=>{if(active)setDetailLoading(false);});
     return ()=>{active=false;};
-  },[authorized,selectedId,detailRetry]);
+  },[authorized,selectedId,detailRetry,orders]);
   const selectedOrder = detailOrder && (detailOrder.id===selectedId || detailOrder.orderNumber===selectedId) ? detailOrder : null;
   const identifierMatches = selectedOrder?.matchingIdentifiers || [];
 

@@ -103,6 +103,12 @@ export default {
 
     const limit = limitFor(url);
     const offset = Math.max(0, Number(url.searchParams.get('offset') || 0) || 0);
+    if (table === 'orders' && url.searchParams.get('action') === 'get') {
+      const orderId = String(url.searchParams.get('orderId') || '').trim();
+      if (!orderId) return json({ error: 'Order ID is required' }, 400);
+      const result = await env.ADMIN_DB.prepare('SELECT * FROM orders WHERE id = ? OR order_number = ? LIMIT 1').bind(orderId, orderId).all();
+      return json({ data: camelize(result.results?.[0] || null) });
+    }
     const result = await env.ADMIN_DB.prepare(`SELECT * FROM ${table} LIMIT ? OFFSET ?`).bind(limit, offset).all();
     return json({ data: camelize(result.results || []), pagination: { limit, offset, count: result.results?.length || 0 } });
   },

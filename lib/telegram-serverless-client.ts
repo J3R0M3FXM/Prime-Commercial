@@ -69,6 +69,8 @@ async function callNativeAdminGateway<T>(name: string, input: Record<string, unk
   const requestedOffset = Number(input.offset || 0);
   if (Number.isFinite(requestedLimit)) url.searchParams.set('limit', String(requestedLimit));
   if (Number.isFinite(requestedOffset)) url.searchParams.set('offset', String(requestedOffset));
+  if (name === 'manageOrders' && input.action) url.searchParams.set('action', String(input.action));
+  if (name === 'manageOrders' && input.orderId) url.searchParams.set('orderId', String(input.orderId));
   if (path === '/v1/admin-read') {
     url.searchParams.set('name', name);
     url.searchParams.set('action', String(input.action || ''));
