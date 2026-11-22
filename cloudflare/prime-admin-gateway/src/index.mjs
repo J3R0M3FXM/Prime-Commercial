@@ -39,6 +39,21 @@ function camelize(value) {
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [camelKey(key), camelize(item)]));
 }
 
+function normalizeProjectionRow(table, row) {
+  const value = camelize(row);
+  const parse = (key, fallback) => {
+    if (typeof value[key] !== 'string') return;
+    try { value[key] = JSON.parse(value[key]); } catch { value[key] = fallback; }
+  };
+  if (table === 'products') {
+    parse('bundleConfig', {}); parse('tags', []); parse('gallery', []);
+    if (!Array.isArray(value.variants) && Array.isArray(value.bundleConfig?.variants)) value.variants = value.bundleConfig.variants;
+  }
+  if (table === 'orders') { parse('items', []); parse('deliveryAddress', {}); parse('chargesBreakdown', []); }
+  if (table === 'support_tickets') parse('messages', []);
+  return value;
+}
+
 async function verifySession(value, env) {
   const session = String(value || '').trim();
   if (!session) return null;
@@ -135,7 +150,7 @@ export default {
       if (!identity) return json({ error: 'Admin authentication required' }, 401);
       if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
       const result = await env.ADMIN_DB.prepare('SELECT id,bucket,path,content_type,size,visibility,created_at,updated_at FROM media_assets ORDER BY created_at DESC LIMIT 500').all();
-      return json({ data: camelize(result.results || []) });
+    return json({ data: (result.results || []).map((row) => normalizeProjectionRow(table, row)) });
     }
 
     const table = READ_ROUTES.get(url.pathname);
