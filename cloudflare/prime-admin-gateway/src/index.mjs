@@ -49,7 +49,7 @@ function normalizeProjectionRow(table, row) {
     parse('bundleConfig', {}); parse('tags', []); parse('gallery', []);
     if (!Array.isArray(value.variants) && Array.isArray(value.bundleConfig?.variants)) value.variants = value.bundleConfig.variants;
   }
-  if (table === 'orders') { parse('items', []); parse('deliveryAddress', {}); parse('chargesBreakdown', []); parse('workflow', {}); }
+  if (table === 'orders') { parse('items', []); parse('deliveryAddress', {}); parse('chargesBreakdown', []); parse('workflow', {}); parse('fingerprintSnapshot', {}); parse('matchingIdentifiers', []); parse('ocrAnalysis', {}); }
   if (table === 'support_tickets') parse('messages', []);
   return value;
 }
