@@ -48,12 +48,18 @@ async function callNativeAdminGateway<T>(name: string, input: Record<string, unk
   const requestedOffset = Number(input.offset || 0);
   if (Number.isFinite(requestedLimit)) url.searchParams.set('limit', String(requestedLimit));
   if (Number.isFinite(requestedOffset)) url.searchParams.set('offset', String(requestedOffset));
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${session}` }, cache: 'no-store',
-    signal: AbortSignal.timeout(12_000),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Authorization: `Bearer ${session}` }, cache: 'no-store',
+      mode: 'cors',
+      signal: AbortSignal.timeout(12_000),
+    });
+  } catch (error) {
+    throw new Error(`Native Admin gateway network error (${url.pathname}): ${error instanceof Error ? error.message : 'request failed'}`);
+  }
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(String(body?.error || 'The native Admin gateway request failed.'));
+  if (!response.ok) throw new Error(String(body?.error || `Native Admin gateway request failed (${response.status} ${url.pathname}).`));
   return (name === 'getTelegramSession' ? body : body?.data) as T;
 }
 
