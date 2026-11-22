@@ -36,6 +36,15 @@ const nativeReadRoutes: Record<string, string> = {
   manageCouriers: '/v1/couriers',
   manageCharges: '/v1/charges',
   manageAccountHistory: '/v1/account-history',
+  manageNotifications: '/v1/admin-read',
+  manageDeviceSecurity: '/v1/admin-read',
+  manageSmsEvidence: '/v1/admin-read',
+  manageStoryCampaigns: '/v1/admin-read',
+  manageVideos: '/v1/admin-read',
+  manageAutomation: '/v1/admin-read',
+  manageOcrSettings: '/v1/admin-read',
+  manageIplocateSettings: '/v1/admin-read',
+  manageTomtomSettings: '/v1/admin-read',
 };
 
 async function callNativeAdminGateway<T>(name: string, input: Record<string, unknown>): Promise<T> {
@@ -48,6 +57,10 @@ async function callNativeAdminGateway<T>(name: string, input: Record<string, unk
   const requestedOffset = Number(input.offset || 0);
   if (Number.isFinite(requestedLimit)) url.searchParams.set('limit', String(requestedLimit));
   if (Number.isFinite(requestedOffset)) url.searchParams.set('offset', String(requestedOffset));
+  if (path === '/v1/admin-read') {
+    url.searchParams.set('name', name);
+    url.searchParams.set('action', String(input.action || ''));
+  }
   let response: Response;
   try {
     response = await fetch(url, {

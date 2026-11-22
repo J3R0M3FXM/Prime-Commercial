@@ -64,6 +64,26 @@ export default {
         ? json({ authenticated: true, isAdmin: true, tgUserId: identity.id, user: identity })
         : json({ authenticated: false }, 401);
     }
+    if (url.pathname === '/v1/admin-read') {
+      const identity = await requireAdmin(request, env);
+      if (!identity) return json({ error: 'Admin authentication required' }, 401);
+      const name = url.searchParams.get('name') || '';
+      const action = url.searchParams.get('action') || '';
+      const readOnly = action === 'list' || action === 'status' || action === 'capabilities' || action === '';
+      if (!readOnly) return json({ error: `${name} ${action} is not migrated to the native gateway yet.` }, 501);
+      const defaults = {
+        manageNotifications: { notifications: [] },
+        manageDeviceSecurity: action === 'capabilities' ? { capabilities: [] } : { devices: [], sessions: [] },
+        manageSmsEvidence: { configured: false },
+        manageStoryCampaigns: { campaigns: [] },
+        manageVideos: [],
+        manageAutomation: [],
+        manageOcrSettings: { googleVisionConfigured: false, ocrSpaceConfigured: false, provider: 'ocr_space' },
+        manageIplocateSettings: { configured: false },
+        manageTomtomSettings: { configured: false },
+      };
+      return json({ data: defaults[name] ?? {} });
+    }
 
     const table = READ_ROUTES.get(url.pathname);
     if (!table) return json({ error: 'Not found' }, 404);
