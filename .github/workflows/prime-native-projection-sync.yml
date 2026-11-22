@@ -23,6 +23,9 @@ jobs:
         run: |
           set -eu
           case "$TGCLOUD_TOKEN" in app8830494959:*) ;; *) echo 'Unexpected TGCloud app token' >&2; exit 1 ;; esac
+          workdir=$(mktemp -d)
+          cd "$workdir"
+          npm exec --yes --package=@tgcloud/cli -- tgcloud pull >/dev/null
           for table in products customers payment_methods promos warehouses couriers support_tickets charges account_history device_registrations; do
             npx --yes --package=@tgcloud/cli -- tgcloud run endpoints/health "{action:'sync',table:'$table'}"
           done
