@@ -26,6 +26,16 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: headers() });
 }
 
+function camelKey(key) {
+  return String(key).replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+function camelize(value) {
+  if (Array.isArray(value)) return value.map(camelize);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [camelKey(key), camelize(item)]));
+}
+
 async function verifySession(value, env) {
   const session = String(value || '').trim();
   if (!session) return null;
@@ -94,6 +104,6 @@ export default {
     const limit = limitFor(url);
     const offset = Math.max(0, Number(url.searchParams.get('offset') || 0) || 0);
     const result = await env.ADMIN_DB.prepare(`SELECT * FROM ${table} LIMIT ? OFFSET ?`).bind(limit, offset).all();
-    return json({ data: result.results || [], pagination: { limit, offset, count: result.results?.length || 0 } });
+    return json({ data: camelize(result.results || []), pagination: { limit, offset, count: result.results?.length || 0 } });
   },
 };

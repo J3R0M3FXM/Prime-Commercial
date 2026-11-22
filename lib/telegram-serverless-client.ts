@@ -47,6 +47,14 @@ const nativeReadRoutes: Record<string, string> = {
   manageTomtomSettings: '/v1/admin-read',
 };
 
+function camelizeNative(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(camelizeNative);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+    key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()), camelizeNative(item),
+  ]));
+}
+
 async function callNativeAdminGateway<T>(name: string, input: Record<string, unknown>): Promise<T> {
   const path = nativeReadRoutes[name];
   if (!path) throw new Error(`The native Admin gateway does not support ${name} yet.`);
@@ -73,7 +81,7 @@ async function callNativeAdminGateway<T>(name: string, input: Record<string, unk
   }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(String(body?.error || `Native Admin gateway request failed (${response.status} ${url.pathname}).`));
-  return (name === 'getTelegramSession' ? body : body?.data) as T;
+  return (name === 'getTelegramSession' ? body : camelizeNative(body?.data)) as T;
 }
 
 function visualPreviewResponse(name: string, input: Record<string, unknown>): unknown {
