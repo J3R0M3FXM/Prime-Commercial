@@ -14,6 +14,15 @@ type Customer = {
   fingerprintCount?: number; latestFingerprint?: any; isVisitor?: boolean;
 };
 
+function normalizeCustomer(row: any): Customer {
+  if (!row || typeof row !== "object") return row;
+  const next = { ...row };
+  if (typeof next.fingerprints === "string") {
+    try { next.fingerprints = JSON.parse(next.fingerprints); } catch { next.fingerprints = []; }
+  }
+  return next;
+}
+
 function date(value?: string) {
   if (!value) return "—";
   const parsed = new Date(value);
@@ -66,7 +75,7 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
     try {
       const rows = await callServerless<Customer[]>("manageCustomers", { action: "list" }, 30_000);
       if (!Array.isArray(rows)) throw new Error("The customer list response was invalid.");
-      setCustomers(rows);
+      setCustomers(rows.map(normalizeCustomer));
     } catch (err: any) { setError(err?.message || "Could not load customers."); }
     finally { setLoading(false); }
   }, []);
@@ -76,8 +85,12 @@ export default function TelegramServerlessCustomersPanel({ onBack }: { onBack: (
     try {
       const dossier = await callServerless<any>("manageCustomers", { action: "detail", id: customer.id }, 30_000);
       setAccountOpen(false);
-      setSelected(dossier);
-    } catch (err: any) { setError(err?.message || "Could not load this customer."); }
+      setSelected(normalizeCustomer(dossier));
+    } catch (err: any) {
+      const cached = customers.find((row) => row.id === customer.id);
+      if (cached) { setAccountOpen(false); setSelected(normalizeCustomer(cached)); }
+      else setError(err?.message || "Could not load this customer.");
+    }
     finally { setLoading(false); }
   };
 
