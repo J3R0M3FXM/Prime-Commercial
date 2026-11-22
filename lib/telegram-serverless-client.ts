@@ -50,9 +50,13 @@ const nativeReadRoutes: Record<string, string> = {
 function camelizeNative(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(camelizeNative);
   if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+  const result = Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [
     key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()), camelizeNative(item),
   ]));
+  if (result.telegramPhotoKey && !result.telegramPhotoUrl) result.telegramPhotoUrl = result.telegramPhotoKey;
+  if (result.telegramPhotoKey && !result.photoUrl) result.photoUrl = result.telegramPhotoKey;
+  if (result.photoKey && !result.photoUrl) result.photoUrl = result.photoKey;
+  return result;
 }
 
 async function callNativeAdminGateway<T>(name: string, input: Record<string, unknown>): Promise<T> {
