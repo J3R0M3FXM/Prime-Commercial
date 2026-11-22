@@ -63,6 +63,14 @@ function camelizeNative(value: unknown): unknown {
 }
 
 async function callNativeAdminGateway<T>(name: string, input: Record<string, unknown>): Promise<T> {
+  if (name === 'manageMediaAssets' && (input.action === 'uploadPublicImage' || input.action === 'uploadProductImage')) {
+    const session = await readNativeAdminSession();
+    if (!session) throw new Error('Native Admin session is missing. Sign in again.');
+    const response = await fetch(new URL('/v1/media-upload', NATIVE_ADMIN_GATEWAY), { method: 'POST', headers: { Authorization: `Bearer ${session}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(60_000) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(body?.error || `Native media upload failed (${response.status}).`));
+    return body?.data as T;
+  }
   if (name === 'getMediaContent') {
     const session = await readNativeAdminSession();
     if (!session) throw new Error('Native Admin session is missing. Sign in again.');

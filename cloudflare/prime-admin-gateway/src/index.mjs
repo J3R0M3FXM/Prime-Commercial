@@ -84,7 +84,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers() });
-    if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+    if (request.method !== 'GET' && !(request.method === 'POST' && url.pathname === '/v1/media-upload')) return json({ error: 'Method not allowed' }, 405);
     if (url.pathname === '/health') return json({ ok: true, service: 'prime-admin-gateway', database: Boolean(env.ADMIN_DB) });
     if (url.pathname === '/session') {
       const identity = await requireAdmin(request, env);
@@ -144,6 +144,20 @@ export default {
       const start = Math.floor(index * chunkSize / 3) * 4;
       const end = Math.ceil(Math.min(bytes, (index + 1) * chunkSize) / 3) * 4;
       return json({ id: row.id, contentType: row.content_type, size: bytes, chunkIndex: index, chunkCount: count, base64: String(row.content_base64).slice(start, end) });
+    }
+    if (url.pathname === '/v1/media-upload') {
+      const identity = await requireAdmin(request, env);
+      if (!identity) return json({ error: 'Admin authentication required' }, 401);
+      if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
+      const input = await request.json().catch(() => ({}));
+      const id = String(input.id || '').trim();
+      const bucket = input.action === 'uploadProductImage' ? 'product-images' : String(input.bucket || '').trim();
+      const contentType = String(input.contentType || '');
+      const encoded = String(input.data || '');
+      if (!/^img-[A-Za-z0-9_-]{8,80}$/.test(id) || !['product-images','media-gallery','courier-logos','payment-method-logos','payment-qr-codes'].includes(bucket) || !['image/jpeg','image/png'].includes(contentType) || !/^[A-Za-z0-9_-]+$/.test(encoded) || encoded.length > 1250000) return json({ error: 'Invalid or oversized image upload.' }, 400);
+      const size = Math.floor(encoded.length * 3 / 4);
+      await env.ADMIN_DB.prepare('INSERT OR REPLACE INTO media_assets (id,bucket,path,content_type,size,visibility,content_base64,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)').bind(id,bucket,`${id}.${contentType === 'image/png' ? 'png' : 'jpg'}`,contentType,size,'public',encoded,Date.now(),Date.now()).run();
+      return json({ data: { success: true, id, bucket, reference: `tgmedia:${id}`, contentType, size } });
     }
     if (url.pathname === '/v1/media-assets') {
       const identity = await requireAdmin(request, env);
