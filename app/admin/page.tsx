@@ -22,7 +22,7 @@ import PrimeIdentityHeader from "@/app/components/prime-identity-header";
 import PrimeOrderQueue, { type PublicOrderQueue } from "@/app/components/prime-order-queue";
 import SupportTickets from '@/app/components/support-tickets';
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
-import { startNativeAdminLogin } from "@/lib/secure-admin-auth";
+import { readNativeAdminSession, startNativeAdminLogin } from "@/lib/secure-admin-auth";
 import { Capacitor } from "@capacitor/core";
 
 type ModuleId = "assets" | "orders" | "pos" | "customers" | "visitors" | "inventory" | "products" | "warehouse" | "couriers" | "payments" | "charges" | "promos" | "media" | "broadcast" | "system" | "support";
@@ -42,7 +42,7 @@ export default function AdminPage() {
   const [publicOrderQueue, setPublicOrderQueue] = useState<PublicOrderQueue | null>(null);
   const [dashboardOrders, setDashboardOrders] = useState<any[] | null>(null);
   const [lowStockCount, setLowStockCount] = useState<number | null>(null);
-  useEffect(() => { let cancelled = false; void (async () => { setChecking(true); setConnectionFailed(false); setBootProgress(45); try { const session = await getTelegramServerlessSession(); if (cancelled) return; if (session?.authenticated && session.isAdmin) { setBootProgress(78); setAuthorized(true); void callServerless("setShopMenuButton").catch(() => undefined); } } catch (error) { if (!cancelled) setConnectionFailed(isSessionConnectionError(error)); } finally { if (!cancelled) { setBootProgress(100); await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); if (!cancelled) setChecking(false); } } })(); return () => { cancelled = true; }; }, [authAttempt]);
+  useEffect(() => { let cancelled = false; void (async () => { setChecking(true); setConnectionFailed(false); setBootProgress(45); try { if (Capacitor.isNativePlatform()) { const nativeSession = await readNativeAdminSession(); if (nativeSession) { const response = await fetch("https://auth.codespacelabs.online/session", { headers: { Authorization: `Bearer ${nativeSession}` }, cache: "no-store" }); const body = await response.json().catch(() => ({})); if (body?.authenticated === true && body.identity?.role === "admin") { if (!cancelled) { setBootProgress(78); setAuthorized(true); } return; } } } const session = await getTelegramServerlessSession(); if (cancelled) return; if (session?.authenticated && session.isAdmin) { setBootProgress(78); setAuthorized(true); void callServerless("setShopMenuButton").catch(() => undefined); } } catch (error) { if (!cancelled) setConnectionFailed(isSessionConnectionError(error)); } finally { if (!cancelled) { setBootProgress(100); await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); if (!cancelled) setChecking(false); } } })(); return () => { cancelled = true; }; }, [authAttempt]);
   useEffect(() => {
     if (!authorized) return;
     let cancelled = false;
