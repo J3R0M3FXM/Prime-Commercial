@@ -26,26 +26,20 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: headers() });
 }
 
-async function hmacHex(keyBytes, value) {
-  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const bytes = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)));
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function isAdmin(id, env) {
-  return String(env.ADMIN_TELEGRAM_USER_IDS || '').split(',').map((value) => value.trim()).includes(String(id));
-}
-
 async function verifySession(value, env) {
-  const parts = String(value || '').split('|');
-  if (parts.length !== 4 || parts[0] !== 'admin' || !/^\d+$/.test(parts[1]) || !/^\d+$/.test(parts[2]) || !/^[a-f0-9]{64}$/i.test(parts[3])) return null;
-  const issued = Number(parts[2]);
-  const now = Math.floor(Date.now() / 1000);
-  if (!Number.isSafeInteger(issued) || issued > now || now - issued > SESSION_TTL_SECONDS || !isAdmin(parts[1], env)) return null;
-  const secret = String(env.SESSION_SIGNING_KEY || '');
-  if (secret.length < 32) return null;
-  const expected = await hmacHex(new TextEncoder().encode(secret), parts.slice(0, 3).join('|'));
-  return expected === parts[3].toLowerCase() ? { id: parts[1], role: 'admin' } : null;
+  const session = String(value || '').trim();
+  if (!session) return null;
+  try {
+    const response = await fetch('https://auth.codespacelabs.online/session', {
+      headers: { Authorization: `Bearer ${session}` },
+      cf: { cacheTtl: 0, cacheEverything: false },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || body?.authenticated !== true || body?.identity?.role !== 'admin') return null;
+    return { id: String(body.identity.id || ''), role: 'admin', authMethod: 'auth_worker_session' };
+  } catch {
+    return null;
+  }
 }
 
 async function requireAdmin(request, env) {
