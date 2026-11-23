@@ -45,7 +45,11 @@ export default function SupportTickets({ admin = false, onBack }: { admin?: bool
         if (request === generation.current) setTicket(result.ticket);
       } else if (!creating) {
         const result = await requestSupport<TicketPage>(admin, { action: "list", status: filter || undefined, ...(cursor ? { cursor } : {}) });
-        if (request === generation.current) setPage((current) => cursor ? { ...result, tickets: [...current.tickets, ...result.tickets.filter((row) => !current.tickets.some((item) => item.id === row.id))] } : result);
+        if (request === generation.current) {
+          const tickets = Array.isArray(result?.tickets) ? result.tickets.filter((row: SupportTicket | null | undefined): row is SupportTicket => Boolean(row?.id)) : [];
+          const normalized = { ...(result || {}), tickets, total: Number(result?.total || tickets.length), unread: Number(result?.unread || 0) } as TicketPage;
+          setPage((current) => cursor ? { ...normalized, tickets: [...current.tickets, ...tickets.filter((row) => !current.tickets.some((item) => item.id === row.id))] } : normalized);
+        }
       }
     } catch (err: any) { if (request === generation.current) setError(err?.message || "Support could not be loaded. Please retry."); }
     finally { if (request === generation.current && !quiet) setLoading(false); }
