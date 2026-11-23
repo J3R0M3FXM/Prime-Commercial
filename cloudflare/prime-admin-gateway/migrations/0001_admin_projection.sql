@@ -268,3 +268,14 @@ CREATE TABLE IF NOT EXISTS projection_sync_runs (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_projection_sync_runs_created ON projection_sync_runs(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS projection_notifications (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  payload TEXT NOT NULL DEFAULT '{}',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_projection_notifications_created ON projection_notifications(created_at DESC);

@@ -13,18 +13,13 @@ async function pollAdminAlerts(): Promise<void> {
   const session = await readNativeAdminSession();
   if (!session) return;
   const headers = { Authorization: `Bearer ${session}` };
-  const [ordersResponse, ticketsResponse] = await Promise.all([
-    fetch(`${GATEWAY}/v1/orders?limit=5`, { headers, cache: "no-store" }),
-    fetch(`${GATEWAY}/v1/support-tickets?limit=5`, { headers, cache: "no-store" }),
-  ]);
-  const orders = (await ordersResponse.json().catch(() => ({})))?.data || [];
-  const tickets = (await ticketsResponse.json().catch(() => ({})))?.data?.tickets || [];
-  const current = `${orders[0]?.id || ""}:${tickets[0]?.id || ""}`;
-  const previous = window.localStorage.getItem("prime-admin-alert-cursor");
-  if (previous && previous !== current) {
-    await LocalNotifications.schedule({ notifications: [{ id: Date.now() % 2147483647, title: "PRIME Admin Update", body: "New order or support activity requires review.", channelId: "prime-admin", schedule: { at: new Date(Date.now() + 250) }, extra: { view: orders[0]?.id !== previous.split(":")[0] ? "orders" : "support" } }] }).catch(() => undefined);
+  const since = Number(window.localStorage.getItem("prime-admin-alert-since") || 0) || 0;
+  const response = await fetch(`${GATEWAY}/v1/notifications?since=${since}`, { headers, cache: "no-store" });
+  const events = (await response.json().catch(() => ({})))?.data || [];
+  for (const event of events) {
+    await LocalNotifications.schedule({ notifications: [{ id: Math.floor(Math.random() * 2147483647), title: event.title || "PRIME Admin Update", body: event.body || "New activity requires review.", channelId: "prime-admin", schedule: { at: new Date(Date.now() + 250) }, extra: event.payload || {} }] }).catch(() => undefined);
   }
-  window.localStorage.setItem("prime-admin-alert-cursor", current);
+  if (events.length) window.localStorage.setItem("prime-admin-alert-since", String(Math.max(...events.map((event: { createdAt?: number }) => Number(event.createdAt) || 0))));
 }
 
 export async function initializeAdminPushNotifications(): Promise<void> {

@@ -71,6 +71,8 @@ async function applySyncBatch(env, payload) {
       const value = row[column];
       return value && typeof value === 'object' ? JSON.stringify(value) : value == null ? null : value;
     });
+    const entityId = String(row.id || row.order_id || row.key || '');
+    const previous = entityId ? await env.ADMIN_DB.prepare(`SELECT updated_at AS updatedAt FROM ${table} WHERE ${SYNC_KEYS[table] || 'id'} = ? LIMIT 1`).bind(entityId).first() : null;
     const placeholders = columns.map(() => '?').join(',');
     const key = SYNC_KEYS[table] || 'id';
     const updates = columns.filter((column) => column !== key && !(table === 'media_assets' && column === 'content_base64' && !hasMediaContent)).map((column) => `${column}=excluded.${column}`).join(',');
@@ -78,6 +80,14 @@ async function applySyncBatch(env, payload) {
       ? `INSERT INTO ${table} (${columns.join(',')}) VALUES (${placeholders}) ON CONFLICT(${key}) DO UPDATE SET ${updates}`
       : `INSERT OR IGNORE INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`;
     await env.ADMIN_DB.prepare(statement).bind(...values).run();
+    const changed = !previous || String(previous.updatedAt || '') !== String(row.updated_at || '');
+    if (changed && (table === 'orders' || table === 'support_tickets')) {
+      const kind = table === 'orders' ? 'order' : 'support';
+      const title = table === 'orders' ? 'New order activity' : 'New support activity';
+      const body = table === 'orders' ? `Order ${row.order_number || entityId} requires review.` : `Support ticket ${entityId} was updated.`;
+      await env.ADMIN_DB.prepare('INSERT OR IGNORE INTO projection_notifications (id,kind,entity_id,title,body,payload,created_at) VALUES (?,?,?,?,?,?,?)')
+        .bind(`${kind}:${entityId}:${row.updated_at || Date.now()}`, kind, entityId, title, body, JSON.stringify({ view: kind === 'order' ? 'orders' : 'support', orderId: kind === 'order' ? entityId : '' }), Date.now()).run();
+    }
     imported += 1;
   }
   await env.ADMIN_DB.prepare('INSERT INTO projection_sync_runs (source_name,table_name,row_count,cursor,status,error,created_at) VALUES (?,?,?,?,?,?,?)')
@@ -169,6 +179,14 @@ export default {
       if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
       const result = await env.ADMIN_DB.prepare('SELECT table_name AS tableName, SUM(row_count) AS rows, MAX(created_at) AS lastSyncAt, MAX(status) AS status FROM projection_sync_runs GROUP BY table_name ORDER BY table_name').all();
       return json({ data: { automatic: Boolean(env.SYNC_SECRET), tables: result.results || [] } });
+    }
+    if (url.pathname === '/v1/notifications') {
+      const identity = await requireAdmin(request, env);
+      if (!identity) return json({ error: 'Admin authentication required' }, 401);
+      if (!env.ADMIN_DB) return json({ error: 'Admin database is not configured' }, 503);
+      const since = Math.max(0, Number(url.searchParams.get('since') || 0) || 0);
+      const result = await env.ADMIN_DB.prepare('SELECT id,kind,entity_id AS entityId,title,body,payload,created_at AS createdAt FROM projection_notifications WHERE created_at > ? ORDER BY created_at ASC LIMIT 50').bind(since).all();
+      return json({ data: (result.results || []).map((row) => { try { row.payload = JSON.parse(row.payload || '{}'); } catch { row.payload = {}; } return row; }) });
     }
     if (url.pathname === '/v1/admin-read') {
       const identity = await requireAdmin(request, env);
