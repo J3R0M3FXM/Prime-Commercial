@@ -35,6 +35,24 @@ public class SecureAdminAuthPlugin extends Plugin {
     private static final String CIPHERTEXT = "ciphertext";
     private static final String IV = "iv";
 
+    /** Used only by the user-enabled native foreground service while the UI is closed. */
+    public static String readStoredSession(Context context) throws Exception {
+        android.content.SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String ciphertext = prefs.getString(CIPHERTEXT, "");
+        String iv = prefs.getString(IV, "");
+        if (ciphertext.isEmpty() || iv.isEmpty()) return "";
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, getKeyForContext(context), new GCMParameterSpec(128, android.util.Base64.decode(iv, android.util.Base64.NO_WRAP)));
+        return new String(cipher.doFinal(android.util.Base64.decode(ciphertext, android.util.Base64.NO_WRAP)), StandardCharsets.UTF_8);
+    }
+
+    private static SecretKey getKeyForContext(Context context) throws Exception {
+        KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+        store.load(null);
+        if (store.containsAlias(KEY_ALIAS)) return ((KeyStore.SecretKeyEntry) store.getEntry(KEY_ALIAS, null)).getSecretKey();
+        throw new IllegalStateException("Admin session key is unavailable");
+    }
+
     @PluginMethod
     public void store(PluginCall call) {
         String value = call.getString("value", "");
