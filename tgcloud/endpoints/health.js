@@ -20,6 +20,16 @@ async function synchronize(input, ctx) {
 }
 
 export default async function (input = {}, ctx) {
+  if (input?.action === 'registerPushToken') {
+    await requireAdmin(ctx);
+    const token = text(input.token);
+    if (token.length < 32 || token.length > 4096) throw new EndpointError('Invalid push registration token.', { code: 'INVALID_INPUT' });
+    const current = await db.select({ value: systemSettings.value }).from(systemSettings).where(eq(systemSettings.key, 'admin_push_tokens')).get();
+    let tokens = Array.isArray(current?.value) ? current.value : [];
+    tokens = Array.from(new Set([...tokens, token])).slice(-20);
+    await db.insert(systemSettings).values({ key: 'admin_push_tokens', value: tokens, updatedAt: new Date() }).onConflictDoUpdate({ target: systemSettings.key, set: { value: tokens, updatedAt: new Date() } }).run();
+    return { registered: true };
+  }
   if (input?.action === 'sync') return synchronize(input, ctx);
   if (input?.action === 'configure') {
     await requireAdmin(ctx); const secret = text(input.secret); const url = text(input.gatewayUrl);

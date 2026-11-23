@@ -24,6 +24,7 @@ import SupportTickets from '@/app/components/support-tickets';
 import { callServerless, getTelegramServerlessSession } from "@/lib/telegram-serverless-client";
 import { clearNativeAdminSession, readNativeAdminSession, resumeNativeAdminLogin, startNativeAdminLogin } from "@/lib/secure-admin-auth";
 import { Capacitor } from "@capacitor/core";
+import { initializeAdminPushNotifications } from "@/lib/admin-push-notifications";
 
 type ModuleId = "assets" | "orders" | "pos" | "customers" | "visitors" | "inventory" | "products" | "warehouse" | "couriers" | "payments" | "charges" | "promos" | "media" | "broadcast" | "system" | "support";
 type Screen = { module: ModuleId; orderId?: string } | null;
@@ -45,6 +46,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     document.documentElement.dataset.nativeAdmin = "true";
+    void initializeAdminPushNotifications();
     return () => { delete document.documentElement.dataset.nativeAdmin; };
   }, []);
   useEffect(() => { let cancelled = false; void (async () => { setChecking(true); setConnectionFailed(false); setBootProgress(45); try { if (Capacitor.isNativePlatform()) { await resumeNativeAdminLogin("https://auth.codespacelabs.online"); let nativeSession = await readNativeAdminSession(); const verifyNativeSession = async (session: string) => { const response = await fetch("https://auth.codespacelabs.online/session", { headers: { Authorization: `Bearer ${session}` }, cache: "no-store" }); const body = await response.json().catch(() => ({})); return body?.authenticated === true && body.identity?.role === "admin"; }; if (!nativeSession || !(await verifyNativeSession(nativeSession))) { await clearNativeAdminSession(); await startNativeAdminLogin("https://auth.codespacelabs.online"); nativeSession = await readNativeAdminSession(); } if (nativeSession && await verifyNativeSession(nativeSession)) { if (!cancelled) { setBootProgress(78); setAuthorized(true); } return; } } const session = await getTelegramServerlessSession(); if (cancelled) return; if (session?.authenticated && session.isAdmin) { setBootProgress(78); setAuthorized(true); void callServerless("setShopMenuButton").catch(() => undefined); } } catch (error) { if (!cancelled) setConnectionFailed(isSessionConnectionError(error)); } finally { if (!cancelled) { setBootProgress(100); await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); if (!cancelled) setChecking(false); } } })(); return () => { cancelled = true; }; }, [authAttempt]);
